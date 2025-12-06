@@ -55,6 +55,13 @@ const Header = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border-border">
                 <DropdownMenuItem 
+                  onClick={() => navigate('/dashboard')}
+                  className="cursor-pointer"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Meu Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem 
                   onClick={handleSignOut}
                   className="text-destructive focus:text-destructive cursor-pointer"
                 >
