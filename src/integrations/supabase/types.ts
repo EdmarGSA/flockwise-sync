@@ -14,6 +14,148 @@ export type Database = {
   }
   public: {
     Tables: {
+      galpoes: {
+        Row: {
+          altura: number
+          ativo: boolean
+          bebedouro_quantidade: number
+          bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
+          caixa_agua_quantidade: number
+          caixa_agua_volume_total: number | null
+          comedouro_quantidade: number
+          comedouro_tipo: Database["public"]["Enums"]["tipo_comedouro"]
+          comprimento: number
+          created_at: string
+          id: string
+          largura: number
+          nome: string
+          nucleo_id: string
+          silo_quantidade: number
+          silo_volume_total: number | null
+          tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
+          updated_at: string
+          ventilador_quantidade: number
+        }
+        Insert: {
+          altura: number
+          ativo?: boolean
+          bebedouro_quantidade?: number
+          bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
+          caixa_agua_quantidade?: number
+          caixa_agua_volume_total?: number | null
+          comedouro_quantidade?: number
+          comedouro_tipo: Database["public"]["Enums"]["tipo_comedouro"]
+          comprimento: number
+          created_at?: string
+          id?: string
+          largura: number
+          nome: string
+          nucleo_id: string
+          silo_quantidade?: number
+          silo_volume_total?: number | null
+          tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
+          updated_at?: string
+          ventilador_quantidade?: number
+        }
+        Update: {
+          altura?: number
+          ativo?: boolean
+          bebedouro_quantidade?: number
+          bebedouro_tipo?: Database["public"]["Enums"]["tipo_bebedouro"]
+          caixa_agua_quantidade?: number
+          caixa_agua_volume_total?: number | null
+          comedouro_quantidade?: number
+          comedouro_tipo?: Database["public"]["Enums"]["tipo_comedouro"]
+          comprimento?: number
+          created_at?: string
+          id?: string
+          largura?: number
+          nome?: string
+          nucleo_id?: string
+          silo_quantidade?: number
+          silo_volume_total?: number | null
+          tipo_pressao?: Database["public"]["Enums"]["tipo_pressao"]
+          updated_at?: string
+          ventilador_quantidade?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "galpoes_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nucleos: {
+        Row: {
+          ativo: boolean
+          bairro: string
+          cep: string
+          cidade: string
+          codigo_ibge: string | null
+          complemento: string | null
+          created_at: string
+          estado: string
+          id: string
+          integrado_id: string
+          latitude: number | null
+          logradouro: string
+          longitude: number | null
+          nome: string
+          numero: string | null
+          tipo_producao: Database["public"]["Enums"]["tipo_producao"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro: string
+          cep: string
+          cidade: string
+          codigo_ibge?: string | null
+          complemento?: string | null
+          created_at?: string
+          estado: string
+          id?: string
+          integrado_id: string
+          latitude?: number | null
+          logradouro: string
+          longitude?: number | null
+          nome: string
+          numero?: string | null
+          tipo_producao: Database["public"]["Enums"]["tipo_producao"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string
+          cep?: string
+          cidade?: string
+          codigo_ibge?: string | null
+          complemento?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          integrado_id?: string
+          latitude?: number | null
+          logradouro?: string
+          longitude?: number | null
+          nome?: string
+          numero?: string | null
+          tipo_producao?: Database["public"]["Enums"]["tipo_producao"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nucleos_integrado_id_fkey"
+            columns: ["integrado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -52,7 +194,10 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      tipo_bebedouro: "niple" | "tacas"
+      tipo_comedouro: "manual" | "automatico"
+      tipo_pressao: "positiva" | "negativa" | "darkhouse"
+      tipo_producao: "corte" | "postura"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -179,6 +324,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      tipo_bebedouro: ["niple", "tacas"],
+      tipo_comedouro: ["manual", "automatico"],
+      tipo_pressao: ["positiva", "negativa", "darkhouse"],
+      tipo_producao: ["corte", "postura"],
+    },
   },
 } as const

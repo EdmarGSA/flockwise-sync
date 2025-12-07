@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Bird, LogOut, User } from "lucide-react";
+import { Bird, Building2, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -60,6 +60,13 @@ const Header = () => {
                 >
                   <User className="w-4 h-4 mr-2" />
                   Meu Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate('/gestao-lotes')}
+                  className="cursor-pointer"
+                >
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Gestão de Lotes
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={handleSignOut}
