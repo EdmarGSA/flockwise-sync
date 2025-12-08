@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      areas: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       galpoes: {
         Row: {
           altura: number
@@ -88,8 +121,75 @@ export type Database = {
           },
         ]
       }
+      lotes: {
+        Row: {
+          created_at: string
+          data_alojamento: string | null
+          data_fechamento: string | null
+          data_prevista_alojamento: string
+          galpao_id: string
+          id: string
+          integrado_id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          nucleo_id: string
+          observacoes: string | null
+          quantidade_aves: number
+          status: Database["public"]["Enums"]["lote_status"]
+          updated_at: string
+          veterinario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_alojamento?: string | null
+          data_fechamento?: string | null
+          data_prevista_alojamento: string
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          nucleo_id: string
+          observacoes?: string | null
+          quantidade_aves: number
+          status?: Database["public"]["Enums"]["lote_status"]
+          updated_at?: string
+          veterinario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_alojamento?: string | null
+          data_fechamento?: string | null
+          data_prevista_alojamento?: string
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
+          nucleo_id?: string
+          observacoes?: string | null
+          quantidade_aves?: number
+          status?: Database["public"]["Enums"]["lote_status"]
+          updated_at?: string
+          veterinario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lotes_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nucleos: {
         Row: {
+          area_id: string | null
           ativo: boolean
           bairro: string
           cep: string
@@ -109,6 +209,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          area_id?: string | null
           ativo?: boolean
           bairro: string
           cep: string
@@ -128,6 +229,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          area_id?: string | null
           ativo?: boolean
           bairro?: string
           cep?: string
@@ -147,6 +249,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "nucleos_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "nucleos_integrado_id_fkey"
             columns: ["integrado_id"]
@@ -186,14 +295,52 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
+      get_veterinarios: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "integrado" | "veterinario" | "tecnico"
+      linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
+      lote_status: "previsao" | "alojado" | "fechado"
       tipo_bebedouro: "niple" | "tacas"
       tipo_comedouro: "manual" | "automatico"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
@@ -325,6 +472,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "integrado", "veterinario", "tecnico"],
+      linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
+      lote_status: ["previsao", "alojado", "fechado"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_comedouro: ["manual", "automatico"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
