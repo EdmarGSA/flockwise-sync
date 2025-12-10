@@ -47,6 +47,51 @@ export type Database = {
         }
         Relationships: []
       }
+      desempenho_aves: {
+        Row: {
+          consumo_acumulado_racao_g: number
+          consumo_diario_racao_g: number
+          conversao_alimentar_acumulada: number
+          created_at: string
+          dia: number
+          ganho_diario_g: number
+          ganho_medio_diario_g: number
+          id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          peso_g: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
+          updated_at: string
+        }
+        Insert: {
+          consumo_acumulado_racao_g: number
+          consumo_diario_racao_g: number
+          conversao_alimentar_acumulada: number
+          created_at?: string
+          dia: number
+          ganho_diario_g: number
+          ganho_medio_diario_g: number
+          id?: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          peso_g: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
+          updated_at?: string
+        }
+        Update: {
+          consumo_acumulado_racao_g?: number
+          consumo_diario_racao_g?: number
+          conversao_alimentar_acumulada?: number
+          created_at?: string
+          dia?: number
+          ganho_diario_g?: number
+          ganho_medio_diario_g?: number
+          id?: string
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
+          peso_g?: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       galpoes: {
         Row: {
           altura: number
@@ -341,6 +386,7 @@ export type Database = {
       app_role: "admin" | "integrado" | "veterinario" | "tecnico"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "alojado" | "fechado"
+      sexo_ave: "macho" | "femea" | "misto"
       tipo_bebedouro: "niple" | "tacas"
       tipo_comedouro: "manual" | "automatico"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
@@ -475,6 +521,7 @@ export const Constants = {
       app_role: ["admin", "integrado", "veterinario", "tecnico"],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "alojado", "fechado"],
+      sexo_ave: ["macho", "femea", "misto"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_comedouro: ["manual", "automatico"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
