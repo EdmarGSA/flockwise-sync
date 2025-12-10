@@ -8,13 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, Users } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3 } from 'lucide-react';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
 import { AreaForm } from '@/components/campo/AreaForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
+import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
+import { DesempenhoTable } from '@/components/campo/DesempenhoTable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Database } from '@/integrations/supabase/types';
+
+type DesempenhoAve = Database['public']['Tables']['desempenho_aves']['Row'];
 
 interface Nucleo {
   id: string;
@@ -66,6 +71,7 @@ export default function GestaoCampo() {
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
+  const [desempenhoData, setDesempenhoData] = useState<DesempenhoAve[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState('lotes');
   const [showForm, setShowForm] = useState(false);
@@ -80,20 +86,22 @@ export default function GestaoCampo() {
   const fetchData = async () => {
     setLoadingData(true);
     
-    const [nucleosRes, galpoesRes, areasRes, lotesRes] = await Promise.all([
+    const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes] = await Promise.all([
       supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude'),
       supabase.from('galpoes').select('id, nome, comprimento, largura, altura, tipo_pressao, ativo, nucleo:nucleos(nome)'),
       supabase.from('areas').select('id, nome, descricao, cor, ativo'),
       supabase.from('lotes').select(`
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
         linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
-      `).order('created_at', { ascending: false })
+      `).order('created_at', { ascending: false }),
+      supabase.from('desempenho_aves').select('*').order('dia', { ascending: true })
     ]);
 
     if (nucleosRes.data) setNucleos(nucleosRes.data);
     if (galpoesRes.data) setGalpoes(galpoesRes.data as Galpao[]);
     if (areasRes.data) setAreas(areasRes.data);
     if (lotesRes.data) setLotes(lotesRes.data as Lote[]);
+    if (desempenhoRes.data) setDesempenhoData(desempenhoRes.data);
     
     setLoadingData(false);
   };
@@ -183,7 +191,7 @@ export default function GestaoCampo() {
       <main className="container mx-auto px-4 py-8 pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+            <TabsList className="grid grid-cols-5 w-full max-w-3xl">
               <TabsTrigger value="lotes" className="flex items-center gap-2">
                 <Bird className="h-4 w-4" />
                 Lotes
@@ -200,14 +208,13 @@ export default function GestaoCampo() {
                 <MapPin className="h-4 w-4" />
                 Áreas
               </TabsTrigger>
+              <TabsTrigger value="desempenho" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Desempenho
+              </TabsTrigger>
             </TabsList>
 
-            {activeTab !== 'lotes' ? (
-              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
-              </Button>
-            ) : (
+            {activeTab === 'lotes' ? (
               <Dialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
@@ -222,6 +229,16 @@ export default function GestaoCampo() {
                   <LoteForm onSuccess={handleLoteSuccess} />
                 </DialogContent>
               </Dialog>
+            ) : activeTab !== 'desempenho' ? (
+              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
+              </Button>
+            ) : (
+              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {showForm ? 'Fechar Formulário' : 'Novo Registro'}
+              </Button>
             )}
           </div>
 
@@ -482,6 +499,13 @@ export default function GestaoCampo() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="desempenho" className="space-y-6">
+            <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
+              {showForm && <DesempenhoForm onSuccess={handleFormSuccess} />}
+              <DesempenhoTable data={desempenhoData} loading={loadingData} />
             </div>
           </TabsContent>
         </Tabs>
