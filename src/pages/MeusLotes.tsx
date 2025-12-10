@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Plus, Calendar, Users } from 'lucide-react';
-import { LoteForm } from '@/components/lotes/LoteForm';
+import { Bird, ArrowLeft, Calendar, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -30,7 +28,6 @@ export default function MeusLotes() {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -102,10 +99,6 @@ export default function MeusLotes() {
     return format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
   };
 
-  const handleFormSuccess = () => {
-    fetchLotes();
-    setDialogOpen(false);
-  };
 
   const lotesAtivos = lotes.filter(l => l.status === 'alojado').length;
   const lotesPendentes = lotes.filter(l => l.status === 'previsao').length;
@@ -129,20 +122,9 @@ export default function MeusLotes() {
             </div>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Abrir Lote
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Abertura de Lote</DialogTitle>
-              </DialogHeader>
-              <LoteForm onSuccess={handleFormSuccess} />
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => navigate('/gestao-campo')} variant="outline" className="gap-2">
+            Gestão de Campo
+          </Button>
         </div>
       </header>
 
@@ -195,9 +177,8 @@ export default function MeusLotes() {
               <div className="text-center py-12">
                 <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
-                <Button onClick={() => setDialogOpen(true)} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Abrir Primeiro Lote
+                <Button onClick={() => navigate('/gestao-campo')} className="gap-2">
+                  Ir para Gestão de Campo
                 </Button>
               </div>
             ) : (
