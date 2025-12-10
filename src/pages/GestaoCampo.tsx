@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, Users } from 'lucide-react';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
 import { AreaForm } from '@/components/campo/AreaForm';
-import { Bird } from 'lucide-react';
+import { LoteForm } from '@/components/lotes/LoteForm';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Nucleo {
   id: string;
@@ -43,15 +46,30 @@ interface Area {
   ativo: boolean;
 }
 
+interface Lote {
+  id: string;
+  quantidade_aves: number;
+  data_prevista_alojamento: string;
+  data_alojamento: string | null;
+  data_fechamento: string | null;
+  linhagem: string;
+  status: string;
+  veterinario_id: string | null;
+  nucleo: { nome: string } | null;
+  galpao: { nome: string } | null;
+}
+
 export default function GestaoCampo() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [activeTab, setActiveTab] = useState('nucleos');
+  const [activeTab, setActiveTab] = useState('lotes');
   const [showForm, setShowForm] = useState(false);
+  const [loteDialogOpen, setLoteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -62,15 +80,20 @@ export default function GestaoCampo() {
   const fetchData = async () => {
     setLoadingData(true);
     
-    const [nucleosRes, galpoesRes, areasRes] = await Promise.all([
+    const [nucleosRes, galpoesRes, areasRes, lotesRes] = await Promise.all([
       supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude'),
       supabase.from('galpoes').select('id, nome, comprimento, largura, altura, tipo_pressao, ativo, nucleo:nucleos(nome)'),
-      supabase.from('areas').select('id, nome, descricao, cor, ativo')
+      supabase.from('areas').select('id, nome, descricao, cor, ativo'),
+      supabase.from('lotes').select(`
+        id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
+        linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
+      `).order('created_at', { ascending: false })
     ]);
 
     if (nucleosRes.data) setNucleos(nucleosRes.data);
     if (galpoesRes.data) setGalpoes(galpoesRes.data as Galpao[]);
     if (areasRes.data) setAreas(areasRes.data);
+    if (lotesRes.data) setLotes(lotesRes.data as Lote[]);
     
     setLoadingData(false);
   };
@@ -105,6 +128,38 @@ export default function GestaoCampo() {
     setShowForm(false);
   };
 
+  const handleLoteSuccess = () => {
+    fetchData();
+    setLoteDialogOpen(false);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+      previsao: { label: 'Previsão', variant: 'outline' },
+      alojado: { label: 'Alojado', variant: 'default' },
+      fechado: { label: 'Fechado', variant: 'secondary' },
+    };
+    const config = variants[status] || { label: status, variant: 'outline' };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getLinhagemLabel = (linhagem: string) => {
+    const labels: Record<string, string> = {
+      cobb_500: 'Cobb 500',
+      ross_308: 'Ross 308',
+      hubbard: 'Hubbard',
+    };
+    return labels[linhagem] || linhagem;
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
+  };
+
+  const lotesAtivos = lotes.filter(l => l.status === 'alojado').length;
+  const lotesPendentes = lotes.filter(l => l.status === 'previsao').length;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -128,7 +183,11 @@ export default function GestaoCampo() {
       <main className="container mx-auto px-4 py-8 pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <TabsList className="grid grid-cols-3 w-full max-w-lg">
+            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+              <TabsTrigger value="lotes" className="flex items-center gap-2">
+                <Bird className="h-4 w-4" />
+                Lotes
+              </TabsTrigger>
               <TabsTrigger value="nucleos" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Núcleos
@@ -143,11 +202,116 @@ export default function GestaoCampo() {
               </TabsTrigger>
             </TabsList>
 
-            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
-            </Button>
+            {activeTab !== 'lotes' ? (
+              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
+              </Button>
+            ) : (
+              <Dialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Abrir Lote
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Abertura de Lote</DialogTitle>
+                  </DialogHeader>
+                  <LoteForm onSuccess={handleLoteSuccess} />
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
+
+          <TabsContent value="lotes" className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Lotes Alojados</p>
+                      <p className="text-2xl font-bold text-primary">{lotesAtivos}</p>
+                    </div>
+                    <Bird className="w-8 h-8 text-primary/50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Previstos</p>
+                      <p className="text-2xl font-bold text-amber-500">{lotesPendentes}</p>
+                    </div>
+                    <Calendar className="w-8 h-8 text-amber-500/50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Núcleos</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{nucleos.length}</p>
+                    </div>
+                    <Building2 className="w-8 h-8 text-muted-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Todos os Lotes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingData ? (
+                  <p className="text-muted-foreground">Carregando...</p>
+                ) : lotes.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
+                    <Button onClick={() => setLoteDialogOpen(true)} className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Abrir Primeiro Lote
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Núcleo</TableHead>
+                          <TableHead>Galpão</TableHead>
+                          <TableHead>Qtd. Aves</TableHead>
+                          <TableHead>Linhagem</TableHead>
+                          <TableHead>Previsão</TableHead>
+                          <TableHead>Alojamento</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lotes.map((lote) => (
+                          <TableRow key={lote.id}>
+                            <TableCell>{getStatusBadge(lote.status)}</TableCell>
+                            <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
+                            <TableCell>{lote.galpao?.nome || '-'}</TableCell>
+                            <TableCell>{lote.quantidade_aves.toLocaleString('pt-BR')}</TableCell>
+                            <TableCell>{getLinhagemLabel(lote.linhagem)}</TableCell>
+                            <TableCell>{formatDate(lote.data_prevista_alojamento)}</TableCell>
+                            <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="nucleos" className="space-y-6">
             <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
