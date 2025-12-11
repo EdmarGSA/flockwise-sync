@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck } from 'lucide-react';
-import { format } from 'date-fns';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
+import { PesagemDialog } from '@/components/lotes/PesagemDialog';
 
 interface Lote {
   id: string;
@@ -26,13 +28,20 @@ interface Lote {
   galpao: { nome: string } | null;
 }
 
+interface LoteComPesagem extends Lote {
+  ultimaPesagem?: string | null;
+  diasDesdeAlojamento?: number;
+  precisaPesar?: boolean;
+}
+
 export default function MeusLotes() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [lotes, setLotes] = useState<Lote[]>([]);
+  const [lotes, setLotes] = useState<LoteComPesagem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [recebimentoOpen, setRecebimentoOpen] = useState(false);
-  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+  const [pesagemOpen, setPesagemOpen] = useState(false);
+  const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -62,10 +71,53 @@ export default function MeusLotes() {
 
     if (error) {
       console.error('Erro ao buscar lotes:', error);
-    } else {
-      setLotes(data as Lote[]);
+      setLoadingData(false);
+      return;
     }
+
+    // Fetch last pesagem for each lote
+    const lotesComPesagem: LoteComPesagem[] = await Promise.all(
+      (data || []).map(async (lote) => {
+        const loteData = lote as Lote;
+        
+        // Get last pesagem date
+        const { data: pesagemData } = await supabase
+          .from('pesagens')
+          .select('data_pesagem')
+          .eq('lote_id', loteData.id)
+          .order('data_pesagem', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const ultimaPesagem = pesagemData?.data_pesagem || null;
+        
+        // Calculate days since alojamento
+        let diasDesdeAlojamento = 0;
+        if (loteData.data_alojamento) {
+          diasDesdeAlojamento = differenceInDays(new Date(), new Date(loteData.data_alojamento));
+        }
+
+        // Check if needs weighing (every 7 days)
+        let precisaPesar = false;
+        if (loteData.status === 'alojado' && diasDesdeAlojamento >= 7) {
+          if (!ultimaPesagem) {
+            precisaPesar = true;
+          } else {
+            const diasDesdeUltimaPesagem = differenceInDays(new Date(), new Date(ultimaPesagem));
+            precisaPesar = diasDesdeUltimaPesagem >= 7;
+          }
+        }
+
+        return {
+          ...loteData,
+          ultimaPesagem,
+          diasDesdeAlojamento,
+          precisaPesar,
+        };
+      })
+    );
     
+    setLotes(lotesComPesagem);
     setLoadingData(false);
   };
 
@@ -92,7 +144,7 @@ export default function MeusLotes() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleAlojar = async (lote: Lote) => {
+  const handleAlojar = async (lote: LoteComPesagem) => {
     try {
       const { error } = await supabase
         .from('lotes')
@@ -109,9 +161,14 @@ export default function MeusLotes() {
     }
   };
 
-  const handleAdm = (lote: Lote) => {
+  const handleAdm = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setRecebimentoOpen(true);
+  };
+
+  const handlePesagem = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setPesagemOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -132,6 +189,7 @@ export default function MeusLotes() {
   const lotesPendentes = lotes.filter(l => l.status === 'previsao').length;
   const lotesEmTransito = lotes.filter(l => l.status === 'saiu_para_entrega').length;
   const lotesFechados = lotes.filter(l => l.status === 'fechado').length;
+  const lotesPrecisandoPesar = lotes.filter(l => l.precisaPesar).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,6 +216,17 @@ export default function MeusLotes() {
       </header>
 
       <main className="container mx-auto px-4 py-8 pt-24">
+        {/* Weighing Alert */}
+        {lotesPrecisandoPesar > 0 && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="flex items-center gap-2">
+              <Scale className="w-4 h-4" />
+              <strong>{lotesPrecisandoPesar} lote(s)</strong> precisam de pesagem (intervalo de 7 dias).
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <Card className="bg-card border-border">
@@ -233,12 +302,13 @@ export default function MeusLotes() {
                       <TableHead>Linhagem</TableHead>
                       <TableHead>Previsão</TableHead>
                       <TableHead>Alojamento</TableHead>
+                      <TableHead>Dias</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {lotes.map((lote) => (
-                      <TableRow key={lote.id}>
+                      <TableRow key={lote.id} className={lote.precisaPesar ? 'bg-destructive/10' : ''}>
                         <TableCell>{getStatusBadge(lote.status)}</TableCell>
                         <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
                         <TableCell>{lote.galpao?.nome || '-'}</TableCell>
@@ -247,28 +317,48 @@ export default function MeusLotes() {
                         <TableCell>{formatDate(lote.data_prevista_alojamento)}</TableCell>
                         <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
                         <TableCell>
-                          {lote.status === 'previsao' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleAlojar(lote)}
-                              className="gap-1"
-                            >
-                              <Truck className="w-4 h-4" />
-                              Alojar
-                            </Button>
-                          )}
-                          {lote.status === 'saiu_para_entrega' && (
-                            <Button 
-                              size="sm" 
-                              variant="default"
-                              onClick={() => handleAdm(lote)}
-                              className="gap-1"
-                            >
-                              <ClipboardCheck className="w-4 h-4" />
-                              Adm.
-                            </Button>
-                          )}
+                          {lote.status === 'alojado' && lote.diasDesdeAlojamento !== undefined ? (
+                            <Badge variant={lote.precisaPesar ? 'destructive' : 'secondary'}>
+                              {lote.diasDesdeAlojamento} dias
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {lote.status === 'previsao' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleAlojar(lote)}
+                                className="gap-1"
+                              >
+                                <Truck className="w-4 h-4" />
+                                Alojar
+                              </Button>
+                            )}
+                            {lote.status === 'saiu_para_entrega' && (
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                onClick={() => handleAdm(lote)}
+                                className="gap-1"
+                              >
+                                <ClipboardCheck className="w-4 h-4" />
+                                Adm.
+                              </Button>
+                            )}
+                            {lote.status === 'alojado' && (
+                              <Button 
+                                size="sm" 
+                                variant={lote.precisaPesar ? 'destructive' : 'outline'}
+                                onClick={() => handlePesagem(lote)}
+                                className="gap-1"
+                              >
+                                <Scale className="w-4 h-4" />
+                                Pesar
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -281,14 +371,23 @@ export default function MeusLotes() {
       </main>
 
       {selectedLote && (
-        <RecebimentoLoteDialog
-          open={recebimentoOpen}
-          onOpenChange={setRecebimentoOpen}
-          loteId={selectedLote.id}
-          integradoId={selectedLote.integrado_id}
-          quantidadeAves={selectedLote.quantidade_aves}
-          onSuccess={fetchLotes}
-        />
+        <>
+          <RecebimentoLoteDialog
+            open={recebimentoOpen}
+            onOpenChange={setRecebimentoOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            quantidadeAves={selectedLote.quantidade_aves}
+            onSuccess={fetchLotes}
+          />
+          <PesagemDialog
+            open={pesagemOpen}
+            onOpenChange={setPesagemOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            onSuccess={fetchLotes}
+          />
+        </>
       )}
     </div>
   );

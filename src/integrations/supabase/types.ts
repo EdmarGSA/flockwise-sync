@@ -456,6 +456,79 @@ export type Database = {
         }
         Relationships: []
       }
+      pesagem_itens: {
+        Row: {
+          created_at: string
+          id: string
+          pesagem_id: string
+          peso_bruto_g: number
+          peso_liquido_g: number | null
+          peso_tara_g: number
+          quantidade_aves: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pesagem_id: string
+          peso_bruto_g: number
+          peso_liquido_g?: number | null
+          peso_tara_g?: number
+          quantidade_aves: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pesagem_id?: string
+          peso_bruto_g?: number
+          peso_liquido_g?: number | null
+          peso_tara_g?: number
+          quantidade_aves?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pesagem_itens_pesagem_id_fkey"
+            columns: ["pesagem_id"]
+            isOneToOne: false
+            referencedRelation: "pesagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pesagens: {
+        Row: {
+          created_at: string
+          data_pesagem: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_pesagem?: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_pesagem?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pesagens_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
