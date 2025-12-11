@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -17,8 +19,8 @@ const recebimentoSchema = z.object({
   quantidade_caixas_conferidas: z.string().min(1, 'Obrigatório'),
   quantidade_pintinhos_caixa: z.string().min(1, 'Obrigatório'),
   aspecto_pintinhos: z.enum(['bom', 'ruim', 'regular']),
-  quantidade_eliminados: z.string().min(1, 'Obrigatório'),
-  motivo_eliminacao: z.string().optional(),
+  quantidade_eliminados_locomotor: z.string().min(1, 'Obrigatório'),
+  quantidade_eliminados_classificacao: z.string().min(1, 'Obrigatório'),
   observacoes: z.string().optional(),
 });
 
@@ -48,17 +50,24 @@ export function RecebimentoLoteDialog({
     defaultValues: {
       quantidade_mortos: '0',
       quantidade_caixas_conferidas: '0',
-      quantidade_pintinhos_caixa: '0',
+      quantidade_pintinhos_caixa: '100',
       aspecto_pintinhos: 'bom',
-      quantidade_eliminados: '0',
-      motivo_eliminacao: 'none',
+      quantidade_eliminados_locomotor: '0',
+      quantidade_eliminados_classificacao: '0',
       observacoes: '',
     },
   });
 
+  const pintinhosCaixa = parseInt(form.watch('quantidade_pintinhos_caixa') || '0');
+  const showDivergenciaAlert = pintinhosCaixa !== 100 && pintinhosCaixa > 0;
+
   const onSubmit = async (data: RecebimentoFormData) => {
     setLoading(true);
     try {
+      const eliminadosLocomotor = parseInt(data.quantidade_eliminados_locomotor);
+      const eliminadosClassificacao = parseInt(data.quantidade_eliminados_classificacao);
+      const totalEliminados = eliminadosLocomotor + eliminadosClassificacao;
+
       // Insert reception record
       const { error: recebimentoError } = await supabase
         .from('recebimento_lotes')
@@ -69,8 +78,10 @@ export function RecebimentoLoteDialog({
           quantidade_caixas_conferidas: parseInt(data.quantidade_caixas_conferidas),
           quantidade_pintinhos_caixa: parseInt(data.quantidade_pintinhos_caixa),
           aspecto_pintinhos: data.aspecto_pintinhos,
-          quantidade_eliminados: parseInt(data.quantidade_eliminados),
-          motivo_eliminacao: data.motivo_eliminacao === 'none' ? null : data.motivo_eliminacao,
+          quantidade_eliminados: totalEliminados,
+          quantidade_eliminados_locomotor: eliminadosLocomotor,
+          quantidade_eliminados_classificacao: eliminadosClassificacao,
+          motivo_eliminacao: null,
           observacoes: data.observacoes || null,
         });
 
@@ -111,8 +122,10 @@ export function RecebimentoLoteDialog({
             {/* Cálculo de quantidade alojada */}
             {(() => {
               const mortos = parseInt(form.watch('quantidade_mortos') || '0');
-              const eliminados = parseInt(form.watch('quantidade_eliminados') || '0');
-              const quantidadeAlojada = quantidadeAves - mortos - eliminados;
+              const eliminadosLocomotor = parseInt(form.watch('quantidade_eliminados_locomotor') || '0');
+              const eliminadosClassificacao = parseInt(form.watch('quantidade_eliminados_classificacao') || '0');
+              const totalEliminados = eliminadosLocomotor + eliminadosClassificacao;
+              const quantidadeAlojada = quantidadeAves - mortos - totalEliminados;
               return (
                 <div className="p-4 bg-muted rounded-lg border">
                   <div className="grid grid-cols-4 gap-2 text-center">
@@ -126,7 +139,7 @@ export function RecebimentoLoteDialog({
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Eliminados</p>
-                      <p className="text-lg font-semibold text-orange-500">-{eliminados}</p>
+                      <p className="text-lg font-semibold text-orange-500">-{totalEliminados}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Qtd. Alojada</p>
@@ -182,6 +195,16 @@ export function RecebimentoLoteDialog({
                   )}
                 />
               </div>
+
+              {showDivergenciaAlert && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Divergência detectada!</strong> A quantidade padrão é de 100 pintinhos por caixa. 
+                    Valor informado: <strong>{pintinhosCaixa}</strong> pintinhos/caixa.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <FormField
@@ -207,43 +230,37 @@ export function RecebimentoLoteDialog({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="quantidade_eliminados"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Qtd. Eliminados</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="motivo_eliminacao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Motivo Eliminação</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Eliminados por Motivo</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantidade_eliminados_locomotor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Locomotor</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
+                        <Input type="number" min="0" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        <SelectItem value="locomotor">Locomotor</SelectItem>
-                        <SelectItem value="classificacao">Classificação</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quantidade_eliminados_classificacao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Classificação</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <FormField
