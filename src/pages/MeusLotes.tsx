@@ -40,6 +40,7 @@ interface LoteComPesagem extends Lote {
   ultimaPesagem?: string | null;
   diasDesdeAlojamento?: number;
   precisaPesar?: boolean;
+  quantidadeAlojada?: number | null;
 }
 
 export default function MeusLotes() {
@@ -85,7 +86,7 @@ export default function MeusLotes() {
       return;
     }
 
-    // Fetch last pesagem for each lote
+    // Fetch last pesagem and recebimento for each lote
     const lotesComPesagem: LoteComPesagem[] = await Promise.all(
       (data || []).map(async (lote) => {
         const loteData = lote as Lote;
@@ -99,7 +100,23 @@ export default function MeusLotes() {
           .limit(1)
           .maybeSingle();
 
+        // Get recebimento data for quantidade alojada
+        const { data: recebimentoData } = await supabase
+          .from('recebimento_lotes')
+          .select('quantidade_mortos, quantidade_eliminados_locomotor, quantidade_eliminados_classificacao')
+          .eq('lote_id', loteData.id)
+          .maybeSingle();
+
         const ultimaPesagem = pesagemData?.data_pesagem || null;
+        
+        // Calculate quantidade alojada
+        let quantidadeAlojada: number | null = null;
+        if (recebimentoData) {
+          const mortos = recebimentoData.quantidade_mortos || 0;
+          const eliminadosLocomotor = recebimentoData.quantidade_eliminados_locomotor || 0;
+          const eliminadosClassificacao = recebimentoData.quantidade_eliminados_classificacao || 0;
+          quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
+        }
         
         // Calculate days since alojamento
         let diasDesdeAlojamento = 0;
@@ -123,6 +140,7 @@ export default function MeusLotes() {
           ultimaPesagem,
           diasDesdeAlojamento,
           precisaPesar,
+          quantidadeAlojada,
         };
       })
     );
@@ -314,8 +332,12 @@ export default function MeusLotes() {
                       <TableHead>Núcleo</TableHead>
                       <TableHead>Galpão</TableHead>
                       <TableHead>Qtd. Aves</TableHead>
-                      <TableHead>Linhagem</TableHead>
-                      <TableHead>Previsão</TableHead>
+                      {lotes.some(l => l.status !== 'alojado' && l.status !== 'fechado') && (
+                        <>
+                          <TableHead>Linhagem</TableHead>
+                          <TableHead>Previsão</TableHead>
+                        </>
+                      )}
                       <TableHead>Alojamento</TableHead>
                       <TableHead>Dias</TableHead>
                       <TableHead>Ações</TableHead>
@@ -327,9 +349,30 @@ export default function MeusLotes() {
                         <TableCell>{getStatusBadge(lote.status)}</TableCell>
                         <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
                         <TableCell>{lote.galpao?.nome || '-'}</TableCell>
-                        <TableCell>{lote.quantidade_aves.toLocaleString('pt-BR')}</TableCell>
-                        <TableCell>{getLinhagemLabel(lote.linhagem)}</TableCell>
-                        <TableCell>{formatDate(lote.data_prevista_alojamento)}</TableCell>
+                        <TableCell>
+                          {lote.status === 'alojado' || lote.status === 'fechado' ? (
+                            <div className="flex flex-col">
+                              <span>{(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
+                              {lote.quantidadeAlojada !== null && lote.quantidadeAlojada !== lote.quantidade_aves && (
+                                <span className="text-xs text-muted-foreground">
+                                  de {lote.quantidade_aves.toLocaleString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            lote.quantidade_aves.toLocaleString('pt-BR')
+                          )}
+                        </TableCell>
+                        {lotes.some(l => l.status !== 'alojado' && l.status !== 'fechado') && (
+                          <>
+                            <TableCell>
+                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? getLinhagemLabel(lote.linhagem) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? formatDate(lote.data_prevista_alojamento) : '-'}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
                         <TableCell>
                           {lote.status === 'alojado' && lote.diasDesdeAlojamento !== undefined ? (
