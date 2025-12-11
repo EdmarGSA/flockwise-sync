@@ -58,8 +58,11 @@ export function RecebimentoLoteDialog({
     },
   });
 
-  const pintinhosCaixa = parseInt(form.watch('quantidade_pintinhos_caixa') || '0');
-  const showDivergenciaAlert = pintinhosCaixa !== 100 && pintinhosCaixa > 0;
+  const caixasConferidas = parseInt(form.watch('quantidade_caixas_conferidas') || '0');
+  const totalPintinhosConferidos = parseInt(form.watch('quantidade_pintinhos_caixa') || '0');
+  const totalEsperado = caixasConferidas * 100;
+  const divergencia = totalEsperado - totalPintinhosConferidos;
+  const showDivergenciaAlert = caixasConferidas > 0 && totalPintinhosConferidos > 0 && divergencia !== 0;
 
   const onSubmit = async (data: RecebimentoFormData) => {
     setLoading(true);
@@ -186,7 +189,7 @@ export function RecebimentoLoteDialog({
                   name="quantidade_pintinhos_caixa"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pintinhos por Caixa</FormLabel>
+                      <FormLabel>Total Pintinhos Conferidos</FormLabel>
                       <FormControl>
                         <Input type="number" min="0" {...field} />
                       </FormControl>
@@ -200,8 +203,11 @@ export function RecebimentoLoteDialog({
                 <Alert variant="destructive" className="mt-2">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Divergência detectada!</strong> A quantidade padrão é de 100 pintinhos por caixa. 
-                    Valor informado: <strong>{pintinhosCaixa}</strong> pintinhos/caixa.
+                    <strong>Divergência detectada!</strong> Esperado: <strong>{totalEsperado.toLocaleString()}</strong> pintinhos 
+                    ({caixasConferidas} cx × 100). Conferido: <strong>{totalPintinhosConferidos.toLocaleString()}</strong>. 
+                    Diferença: <strong className={divergencia > 0 ? 'text-red-400' : 'text-green-400'}>
+                      {divergencia > 0 ? `-${divergencia}` : `+${Math.abs(divergencia)}`}
+                    </strong> pintinhos.
                   </AlertDescription>
                 </Alert>
               )}
