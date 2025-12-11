@@ -47,6 +47,36 @@ export type Database = {
         }
         Relationships: []
       }
+      categorias: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       desempenho_aves: {
         Row: {
           consumo_acumulado_racao_g: number
@@ -168,6 +198,59 @@ export type Database = {
             columns: ["nucleo_id"]
             isOneToOne: false
             referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kardex: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          custo_unitario: number | null
+          documento_ref: string | null
+          id: string
+          integrado_id: string
+          observacao: string | null
+          produto_id: string
+          quantidade: number
+          saldo_anterior: number
+          saldo_atual: number
+          tipo_movimento: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          custo_unitario?: number | null
+          documento_ref?: string | null
+          id?: string
+          integrado_id: string
+          observacao?: string | null
+          produto_id: string
+          quantidade: number
+          saldo_anterior: number
+          saldo_atual: number
+          tipo_movimento: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          custo_unitario?: number | null
+          documento_ref?: string | null
+          id?: string
+          integrado_id?: string
+          observacao?: string | null
+          produto_id?: string
+          quantidade?: number
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo_movimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kardex_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -315,6 +398,152 @@ export type Database = {
             columns: ["integrado_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizacoes: {
+        Row: {
+          ativo: boolean
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          inscricao_estadual: string | null
+          integrado_id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          integrado_id: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          integrado_id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          ativo: boolean
+          atualizado_por: string | null
+          categoria_id: string | null
+          cest: string | null
+          codigo_barras_ean: string | null
+          created_at: string
+          criado_por: string | null
+          custo_medio: number
+          custo_unitario: number
+          descricao: string | null
+          embalagem_primaria: string | null
+          embalagem_secundaria: string | null
+          embalagem_tipo: string | null
+          estoque_atual: number
+          estoque_minimo: number
+          id: string
+          integrado_id: string
+          localizacao_estoque: string | null
+          marca: string | null
+          ncm: string | null
+          nome: string
+          origem_mercadoria: string | null
+          preco_venda: number
+          sku: string
+          unidade_medida: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_por?: string | null
+          categoria_id?: string | null
+          cest?: string | null
+          codigo_barras_ean?: string | null
+          created_at?: string
+          criado_por?: string | null
+          custo_medio?: number
+          custo_unitario?: number
+          descricao?: string | null
+          embalagem_primaria?: string | null
+          embalagem_secundaria?: string | null
+          embalagem_tipo?: string | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          id?: string
+          integrado_id: string
+          localizacao_estoque?: string | null
+          marca?: string | null
+          ncm?: string | null
+          nome: string
+          origem_mercadoria?: string | null
+          preco_venda?: number
+          sku: string
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_por?: string | null
+          categoria_id?: string | null
+          cest?: string | null
+          codigo_barras_ean?: string | null
+          created_at?: string
+          criado_por?: string | null
+          custo_medio?: number
+          custo_unitario?: number
+          descricao?: string | null
+          embalagem_primaria?: string | null
+          embalagem_secundaria?: string | null
+          embalagem_tipo?: string | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          id?: string
+          integrado_id?: string
+          localizacao_estoque?: string | null
+          marca?: string | null
+          ncm?: string | null
+          nome?: string
+          origem_mercadoria?: string | null
+          preco_venda?: number
+          sku?: string
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
             referencedColumns: ["id"]
           },
         ]

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Bird, Building2, LogOut, User } from "lucide-react";
+import { Bird, Building2, LogOut, User, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -43,6 +43,16 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-3">
+          {user && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/configuracoes')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
+          )}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
