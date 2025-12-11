@@ -24,6 +24,7 @@ interface Lote {
   status: string;
   veterinario_id: string | null;
   integrado_id: string;
+  peso_medio_pintinhos: number | null;
   nucleo: { nome: string } | null;
   galpao: { nome: string } | null;
 }
@@ -63,6 +64,7 @@ export default function MeusLotes() {
         linhagem,
         status,
         integrado_id,
+        peso_medio_pintinhos,
         nucleo:nucleos(nome),
         galpao:galpoes(nome),
         veterinario_id
@@ -385,6 +387,8 @@ export default function MeusLotes() {
             onOpenChange={setPesagemOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
             onSuccess={fetchLotes}
           />
         </>
