@@ -383,6 +383,79 @@ export type Database = {
           },
         ]
       }
+      mortalidade: {
+        Row: {
+          created_at: string
+          data_registro: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortalidade_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mortalidade_itens: {
+        Row: {
+          created_at: string
+          id: string
+          mortalidade_id: string
+          motivo: Database["public"]["Enums"]["motivo_mortalidade"]
+          peso_kg: number | null
+          quantidade: number
+          submotivo: Database["public"]["Enums"]["submotivo_eliminacao"] | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mortalidade_id: string
+          motivo: Database["public"]["Enums"]["motivo_mortalidade"]
+          peso_kg?: number | null
+          quantidade?: number
+          submotivo?: Database["public"]["Enums"]["submotivo_eliminacao"] | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mortalidade_id?: string
+          motivo?: Database["public"]["Enums"]["motivo_mortalidade"]
+          peso_kg?: number | null
+          quantidade?: number
+          submotivo?: Database["public"]["Enums"]["submotivo_eliminacao"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortalidade_itens_mortalidade_id_fkey"
+            columns: ["mortalidade_id"]
+            isOneToOne: false
+            referencedRelation: "mortalidade"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nucleos: {
         Row: {
           area_id: string | null
@@ -815,7 +888,9 @@ export type Database = {
       app_role: "admin" | "integrado" | "veterinario" | "tecnico"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
+      motivo_mortalidade: "natural" | "eliminado"
       sexo_ave: "macho" | "femea" | "misto"
+      submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
       tipo_bebedouro: "niple" | "tacas"
       tipo_comedouro: "manual" | "automatico"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
@@ -950,7 +1025,9 @@ export const Constants = {
       app_role: ["admin", "integrado", "veterinario", "tecnico"],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
+      motivo_mortalidade: ["natural", "eliminado"],
       sexo_ave: ["macho", "femea", "misto"],
+      submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_comedouro: ["manual", "automatico"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
