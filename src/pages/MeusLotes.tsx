@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
 import { PesagemDialog } from '@/components/lotes/PesagemDialog';
+import { MortalidadeDialog } from '@/components/lotes/MortalidadeDialog';
 
 interface Lote {
   id: string;
@@ -42,6 +43,7 @@ export default function MeusLotes() {
   const [loadingData, setLoadingData] = useState(true);
   const [recebimentoOpen, setRecebimentoOpen] = useState(false);
   const [pesagemOpen, setPesagemOpen] = useState(false);
+  const [mortalidadeOpen, setMortalidadeOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -171,6 +173,11 @@ export default function MeusLotes() {
   const handlePesagem = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setPesagemOpen(true);
+  };
+
+  const handleMortalidade = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setMortalidadeOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -350,15 +357,26 @@ export default function MeusLotes() {
                               </Button>
                             )}
                             {lote.status === 'alojado' && (
-                              <Button 
-                                size="sm" 
-                                variant={lote.precisaPesar ? 'destructive' : 'outline'}
-                                onClick={() => handlePesagem(lote)}
-                                className="gap-1"
-                              >
-                                <Scale className="w-4 h-4" />
-                                Pesar
-                              </Button>
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant={lote.precisaPesar ? 'destructive' : 'outline'}
+                                  onClick={() => handlePesagem(lote)}
+                                  className="gap-1"
+                                >
+                                  <Scale className="w-4 h-4" />
+                                  Pesar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleMortalidade(lote)}
+                                  className="gap-1"
+                                >
+                                  <Skull className="w-4 h-4" />
+                                  Mort.
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -389,6 +407,13 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
+            onSuccess={fetchLotes}
+          />
+          <MortalidadeDialog
+            open={mortalidadeOpen}
+            onOpenChange={setMortalidadeOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
             onSuccess={fetchLotes}
           />
         </>
