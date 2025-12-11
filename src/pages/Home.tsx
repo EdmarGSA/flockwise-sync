@@ -11,7 +11,8 @@ import {
   Map, 
   BarChart3,
   AlertTriangle,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -114,6 +115,14 @@ export default function Home() {
             <span className="text-muted-foreground hidden sm:block">
               {user?.user_metadata?.full_name || user?.email}
             </span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/configuracoes')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Sair
