@@ -327,6 +327,62 @@ export type Database = {
           },
         ]
       }
+      metas_peso: {
+        Row: {
+          created_at: string
+          gpd_kg: number
+          id: string
+          integrado_id: string
+          lote_id: string
+          meta_14_dias_kg: number
+          meta_21_dias_kg: number
+          meta_28_dias_kg: number
+          meta_35_dias_kg: number
+          meta_42_dias_kg: number
+          meta_7_dias_kg: number
+          peso_inicial_kg: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          gpd_kg: number
+          id?: string
+          integrado_id: string
+          lote_id: string
+          meta_14_dias_kg: number
+          meta_21_dias_kg: number
+          meta_28_dias_kg: number
+          meta_35_dias_kg: number
+          meta_42_dias_kg: number
+          meta_7_dias_kg: number
+          peso_inicial_kg: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          gpd_kg?: number
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          meta_14_dias_kg?: number
+          meta_21_dias_kg?: number
+          meta_28_dias_kg?: number
+          meta_35_dias_kg?: number
+          meta_42_dias_kg?: number
+          meta_7_dias_kg?: number
+          peso_inicial_kg?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_peso_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: true
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nucleos: {
         Row: {
           area_id: string | null
