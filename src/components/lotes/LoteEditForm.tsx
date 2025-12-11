@@ -57,7 +57,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       linhagem: lote.linhagem,
       sexo: lote.sexo,
       status: lote.status,
-      veterinario_id: lote.veterinario_id || '',
+      veterinario_id: lote.veterinario_id || 'none',
       observacoes: lote.observacoes || '',
     },
   });
@@ -88,7 +88,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           linhagem: data.linhagem,
           sexo: data.sexo,
           status: data.status,
-          veterinario_id: data.veterinario_id || null,
+          veterinario_id: data.veterinario_id === 'none' ? null : data.veterinario_id || null,
           observacoes: data.observacoes || null,
         })
         .eq('id', lote.id);
@@ -300,7 +300,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {veterinarios.map((vet) => (
                     <SelectItem key={vet.id} value={vet.id}>
                       {vet.full_name}
