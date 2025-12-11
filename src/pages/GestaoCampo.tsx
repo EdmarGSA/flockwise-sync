@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3 } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil } from 'lucide-react';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
+import { GalpaoEditForm } from '@/components/lotes/GalpaoEditForm';
 import { AreaForm } from '@/components/campo/AreaForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
 import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
@@ -39,9 +40,21 @@ interface Galpao {
   comprimento: number;
   largura: number;
   altura: number;
-  tipo_pressao: string;
+  tipo_pressao: Database['public']['Enums']['tipo_pressao'];
+  nucleo_id: string;
   nucleo: { nome: string } | null;
   ativo: boolean;
+  silo_quantidade: number;
+  silo_volume_total: number | null;
+  comedouro_tipo: Database['public']['Enums']['tipo_comedouro'];
+  comedouro_quantidade: number;
+  bebedouro_tipo: Database['public']['Enums']['tipo_bebedouro'];
+  bebedouro_quantidade: number;
+  ventilador_quantidade: number;
+  caixa_agua_quantidade: number;
+  caixa_agua_volume_total: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Area {
@@ -77,6 +90,7 @@ export default function GestaoCampo() {
   const [activeTab, setActiveTab] = useState('lotes');
   const [showForm, setShowForm] = useState(false);
   const [loteDialogOpen, setLoteDialogOpen] = useState(false);
+  const [editingGalpao, setEditingGalpao] = useState<Galpao | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -89,7 +103,7 @@ export default function GestaoCampo() {
     
     const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes] = await Promise.all([
       supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude'),
-      supabase.from('galpoes').select('id, nome, comprimento, largura, altura, tipo_pressao, ativo, nucleo:nucleos(nome)'),
+      supabase.from('galpoes').select('*,nucleo:nucleos(nome)'),
       supabase.from('areas').select('id, nome, descricao, cor, ativo'),
       supabase.from('lotes').select(`
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
@@ -140,6 +154,11 @@ export default function GestaoCampo() {
   const handleLoteSuccess = () => {
     fetchData();
     setLoteDialogOpen(false);
+  };
+
+  const handleGalpaoEditSuccess = () => {
+    fetchData();
+    setEditingGalpao(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -416,32 +435,59 @@ export default function GestaoCampo() {
                       )}
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Núcleo</TableHead>
-                          <TableHead>Dimensões (m)</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {galpoes.map((galpao) => (
-                          <TableRow key={galpao.id}>
-                            <TableCell className="font-medium">{galpao.nome}</TableCell>
-                            <TableCell>{galpao.nucleo?.nome || '-'}</TableCell>
-                            <TableCell>{galpao.comprimento}x{galpao.largura}x{galpao.altura}</TableCell>
-                            <TableCell>{getTipoPressaoLabel(galpao.tipo_pressao)}</TableCell>
-                            <TableCell>
-                              <Badge variant={galpao.ativo ? 'default' : 'secondary'}>
-                                {galpao.ativo ? 'Ativo' : 'Inativo'}
-                              </Badge>
-                            </TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Núcleo</TableHead>
+                            <TableHead>Dimensões (m)</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[80px]">Ações</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {galpoes.map((galpao) => (
+                            <TableRow key={galpao.id}>
+                              <TableCell className="font-medium">{galpao.nome}</TableCell>
+                              <TableCell>{galpao.nucleo?.nome || '-'}</TableCell>
+                              <TableCell>{galpao.comprimento}x{galpao.largura}x{galpao.altura}</TableCell>
+                              <TableCell>{getTipoPressaoLabel(galpao.tipo_pressao)}</TableCell>
+                              <TableCell>
+                                <Badge variant={galpao.ativo ? 'default' : 'secondary'}>
+                                  {galpao.ativo ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingGalpao(galpao)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <Dialog open={!!editingGalpao} onOpenChange={(open) => !open && setEditingGalpao(null)}>
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Editar Galpão</DialogTitle>
+                          </DialogHeader>
+                          {editingGalpao && (
+                            <GalpaoEditForm
+                              galpao={editingGalpao}
+                              onSuccess={handleGalpaoEditSuccess}
+                              onCancel={() => setEditingGalpao(null)}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                 </CardContent>
               </Card>
