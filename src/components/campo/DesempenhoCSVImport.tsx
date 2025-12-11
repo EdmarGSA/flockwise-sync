@@ -201,11 +201,19 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <a href="/modelo_desempenho_aves.csv" download="modelo_desempenho_aves.csv">
-              <Download className="h-4 w-4 mr-2" />
-              Baixar CSV Modelo
-            </a>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = '/modelo_desempenho_aves.csv';
+              link.download = 'modelo_desempenho_aves.csv';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Baixar CSV Modelo
           </Button>
           <span className="text-sm text-muted-foreground">
             (Cobb 500 e Ross 308)
