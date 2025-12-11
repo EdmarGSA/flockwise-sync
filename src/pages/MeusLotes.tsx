@@ -286,6 +286,7 @@ export default function MeusLotes() {
           onOpenChange={setRecebimentoOpen}
           loteId={selectedLote.id}
           integradoId={selectedLote.integrado_id}
+          quantidadeAves={selectedLote.quantidade_aves}
           onSuccess={fetchLotes}
         />
       )}
