@@ -202,8 +202,11 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
       <CardContent className="space-y-4">
         <div className="flex items-center gap-2">
           <Button 
+            type="button"
             variant="outline" 
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               const link = document.createElement('a');
               link.href = '/modelo_desempenho_aves.csv';
               link.download = 'modelo_desempenho_aves.csv';
