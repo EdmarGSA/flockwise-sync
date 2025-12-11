@@ -96,6 +96,7 @@ export type Database = {
         Row: {
           altura: number
           ativo: boolean
+          aves_por_m2: number | null
           bebedouro_quantidade: number
           bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
           caixa_agua_quantidade: number
@@ -111,12 +112,14 @@ export type Database = {
           silo_quantidade: number
           silo_volume_total: number | null
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
+          total_aves: number | null
           updated_at: string
           ventilador_quantidade: number
         }
         Insert: {
           altura: number
           ativo?: boolean
+          aves_por_m2?: number | null
           bebedouro_quantidade?: number
           bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
           caixa_agua_quantidade?: number
@@ -132,12 +135,14 @@ export type Database = {
           silo_quantidade?: number
           silo_volume_total?: number | null
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
+          total_aves?: number | null
           updated_at?: string
           ventilador_quantidade?: number
         }
         Update: {
           altura?: number
           ativo?: boolean
+          aves_por_m2?: number | null
           bebedouro_quantidade?: number
           bebedouro_tipo?: Database["public"]["Enums"]["tipo_bebedouro"]
           caixa_agua_quantidade?: number
@@ -153,6 +158,7 @@ export type Database = {
           silo_quantidade?: number
           silo_volume_total?: number | null
           tipo_pressao?: Database["public"]["Enums"]["tipo_pressao"]
+          total_aves?: number | null
           updated_at?: string
           ventilador_quantidade?: number
         }

@@ -44,6 +44,8 @@ interface Galpao {
   nucleo_id: string;
   nucleo: { nome: string } | null;
   ativo: boolean;
+  total_aves: number | null;
+  aves_por_m2: number | null;
   silo_quantidade: number;
   silo_volume_total: number | null;
   comedouro_tipo: Database['public']['Enums']['tipo_comedouro'];
@@ -442,6 +444,8 @@ export default function GestaoCampo() {
                             <TableHead>Nome</TableHead>
                             <TableHead>Núcleo</TableHead>
                             <TableHead>Dimensões (m)</TableHead>
+                            <TableHead>Total Aves</TableHead>
+                            <TableHead>Aves/m²</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="w-[80px]">Ações</TableHead>
@@ -453,6 +457,8 @@ export default function GestaoCampo() {
                               <TableCell className="font-medium">{galpao.nome}</TableCell>
                               <TableCell>{galpao.nucleo?.nome || '-'}</TableCell>
                               <TableCell>{galpao.comprimento}x{galpao.largura}x{galpao.altura}</TableCell>
+                              <TableCell>{galpao.total_aves?.toLocaleString('pt-BR') || '-'}</TableCell>
+                              <TableCell>{galpao.aves_por_m2?.toFixed(2) || '-'}</TableCell>
                               <TableCell>{getTipoPressaoLabel(galpao.tipo_pressao)}</TableCell>
                               <TableCell>
                                 <Badge variant={galpao.ativo ? 'default' : 'secondary'}>
