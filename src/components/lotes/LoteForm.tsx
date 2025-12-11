@@ -107,8 +107,8 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       return;
     }
     
-    const uniqueSexos = [...new Set(data?.map(d => d.sexo) || [])];
-    setAvailableSexos(uniqueSexos);
+    const uniqueSexos = [...new Set(data?.map(d => d.sexo).filter(Boolean) || [])];
+    setAvailableSexos(uniqueSexos.length > 0 ? uniqueSexos : ['misto']);
   };
 
   const fetchNucleos = async () => {
