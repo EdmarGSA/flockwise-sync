@@ -592,6 +592,8 @@ export type Database = {
           observacoes: string | null
           quantidade_caixas_conferidas: number
           quantidade_eliminados: number
+          quantidade_eliminados_classificacao: number
+          quantidade_eliminados_locomotor: number
           quantidade_mortos: number
           quantidade_pintinhos_caixa: number
           updated_at: string
@@ -606,6 +608,8 @@ export type Database = {
           observacoes?: string | null
           quantidade_caixas_conferidas?: number
           quantidade_eliminados?: number
+          quantidade_eliminados_classificacao?: number
+          quantidade_eliminados_locomotor?: number
           quantidade_mortos?: number
           quantidade_pintinhos_caixa?: number
           updated_at?: string
@@ -620,6 +624,8 @@ export type Database = {
           observacoes?: string | null
           quantidade_caixas_conferidas?: number
           quantidade_eliminados?: number
+          quantidade_eliminados_classificacao?: number
+          quantidade_eliminados_locomotor?: number
           quantidade_mortos?: number
           quantidade_pintinhos_caixa?: number
           updated_at?: string
