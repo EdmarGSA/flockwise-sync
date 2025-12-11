@@ -10,11 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from '@/integrations/supabase/client';
 import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil } from 'lucide-react';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
+import { NucleoEditForm } from '@/components/lotes/NucleoEditForm';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
 import { GalpaoEditForm } from '@/components/lotes/GalpaoEditForm';
 import { AreaForm } from '@/components/campo/AreaForm';
+import { AreaEditForm } from '@/components/campo/AreaEditForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
+import { LoteEditForm } from '@/components/lotes/LoteEditForm';
 import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
+import { DesempenhoEditForm } from '@/components/campo/DesempenhoEditForm';
 import { DesempenhoTable } from '@/components/campo/DesempenhoTable';
 import { DesempenhoCSVImport } from '@/components/campo/DesempenhoCSVImport';
 import { format } from 'date-fns';
@@ -22,6 +26,9 @@ import { ptBR } from 'date-fns/locale';
 import { Database } from '@/integrations/supabase/types';
 
 type DesempenhoAve = Database['public']['Tables']['desempenho_aves']['Row'];
+type NucleoRow = Database['public']['Tables']['nucleos']['Row'];
+type AreaRow = Database['public']['Tables']['areas']['Row'];
+type LoteRow = Database['public']['Tables']['lotes']['Row'];
 
 interface Nucleo {
   id: string;
@@ -93,6 +100,10 @@ export default function GestaoCampo() {
   const [showForm, setShowForm] = useState(false);
   const [loteDialogOpen, setLoteDialogOpen] = useState(false);
   const [editingGalpao, setEditingGalpao] = useState<Galpao | null>(null);
+  const [editingNucleo, setEditingNucleo] = useState<NucleoRow | null>(null);
+  const [editingArea, setEditingArea] = useState<AreaRow | null>(null);
+  const [editingLote, setEditingLote] = useState<LoteRow | null>(null);
+  const [editingDesempenho, setEditingDesempenho] = useState<DesempenhoAve | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -161,6 +172,26 @@ export default function GestaoCampo() {
   const handleGalpaoEditSuccess = () => {
     fetchData();
     setEditingGalpao(null);
+  };
+
+  const handleNucleoEditSuccess = () => {
+    fetchData();
+    setEditingNucleo(null);
+  };
+
+  const handleAreaEditSuccess = () => {
+    fetchData();
+    setEditingArea(null);
+  };
+
+  const handleLoteEditSuccess = () => {
+    fetchData();
+    setEditingLote(null);
+  };
+
+  const handleDesempenhoEditSuccess = () => {
+    fetchData();
+    setEditingDesempenho(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -330,6 +361,7 @@ export default function GestaoCampo() {
                           <TableHead>Linhagem</TableHead>
                           <TableHead>Previsão</TableHead>
                           <TableHead>Alojamento</TableHead>
+                          <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -342,10 +374,37 @@ export default function GestaoCampo() {
                             <TableCell>{getLinhagemLabel(lote.linhagem)}</TableCell>
                             <TableCell>{formatDate(lote.data_prevista_alojamento)}</TableCell>
                             <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                  const { data } = await supabase.from('lotes').select('*').eq('id', lote.id).single();
+                                  if (data) setEditingLote(data);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+
+                    <Dialog open={!!editingLote} onOpenChange={(open) => !open && setEditingLote(null)}>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Editar Lote</DialogTitle>
+                        </DialogHeader>
+                        {editingLote && (
+                          <LoteEditForm
+                            lote={editingLote}
+                            onSuccess={handleLoteEditSuccess}
+                            onCancel={() => setEditingLote(null)}
+                          />
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
               </CardContent>
@@ -372,41 +431,71 @@ export default function GestaoCampo() {
                       </Button>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Localização</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>GPS</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {nucleos.map((nucleo) => (
-                          <TableRow key={nucleo.id}>
-                            <TableCell className="font-medium">{nucleo.nome}</TableCell>
-                            <TableCell>{nucleo.cidade}/{nucleo.estado}</TableCell>
-                            <TableCell>{getTipoProducaoLabel(nucleo.tipo_producao)}</TableCell>
-                            <TableCell>
-                              {nucleo.latitude && nucleo.longitude ? (
-                                <Badge variant="outline" className="text-primary">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  OK
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary">Sem GPS</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={nucleo.ativo ? 'default' : 'secondary'}>
-                                {nucleo.ativo ? 'Ativo' : 'Inativo'}
-                              </Badge>
-                            </TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Localização</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>GPS</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[80px]">Ações</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {nucleos.map((nucleo) => (
+                            <TableRow key={nucleo.id}>
+                              <TableCell className="font-medium">{nucleo.nome}</TableCell>
+                              <TableCell>{nucleo.cidade}/{nucleo.estado}</TableCell>
+                              <TableCell>{getTipoProducaoLabel(nucleo.tipo_producao)}</TableCell>
+                              <TableCell>
+                                {nucleo.latitude && nucleo.longitude ? (
+                                  <Badge variant="outline" className="text-primary">
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    OK
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary">Sem GPS</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={nucleo.ativo ? 'default' : 'secondary'}>
+                                  {nucleo.ativo ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={async () => {
+                                    const { data } = await supabase.from('nucleos').select('*').eq('id', nucleo.id).single();
+                                    if (data) setEditingNucleo(data);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <Dialog open={!!editingNucleo} onOpenChange={(open) => !open && setEditingNucleo(null)}>
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Editar Núcleo</DialogTitle>
+                          </DialogHeader>
+                          {editingNucleo && (
+                            <NucleoEditForm
+                              nucleo={editingNucleo}
+                              onSuccess={handleNucleoEditSuccess}
+                              onCancel={() => setEditingNucleo(null)}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -520,35 +609,65 @@ export default function GestaoCampo() {
                       </Button>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Cor</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Descrição</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {areas.map((area) => (
-                          <TableRow key={area.id}>
-                            <TableCell>
-                              <div 
-                                className="w-6 h-6 rounded-full border-2 border-border" 
-                                style={{ backgroundColor: area.cor }}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">{area.nome}</TableCell>
-                            <TableCell className="text-muted-foreground">{area.descricao || '-'}</TableCell>
-                            <TableCell>
-                              <Badge variant={area.ativo ? 'default' : 'secondary'}>
-                                {area.ativo ? 'Ativo' : 'Inativo'}
-                              </Badge>
-                            </TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Cor</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[80px]">Ações</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {areas.map((area) => (
+                            <TableRow key={area.id}>
+                              <TableCell>
+                                <div 
+                                  className="w-6 h-6 rounded-full border-2 border-border" 
+                                  style={{ backgroundColor: area.cor }}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{area.nome}</TableCell>
+                              <TableCell className="text-muted-foreground">{area.descricao || '-'}</TableCell>
+                              <TableCell>
+                                <Badge variant={area.ativo ? 'default' : 'secondary'}>
+                                  {area.ativo ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={async () => {
+                                    const { data } = await supabase.from('areas').select('*').eq('id', area.id).single();
+                                    if (data) setEditingArea(data);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <Dialog open={!!editingArea} onOpenChange={(open) => !open && setEditingArea(null)}>
+                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Editar Área</DialogTitle>
+                          </DialogHeader>
+                          {editingArea && (
+                            <AreaEditForm
+                              area={editingArea}
+                              onSuccess={handleAreaEditSuccess}
+                              onCancel={() => setEditingArea(null)}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -562,7 +681,26 @@ export default function GestaoCampo() {
                 <DesempenhoCSVImport onSuccess={handleFormSuccess} />
               </div>
             )}
-            <DesempenhoTable data={desempenhoData} loading={loadingData} />
+            <DesempenhoTable 
+              data={desempenhoData} 
+              loading={loadingData} 
+              onEdit={setEditingDesempenho}
+            />
+
+            <Dialog open={!!editingDesempenho} onOpenChange={(open) => !open && setEditingDesempenho(null)}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Editar Registro de Desempenho</DialogTitle>
+                </DialogHeader>
+                {editingDesempenho && (
+                  <DesempenhoEditForm
+                    desempenho={editingDesempenho}
+                    onSuccess={handleDesempenhoEditSuccess}
+                    onCancel={() => setEditingDesempenho(null)}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>
