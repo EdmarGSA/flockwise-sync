@@ -15,6 +15,7 @@ import { AreaForm } from '@/components/campo/AreaForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
 import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
 import { DesempenhoTable } from '@/components/campo/DesempenhoTable';
+import { DesempenhoCSVImport } from '@/components/campo/DesempenhoCSVImport';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Database } from '@/integrations/supabase/types';
@@ -503,10 +504,13 @@ export default function GestaoCampo() {
           </TabsContent>
 
           <TabsContent value="desempenho" className="space-y-6">
-            <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
-              {showForm && <DesempenhoForm onSuccess={handleFormSuccess} />}
-              <DesempenhoTable data={desempenhoData} loading={loadingData} />
-            </div>
+            {showForm && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DesempenhoForm onSuccess={handleFormSuccess} />
+                <DesempenhoCSVImport onSuccess={handleFormSuccess} />
+              </div>
+            )}
+            <DesempenhoTable data={desempenhoData} loading={loadingData} />
           </TabsContent>
         </Tabs>
       </main>
