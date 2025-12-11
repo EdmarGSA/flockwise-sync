@@ -7,7 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -357,26 +363,36 @@ export default function MeusLotes() {
                               </Button>
                             )}
                             {lote.status === 'alojado' && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant={lote.precisaPesar ? 'destructive' : 'outline'}
-                                  onClick={() => handlePesagem(lote)}
-                                  className="gap-1"
-                                >
-                                  <Scale className="w-4 h-4" />
-                                  Pesar
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleMortalidade(lote)}
-                                  className="gap-1"
-                                >
-                                  <Skull className="w-4 h-4" />
-                                  Mort.
-                                </Button>
-                              </>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant={lote.precisaPesar ? 'destructive' : 'default'}
+                                    className="gap-1"
+                                  >
+                                    <ClipboardCheck className="w-4 h-4" />
+                                    Adm.
+                                    <ChevronDown className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
+                                    <Scale className="w-4 h-4" />
+                                    Pesagem
+                                    {lote.precisaPesar && (
+                                      <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
+                                    <Skull className="w-4 h-4" />
+                                    Mortalidade
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
+                                    <Target className="w-4 h-4" />
+                                    Metas de Peso
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </div>
                         </TableCell>
