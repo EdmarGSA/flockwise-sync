@@ -10,6 +10,10 @@ import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import GestaoCampo from "./pages/GestaoCampo";
 import MeusLotes from "./pages/MeusLotes";
+import Configuracoes from "./pages/Configuracoes";
+import CadastroOrganizacao from "./pages/CadastroOrganizacao";
+import CadastroMembros from "./pages/CadastroMembros";
+import CadastroProdutos from "./pages/CadastroProdutos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -85,6 +89,26 @@ const AppRoutes = () => (
     <Route path="/meus-lotes" element={
       <ProtectedRoute>
         <MeusLotes />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes" element={
+      <ProtectedRoute>
+        <Configuracoes />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/organizacao" element={
+      <ProtectedRoute>
+        <CadastroOrganizacao />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/membros" element={
+      <ProtectedRoute>
+        <CadastroMembros />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/produtos" element={
+      <ProtectedRoute>
+        <CadastroProdutos />
       </ProtectedRoute>
     } />
     
