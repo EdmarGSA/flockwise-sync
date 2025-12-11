@@ -444,8 +444,8 @@ export default function GestaoCampo() {
                             <TableHead>Nome</TableHead>
                             <TableHead>Núcleo</TableHead>
                             <TableHead>Dimensões (m)</TableHead>
-                            <TableHead>Total Aves</TableHead>
                             <TableHead>Aves/m²</TableHead>
+                            <TableHead>Total Aves</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="w-[80px]">Ações</TableHead>
@@ -457,8 +457,8 @@ export default function GestaoCampo() {
                               <TableCell className="font-medium">{galpao.nome}</TableCell>
                               <TableCell>{galpao.nucleo?.nome || '-'}</TableCell>
                               <TableCell>{galpao.comprimento}x{galpao.largura}x{galpao.altura}</TableCell>
-                              <TableCell>{galpao.total_aves?.toLocaleString('pt-BR') || '-'}</TableCell>
                               <TableCell>{galpao.aves_por_m2?.toFixed(2) || '-'}</TableCell>
+                              <TableCell>{galpao.total_aves?.toLocaleString('pt-BR') || '-'}</TableCell>
                               <TableCell>{getTipoPressaoLabel(galpao.tipo_pressao)}</TableCell>
                               <TableCell>
                                 <Badge variant={galpao.ativo ? 'default' : 'secondary'}>
