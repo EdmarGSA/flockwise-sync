@@ -179,6 +179,7 @@ export type Database = {
           nucleo_id: string
           observacoes: string | null
           quantidade_aves: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
           status: Database["public"]["Enums"]["lote_status"]
           updated_at: string
           veterinario_id: string | null
@@ -195,6 +196,7 @@ export type Database = {
           nucleo_id: string
           observacoes?: string | null
           quantidade_aves: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]
           updated_at?: string
           veterinario_id?: string | null
@@ -211,6 +213,7 @@ export type Database = {
           nucleo_id?: string
           observacoes?: string | null
           quantidade_aves?: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]
           updated_at?: string
           veterinario_id?: string | null

@@ -24,6 +24,7 @@ const loteSchema = z.object({
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
   linhagem: z.enum(['cobb_500', 'ross_308', 'hubbard']),
+  sexo: z.enum(['macho', 'femea', 'misto']),
   veterinario_id: z.string().optional(),
   observacoes: z.string().optional(),
 });
@@ -58,6 +59,8 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
   const [selectedNucleoId, setSelectedNucleoId] = useState<string>('');
+  const [availableSexos, setAvailableSexos] = useState<string[]>([]);
+  const [selectedLinhagem, setSelectedLinhagem] = useState<string>('cobb_500');
 
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
@@ -66,6 +69,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       galpao_id: '',
       quantidade_aves: '',
       linhagem: 'cobb_500',
+      sexo: 'misto',
       veterinario_id: '',
       observacoes: '',
     },
@@ -74,6 +78,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   useEffect(() => {
     fetchNucleos();
     fetchVeterinarios();
+    fetchSexosByLinhagem('cobb_500');
   }, []);
 
   useEffect(() => {
@@ -82,6 +87,28 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       form.setValue('galpao_id', '');
     }
   }, [selectedNucleoId]);
+
+  useEffect(() => {
+    if (selectedLinhagem) {
+      fetchSexosByLinhagem(selectedLinhagem);
+      form.setValue('sexo', 'misto');
+    }
+  }, [selectedLinhagem]);
+
+  const fetchSexosByLinhagem = async (linhagem: string) => {
+    const { data, error } = await supabase
+      .from('desempenho_aves')
+      .select('sexo')
+      .eq('linhagem', linhagem as 'cobb_500' | 'ross_308' | 'hubbard');
+    
+    if (error) {
+      console.error('Erro ao buscar sexos:', error);
+      return;
+    }
+    
+    const uniqueSexos = [...new Set(data?.map(d => d.sexo) || [])];
+    setAvailableSexos(uniqueSexos);
+  };
 
   const fetchNucleos = async () => {
     const { data, error } = await supabase
@@ -159,6 +186,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
         quantidade_aves: parseInt(data.quantidade_aves),
         data_prevista_alojamento: format(data.data_prevista_alojamento, 'yyyy-MM-dd'),
         linhagem: data.linhagem,
+        sexo: data.sexo,
         veterinario_id: data.veterinario_id || null,
         observacoes: data.observacoes || null,
         integrado_id: user.id,
@@ -295,7 +323,13 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Linhagem</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    setSelectedLinhagem(value);
+                  }} 
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a linhagem" />
@@ -305,6 +339,35 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                     <SelectItem value="cobb_500">Cobb 500</SelectItem>
                     <SelectItem value="ross_308">Ross 308</SelectItem>
                     <SelectItem value="hubbard">Hubbard</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="sexo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Sexo</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o sexo" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {availableSexos.length === 0 ? (
+                      <SelectItem value="misto">Misto</SelectItem>
+                    ) : (
+                      availableSexos.map((sexo) => (
+                        <SelectItem key={sexo} value={sexo}>
+                          {sexo === 'macho' ? 'Macho' : sexo === 'femea' ? 'Fêmea' : 'Misto'}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
