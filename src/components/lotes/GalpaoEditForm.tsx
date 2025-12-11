@@ -17,6 +17,7 @@ const galpaoSchema = z.object({
   largura: z.string().min(1, 'Largura obrigatória'),
   altura: z.string().min(1, 'Altura obrigatória'),
   tipo_pressao: z.enum(['positiva', 'negativa', 'darkhouse']),
+  total_aves: z.string().min(1, 'Total de aves obrigatório'),
   silo_quantidade: z.string().min(1, 'Quantidade de silos obrigatória'),
   silo_volume_total: z.string().min(1, 'Volume dos silos obrigatório'),
   comedouro_tipo: z.enum(['manual', 'automatico']),
@@ -57,6 +58,7 @@ export function GalpaoEditForm({ galpao, onSuccess, onCancel }: GalpaoEditFormPr
       largura: String(galpao.largura),
       altura: String(galpao.altura),
       tipo_pressao: galpao.tipo_pressao,
+      total_aves: String(galpao.total_aves || 0),
       silo_quantidade: String(galpao.silo_quantidade),
       silo_volume_total: String(galpao.silo_volume_total || 0),
       comedouro_tipo: galpao.comedouro_tipo,
@@ -99,6 +101,7 @@ export function GalpaoEditForm({ galpao, onSuccess, onCancel }: GalpaoEditFormPr
           largura: parseFloat(data.largura),
           altura: parseFloat(data.altura),
           tipo_pressao: data.tipo_pressao,
+          total_aves: parseInt(data.total_aves),
           silo_quantidade: parseInt(data.silo_quantidade),
           silo_volume_total: parseFloat(data.silo_volume_total),
           comedouro_tipo: data.comedouro_tipo,
@@ -237,6 +240,26 @@ export function GalpaoEditForm({ galpao, onSuccess, onCancel }: GalpaoEditFormPr
             </FormItem>
           )}
         />
+
+        <div>
+          <h3 className="text-lg font-semibold text-foreground mb-3">Capacidade de Aves</h3>
+          <FormField
+            control={form.control}
+            name="total_aves"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Total de Aves</FormLabel>
+                <FormControl>
+                  <Input type="number" min="0" placeholder="0" {...field} />
+                </FormControl>
+                <FormMessage />
+                <p className="text-xs text-muted-foreground">
+                  A densidade (aves/m²) será calculada automaticamente
+                </p>
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div>
           <h3 className="text-lg font-semibold text-foreground mb-3">Silos</h3>
