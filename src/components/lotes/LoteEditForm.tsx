@@ -19,6 +19,7 @@ import { Database } from '@/integrations/supabase/types';
 
 const loteSchema = z.object({
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
+  peso_medio_pintinhos: z.string().optional(),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
   data_alojamento: z.date().optional().nullable(),
   data_fechamento: z.date().optional().nullable(),
@@ -53,6 +54,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     resolver: zodResolver(loteSchema),
     defaultValues: {
       quantidade_aves: String(lote.quantidade_aves),
+      peso_medio_pintinhos: lote.peso_medio_pintinhos ? String(lote.peso_medio_pintinhos) : '',
       data_prevista_alojamento: parseISO(lote.data_prevista_alojamento),
       data_alojamento: lote.data_alojamento ? parseISO(lote.data_alojamento) : null,
       data_fechamento: lote.data_fechamento ? parseISO(lote.data_fechamento) : null,
@@ -108,6 +110,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
         .from('lotes')
         .update({
           quantidade_aves: parseInt(data.quantidade_aves),
+          peso_medio_pintinhos: data.peso_medio_pintinhos ? parseFloat(data.peso_medio_pintinhos) : null,
           data_prevista_alojamento: format(data.data_prevista_alojamento, 'yyyy-MM-dd'),
           data_alojamento: data.data_alojamento ? format(data.data_alojamento, 'yyyy-MM-dd') : null,
           data_fechamento: data.data_fechamento ? format(data.data_fechamento, 'yyyy-MM-dd') : null,
@@ -134,7 +137,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="quantidade_aves"
@@ -143,6 +146,20 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                 <FormLabel>Quantidade de Aves</FormLabel>
                 <FormControl>
                   <Input type="number" min="1" placeholder="Ex: 25000" disabled={!isEditable} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="peso_medio_pintinhos"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Peso Médio Pintinhos (g)</FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.1" min="0" placeholder="Ex: 42.5" disabled={!isEditable} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

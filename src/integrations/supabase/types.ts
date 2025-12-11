@@ -267,6 +267,7 @@ export type Database = {
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id: string
           observacoes: string | null
+          peso_medio_pintinhos: number | null
           quantidade_aves: number
           sexo: Database["public"]["Enums"]["sexo_ave"]
           status: Database["public"]["Enums"]["lote_status"]
@@ -284,6 +285,7 @@ export type Database = {
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id: string
           observacoes?: string | null
+          peso_medio_pintinhos?: number | null
           quantidade_aves: number
           sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]
@@ -301,6 +303,7 @@ export type Database = {
           linhagem?: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id?: string
           observacoes?: string | null
+          peso_medio_pintinhos?: number | null
           quantidade_aves?: number
           sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]

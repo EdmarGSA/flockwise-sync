@@ -29,6 +29,7 @@ interface RecebimentoLoteDialogProps {
   onOpenChange: (open: boolean) => void;
   loteId: string;
   integradoId: string;
+  quantidadeAves: number;
   onSuccess?: () => void;
 }
 
@@ -37,6 +38,7 @@ export function RecebimentoLoteDialog({
   onOpenChange, 
   loteId, 
   integradoId,
+  quantidadeAves,
   onSuccess 
 }: RecebimentoLoteDialogProps) {
   const [loading, setLoading] = useState(false);
@@ -106,6 +108,35 @@ export function RecebimentoLoteDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Cálculo de quantidade alojada */}
+            {(() => {
+              const mortos = parseInt(form.watch('quantidade_mortos') || '0');
+              const eliminados = parseInt(form.watch('quantidade_eliminados') || '0');
+              const quantidadeAlojada = quantidadeAves - mortos - eliminados;
+              return (
+                <div className="p-4 bg-muted rounded-lg border">
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Aves</p>
+                      <p className="text-lg font-semibold">{quantidadeAves.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Mortos</p>
+                      <p className="text-lg font-semibold text-red-500">-{mortos}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Eliminados</p>
+                      <p className="text-lg font-semibold text-orange-500">-{eliminados}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Qtd. Alojada</p>
+                      <p className="text-lg font-bold text-green-600">{quantidadeAlojada.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <FormField
               control={form.control}
               name="quantidade_mortos"
