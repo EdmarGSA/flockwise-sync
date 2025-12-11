@@ -6,9 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
+import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
 
 interface Lote {
   id: string;
@@ -19,6 +21,7 @@ interface Lote {
   linhagem: string;
   status: string;
   veterinario_id: string | null;
+  integrado_id: string;
   nucleo: { nome: string } | null;
   galpao: { nome: string } | null;
 }
@@ -28,6 +31,8 @@ export default function MeusLotes() {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [recebimentoOpen, setRecebimentoOpen] = useState(false);
+  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -48,6 +53,7 @@ export default function MeusLotes() {
         data_fechamento,
         linhagem,
         status,
+        integrado_id,
         nucleo:nucleos(nome),
         galpao:galpoes(nome),
         veterinario_id
@@ -78,11 +84,34 @@ export default function MeusLotes() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
       previsao: { label: 'Previsão', variant: 'outline' },
+      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'destructive' },
       alojado: { label: 'Alojado', variant: 'default' },
       fechado: { label: 'Fechado', variant: 'secondary' },
     };
     const config = variants[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const handleAlojar = async (lote: Lote) => {
+    try {
+      const { error } = await supabase
+        .from('lotes')
+        .update({ status: 'saiu_para_entrega' })
+        .eq('id', lote.id);
+
+      if (error) throw error;
+
+      toast.success('Status alterado para "Saiu para Entrega"');
+      fetchLotes();
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast.error('Erro ao atualizar status');
+    }
+  };
+
+  const handleAdm = (lote: Lote) => {
+    setSelectedLote(lote);
+    setRecebimentoOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -99,9 +128,9 @@ export default function MeusLotes() {
     return format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
   };
 
-
   const lotesAtivos = lotes.filter(l => l.status === 'alojado').length;
   const lotesPendentes = lotes.filter(l => l.status === 'previsao').length;
+  const lotesEmTransito = lotes.filter(l => l.status === 'saiu_para_entrega').length;
   const lotesFechados = lotes.filter(l => l.status === 'fechado').length;
 
   return (
@@ -130,12 +159,12 @@ export default function MeusLotes() {
 
       <main className="container mx-auto px-4 py-8 pt-24">
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <Card className="bg-card border-border">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-sm">Lotes Alojados</p>
+                  <p className="text-muted-foreground text-sm">Alojados</p>
                   <p className="text-2xl font-bold text-primary">{lotesAtivos}</p>
                 </div>
                 <Bird className="w-8 h-8 text-primary/50" />
@@ -150,6 +179,17 @@ export default function MeusLotes() {
                   <p className="text-2xl font-bold text-amber-500">{lotesPendentes}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-amber-500/50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Em Trânsito</p>
+                  <p className="text-2xl font-bold text-destructive">{lotesEmTransito}</p>
+                </div>
+                <Truck className="w-8 h-8 text-destructive/50" />
               </div>
             </CardContent>
           </Card>
@@ -193,7 +233,7 @@ export default function MeusLotes() {
                       <TableHead>Linhagem</TableHead>
                       <TableHead>Previsão</TableHead>
                       <TableHead>Alojamento</TableHead>
-                      <TableHead>Veterinário</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -206,7 +246,30 @@ export default function MeusLotes() {
                         <TableCell>{getLinhagemLabel(lote.linhagem)}</TableCell>
                         <TableCell>{formatDate(lote.data_prevista_alojamento)}</TableCell>
                         <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
-                        <TableCell>{lote.veterinario_id ? 'Sim' : '-'}</TableCell>
+                        <TableCell>
+                          {lote.status === 'previsao' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleAlojar(lote)}
+                              className="gap-1"
+                            >
+                              <Truck className="w-4 h-4" />
+                              Alojar
+                            </Button>
+                          )}
+                          {lote.status === 'saiu_para_entrega' && (
+                            <Button 
+                              size="sm" 
+                              variant="default"
+                              onClick={() => handleAdm(lote)}
+                              className="gap-1"
+                            >
+                              <ClipboardCheck className="w-4 h-4" />
+                              Adm.
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -216,6 +279,16 @@ export default function MeusLotes() {
           </CardContent>
         </Card>
       </main>
+
+      {selectedLote && (
+        <RecebimentoLoteDialog
+          open={recebimentoOpen}
+          onOpenChange={setRecebimentoOpen}
+          loteId={selectedLote.id}
+          integradoId={selectedLote.integrado_id}
+          onSuccess={fetchLotes}
+        />
+      )}
     </div>
   );
 }
