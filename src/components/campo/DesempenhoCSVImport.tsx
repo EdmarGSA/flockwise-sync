@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 
 type LinhagemAves = Database['public']['Enums']['linhagem_aves'];
@@ -200,6 +200,18 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <a href="/modelo_desempenho_aves.csv" download="modelo_desempenho_aves.csv">
+              <Download className="h-4 w-4 mr-2" />
+              Baixar CSV Modelo
+            </a>
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            (Cobb 500 e Ross 308)
+          </span>
+        </div>
+
         <div className="flex items-center gap-4">
           <Input
             ref={fileInputRef}
