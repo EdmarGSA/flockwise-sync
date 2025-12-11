@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Home } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,8 @@ interface LoteEditFormProps {
 export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  
+  const isEditable = lote.status === 'previsao';
 
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
@@ -75,7 +77,32 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     setVeterinarios(data || []);
   };
 
+  const handleAlojar = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('lotes')
+        .update({
+          status: 'alojado',
+          data_alojamento: format(new Date(), 'yyyy-MM-dd'),
+        })
+        .eq('id', lote.id);
+
+      if (error) throw error;
+
+      toast.success('Lote alojado com sucesso!');
+      onSuccess?.();
+    } catch (error) {
+      console.error('Erro ao alojar lote:', error);
+      toast.error('Erro ao alojar lote');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (data: LoteFormData) => {
+    if (!isEditable) return;
+    
     setLoading(true);
     try {
       const { error } = await supabase
@@ -116,7 +143,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
               <FormItem>
                 <FormLabel>Quantidade de Aves</FormLabel>
                 <FormControl>
-                  <Input type="number" min="1" placeholder="Ex: 25000" {...field} />
+                  <Input type="number" min="1" placeholder="Ex: 25000" disabled={!isEditable} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -129,7 +156,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Status</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o status" />
@@ -154,7 +181,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Linhagem</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a linhagem" />
@@ -177,7 +204,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Sexo</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o sexo" />
@@ -293,7 +320,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Veterinário (opcional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o veterinário" />
@@ -320,7 +347,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             <FormItem>
               <FormLabel>Observações (opcional)</FormLabel>
               <FormControl>
-                <Textarea placeholder="Observações sobre o lote..." className="resize-none" {...field} />
+                <Textarea placeholder="Observações sobre o lote..." className="resize-none" disabled={!isEditable} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -329,11 +356,25 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-            Cancelar
+            {isEditable ? 'Cancelar' : 'Fechar'}
           </Button>
-          <Button type="submit" className="flex-1" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar Alterações'}
-          </Button>
+          {isEditable && (
+            <>
+              <Button 
+                type="button" 
+                variant="default"
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                disabled={loading}
+                onClick={handleAlojar}
+              >
+                <Home className="w-4 h-4 mr-2" />
+                {loading ? 'Alojando...' : 'Alojar'}
+              </Button>
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </>
+          )}
         </div>
       </form>
     </Form>
