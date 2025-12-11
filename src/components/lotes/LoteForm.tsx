@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, AlertCircle } from 'lucide-react';
+import { CalendarIcon, AlertCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,7 @@ interface Galpao {
   id: string;
   nome: string;
   nucleo_id: string;
+  total_aves: number | null;
   has_active_lote?: boolean;
 }
 
@@ -126,7 +127,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const fetchGalpoes = async (nucleoId: string) => {
     const { data: galpoesData, error } = await supabase
       .from('galpoes')
-      .select('id, nome, nucleo_id')
+      .select('id, nome, nucleo_id, total_aves')
       .eq('nucleo_id', nucleoId)
       .eq('ativo', true);
     
@@ -208,6 +209,40 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
 
   const availableGalpoes = galpoes.filter(g => !g.has_active_lote);
   const unavailableGalpoes = galpoes.filter(g => g.has_active_lote);
+
+  // Capacity alert logic
+  const selectedGalpaoId = form.watch('galpao_id');
+  const quantidadeAvesStr = form.watch('quantidade_aves');
+  const selectedGalpaoData = galpoes.find(g => g.id === selectedGalpaoId);
+  const capacidadeGalpao = selectedGalpaoData?.total_aves || 0;
+  const quantidadeAves = parseInt(quantidadeAvesStr) || 0;
+  
+  const getCapacityAlert = () => {
+    if (!selectedGalpaoId || !capacidadeGalpao || !quantidadeAves) return null;
+    
+    const minCapacity = capacidadeGalpao * 0.9;
+    const maxCapacity = capacidadeGalpao * 1.1;
+    
+    if (quantidadeAves < minCapacity) {
+      const percentBelow = (((capacidadeGalpao - quantidadeAves) / capacidadeGalpao) * 100).toFixed(1);
+      return {
+        type: 'warning' as const,
+        message: `Quantidade ${percentBelow}% abaixo da capacidade do galpão (${capacidadeGalpao.toLocaleString('pt-BR')} aves)`
+      };
+    }
+    
+    if (quantidadeAves > maxCapacity) {
+      const percentAbove = (((quantidadeAves - capacidadeGalpao) / capacidadeGalpao) * 100).toFixed(1);
+      return {
+        type: 'destructive' as const,
+        message: `Quantidade ${percentAbove}% acima da capacidade do galpão (${capacidadeGalpao.toLocaleString('pt-BR')} aves)`
+      };
+    }
+    
+    return null;
+  };
+  
+  const capacityAlert = getCapacityAlert();
 
   return (
     <Form {...form}>
@@ -312,6 +347,11 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                 <FormControl>
                   <Input type="number" min="1" placeholder="Ex: 25000" {...field} />
                 </FormControl>
+                {capacidadeGalpao > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Capacidade do galpão: {capacidadeGalpao.toLocaleString('pt-BR')} aves
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -375,6 +415,15 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
             )}
           />
         </div>
+
+        {capacityAlert && (
+          <Alert variant={capacityAlert.type === 'destructive' ? 'destructive' : 'default'} className={capacityAlert.type === 'warning' ? 'border-amber-500 bg-amber-500/10' : ''}>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {capacityAlert.message}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
