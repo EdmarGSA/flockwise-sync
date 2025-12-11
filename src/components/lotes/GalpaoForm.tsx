@@ -17,7 +17,7 @@ const galpaoSchema = z.object({
   largura: z.string().min(1, 'Largura obrigatória'),
   altura: z.string().min(1, 'Altura obrigatória'),
   tipo_pressao: z.enum(['positiva', 'negativa', 'darkhouse']),
-  total_aves: z.string().min(1, 'Total de aves obrigatório'),
+  aves_por_m2: z.string().min(1, 'Densidade de aves obrigatória'),
   silo_quantidade: z.string().min(1, 'Quantidade de silos obrigatória'),
   silo_volume_total: z.string().min(1, 'Volume dos silos obrigatório'),
   comedouro_tipo: z.enum(['manual', 'automatico']),
@@ -53,7 +53,7 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
       largura: '',
       altura: '',
       tipo_pressao: 'positiva',
-      total_aves: '0',
+      aves_por_m2: '0',
       silo_quantidade: '0',
       silo_volume_total: '0',
       comedouro_tipo: 'automatico',
@@ -93,7 +93,7 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
         largura: parseFloat(data.largura),
         altura: parseFloat(data.altura),
         tipo_pressao: data.tipo_pressao,
-        total_aves: parseInt(data.total_aves),
+        aves_por_m2: parseFloat(data.aves_por_m2),
         silo_quantidade: parseInt(data.silo_quantidade),
         silo_volume_total: parseFloat(data.silo_volume_total),
         comedouro_tipo: data.comedouro_tipo,
@@ -249,16 +249,16 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
               <h3 className="text-lg font-semibold text-foreground mb-3">Capacidade de Aves</h3>
               <FormField
                 control={form.control}
-                name="total_aves"
+                name="aves_por_m2"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total de Aves</FormLabel>
+                    <FormLabel>Densidade (Aves/m²)</FormLabel>
                     <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
+                      <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
                     </FormControl>
                     <FormMessage />
                     <p className="text-xs text-muted-foreground">
-                      A densidade (aves/m²) será calculada automaticamente
+                      O total de aves será calculado automaticamente (densidade × área)
                     </p>
                   </FormItem>
                 )}
