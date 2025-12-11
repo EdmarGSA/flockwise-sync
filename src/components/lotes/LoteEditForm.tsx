@@ -24,7 +24,7 @@ const loteSchema = z.object({
   data_fechamento: z.date().optional().nullable(),
   linhagem: z.enum(['cobb_500', 'ross_308', 'hubbard']),
   sexo: z.enum(['macho', 'femea', 'misto']),
-  status: z.enum(['previsao', 'alojado', 'fechado']),
+  status: z.enum(['previsao', 'saiu_para_entrega', 'alojado', 'fechado']),
   veterinario_id: z.string().optional(),
   observacoes: z.string().optional(),
 });
@@ -83,18 +83,17 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       const { error } = await supabase
         .from('lotes')
         .update({
-          status: 'alojado',
-          data_alojamento: format(new Date(), 'yyyy-MM-dd'),
+          status: 'saiu_para_entrega',
         })
         .eq('id', lote.id);
 
       if (error) throw error;
 
-      toast.success('Lote alojado com sucesso!');
+      toast.success('Status alterado para "Saiu para Entrega"');
       onSuccess?.();
     } catch (error) {
-      console.error('Erro ao alojar lote:', error);
-      toast.error('Erro ao alojar lote');
+      console.error('Erro ao atualizar status:', error);
+      toast.error('Erro ao atualizar status');
     } finally {
       setLoading(false);
     }
@@ -164,6 +163,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="previsao">Previsão</SelectItem>
+                    <SelectItem value="saiu_para_entrega">Saiu p/ Entrega</SelectItem>
                     <SelectItem value="alojado">Alojado</SelectItem>
                     <SelectItem value="fechado">Fechado</SelectItem>
                   </SelectContent>
@@ -360,9 +360,9 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           </Button>
           {isEditable && (
             <>
-              <Button 
-                type="button" 
-                variant="default"
+              <Button
+                type="button"
+                variant="secondary"
                 className="flex-1 bg-green-600 hover:bg-green-700"
                 disabled={loading}
                 onClick={handleAlojar}

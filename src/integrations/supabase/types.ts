@@ -578,6 +578,59 @@ export type Database = {
         }
         Relationships: []
       }
+      recebimento_lotes: {
+        Row: {
+          aspecto_pintinhos: string
+          created_at: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          motivo_eliminacao: string | null
+          observacoes: string | null
+          quantidade_caixas_conferidas: number
+          quantidade_eliminados: number
+          quantidade_mortos: number
+          quantidade_pintinhos_caixa: number
+          updated_at: string
+        }
+        Insert: {
+          aspecto_pintinhos: string
+          created_at?: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          motivo_eliminacao?: string | null
+          observacoes?: string | null
+          quantidade_caixas_conferidas?: number
+          quantidade_eliminados?: number
+          quantidade_mortos?: number
+          quantidade_pintinhos_caixa?: number
+          updated_at?: string
+        }
+        Update: {
+          aspecto_pintinhos?: string
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          motivo_eliminacao?: string | null
+          observacoes?: string | null
+          quantidade_caixas_conferidas?: number
+          quantidade_eliminados?: number
+          quantidade_mortos?: number
+          quantidade_pintinhos_caixa?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recebimento_lotes_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -623,7 +676,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "integrado" | "veterinario" | "tecnico"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
-      lote_status: "previsao" | "alojado" | "fechado"
+      lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       sexo_ave: "macho" | "femea" | "misto"
       tipo_bebedouro: "niple" | "tacas"
       tipo_comedouro: "manual" | "automatico"
@@ -758,7 +811,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "integrado", "veterinario", "tecnico"],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
-      lote_status: ["previsao", "alojado", "fechado"],
+      lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       sexo_ave: ["macho", "femea", "misto"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_comedouro: ["manual", "automatico"],
