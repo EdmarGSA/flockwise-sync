@@ -156,12 +156,12 @@ const FormulacaoDialog = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <Label>Filtrar por Grupo</Label>
-                <Select value={selectedGrupo} onValueChange={setSelectedGrupo}>
+                <Select value={selectedGrupo || "all"} onValueChange={(val) => setSelectedGrupo(val === "all" ? "" : val)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os grupos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {gruposProduto.map(grupo => (
                       <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
                     ))}
