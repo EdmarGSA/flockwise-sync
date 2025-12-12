@@ -48,10 +48,44 @@ const CadastroGruposAnimal = () => {
 
   useEffect(() => {
     if (user) {
-      fetchGrupos();
-      fetchFases();
+      initializeDefaultGroups();
     }
   }, [user]);
+
+  const initializeDefaultGroups = async () => {
+    const { data: existingGrupos, error } = await supabase
+      .from("grupos_animal")
+      .select("id")
+      .eq("integrado_id", user?.id)
+      .limit(1);
+
+    if (error) {
+      toast.error("Erro ao verificar grupos");
+      return;
+    }
+
+    if (!existingGrupos || existingGrupos.length === 0) {
+      const defaultGrupos = [
+        { nome: "Aves Corte", descricao: "Frangos de corte para abate", integrado_id: user?.id },
+        { nome: "Aves Postura", descricao: "Galinhas poedeiras para produção de ovos", integrado_id: user?.id },
+        { nome: "Suínos", descricao: "Criação de suínos", integrado_id: user?.id },
+        { nome: "Bovinos", descricao: "Criação de bovinos", integrado_id: user?.id },
+      ];
+
+      const { error: insertError } = await supabase
+        .from("grupos_animal")
+        .insert(defaultGrupos);
+
+      if (insertError) {
+        toast.error("Erro ao criar grupos padrão");
+      } else {
+        toast.success("Grupos padrão criados com sucesso!");
+      }
+    }
+
+    fetchGrupos();
+    fetchFases();
+  };
 
   const fetchGrupos = async () => {
     const { data, error } = await supabase
