@@ -7,42 +7,33 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
-  tipo_origem: z.string().default("terceiros"),
   ativo: z.boolean().default(true),
 });
 
-interface CategoriaFormProps {
+interface GrupoProdutoFormProps {
   integradoId: string;
   onSuccess: () => void;
 }
 
-const tiposOrigem = [
-  { value: "producao_propria", label: "Produção Própria" },
-  { value: "fabricacao_propria", label: "Fabricação Própria" },
-  { value: "terceiros", label: "Terceiros" },
-];
-
-const CategoriaForm = ({ integradoId, onSuccess }: CategoriaFormProps) => {
+const GrupoProdutoForm = ({ integradoId, onSuccess }: GrupoProdutoFormProps) => {
   const [loading, setLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       ativo: true,
-      tipo_origem: "terceiros",
     },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
-    const { error } = await supabase.from('categorias').insert({
+    const { error } = await supabase.from('grupos_produto').insert({
       ...values,
       integrado_id: integradoId,
     } as any);
@@ -67,7 +58,7 @@ const CategoriaForm = ({ integradoId, onSuccess }: CategoriaFormProps) => {
             <FormItem>
               <FormLabel>Nome *</FormLabel>
               <FormControl>
-                <Input placeholder="Nome da categoria" {...field} />
+                <Input placeholder="Ex: Ração, Suplemento, Cereais" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -80,30 +71,8 @@ const CategoriaForm = ({ integradoId, onSuccess }: CategoriaFormProps) => {
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Textarea placeholder="Descrição da categoria" {...field} />
+                <Textarea placeholder="Descrição do grupo de produto" {...field} />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="tipo_origem"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tipo de Origem</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {tiposOrigem.map((tipo) => (
-                    <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -123,7 +92,7 @@ const CategoriaForm = ({ integradoId, onSuccess }: CategoriaFormProps) => {
 
         <div className="flex justify-end gap-2 pt-4">
           <Button type="submit" disabled={loading}>
-            {loading ? "Salvando..." : "Salvar Categoria"}
+            {loading ? "Salvando..." : "Salvar Grupo"}
           </Button>
         </div>
       </form>
@@ -131,4 +100,4 @@ const CategoriaForm = ({ integradoId, onSuccess }: CategoriaFormProps) => {
   );
 };
 
-export default CategoriaForm;
+export default GrupoProdutoForm;
