@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
 import { PesagemDialog } from '@/components/lotes/PesagemDialog';
 import { MortalidadeDialog } from '@/components/lotes/MortalidadeDialog';
+import { RacaoLoteDialog } from '@/components/lotes/RacaoLoteDialog';
 
 interface Lote {
   id: string;
@@ -51,6 +52,7 @@ export default function MeusLotes() {
   const [recebimentoOpen, setRecebimentoOpen] = useState(false);
   const [pesagemOpen, setPesagemOpen] = useState(false);
   const [mortalidadeOpen, setMortalidadeOpen] = useState(false);
+  const [racaoOpen, setRacaoOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -202,6 +204,11 @@ export default function MeusLotes() {
   const handleMortalidade = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setMortalidadeOpen(true);
+  };
+
+  const handleRacao = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setRacaoOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -434,6 +441,10 @@ export default function MeusLotes() {
                                     <Target className="w-4 h-4" />
                                     Metas de Peso
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleRacao(lote)} className="gap-2">
+                                    <Package className="w-4 h-4" />
+                                    Ração
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
@@ -473,6 +484,15 @@ export default function MeusLotes() {
             onOpenChange={setMortalidadeOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
+            onSuccess={fetchLotes}
+          />
+          <RacaoLoteDialog
+            open={racaoOpen}
+            onOpenChange={setRacaoOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            nucleo={selectedLote.nucleo?.nome || '-'}
+            galpao={selectedLote.galpao?.nome || '-'}
             onSuccess={fetchLotes}
           />
         </>
