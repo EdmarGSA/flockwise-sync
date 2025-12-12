@@ -57,6 +57,7 @@ const CadastroProdutos = () => {
   };
 
   const initializeDefaultGrupos = async () => {
+    // Initialize default product groups
     const { data: existingGrupos } = await supabase
       .from("grupos_produto")
       .select("id")
@@ -73,6 +74,26 @@ const CadastroProdutos = () => {
       ];
 
       await supabase.from('grupos_produto').insert(defaultGrupos as any);
+    }
+
+    // Initialize default categories
+    const { data: existingCategorias } = await supabase
+      .from("categorias")
+      .select("id")
+      .eq("integrado_id", profile?.id)
+      .limit(1);
+
+    if (!existingCategorias || existingCategorias.length === 0) {
+      const defaultCategorias = [
+        { nome: "Ração Inicial", descricao: "Ração para fase inicial", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
+        { nome: "Ração Crescimento", descricao: "Ração para fase de crescimento", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
+        { nome: "Ração Engorda", descricao: "Ração para fase de engorda", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
+        { nome: "Insumos", descricao: "Matérias-primas e insumos", tipo_origem: "terceiros", integrado_id: profile?.id },
+        { nome: "Medicamentos", descricao: "Medicamentos e vacinas", tipo_origem: "terceiros", integrado_id: profile?.id },
+        { nome: "Suplementos", descricao: "Suplementos nutricionais", tipo_origem: "producao_propria", integrado_id: profile?.id },
+      ];
+
+      await supabase.from('categorias').insert(defaultCategorias as any);
     }
 
     fetchData();
