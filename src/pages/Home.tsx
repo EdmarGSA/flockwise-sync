@@ -12,7 +12,8 @@ import {
   BarChart3,
   AlertTriangle,
   LogOut,
-  Settings
+  Settings,
+  Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -43,6 +44,15 @@ const modules: ModuleCard[] = [
     icon: Map,
     path: '/gestao-campo',
     color: 'from-emerald-500 to-emerald-700',
+    available: true,
+  },
+  {
+    id: 'gestao-consumo',
+    title: 'Gestão de Consumo',
+    description: 'Solicitação e controle de ração',
+    icon: Package,
+    path: '/gestao-consumo',
+    color: 'from-orange-500 to-orange-700',
     available: true,
   },
   {
