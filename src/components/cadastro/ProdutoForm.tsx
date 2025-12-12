@@ -60,6 +60,12 @@ const origensOptions = [
   { value: "8", label: "8 - Nacional com Conteúdo de Importação > 70%" },
 ];
 
+const generateSKU = () => {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `PRD-${timestamp}-${random}`;
+};
+
 const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAnimal, fasesAnimal, onSuccess }: ProdutoFormProps) => {
   const [loading, setLoading] = useState(false);
   const [fasesDisponiveis, setFasesDisponiveis] = useState<any[]>([]);
@@ -67,7 +73,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sku: "",
+      sku: generateSKU(),
       nome: "",
       descricao: "",
       categoria_id: "",
@@ -144,7 +150,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                 <FormItem>
                   <FormLabel>SKU *</FormLabel>
                   <FormControl>
-                    <Input placeholder="SKU001" {...field} />
+                    <Input placeholder="SKU001" {...field} readOnly className="bg-muted" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -181,7 +187,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
               name="categoria_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Categoria</FormLabel>
+                  <FormLabel>Categoria de Produto</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
@@ -190,7 +196,9 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                     </FormControl>
                     <SelectContent>
                       {categorias.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.nome} {cat.tipo_origem ? `(${cat.tipo_origem})` : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
