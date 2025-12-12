@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings } from "lucide-react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -41,6 +40,12 @@ const Configuracoes = () => {
       description: "Cadastro completo de produtos e kardex",
       icon: Package,
       path: "/configuracoes/produtos"
+    },
+    {
+      title: "Grupos de Animais",
+      description: "Grupos e fases de produção animal",
+      icon: Layers,
+      path: "/configuracoes/grupos-animal"
     }
   ];
 

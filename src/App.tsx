@@ -16,6 +16,7 @@ import Configuracoes from "./pages/Configuracoes";
 import CadastroOrganizacao from "./pages/CadastroOrganizacao";
 import CadastroMembros from "./pages/CadastroMembros";
 import CadastroProdutos from "./pages/CadastroProdutos";
+import CadastroGruposAnimal from "./pages/CadastroGruposAnimal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -121,6 +122,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/produtos" element={
       <ProtectedRoute>
         <CadastroProdutos />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/grupos-animal" element={
+      <ProtectedRoute>
+        <CadastroGruposAnimal />
       </ProtectedRoute>
     } />
     

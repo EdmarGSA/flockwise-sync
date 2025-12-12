@@ -122,6 +122,53 @@ export type Database = {
         }
         Relationships: []
       }
+      fases_animal: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          dia_fim: number
+          dia_inicio: number
+          grupo_id: string
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dia_fim: number
+          dia_inicio?: number
+          grupo_id: string
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dia_fim?: number
+          dia_inicio?: number
+          grupo_id?: string
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fases_animal_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_animal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       galpoes: {
         Row: {
           altura: number
@@ -201,6 +248,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      grupos_animal: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       kardex: {
         Row: {
