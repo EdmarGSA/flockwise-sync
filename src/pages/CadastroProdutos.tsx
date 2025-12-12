@@ -184,6 +184,15 @@ const CadastroProdutos = () => {
     return labels[tipo] || tipo;
   };
 
+  const getTipoOrigemBadgeVariant = (tipo: string): "default" | "secondary" | "destructive" | "outline" => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      'producao_propria': 'outline',
+      'fabricacao_propria': 'default',
+      'terceiros': 'secondary',
+    };
+    return variants[tipo] || 'outline';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -309,7 +318,19 @@ const CadastroProdutos = () => {
                         <TableRow key={produto.id}>
                           <TableCell className="font-mono">{produto.sku}</TableCell>
                           <TableCell className="font-medium">{produto.nome}</TableCell>
-                          <TableCell>{produto.categorias?.nome || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <span>{produto.categorias?.nome || '-'}</span>
+                              {produto.categorias?.tipo_origem && (
+                                <Badge 
+                                  variant={getTipoOrigemBadgeVariant(produto.categorias.tipo_origem)}
+                                  className="w-fit text-xs"
+                                >
+                                  {getTipoOrigemLabel(produto.categorias.tipo_origem)}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <span className={Number(produto.estoque_atual) <= Number(produto.estoque_minimo) ? 'text-destructive font-bold' : ''}>
                               {produto.estoque_atual} {produto.unidade_medida}
@@ -328,15 +349,17 @@ const CadastroProdutos = () => {
                                 variant="ghost" 
                                 size="icon"
                                 onClick={() => setEditingProduto(produto)}
+                                title="Editar produto"
                               >
                                 <Pencil className="w-4 h-4" />
                               </Button>
                               {produto.categorias?.tipo_origem === 'fabricacao_propria' && (
                                 <Button 
-                                  variant="ghost" 
+                                  variant="outline" 
                                   size="icon"
                                   onClick={() => setFormulacaoProduto(produto)}
-                                  title="Formulação"
+                                  title="Cadastrar Formulação / Bill of Materials"
+                                  className="text-primary border-primary hover:bg-primary hover:text-primary-foreground"
                                 >
                                   <FlaskConical className="w-4 h-4" />
                                 </Button>
@@ -345,6 +368,7 @@ const CadastroProdutos = () => {
                                 variant="ghost" 
                                 size="icon"
                                 onClick={() => setSelectedProdutoKardex(produto)}
+                                title="Ver Kardex"
                               >
                                 <History className="w-4 h-4" />
                               </Button>
