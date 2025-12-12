@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical } from "lucide-react";
+import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical, RotateCcw } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import ProdutoForm from "@/components/cadastro/ProdutoForm";
@@ -138,6 +139,45 @@ const CadastroProdutos = () => {
     toast({ title: "Grupo salvo com sucesso!" });
   };
 
+  const handleResetDefaults = async () => {
+    setLoadingData(true);
+
+    // Delete existing categories for this user
+    await supabase
+      .from('categorias')
+      .delete()
+      .eq('integrado_id', profile?.id);
+
+    // Delete existing product groups for this user
+    await supabase
+      .from('grupos_produto')
+      .delete()
+      .eq('integrado_id', profile?.id);
+
+    // Recreate default categories
+    const defaultCategorias = [
+      { nome: "Produção Própria", descricao: "Produtos de produção própria", tipo_origem: "producao_propria", integrado_id: profile?.id },
+      { nome: "Fabricação Própria", descricao: "Produtos fabricados internamente", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
+      { nome: "Terceiros", descricao: "Produtos adquiridos de terceiros", tipo_origem: "terceiros", integrado_id: profile?.id },
+    ];
+
+    await supabase.from('categorias').insert(defaultCategorias as any);
+
+    // Recreate default product groups
+    const defaultGrupos = [
+      { nome: "Ração", descricao: "Rações para animais", integrado_id: profile?.id },
+      { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: profile?.id },
+      { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: profile?.id },
+      { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: profile?.id },
+      { nome: "Vacina", descricao: "Vacinas", integrado_id: profile?.id },
+    ];
+
+    await supabase.from('grupos_produto').insert(defaultGrupos as any);
+
+    await fetchData();
+    toast({ title: "Dados padrão recriados com sucesso!" });
+  };
+
   const getTipoOrigemLabel = (tipo: string) => {
     const labels: Record<string, string> = {
       'producao_propria': 'Produção Própria',
@@ -164,19 +204,44 @@ const CadastroProdutos = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-6 pt-24 pb-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Package className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Cadastro de Produtos</h1>
-              <p className="text-muted-foreground">Gerencie produtos, categorias, grupos e movimentações</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Package className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Cadastro de Produtos</h1>
+                <p className="text-muted-foreground">Gerencie produtos, categorias, grupos e movimentações</p>
+              </div>
             </div>
           </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <RotateCcw className="w-4 h-4" /> Recriar Padrões
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Recriar dados padrão?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação irá excluir todas as categorias e grupos de produtos existentes e recriá-los com os valores padrão:
+                  <br /><br />
+                  <strong>Categorias:</strong> Produção Própria, Fabricação Própria, Terceiros
+                  <br />
+                  <strong>Grupos:</strong> Ração, Suplemento, Cereais, Medicamento, Vacina
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleResetDefaults}>Confirmar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <Tabs defaultValue="produtos" className="space-y-6">
