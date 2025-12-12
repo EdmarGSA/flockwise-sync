@@ -167,7 +167,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoria</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione" />
@@ -189,7 +189,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grupo de Produto</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione" />
@@ -211,7 +211,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grupo de Animal</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione" />
@@ -235,7 +235,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                   <FormLabel>Fase do Animal</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value}
+                    value={field.value || undefined}
                     disabled={!selectedGrupoAnimal}
                   >
                     <FormControl>
