@@ -55,6 +55,7 @@ export type Database = {
           id: string
           integrado_id: string
           nome: string
+          tipo_origem: string | null
           updated_at: string
         }
         Insert: {
@@ -64,6 +65,7 @@ export type Database = {
           id?: string
           integrado_id: string
           nome: string
+          tipo_origem?: string | null
           updated_at?: string
         }
         Update: {
@@ -73,6 +75,7 @@ export type Database = {
           id?: string
           integrado_id?: string
           nome?: string
+          tipo_origem?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -250,6 +253,36 @@ export type Database = {
         ]
       }
       grupos_animal: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      grupos_produto: {
         Row: {
           ativo: boolean
           created_at: string
@@ -735,6 +768,51 @@ export type Database = {
           },
         ]
       }
+      produto_formulacao: {
+        Row: {
+          created_at: string
+          id: string
+          insumo_id: string
+          integrado_id: string
+          produto_id: string
+          quantidade: number
+          unidade_medida: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          insumo_id: string
+          integrado_id: string
+          produto_id: string
+          quantidade: number
+          unidade_medida?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          insumo_id?: string
+          integrado_id?: string
+          produto_id?: string
+          quantidade?: number
+          unidade_medida?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_formulacao_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_formulacao_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
@@ -752,6 +830,9 @@ export type Database = {
           embalagem_tipo: string | null
           estoque_atual: number
           estoque_minimo: number
+          fase_animal_id: string | null
+          grupo_animal_id: string | null
+          grupo_produto_id: string | null
           id: string
           integrado_id: string
           localizacao_estoque: string | null
@@ -780,6 +861,9 @@ export type Database = {
           embalagem_tipo?: string | null
           estoque_atual?: number
           estoque_minimo?: number
+          fase_animal_id?: string | null
+          grupo_animal_id?: string | null
+          grupo_produto_id?: string | null
           id?: string
           integrado_id: string
           localizacao_estoque?: string | null
@@ -808,6 +892,9 @@ export type Database = {
           embalagem_tipo?: string | null
           estoque_atual?: number
           estoque_minimo?: number
+          fase_animal_id?: string | null
+          grupo_animal_id?: string | null
+          grupo_produto_id?: string | null
           id?: string
           integrado_id?: string
           localizacao_estoque?: string | null
@@ -826,6 +913,27 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_fase_animal_id_fkey"
+            columns: ["fase_animal_id"]
+            isOneToOne: false
+            referencedRelation: "fases_animal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_grupo_animal_id_fkey"
+            columns: ["grupo_animal_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_animal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_grupo_produto_id_fkey"
+            columns: ["grupo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_produto"
             referencedColumns: ["id"]
           },
         ]

@@ -8,12 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Package, History, Pencil, FolderTree } from "lucide-react";
+import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import ProdutoForm from "@/components/cadastro/ProdutoForm";
 import ProdutoEditForm from "@/components/cadastro/ProdutoEditForm";
 import CategoriaForm from "@/components/cadastro/CategoriaForm";
+import GrupoProdutoForm from "@/components/cadastro/GrupoProdutoForm";
+import FormulacaoDialog from "@/components/cadastro/FormulacaoDialog";
 import KardexView from "@/components/cadastro/KardexView";
 
 const CadastroProdutos = () => {
@@ -21,11 +23,16 @@ const CadastroProdutos = () => {
   const navigate = useNavigate();
   const [produtos, setProdutos] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
+  const [gruposProduto, setGruposProduto] = useState<any[]>([]);
+  const [gruposAnimal, setGruposAnimal] = useState<any[]>([]);
+  const [fasesAnimal, setFasesAnimal] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [showProdutoForm, setShowProdutoForm] = useState(false);
   const [showCategoriaForm, setShowCategoriaForm] = useState(false);
+  const [showGrupoForm, setShowGrupoForm] = useState(false);
   const [editingProduto, setEditingProduto] = useState<any>(null);
   const [selectedProdutoKardex, setSelectedProdutoKardex] = useState<any>(null);
+  const [formulacaoProduto, setFormulacaoProduto] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -36,7 +43,7 @@ const CadastroProdutos = () => {
 
   useEffect(() => {
     if (profile) {
-      fetchData();
+      initializeDefaultGrupos();
     }
   }, [profile]);
 
@@ -49,16 +56,44 @@ const CadastroProdutos = () => {
     setProfile(data);
   };
 
+  const initializeDefaultGrupos = async () => {
+    const { data: existingGrupos } = await supabase
+      .from("grupos_produto")
+      .select("id")
+      .eq("integrado_id", profile?.id)
+      .limit(1);
+
+    if (!existingGrupos || existingGrupos.length === 0) {
+      const defaultGrupos = [
+        { nome: "Ração", descricao: "Rações para animais", integrado_id: profile?.id },
+        { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: profile?.id },
+        { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: profile?.id },
+        { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: profile?.id },
+        { nome: "Vacina", descricao: "Vacinas", integrado_id: profile?.id },
+      ];
+
+      await supabase.from('grupos_produto').insert(defaultGrupos as any);
+    }
+
+    fetchData();
+  };
+
   const fetchData = async () => {
     setLoadingData(true);
     
-    const [produtosRes, categoriasRes] = await Promise.all([
-      supabase.from('produtos').select('*, categorias(nome)').eq('integrado_id', profile?.id),
-      supabase.from('categorias').select('*').eq('integrado_id', profile?.id)
+    const [produtosRes, categoriasRes, gruposProdutoRes, gruposAnimalRes, fasesRes] = await Promise.all([
+      supabase.from('produtos').select('*, categorias(nome, tipo_origem)').eq('integrado_id', profile?.id),
+      supabase.from('categorias').select('*').eq('integrado_id', profile?.id),
+      supabase.from('grupos_produto').select('*').eq('integrado_id', profile?.id),
+      supabase.from('grupos_animal').select('*').eq('integrado_id', profile?.id),
+      supabase.from('fases_animal').select('*').eq('integrado_id', profile?.id),
     ]);
 
     if (produtosRes.data) setProdutos(produtosRes.data);
     if (categoriasRes.data) setCategorias(categoriasRes.data);
+    if (gruposProdutoRes.data) setGruposProduto(gruposProdutoRes.data);
+    if (gruposAnimalRes.data) setGruposAnimal(gruposAnimalRes.data);
+    if (fasesRes.data) setFasesAnimal(fasesRes.data);
     
     setLoadingData(false);
   };
@@ -74,6 +109,21 @@ const CadastroProdutos = () => {
     setShowCategoriaForm(false);
     fetchData();
     toast({ title: "Categoria salva com sucesso!" });
+  };
+
+  const handleGrupoSuccess = () => {
+    setShowGrupoForm(false);
+    fetchData();
+    toast({ title: "Grupo salvo com sucesso!" });
+  };
+
+  const getTipoOrigemLabel = (tipo: string) => {
+    const labels: Record<string, string> = {
+      'producao_propria': 'Produção Própria',
+      'fabricacao_propria': 'Fabricação Própria',
+      'terceiros': 'Terceiros',
+    };
+    return labels[tipo] || tipo;
   };
 
   if (loading) {
@@ -103,7 +153,7 @@ const CadastroProdutos = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Cadastro de Produtos</h1>
-              <p className="text-muted-foreground">Gerencie produtos, categorias e movimentações</p>
+              <p className="text-muted-foreground">Gerencie produtos, categorias, grupos e movimentações</p>
             </div>
           </div>
         </div>
@@ -112,6 +162,9 @@ const CadastroProdutos = () => {
           <TabsList>
             <TabsTrigger value="produtos" className="gap-2">
               <Package className="w-4 h-4" /> Produtos
+            </TabsTrigger>
+            <TabsTrigger value="grupos" className="gap-2">
+              <Layers className="w-4 h-4" /> Grupos
             </TabsTrigger>
             <TabsTrigger value="categorias" className="gap-2">
               <FolderTree className="w-4 h-4" /> Categorias
@@ -139,6 +192,9 @@ const CadastroProdutos = () => {
                       integradoId={profile?.id} 
                       userId={user?.id}
                       categorias={categorias}
+                      gruposProduto={gruposProduto}
+                      gruposAnimal={gruposAnimal}
+                      fasesAnimal={fasesAnimal}
                       onSuccess={handleProdutoSuccess} 
                     />
                   </DialogContent>
@@ -192,6 +248,16 @@ const CadastroProdutos = () => {
                               >
                                 <Pencil className="w-4 h-4" />
                               </Button>
+                              {produto.categorias?.tipo_origem === 'fabricacao_propria' && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => setFormulacaoProduto(produto)}
+                                  title="Formulação"
+                                >
+                                  <FlaskConical className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button 
                                 variant="ghost" 
                                 size="icon"
@@ -200,6 +266,59 @@ const CadastroProdutos = () => {
                                 <History className="w-4 h-4" />
                               </Button>
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="grupos">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Grupos de Produtos</CardTitle>
+                <Dialog open={showGrupoForm} onOpenChange={setShowGrupoForm}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="w-4 h-4" /> Novo Grupo
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Novo Grupo de Produto</DialogTitle>
+                    </DialogHeader>
+                    <GrupoProdutoForm integradoId={profile?.id} onSuccess={handleGrupoSuccess} />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {loadingData ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : gruposProduto.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">Nenhum grupo cadastrado</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gruposProduto.map((grupo) => (
+                        <TableRow key={grupo.id}>
+                          <TableCell className="font-medium">{grupo.nome}</TableCell>
+                          <TableCell>{grupo.descricao || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant={grupo.ativo ? "default" : "secondary"}>
+                              {grupo.ativo ? 'Ativo' : 'Inativo'}
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -241,6 +360,7 @@ const CadastroProdutos = () => {
                       <TableRow>
                         <TableHead>Nome</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead>Tipo de Origem</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -249,6 +369,11 @@ const CadastroProdutos = () => {
                         <TableRow key={categoria.id}>
                           <TableCell className="font-medium">{categoria.nome}</TableCell>
                           <TableCell>{categoria.descricao || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {getTipoOrigemLabel(categoria.tipo_origem)}
+                            </Badge>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={categoria.ativo ? "default" : "secondary"}>
                               {categoria.ativo ? 'Ativo' : 'Inativo'}
@@ -279,6 +404,9 @@ const CadastroProdutos = () => {
                 produto={editingProduto}
                 userId={user?.id}
                 categorias={categorias}
+                gruposProduto={gruposProduto}
+                gruposAnimal={gruposAnimal}
+                fasesAnimal={fasesAnimal}
                 onSuccess={handleProdutoSuccess}
               />
             )}
@@ -300,6 +428,16 @@ const CadastroProdutos = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Formulação Dialog */}
+        <FormulacaoDialog
+          open={!!formulacaoProduto}
+          onOpenChange={() => setFormulacaoProduto(null)}
+          produto={formulacaoProduto}
+          integradoId={profile?.id}
+          gruposProduto={gruposProduto}
+          produtos={produtos}
+        />
       </main>
     </div>
   );

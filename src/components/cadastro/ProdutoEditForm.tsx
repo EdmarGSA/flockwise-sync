@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,6 +16,9 @@ const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   categoria_id: z.string().optional(),
+  grupo_produto_id: z.string().optional(),
+  grupo_animal_id: z.string().optional(),
+  fase_animal_id: z.string().optional(),
   marca: z.string().optional(),
   ativo: z.boolean().default(true),
   unidade_medida: z.string().default("UN"),
@@ -38,6 +41,9 @@ interface ProdutoEditFormProps {
   produto: any;
   userId: string;
   categorias: any[];
+  gruposProduto: any[];
+  gruposAnimal: any[];
+  fasesAnimal: any[];
   onSuccess: () => void;
 }
 
@@ -54,8 +60,9 @@ const origensOptions = [
   { value: "8", label: "8 - Nacional com Conteúdo de Importação > 70%" },
 ];
 
-const ProdutoEditForm = ({ produto, userId, categorias, onSuccess }: ProdutoEditFormProps) => {
+const ProdutoEditForm = ({ produto, userId, categorias, gruposProduto, gruposAnimal, fasesAnimal, onSuccess }: ProdutoEditFormProps) => {
   const [loading, setLoading] = useState(false);
+  const [fasesDisponiveis, setFasesDisponiveis] = useState<any[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,6 +71,9 @@ const ProdutoEditForm = ({ produto, userId, categorias, onSuccess }: ProdutoEdit
       nome: produto.nome || "",
       descricao: produto.descricao || "",
       categoria_id: produto.categoria_id || "",
+      grupo_produto_id: produto.grupo_produto_id || "",
+      grupo_animal_id: produto.grupo_animal_id || "",
+      fase_animal_id: produto.fase_animal_id || "",
       marca: produto.marca || "",
       ativo: produto.ativo ?? true,
       unidade_medida: produto.unidade_medida || "UN",
@@ -83,6 +93,24 @@ const ProdutoEditForm = ({ produto, userId, categorias, onSuccess }: ProdutoEdit
     },
   });
 
+  const selectedGrupoAnimal = form.watch("grupo_animal_id");
+
+  useEffect(() => {
+    if (selectedGrupoAnimal) {
+      const fases = fasesAnimal.filter(f => f.grupo_id === selectedGrupoAnimal);
+      setFasesDisponiveis(fases);
+    } else {
+      setFasesDisponiveis([]);
+    }
+  }, [selectedGrupoAnimal, fasesAnimal]);
+
+  useEffect(() => {
+    if (produto.grupo_animal_id) {
+      const fases = fasesAnimal.filter(f => f.grupo_id === produto.grupo_animal_id);
+      setFasesDisponiveis(fases);
+    }
+  }, [produto.grupo_animal_id, fasesAnimal]);
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
@@ -91,6 +119,9 @@ const ProdutoEditForm = ({ produto, userId, categorias, onSuccess }: ProdutoEdit
       .update({
         ...values,
         categoria_id: values.categoria_id || null,
+        grupo_produto_id: values.grupo_produto_id || null,
+        grupo_animal_id: values.grupo_animal_id || null,
+        fase_animal_id: values.fase_animal_id || null,
         atualizado_por: userId,
       })
       .eq('id', produto.id);
@@ -168,6 +199,78 @@ const ProdutoEditForm = ({ produto, userId, categorias, onSuccess }: ProdutoEdit
                     <SelectContent>
                       {categorias.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="grupo_produto_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Grupo de Produto</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {gruposProduto.map((grupo) => (
+                        <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="grupo_animal_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Grupo de Animal</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {gruposAnimal.map((grupo) => (
+                        <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fase_animal_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fase do Animal</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={!selectedGrupoAnimal}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedGrupoAnimal ? "Selecione" : "Selecione um grupo primeiro"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {fasesDisponiveis.map((fase) => (
+                        <SelectItem key={fase.id} value={fase.id}>
+                          {fase.nome} ({fase.dia_inicio}-{fase.dia_fim} dias)
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
