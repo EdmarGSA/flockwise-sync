@@ -26,6 +26,7 @@ interface ItemFormulacao {
   quantidade: number;
   unidade_medida: string;
   grupo_nome?: string;
+  custo_unitario: number;
 }
 
 const FormulacaoDialog = ({ 
@@ -57,7 +58,7 @@ const FormulacaoDialog = ({
     setLoading(true);
     const { data, error } = await supabase
       .from('produto_formulacao')
-      .select('*, insumo:produtos!produto_formulacao_insumo_id_fkey(id, nome, unidade_medida, grupo_produto_id)')
+      .select('*, insumo:produtos!produto_formulacao_insumo_id_fkey(id, nome, unidade_medida, grupo_produto_id, custo_unitario)')
       .eq('produto_id', produto.id);
 
     if (data) {
@@ -68,6 +69,7 @@ const FormulacaoDialog = ({
         quantidade: Number(item.quantidade),
         unidade_medida: item.unidade_medida,
         grupo_nome: gruposProduto.find(g => g.id === item.insumo?.grupo_produto_id)?.nome,
+        custo_unitario: Number(item.insumo?.custo_unitario || 0),
       }));
       setItens(mappedItens);
     }
@@ -89,6 +91,7 @@ const FormulacaoDialog = ({
       quantidade: Number(quantidade),
       unidade_medida: unidadeMedida,
       grupo_nome: gruposProduto.find(g => g.id === insumo.grupo_produto_id)?.nome,
+      custo_unitario: Number(insumo.custo_unitario || 0),
     };
 
     setItens([...itens, novoItem]);
@@ -138,6 +141,7 @@ const FormulacaoDialog = ({
   };
 
   const totalQuantidade = itens.reduce((acc, item) => acc + item.quantidade, 0);
+  const totalCusto = itens.reduce((acc, item) => acc + (item.quantidade * item.custo_unitario), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,6 +212,8 @@ const FormulacaoDialog = ({
                   <TableHead>Insumo</TableHead>
                   <TableHead className="text-right">Quantidade</TableHead>
                   <TableHead>Unidade</TableHead>
+                  <TableHead className="text-right">Custo Unit.</TableHead>
+                  <TableHead className="text-right">Custo Total</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -220,6 +226,12 @@ const FormulacaoDialog = ({
                     <TableCell className="font-medium">{item.insumo_nome}</TableCell>
                     <TableCell className="text-right">{item.quantidade.toFixed(3)}</TableCell>
                     <TableCell>{item.unidade_medida}</TableCell>
+                    <TableCell className="text-right">
+                      R$ {item.custo_unitario.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      R$ {(item.quantidade * item.custo_unitario).toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       <Button 
                         variant="ghost" 
@@ -231,10 +243,15 @@ const FormulacaoDialog = ({
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={2} className="font-bold">Total</TableCell>
-                  <TableCell className="text-right font-bold">{totalQuantidade.toFixed(3)}</TableCell>
-                  <TableCell colSpan={2}>KG</TableCell>
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell colSpan={2}>Total</TableCell>
+                  <TableCell className="text-right">{totalQuantidade.toFixed(3)}</TableCell>
+                  <TableCell>KG</TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right text-primary">
+                    R$ {totalCusto.toFixed(2)}
+                  </TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
