@@ -842,6 +842,75 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_racao: {
+        Row: {
+          confirmado_por: string | null
+          created_at: string
+          data_confirmacao: string | null
+          data_devolucao: string | null
+          data_envio: string | null
+          data_prevista_entrega: string | null
+          data_recebimento: string | null
+          data_solicitacao: string
+          devolucao_confirmada: boolean | null
+          id: string
+          integrado_id: string
+          lote_id: string
+          observacoes: string | null
+          quantidade_devolvida_kg: number | null
+          quantidade_recebida_kg: number | null
+          quantidade_solicitada_kg: number
+          solicitado_por: string | null
+          status: string
+          tipo_racao: string
+          updated_at: string
+        }
+        Insert: {
+          confirmado_por?: string | null
+          created_at?: string
+          data_confirmacao?: string | null
+          data_devolucao?: string | null
+          data_envio?: string | null
+          data_prevista_entrega?: string | null
+          data_recebimento?: string | null
+          data_solicitacao?: string
+          devolucao_confirmada?: boolean | null
+          id?: string
+          integrado_id: string
+          lote_id: string
+          observacoes?: string | null
+          quantidade_devolvida_kg?: number | null
+          quantidade_recebida_kg?: number | null
+          quantidade_solicitada_kg: number
+          solicitado_por?: string | null
+          status?: string
+          tipo_racao: string
+          updated_at?: string
+        }
+        Update: {
+          confirmado_por?: string | null
+          created_at?: string
+          data_confirmacao?: string | null
+          data_devolucao?: string | null
+          data_envio?: string | null
+          data_prevista_entrega?: string | null
+          data_recebimento?: string | null
+          data_solicitacao?: string
+          devolucao_confirmada?: boolean | null
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          observacoes?: string | null
+          quantidade_devolvida_kg?: number | null
+          quantidade_recebida_kg?: number | null
+          quantidade_solicitada_kg?: number
+          solicitado_por?: string | null
+          status?: string
+          tipo_racao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
