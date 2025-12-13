@@ -28,7 +28,8 @@ interface Lote {
   data_prevista_alojamento: string;
   data_alojamento: string | null;
   data_fechamento: string | null;
-  linhagem: string;
+  linhagem: 'cobb_500' | 'ross_308' | 'hubbard';
+  sexo: 'macho' | 'femea' | 'misto';
   status: string;
   veterinario_id: string | null;
   integrado_id: string;
@@ -75,6 +76,7 @@ export default function MeusLotes() {
         data_alojamento,
         data_fechamento,
         linhagem,
+        sexo,
         status,
         integrado_id,
         peso_medio_pintinhos,
@@ -504,6 +506,8 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
+            linhagem={selectedLote.linhagem}
+            sexo={selectedLote.sexo}
             onSuccess={fetchLotes}
           />
           <MortalidadeDialog
