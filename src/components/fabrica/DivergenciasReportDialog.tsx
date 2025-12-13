@@ -3,10 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertTriangle, Check, CheckCircle, Lock, Shield, Package } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle, Lock, Shield } from 'lucide-react';
 import AutorizacaoDivergenciaDialog from './AutorizacaoDivergenciaDialog';
 
 interface ItemConferido {
@@ -18,6 +18,9 @@ interface ItemConferido {
   preco_oc: number;
   preco_nfe: number;
   lote_fornecedor: string;
+  unidade_compra: string | null;
+  fator_conversao: number | null;
+  quantidade_estoque: number | null;
   produtos: {
     id: string;
     nome: string;
@@ -78,14 +81,15 @@ export default function DivergenciasReportDialog({
       if (referencia > 0 && item.quantidade_fisica !== referencia) {
         const diferenca = item.quantidade_fisica - referencia;
         const percentual = (diferenca / referencia) * 100;
+        const unidade = item.unidade_compra || item.produtos.unidade_medida;
         
         if (Math.abs(percentual) > 0.5) {
           divs.push({
             id: `qty-${divIndex++}`,
             tipo: 'quantidade',
             descricao: diferenca < 0 
-              ? `Faltam ${Math.abs(diferenca).toFixed(2)} ${item.produtos.unidade_medida}`
-              : `Excesso de ${diferenca.toFixed(2)} ${item.produtos.unidade_medida}`,
+              ? `Faltam ${Math.abs(diferenca).toFixed(2)} ${unidade}`
+              : `Excesso de ${diferenca.toFixed(2)} ${unidade}`,
             itemId: item.id,
             produtoNome: item.produtos.nome,
             valorOc: item.quantidade_oc,
@@ -214,8 +218,13 @@ export default function DivergenciasReportDialog({
       if (fetchError) throw fetchError;
 
       // Create kardex entries for each item (with quarantine status)
+      // USE CONVERTED STOCK QUANTITY (quantidade_estoque)
       for (const item of itens) {
-        if (item.quantidade_fisica > 0) {
+        // Calculate stock quantity using conversion factor
+        const fatorConversao = item.fator_conversao || 1;
+        const quantidadeEstoque = item.quantidade_fisica * fatorConversao;
+        
+        if (quantidadeEstoque > 0) {
           // Get current stock
           const { data: produto, error: prodError } = await supabase
             .from('produtos')
@@ -226,21 +235,21 @@ export default function DivergenciasReportDialog({
           if (prodError) throw prodError;
 
           const saldoAnterior = produto?.estoque_atual || 0;
-          const saldoAtual = saldoAnterior + item.quantidade_fisica;
+          const saldoAtual = saldoAnterior + quantidadeEstoque;
 
-          // Insert kardex entry with quarantine
+          // Insert kardex entry with quarantine - using STOCK QUANTITY
           const { error: kardexError } = await supabase
             .from('kardex')
             .insert({
               integrado_id: integradoId,
               produto_id: item.produto_id,
               tipo_movimento: 'entrada',
-              quantidade: item.quantidade_fisica,
+              quantidade: quantidadeEstoque, // Stock quantity, not physical
               saldo_anterior: saldoAnterior,
               saldo_atual: saldoAtual,
               custo_unitario: item.preco_nfe || item.preco_oc,
               documento_ref: `NF-e ${recebimento?.numero_nfe || 'S/N'}`,
-              observacao: `Recebimento - Lote: ${item.lote_fornecedor || 'N/A'}`,
+              observacao: `Recebimento - ${item.quantidade_fisica} ${item.unidade_compra || item.produtos.unidade_medida} (${quantidadeEstoque} ${item.produtos.unidade_medida}) - Lote: ${item.lote_fornecedor || 'N/A'}`,
               lote_fornecedor: item.lote_fornecedor || null,
               status_quarentena: 'quarentena',
               recebimento_id: recebimentoId
@@ -248,7 +257,7 @@ export default function DivergenciasReportDialog({
 
           if (kardexError) throw kardexError;
 
-          // Update product stock
+          // Update product stock with CONVERTED quantity
           const { error: stockError } = await supabase
             .from('produtos')
             .update({ estoque_atual: saldoAtual })
@@ -471,15 +480,10 @@ export default function DivergenciasReportDialog({
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Voltar
+            Cancelar
           </Button>
           <Button onClick={handleFinalizar} disabled={loading}>
-            {loading ? 'Finalizando...' : (
-              <>
-                <Package className="w-4 h-4 mr-2" />
-                Finalizar Recebimento
-              </>
-            )}
+            {loading ? 'Finalizando...' : 'Finalizar Recebimento'}
           </Button>
         </div>
       </DialogContent>

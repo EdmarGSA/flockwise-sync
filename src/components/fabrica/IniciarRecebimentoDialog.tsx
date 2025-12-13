@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileText, Package, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Upload, CheckCircle, Package, ArrowRight } from 'lucide-react';
 import ConferenciaFisicaDialog from './ConferenciaFisicaDialog';
 
 interface OrdemCompra {
@@ -25,11 +25,15 @@ interface OrdemCompra {
     quantidade: number;
     preco_unitario: number;
     quantidade_recebida: number;
+    unidade_compra: string | null;
+    fator_conversao: number | null;
     produtos: {
       id: string;
       nome: string;
       sku: string;
       unidade_medida: string;
+      unidade_compra: string | null;
+      fator_conversao: number | null;
     };
   }[];
 }
@@ -109,7 +113,9 @@ export default function IniciarRecebimentoDialog({
             quantidade,
             preco_unitario,
             quantidade_recebida,
-            produtos(id, nome, sku, unidade_medida)
+            unidade_compra,
+            fator_conversao,
+            produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao)
           )
         `)
         .eq('integrado_id', integradoId)
@@ -270,6 +276,10 @@ export default function IniciarRecebimentoDialog({
                   ni.descricao.toLowerCase().includes(item.produtos.nome.toLowerCase())
           );
 
+          // Use conversion data from OC item if available, otherwise from product
+          const unidadeCompra = item.unidade_compra || item.produtos.unidade_compra || item.produtos.unidade_medida;
+          const fatorConversao = item.fator_conversao || item.produtos.fator_conversao || 1;
+
           itensToInsert.push({
             recebimento_id: recebimento.id,
             ordem_compra_item_id: item.id,
@@ -281,7 +291,10 @@ export default function IniciarRecebimentoDialog({
             preco_nfe: nfeItem?.valorUnitario || 0,
             codigo_produto_nfe: nfeItem?.codigo || null,
             descricao_produto_nfe: nfeItem?.descricao || null,
-            unidade_nfe: nfeItem?.unidade || null
+            unidade_nfe: nfeItem?.unidade || null,
+            unidade_compra: unidadeCompra,
+            fator_conversao: fatorConversao,
+            quantidade_estoque: 0
           });
         }
       } else if (nfeData) {
@@ -290,12 +303,15 @@ export default function IniciarRecebimentoDialog({
           // Find matching product by SKU or name
           const { data: produto } = await supabase
             .from('produtos')
-            .select('id')
+            .select('id, unidade_medida, unidade_compra, fator_conversao')
             .eq('integrado_id', integradoId)
             .or(`sku.eq.${nfeItem.codigo},nome.ilike.%${nfeItem.descricao.substring(0, 30)}%`)
             .maybeSingle();
 
           if (produto) {
+            const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
+            const fatorConversao = produto.fator_conversao || 1;
+
             itensToInsert.push({
               recebimento_id: recebimento.id,
               produto_id: produto.id,
@@ -306,7 +322,10 @@ export default function IniciarRecebimentoDialog({
               preco_nfe: nfeItem.valorUnitario,
               codigo_produto_nfe: nfeItem.codigo,
               descricao_produto_nfe: nfeItem.descricao,
-              unidade_nfe: nfeItem.unidade
+              unidade_nfe: nfeItem.unidade,
+              unidade_compra: unidadeCompra,
+              fator_conversao: fatorConversao,
+              quantidade_estoque: 0
             });
           }
         }
@@ -398,14 +417,27 @@ export default function IniciarRecebimentoDialog({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 text-sm">
-                    {getSelectedOC()?.ordens_compra_itens.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center py-1 border-b border-border/50">
-                        <span>{item.produtos.nome}</span>
-                        <span className="text-muted-foreground">
-                          {item.quantidade - (item.quantidade_recebida || 0)} {item.produtos.unidade_medida} pendente
-                        </span>
-                      </div>
-                    ))}
+                    {getSelectedOC()?.ordens_compra_itens.map((item) => {
+                      const unidadeCompra = item.unidade_compra || item.produtos.unidade_compra || item.produtos.unidade_medida;
+                      const fatorConversao = item.fator_conversao || item.produtos.fator_conversao || 1;
+                      const qtdPendente = item.quantidade - (item.quantidade_recebida || 0);
+                      const qtdEstoque = qtdPendente * fatorConversao;
+                      
+                      return (
+                        <div key={item.id} className="flex justify-between items-center py-1 border-b border-border/50">
+                          <span>{item.produtos.nome}</span>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <span>{qtdPendente} {unidadeCompra}</span>
+                            {fatorConversao > 1 && (
+                              <>
+                                <ArrowRight className="w-3 h-3" />
+                                <span className="text-green-600">{qtdEstoque} {item.produtos.unidade_medida}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -491,10 +523,10 @@ export default function IniciarRecebimentoDialog({
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(nfeData.valorTotal)}
                   </span>
                 </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Itens: </span>
-                  <span className="font-medium">{nfeData.itens.length} produtos</span>
-                </div>
+              </div>
+              <div className="pt-2 border-t border-border">
+                <span className="text-muted-foreground">Itens: </span>
+                <span className="font-medium">{nfeData.itens.length} produto(s)</span>
               </div>
             </CardContent>
           </Card>
@@ -505,7 +537,7 @@ export default function IniciarRecebimentoDialog({
             Cancelar
           </Button>
           <Button onClick={handleIniciarConferencia} disabled={loading}>
-            {loading ? 'Processando...' : 'Próximo: Conferência Física'}
+            {loading ? 'Iniciando...' : 'Iniciar Conferência Física'}
           </Button>
         </div>
       </DialogContent>

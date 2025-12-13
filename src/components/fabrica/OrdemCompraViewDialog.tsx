@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Truck, Calendar, CreditCard, Package } from 'lucide-react';
+import { FileText, Truck, Calendar, CreditCard, Package, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -47,12 +47,15 @@ interface OrdemCompra {
     id: string;
     quantidade: number;
     unidade_medida: string;
+    unidade_compra: string | null;
+    fator_conversao: number | null;
     preco_unitario: number;
     preco_total: number;
     quantidade_recebida: number | null;
     produtos: {
       nome: string;
       sku: string;
+      unidade_medida: string;
     };
   }[];
 }
@@ -102,10 +105,12 @@ export default function OrdemCompraViewDialog({
           id,
           quantidade,
           unidade_medida,
+          unidade_compra,
+          fator_conversao,
           preco_unitario,
           preco_total,
           quantidade_recebida,
-          produtos!inner(nome, sku)
+          produtos!inner(nome, sku, unidade_medida)
         `)
         .eq('ordem_compra_id', ordemId);
 
@@ -207,27 +212,45 @@ export default function OrdemCompraViewDialog({
                       <TableRow>
                         <TableHead>Produto</TableHead>
                         <TableHead>SKU</TableHead>
-                        <TableHead className="text-right">Qtd.</TableHead>
+                        <TableHead className="text-right">Qtd. Compra</TableHead>
+                        <TableHead className="text-right">Qtd. Estoque</TableHead>
                         <TableHead className="text-right">Preço Unit.</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ordem.itens.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.produtos.nome}</TableCell>
-                          <TableCell className="text-muted-foreground">{item.produtos.sku}</TableCell>
-                          <TableCell className="text-right">
-                            {item.quantidade} {item.unidade_medida}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            R$ {item.preco_unitario.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            R$ {item.preco_total.toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {ordem.itens.map((item) => {
+                        const unidadeCompra = item.unidade_compra || item.unidade_medida;
+                        const fatorConversao = item.fator_conversao || 1;
+                        const qtdEstoque = item.quantidade * fatorConversao;
+                        
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.produtos.nome}</TableCell>
+                            <TableCell className="text-muted-foreground">{item.produtos.sku}</TableCell>
+                            <TableCell className="text-right">
+                              {item.quantidade} {unidadeCompra}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {fatorConversao > 1 ? (
+                                <div className="flex items-center justify-end gap-1">
+                                  <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-green-600">{qtdEstoque}</span>
+                                  <span className="text-muted-foreground">{item.produtos.unidade_medida}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              R$ {item.preco_unitario.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              R$ {item.preco_total.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
