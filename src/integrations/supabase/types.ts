@@ -188,6 +188,81 @@ export type Database = {
         }
         Relationships: []
       }
+      divergencias_recebimento: {
+        Row: {
+          aceita: boolean | null
+          created_at: string
+          criado_por: string | null
+          data_resolucao: string | null
+          descricao: string
+          id: string
+          percentual_diferenca: number | null
+          recebimento_id: string
+          recebimento_item_id: string | null
+          resolucao: string | null
+          resolvido_por: string | null
+          status: Database["public"]["Enums"]["divergencia_status"]
+          tipo: Database["public"]["Enums"]["divergencia_tipo"]
+          updated_at: string
+          valor_fisico: number | null
+          valor_nfe: number | null
+          valor_oc: number | null
+        }
+        Insert: {
+          aceita?: boolean | null
+          created_at?: string
+          criado_por?: string | null
+          data_resolucao?: string | null
+          descricao: string
+          id?: string
+          percentual_diferenca?: number | null
+          recebimento_id: string
+          recebimento_item_id?: string | null
+          resolucao?: string | null
+          resolvido_por?: string | null
+          status?: Database["public"]["Enums"]["divergencia_status"]
+          tipo: Database["public"]["Enums"]["divergencia_tipo"]
+          updated_at?: string
+          valor_fisico?: number | null
+          valor_nfe?: number | null
+          valor_oc?: number | null
+        }
+        Update: {
+          aceita?: boolean | null
+          created_at?: string
+          criado_por?: string | null
+          data_resolucao?: string | null
+          descricao?: string
+          id?: string
+          percentual_diferenca?: number | null
+          recebimento_id?: string
+          recebimento_item_id?: string | null
+          resolucao?: string | null
+          resolvido_por?: string | null
+          status?: Database["public"]["Enums"]["divergencia_status"]
+          tipo?: Database["public"]["Enums"]["divergencia_tipo"]
+          updated_at?: string
+          valor_fisico?: number | null
+          valor_nfe?: number | null
+          valor_oc?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "divergencias_recebimento_recebimento_id_fkey"
+            columns: ["recebimento_id"]
+            isOneToOne: false
+            referencedRelation: "recebimentos_mercadoria"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "divergencias_recebimento_recebimento_item_id_fkey"
+            columns: ["recebimento_item_id"]
+            isOneToOne: false
+            referencedRelation: "recebimento_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fases_animal: {
         Row: {
           ativo: boolean
@@ -383,11 +458,16 @@ export type Database = {
           documento_ref: string | null
           id: string
           integrado_id: string
+          lote_fornecedor: string | null
           observacao: string | null
           produto_id: string
           quantidade: number
+          recebimento_id: string | null
           saldo_anterior: number
           saldo_atual: number
+          status_quarentena:
+            | Database["public"]["Enums"]["status_quarentena"]
+            | null
           tipo_movimento: string
         }
         Insert: {
@@ -397,11 +477,16 @@ export type Database = {
           documento_ref?: string | null
           id?: string
           integrado_id: string
+          lote_fornecedor?: string | null
           observacao?: string | null
           produto_id: string
           quantidade: number
+          recebimento_id?: string | null
           saldo_anterior: number
           saldo_atual: number
+          status_quarentena?:
+            | Database["public"]["Enums"]["status_quarentena"]
+            | null
           tipo_movimento: string
         }
         Update: {
@@ -411,11 +496,16 @@ export type Database = {
           documento_ref?: string | null
           id?: string
           integrado_id?: string
+          lote_fornecedor?: string | null
           observacao?: string | null
           produto_id?: string
           quantidade?: number
+          recebimento_id?: string | null
           saldo_anterior?: number
           saldo_atual?: number
+          status_quarentena?:
+            | Database["public"]["Enums"]["status_quarentena"]
+            | null
           tipo_movimento?: string
         }
         Relationships: [
@@ -424,6 +514,13 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kardex_recebimento_id_fkey"
+            columns: ["recebimento_id"]
+            isOneToOne: false
+            referencedRelation: "recebimentos_mercadoria"
             referencedColumns: ["id"]
           },
         ]
@@ -1312,6 +1409,82 @@ export type Database = {
         }
         Relationships: []
       }
+      recebimento_itens: {
+        Row: {
+          codigo_produto_nfe: string | null
+          created_at: string
+          data_validade: string | null
+          descricao_produto_nfe: string | null
+          id: string
+          lote_fornecedor: string | null
+          ordem_compra_item_id: string | null
+          preco_nfe: number | null
+          preco_oc: number | null
+          produto_id: string
+          quantidade_fisica: number | null
+          quantidade_nfe: number | null
+          quantidade_oc: number | null
+          recebimento_id: string
+          unidade_nfe: string | null
+        }
+        Insert: {
+          codigo_produto_nfe?: string | null
+          created_at?: string
+          data_validade?: string | null
+          descricao_produto_nfe?: string | null
+          id?: string
+          lote_fornecedor?: string | null
+          ordem_compra_item_id?: string | null
+          preco_nfe?: number | null
+          preco_oc?: number | null
+          produto_id: string
+          quantidade_fisica?: number | null
+          quantidade_nfe?: number | null
+          quantidade_oc?: number | null
+          recebimento_id: string
+          unidade_nfe?: string | null
+        }
+        Update: {
+          codigo_produto_nfe?: string | null
+          created_at?: string
+          data_validade?: string | null
+          descricao_produto_nfe?: string | null
+          id?: string
+          lote_fornecedor?: string | null
+          ordem_compra_item_id?: string | null
+          preco_nfe?: number | null
+          preco_oc?: number | null
+          produto_id?: string
+          quantidade_fisica?: number | null
+          quantidade_nfe?: number | null
+          quantidade_oc?: number | null
+          recebimento_id?: string
+          unidade_nfe?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recebimento_itens_ordem_compra_item_id_fkey"
+            columns: ["ordem_compra_item_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recebimento_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recebimento_itens_recebimento_id_fkey"
+            columns: ["recebimento_id"]
+            isOneToOne: false
+            referencedRelation: "recebimentos_mercadoria"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recebimento_lotes: {
         Row: {
           aspecto_pintinhos: string
@@ -1367,6 +1540,89 @@ export type Database = {
             columns: ["lote_id"]
             isOneToOne: false
             referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recebimentos_mercadoria: {
+        Row: {
+          autorizado_por: string | null
+          chave_nfe: string | null
+          cnpj_fornecedor: string | null
+          condicao_pagamento_nfe: string | null
+          created_at: string
+          data_autorizacao: string | null
+          data_emissao_nfe: string | null
+          data_recebimento: string
+          id: string
+          integrado_id: string
+          justificativa_autorizacao: string | null
+          numero_nfe: string | null
+          observacoes: string | null
+          ordem_compra_id: string | null
+          razao_social_fornecedor: string | null
+          recebido_por: string | null
+          serie_nfe: string | null
+          status: Database["public"]["Enums"]["recebimento_status"]
+          updated_at: string
+          valor_desconto_nfe: number | null
+          valor_frete_nfe: number | null
+          valor_nfe: number | null
+        }
+        Insert: {
+          autorizado_por?: string | null
+          chave_nfe?: string | null
+          cnpj_fornecedor?: string | null
+          condicao_pagamento_nfe?: string | null
+          created_at?: string
+          data_autorizacao?: string | null
+          data_emissao_nfe?: string | null
+          data_recebimento?: string
+          id?: string
+          integrado_id: string
+          justificativa_autorizacao?: string | null
+          numero_nfe?: string | null
+          observacoes?: string | null
+          ordem_compra_id?: string | null
+          razao_social_fornecedor?: string | null
+          recebido_por?: string | null
+          serie_nfe?: string | null
+          status?: Database["public"]["Enums"]["recebimento_status"]
+          updated_at?: string
+          valor_desconto_nfe?: number | null
+          valor_frete_nfe?: number | null
+          valor_nfe?: number | null
+        }
+        Update: {
+          autorizado_por?: string | null
+          chave_nfe?: string | null
+          cnpj_fornecedor?: string | null
+          condicao_pagamento_nfe?: string | null
+          created_at?: string
+          data_autorizacao?: string | null
+          data_emissao_nfe?: string | null
+          data_recebimento?: string
+          id?: string
+          integrado_id?: string
+          justificativa_autorizacao?: string | null
+          numero_nfe?: string | null
+          observacoes?: string | null
+          ordem_compra_id?: string | null
+          razao_social_fornecedor?: string | null
+          recebido_por?: string | null
+          serie_nfe?: string | null
+          status?: Database["public"]["Enums"]["recebimento_status"]
+          updated_at?: string
+          valor_desconto_nfe?: number | null
+          valor_frete_nfe?: number | null
+          valor_nfe?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recebimentos_mercadoria_ordem_compra_id_fkey"
+            columns: ["ordem_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
             referencedColumns: ["id"]
           },
         ]
@@ -1485,6 +1741,16 @@ export type Database = {
     Enums: {
       app_role: "admin" | "integrado" | "veterinario" | "tecnico"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
+      divergencia_status:
+        | "aberta"
+        | "em_negociacao"
+        | "resolvida"
+        | "aceita_com_autorizacao"
+      divergencia_tipo:
+        | "quantidade"
+        | "preco"
+        | "condicao_pagamento"
+        | "produto_nao_previsto"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
@@ -1495,7 +1761,14 @@ export type Database = {
         | "parcial_recebida"
         | "recebida"
         | "cancelada"
+      recebimento_status:
+        | "em_conferencia"
+        | "divergente"
+        | "aguardando_autorizacao"
+        | "finalizado"
+        | "cancelado"
       sexo_ave: "macho" | "femea" | "misto"
+      status_quarentena: "quarentena" | "liberado" | "rejeitado"
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
       tipo_bebedouro: "niple" | "tacas"
       tipo_cadastro: "cliente" | "fornecedor" | "ambos"
@@ -1632,6 +1905,18 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "integrado", "veterinario", "tecnico"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
+      divergencia_status: [
+        "aberta",
+        "em_negociacao",
+        "resolvida",
+        "aceita_com_autorizacao",
+      ],
+      divergencia_tipo: [
+        "quantidade",
+        "preco",
+        "condicao_pagamento",
+        "produto_nao_previsto",
+      ],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
@@ -1643,7 +1928,15 @@ export const Constants = {
         "recebida",
         "cancelada",
       ],
+      recebimento_status: [
+        "em_conferencia",
+        "divergente",
+        "aguardando_autorizacao",
+        "finalizado",
+        "cancelado",
+      ],
       sexo_ave: ["macho", "femea", "misto"],
+      status_quarentena: ["quarentena", "liberado", "rejeitado"],
       submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_cadastro: ["cliente", "fornecedor", "ambos"],
