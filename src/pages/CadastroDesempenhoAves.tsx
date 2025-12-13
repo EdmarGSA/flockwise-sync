@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Plus, Pencil, Trash2, Save, X, Upload } from 'lucide-react';
+import { ArrowLeft, Target, Plus, Pencil, Save, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { Constants } from '@/integrations/supabase/types';
 
@@ -43,6 +44,24 @@ interface FormData {
   conversao_alimentar_acumulada: number;
 }
 
+interface Multiplicadores {
+  mult_7_dias: number;
+  mult_14_dias: number;
+  mult_21_dias: number;
+  mult_28_dias: number;
+  mult_35_dias: number;
+  mult_42_dias: number;
+}
+
+const DEFAULT_MULTIPLICADORES: Multiplicadores = {
+  mult_7_dias: 4.5,
+  mult_14_dias: 2.6,
+  mult_21_dias: 1.9,
+  mult_28_dias: 1.6,
+  mult_35_dias: 1.4,
+  mult_42_dias: 1.3,
+};
+
 const linhagemLabels: Record<Linhagem, string> = {
   cobb_500: 'Cobb 500',
   ross_308: 'Ross 308',
@@ -55,6 +74,24 @@ const sexoLabels: Record<SexoAve, string> = {
   misto: 'Misto',
 };
 
+// Load multiplicadores from localStorage
+const loadMultiplicadores = (): Multiplicadores => {
+  try {
+    const saved = localStorage.getItem('metas_peso_multiplicadores');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar multiplicadores:', e);
+  }
+  return DEFAULT_MULTIPLICADORES;
+};
+
+// Save multiplicadores to localStorage
+const saveMultiplicadores = (mult: Multiplicadores) => {
+  localStorage.setItem('metas_peso_multiplicadores', JSON.stringify(mult));
+};
+
 export default function CadastroDesempenhoAves() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -65,6 +102,8 @@ export default function CadastroDesempenhoAves() {
   const [editingItem, setEditingItem] = useState<DesempenhoAve | null>(null);
   const [filterLinhagem, setFilterLinhagem] = useState<Linhagem | 'all'>('all');
   const [filterSexo, setFilterSexo] = useState<SexoAve | 'all'>('all');
+  const [multiplicadores, setMultiplicadores] = useState<Multiplicadores>(loadMultiplicadores());
+  const [pesoInicial, setPesoInicial] = useState<number>(0.045);
   
   const [formData, setFormData] = useState<FormData>({
     dia: 0,
@@ -77,6 +116,30 @@ export default function CadastroDesempenhoAves() {
     consumo_acumulado_racao_g: 0,
     conversao_alimentar_acumulada: 0,
   });
+
+  // Calculate weight targets based on multiplicadores
+  const calcularMetas = (pesoInicialKg: number) => {
+    const meta7 = pesoInicialKg * multiplicadores.mult_7_dias;
+    const meta14 = meta7 * multiplicadores.mult_14_dias;
+    const meta21 = meta14 * multiplicadores.mult_21_dias;
+    const meta28 = meta21 * multiplicadores.mult_28_dias;
+    const meta35 = meta28 * multiplicadores.mult_35_dias;
+    const meta42 = meta35 * multiplicadores.mult_42_dias;
+    const gpd = (meta42 - pesoInicialKg) / 42;
+    
+    return { meta7, meta14, meta21, meta28, meta35, meta42, gpd };
+  };
+
+  const handleSaveMultiplicadores = () => {
+    saveMultiplicadores(multiplicadores);
+    toast.success('Multiplicadores salvos com sucesso!');
+  };
+
+  const handleResetMultiplicadores = () => {
+    setMultiplicadores(DEFAULT_MULTIPLICADORES);
+    saveMultiplicadores(DEFAULT_MULTIPLICADORES);
+    toast.success('Multiplicadores restaurados para valores padrão');
+  };
 
   useEffect(() => {
     if (user) {
@@ -214,101 +277,263 @@ export default function CadastroDesempenhoAves() {
               <Target className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Referência de Peso</h1>
-              <p className="text-muted-foreground">Tabela de desempenho por linhagem e sexo</p>
+              <h1 className="text-3xl font-bold text-foreground">Meta de Peso</h1>
+              <p className="text-muted-foreground">Multiplicadores e tabela de desempenho</p>
             </div>
           </div>
         </div>
 
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Dados de Desempenho</CardTitle>
-              <CardDescription>Referência de peso e consumo por dia de vida</CardDescription>
-            </div>
-            <Button onClick={() => handleOpenDialog()} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo Registro
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 mb-4">
-              <div className="flex-1 max-w-xs">
-                <Label className="text-xs text-muted-foreground">Linhagem</Label>
-                <Select value={filterLinhagem} onValueChange={(v) => setFilterLinhagem(v as Linhagem | 'all')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {Constants.public.Enums.linhagem_aves.map((l) => (
-                      <SelectItem key={l} value={l}>{linhagemLabels[l]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 max-w-xs">
-                <Label className="text-xs text-muted-foreground">Sexo</Label>
-                <Select value={filterSexo} onValueChange={(v) => setFilterSexo(v as SexoAve | 'all')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {Constants.public.Enums.sexo_ave.map((s) => (
-                      <SelectItem key={s} value={s}>{sexoLabels[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        <Tabs defaultValue="multiplicadores" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="multiplicadores" className="gap-2">
+              <Calculator className="w-4 h-4" />
+              Multiplicadores
+            </TabsTrigger>
+            <TabsTrigger value="referencia" className="gap-2">
+              <Target className="w-4 h-4" />
+              Tabela de Referência
+            </TabsTrigger>
+          </TabsList>
 
-            {loadingData ? (
-              <p className="text-muted-foreground py-8 text-center">Carregando...</p>
-            ) : filteredData.length === 0 ? (
-              <p className="text-muted-foreground py-8 text-center">Nenhum registro encontrado</p>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-16">Dia</TableHead>
-                      <TableHead>Linhagem</TableHead>
-                      <TableHead>Sexo</TableHead>
-                      <TableHead className="text-right">Peso (g)</TableHead>
-                      <TableHead className="text-right">Ganho/Dia (g)</TableHead>
-                      <TableHead className="text-right">Consumo/Dia (g)</TableHead>
-                      <TableHead className="text-right">CA Acum.</TableHead>
-                      <TableHead className="w-20"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.dia}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{linhagemLabels[item.linhagem]}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{sexoLabels[item.sexo]}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{item.peso_g.toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{item.ganho_diario_g.toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{item.consumo_diario_racao_g.toFixed(1)}</TableCell>
-                        <TableCell className="text-right">{item.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(item)}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <TabsContent value="multiplicadores">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle>Multiplicadores de Meta</CardTitle>
+                  <CardDescription>
+                    Configure os multiplicadores usados no cálculo automático das metas de peso
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>7 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_7_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_7_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Peso inicial × este valor</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>14 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_14_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_14_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Meta 7 dias × este valor</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>21 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_21_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_21_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Meta 14 dias × este valor</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>28 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_28_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_28_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Meta 21 dias × este valor</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>35 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_35_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_35_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Meta 28 dias × este valor</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>42 dias (×)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={multiplicadores.mult_42_dias}
+                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_42_dias: parseFloat(e.target.value) || 0 })}
+                      />
+                      <p className="text-xs text-muted-foreground">Meta 35 dias × este valor</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button onClick={handleSaveMultiplicadores} className="gap-2">
+                      <Save className="w-4 h-4" />
+                      Salvar Multiplicadores
+                    </Button>
+                    <Button variant="outline" onClick={handleResetMultiplicadores}>
+                      Restaurar Padrão
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle>Simulação de Metas</CardTitle>
+                  <CardDescription>
+                    Visualize as metas calculadas com os multiplicadores atuais
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Peso Inicial (kg)</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={pesoInicial}
+                      onChange={(e) => setPesoInicial(parseFloat(e.target.value) || 0)}
+                      placeholder="0,045"
+                    />
+                  </div>
+                  
+                  {pesoInicial > 0 && (
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                      {(() => {
+                        const metas = calcularMetas(pesoInicial);
+                        return (
+                          <>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">7 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta7.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">14 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta14.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">21 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta21.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">28 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta28.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">35 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta35.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-muted-foreground">42 dias:</span>
+                              <span className="font-mono font-medium">{metas.meta42.toFixed(3)} kg</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 bg-primary/10 rounded px-2">
+                              <span className="font-medium">GPD:</span>
+                              <span className="font-mono font-bold text-primary">{metas.gpd.toFixed(4)} kg/dia</span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="referencia">
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Dados de Desempenho</CardTitle>
+                  <CardDescription>Referência de peso e consumo por dia de vida</CardDescription>
+                </div>
+                <Button onClick={() => handleOpenDialog()} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Novo Registro
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 mb-4">
+                  <div className="flex-1 max-w-xs">
+                    <Label className="text-xs text-muted-foreground">Linhagem</Label>
+                    <Select value={filterLinhagem} onValueChange={(v) => setFilterLinhagem(v as Linhagem | 'all')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {Constants.public.Enums.linhagem_aves.map((l) => (
+                          <SelectItem key={l} value={l}>{linhagemLabels[l]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1 max-w-xs">
+                    <Label className="text-xs text-muted-foreground">Sexo</Label>
+                    <Select value={filterSexo} onValueChange={(v) => setFilterSexo(v as SexoAve | 'all')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {Constants.public.Enums.sexo_ave.map((s) => (
+                          <SelectItem key={s} value={s}>{sexoLabels[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {loadingData ? (
+                  <p className="text-muted-foreground py-8 text-center">Carregando...</p>
+                ) : filteredData.length === 0 ? (
+                  <p className="text-muted-foreground py-8 text-center">Nenhum registro encontrado</p>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">Dia</TableHead>
+                          <TableHead>Linhagem</TableHead>
+                          <TableHead>Sexo</TableHead>
+                          <TableHead className="text-right">Peso (g)</TableHead>
+                          <TableHead className="text-right">Ganho/Dia (g)</TableHead>
+                          <TableHead className="text-right">Consumo/Dia (g)</TableHead>
+                          <TableHead className="text-right">CA Acum.</TableHead>
+                          <TableHead className="w-20"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredData.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.dia}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{linhagemLabels[item.linhagem]}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{sexoLabels[item.sexo]}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{item.peso_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.ganho_diario_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.consumo_diario_racao_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(item)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -48,8 +48,8 @@ const Configuracoes = () => {
       path: "/configuracoes/grupos-animal"
     },
     {
-      title: "Referência de Peso",
-      description: "Tabela de desempenho por linhagem",
+      title: "Meta de Peso",
+      description: "Multiplicadores e tabela de desempenho",
       icon: Target,
       path: "/configuracoes/desempenho-aves"
     }
