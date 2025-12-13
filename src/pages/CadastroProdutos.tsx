@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical, RotateCcw, Truck } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ import CategoriaForm from "@/components/cadastro/CategoriaForm";
 import GrupoProdutoForm from "@/components/cadastro/GrupoProdutoForm";
 import FormulacaoDialog from "@/components/cadastro/FormulacaoDialog";
 import KardexView from "@/components/cadastro/KardexView";
+import FornecedoresVinculadosDialog from "@/components/cadastro/FornecedoresVinculadosDialog";
 
 const CadastroProdutos = () => {
   const { user, loading } = useAuth();
@@ -34,6 +35,7 @@ const CadastroProdutos = () => {
   const [editingProduto, setEditingProduto] = useState<any>(null);
   const [selectedProdutoKardex, setSelectedProdutoKardex] = useState<any>(null);
   const [formulacaoProduto, setFormulacaoProduto] = useState<any>(null);
+  const [fornecedoresProduto, setFornecedoresProduto] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -367,6 +369,14 @@ const CadastroProdutos = () => {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
+                                onClick={() => setFornecedoresProduto(produto)}
+                                title="Ver Fornecedores"
+                              >
+                                <Truck className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
                                 onClick={() => setSelectedProdutoKardex(produto)}
                                 title="Ver Kardex"
                               >
@@ -544,6 +554,13 @@ const CadastroProdutos = () => {
           integradoId={profile?.id}
           gruposProduto={gruposProduto}
           produtos={produtos}
+        />
+
+        {/* Fornecedores Vinculados Dialog */}
+        <FornecedoresVinculadosDialog
+          produto={fornecedoresProduto}
+          open={!!fornecedoresProduto}
+          onOpenChange={() => setFornecedoresProduto(null)}
         />
       </main>
     </div>
