@@ -19,6 +19,7 @@ import CadastroProdutos from "./pages/CadastroProdutos";
 import CadastroGruposAnimal from "./pages/CadastroGruposAnimal";
 import CadastroDesempenhoAves from "./pages/CadastroDesempenhoAves";
 import CadastroParceiros from "./pages/CadastroParceiros";
+import FabricaRacao from "./pages/FabricaRacao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -139,6 +140,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/parceiros" element={
       <ProtectedRoute>
         <CadastroParceiros />
+      </ProtectedRoute>
+    } />
+    <Route path="/fabrica-racao" element={
+      <ProtectedRoute>
+        <FabricaRacao />
       </ProtectedRoute>
     } />
     
