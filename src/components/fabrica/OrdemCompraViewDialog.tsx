@@ -229,7 +229,54 @@ export default function OrdemCompraViewDialog({
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.text(`Observações: ${ordem.observacoes}`, 14, y, { maxWidth: pageWidth - 28 });
+      y += 15;
     }
+    
+    // Signature section - ensure enough space
+    const signatureY = Math.max(y + 20, 230);
+    
+    // Check if we need a new page for signatures
+    if (signatureY > 250) {
+      doc.addPage();
+      y = 40;
+    } else {
+      y = signatureY;
+    }
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    
+    // Signature boxes
+    const boxWidth = 75;
+    const boxHeight = 30;
+    const leftBoxX = 20;
+    const rightBoxX = pageWidth - boxWidth - 20;
+    
+    // Comprador (Buyer) signature
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(leftBoxX, y, boxWidth, boxHeight);
+    doc.line(leftBoxX + 5, y + boxHeight - 8, leftBoxX + boxWidth - 5, y + boxHeight - 8);
+    doc.setFontSize(8);
+    doc.text('Assinatura do Comprador', leftBoxX + boxWidth / 2, y + boxHeight + 5, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text('Nome:', leftBoxX + 5, y + boxHeight - 3);
+    doc.text('Data: ___/___/______', leftBoxX + 5, y + boxHeight + 12);
+    
+    // Fornecedor (Supplier) signature
+    doc.rect(rightBoxX, y, boxWidth, boxHeight);
+    doc.line(rightBoxX + 5, y + boxHeight - 8, rightBoxX + boxWidth - 5, y + boxHeight - 8);
+    doc.setFontSize(8);
+    doc.text('Assinatura do Fornecedor', rightBoxX + boxWidth / 2, y + boxHeight + 5, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text('Nome:', rightBoxX + 5, y + boxHeight - 3);
+    doc.text('Data: ___/___/______', rightBoxX + 5, y + boxHeight + 12);
+    
+    // Footer
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text(`OC #${ordem.numero_oc}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
     
     // Save
     doc.save(`OC_${ordem.numero_oc}.pdf`);
