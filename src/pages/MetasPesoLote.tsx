@@ -51,6 +51,37 @@ interface DesempenhoReferencia {
   conversao_alimentar_acumulada: number;
 }
 
+interface Multiplicadores {
+  mult_7_dias: number;
+  mult_14_dias: number;
+  mult_21_dias: number;
+  mult_28_dias: number;
+  mult_35_dias: number;
+  mult_42_dias: number;
+}
+
+const DEFAULT_MULTIPLICADORES: Multiplicadores = {
+  mult_7_dias: 4.5,
+  mult_14_dias: 2.6,
+  mult_21_dias: 1.9,
+  mult_28_dias: 1.6,
+  mult_35_dias: 1.4,
+  mult_42_dias: 1.3,
+};
+
+// Load multiplicadores from localStorage (same as CadastroDesempenhoAves)
+const loadMultiplicadores = (): Multiplicadores => {
+  try {
+    const saved = localStorage.getItem('metas_peso_multiplicadores');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar multiplicadores:', e);
+  }
+  return DEFAULT_MULTIPLICADORES;
+};
+
 export default function MetasPesoLote() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +93,7 @@ export default function MetasPesoLote() {
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingMetas, setEditingMetas] = useState<MetasPeso | null>(null);
+  const [multiplicadores] = useState<Multiplicadores>(loadMultiplicadores());
 
   useEffect(() => {
     if (user && loteId) {
@@ -184,12 +216,12 @@ export default function MetasPesoLote() {
   };
 
   const calcularMetas = (pesoInicial: number): MetasPeso => {
-    const meta7 = pesoInicial * 4.5;
-    const meta14 = meta7 * 2.6;
-    const meta21 = meta14 * 1.9;
-    const meta28 = meta21 * 1.6;
-    const meta35 = meta28 * 1.4;
-    const meta42 = meta35 * 1.3;
+    const meta7 = pesoInicial * multiplicadores.mult_7_dias;
+    const meta14 = meta7 * multiplicadores.mult_14_dias;
+    const meta21 = meta14 * multiplicadores.mult_21_dias;
+    const meta28 = meta21 * multiplicadores.mult_28_dias;
+    const meta35 = meta28 * multiplicadores.mult_35_dias;
+    const meta42 = meta35 * multiplicadores.mult_42_dias;
     const gpd = (meta42 - pesoInicial) / 42;
 
     return {
