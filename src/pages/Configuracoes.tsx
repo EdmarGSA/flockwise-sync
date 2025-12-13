@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -46,6 +46,12 @@ const Configuracoes = () => {
       description: "Grupos e fases de produção animal",
       icon: Layers,
       path: "/configuracoes/grupos-animal"
+    },
+    {
+      title: "Referência de Peso",
+      description: "Tabela de desempenho por linhagem",
+      icon: Target,
+      path: "/configuracoes/desempenho-aves"
     }
   ];
 
