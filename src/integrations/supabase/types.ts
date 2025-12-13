@@ -881,6 +881,7 @@ export type Database = {
       ordens_compra_itens: {
         Row: {
           created_at: string
+          fator_conversao: number | null
           id: string
           ordem_compra_id: string
           preco_total: number
@@ -888,10 +889,12 @@ export type Database = {
           produto_id: string
           quantidade: number
           quantidade_recebida: number | null
+          unidade_compra: string | null
           unidade_medida: string
         }
         Insert: {
           created_at?: string
+          fator_conversao?: number | null
           id?: string
           ordem_compra_id: string
           preco_total?: number
@@ -899,10 +902,12 @@ export type Database = {
           produto_id: string
           quantidade: number
           quantidade_recebida?: number | null
+          unidade_compra?: string | null
           unidade_medida?: string
         }
         Update: {
           created_at?: string
+          fator_conversao?: number | null
           id?: string
           ordem_compra_id?: string
           preco_total?: number
@@ -910,6 +915,7 @@ export type Database = {
           produto_id?: string
           quantidade?: number
           quantidade_recebida?: number | null
+          unidade_compra?: string | null
           unidade_medida?: string
         }
         Relationships: [
@@ -1415,16 +1421,19 @@ export type Database = {
           created_at: string
           data_validade: string | null
           descricao_produto_nfe: string | null
+          fator_conversao: number | null
           id: string
           lote_fornecedor: string | null
           ordem_compra_item_id: string | null
           preco_nfe: number | null
           preco_oc: number | null
           produto_id: string
+          quantidade_estoque: number | null
           quantidade_fisica: number | null
           quantidade_nfe: number | null
           quantidade_oc: number | null
           recebimento_id: string
+          unidade_compra: string | null
           unidade_nfe: string | null
         }
         Insert: {
@@ -1432,16 +1441,19 @@ export type Database = {
           created_at?: string
           data_validade?: string | null
           descricao_produto_nfe?: string | null
+          fator_conversao?: number | null
           id?: string
           lote_fornecedor?: string | null
           ordem_compra_item_id?: string | null
           preco_nfe?: number | null
           preco_oc?: number | null
           produto_id: string
+          quantidade_estoque?: number | null
           quantidade_fisica?: number | null
           quantidade_nfe?: number | null
           quantidade_oc?: number | null
           recebimento_id: string
+          unidade_compra?: string | null
           unidade_nfe?: string | null
         }
         Update: {
@@ -1449,16 +1461,19 @@ export type Database = {
           created_at?: string
           data_validade?: string | null
           descricao_produto_nfe?: string | null
+          fator_conversao?: number | null
           id?: string
           lote_fornecedor?: string | null
           ordem_compra_item_id?: string | null
           preco_nfe?: number | null
           preco_oc?: number | null
           produto_id?: string
+          quantidade_estoque?: number | null
           quantidade_fisica?: number | null
           quantidade_nfe?: number | null
           quantidade_oc?: number | null
           recebimento_id?: string
+          unidade_compra?: string | null
           unidade_nfe?: string | null
         }
         Relationships: [

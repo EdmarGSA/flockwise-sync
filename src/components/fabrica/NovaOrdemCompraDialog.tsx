@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FileText, Plus, Trash2, Package, Save, Send } from 'lucide-react';
+import { FileText, Plus, Trash2, Package, Save, Send, ArrowRight } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 interface Produto {
@@ -37,6 +37,8 @@ interface Produto {
   estoque_atual: number;
   estoque_minimo: number;
   unidade_medida: string;
+  unidade_compra: string | null;
+  fator_conversao: number | null;
   consumo_medio_diario: number;
   dias_restantes: number;
   nivel_critico: 'critico' | 'atencao' | 'ok';
@@ -55,8 +57,11 @@ interface FornecedorAgrupado {
 interface ItemOC {
   produto_id: string;
   nome: string;
-  unidade_medida: string;
+  unidade_compra: string;
+  unidade_estoque: string;
+  fator_conversao: number;
   quantidade: number;
+  quantidade_estoque: number;
   preco_unitario: number;
   preco_total: number;
 }
@@ -93,18 +98,29 @@ export default function NovaOrdemCompraDialog({
     if (open) {
       // Initialize items from fornecedor produtos
       const initialItems: ItemOC[] = fornecedor.produtos.map(({ produto, preco_compra }) => {
-        // Suggest quantity based on consumption and minimum stock
-        const qtdSugerida = Math.max(
+        const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
+        const fatorConversao = produto.fator_conversao || 1;
+        
+        // Calculate suggested quantity in stock units, then convert to purchase units
+        const qtdEstoqueNecessaria = Math.max(
           produto.estoque_minimo - produto.estoque_atual,
           produto.consumo_medio_diario * 15 // 15 days supply
         );
+        
+        // Convert to purchase units (round up)
+        const qtdCompra = Math.ceil(qtdEstoqueNecessaria / fatorConversao);
+        const qtdEstoque = qtdCompra * fatorConversao;
+        
         return {
           produto_id: produto.id,
           nome: produto.nome,
-          unidade_medida: produto.unidade_medida,
-          quantidade: Math.ceil(qtdSugerida),
+          unidade_compra: unidadeCompra,
+          unidade_estoque: produto.unidade_medida,
+          fator_conversao: fatorConversao,
+          quantidade: qtdCompra,
+          quantidade_estoque: qtdEstoque,
           preco_unitario: preco_compra,
-          preco_total: Math.ceil(qtdSugerida) * preco_compra
+          preco_total: qtdCompra * preco_compra
         };
       });
       setItens(initialItems);
@@ -122,7 +138,7 @@ export default function NovaOrdemCompraDialog({
         .select(`
           produto_id,
           preco_compra,
-          produtos!inner(id, nome, sku, unidade_medida, estoque_atual, categorias!inner(tipo_origem))
+          produtos!inner(id, nome, sku, unidade_medida, unidade_compra, fator_conversao, estoque_atual, categorias!inner(tipo_origem))
         `)
         .eq('parceiro_id', fornecedor.parceiro_id)
         .eq('ativo', true)
@@ -137,6 +153,8 @@ export default function NovaOrdemCompraDialog({
           nome: (p.produtos as any).nome,
           sku: (p.produtos as any).sku,
           unidade_medida: (p.produtos as any).unidade_medida,
+          unidade_compra: (p.produtos as any).unidade_compra || (p.produtos as any).unidade_medida,
+          fator_conversao: (p.produtos as any).fator_conversao || 1,
           estoque_atual: (p.produtos as any).estoque_atual,
           preco_compra: p.preco_compra || 0
         }));
@@ -150,15 +168,24 @@ export default function NovaOrdemCompraDialog({
   const handleItemChange = (index: number, field: string, value: number) => {
     setItens(prev => {
       const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-        preco_total: field === 'quantidade' 
-          ? value * updated[index].preco_unitario 
-          : field === 'preco_unitario'
-            ? value * updated[index].quantidade
-            : updated[index].preco_total
-      };
+      const item = updated[index];
+      
+      if (field === 'quantidade') {
+        // Update quantity and recalculate stock quantity
+        updated[index] = {
+          ...item,
+          quantidade: value,
+          quantidade_estoque: value * item.fator_conversao,
+          preco_total: value * item.preco_unitario
+        };
+      } else if (field === 'preco_unitario') {
+        updated[index] = {
+          ...item,
+          preco_unitario: value,
+          preco_total: value * item.quantidade
+        };
+      }
+      
       return updated;
     });
   };
@@ -178,11 +205,17 @@ export default function NovaOrdemCompraDialog({
       return;
     }
 
+    const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
+    const fatorConversao = produto.fator_conversao || 1;
+
     setItens(prev => [...prev, {
       produto_id: produto.id,
       nome: produto.nome,
-      unidade_medida: produto.unidade_medida,
+      unidade_compra: unidadeCompra,
+      unidade_estoque: produto.unidade_medida,
+      fator_conversao: fatorConversao,
       quantidade: 1,
+      quantidade_estoque: fatorConversao,
       preco_unitario: produto.preco_compra,
       preco_total: produto.preco_compra
     }]);
@@ -232,14 +265,16 @@ export default function NovaOrdemCompraDialog({
 
       if (ordemError) throw ordemError;
 
-      // Create order items
+      // Create order items with conversion data
       const { error: itensError } = await supabase
         .from('ordens_compra_itens')
         .insert(itens.map(item => ({
           ordem_compra_id: ordem.id,
           produto_id: item.produto_id,
           quantidade: item.quantidade,
-          unidade_medida: item.unidade_medida,
+          unidade_medida: item.unidade_compra, // Use purchase unit
+          unidade_compra: item.unidade_compra,
+          fator_conversao: item.fator_conversao,
           preco_unitario: item.preco_unitario,
           preco_total: item.preco_total
         })));
@@ -334,7 +369,7 @@ export default function NovaOrdemCompraDialog({
                       .filter(p => !itens.some(i => i.produto_id === p.id))
                       .map((produto) => (
                         <SelectItem key={produto.id} value={produto.id}>
-                          {produto.nome} - R$ {produto.preco_compra.toFixed(2)}
+                          {produto.nome} - R$ {produto.preco_compra.toFixed(2)}/{produto.unidade_compra}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -354,7 +389,7 @@ export default function NovaOrdemCompraDialog({
                 <TableRow>
                   <TableHead>Produto</TableHead>
                   <TableHead className="w-32">Quantidade</TableHead>
-                  <TableHead className="w-32">Unidade</TableHead>
+                  <TableHead className="w-40">Unidade</TableHead>
                   <TableHead className="w-36">Preço Unit. (R$)</TableHead>
                   <TableHead className="w-36 text-right">Total (R$)</TableHead>
                   <TableHead className="w-16"></TableHead>
@@ -378,7 +413,19 @@ export default function NovaOrdemCompraDialog({
                         className="w-24"
                       />
                     </TableCell>
-                    <TableCell>{item.unidade_medida}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-sm">
+                        <span className="font-medium">{item.unidade_compra}</span>
+                        {item.fator_conversao > 1 && (
+                          <>
+                            <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {item.quantidade_estoque.toFixed(0)} {item.unidade_estoque}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
