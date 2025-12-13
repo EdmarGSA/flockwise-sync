@@ -22,14 +22,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FileText, Search, MoreVertical, Check, Truck, X, Eye, Package } from 'lucide-react';
+import { FileText, Search, MoreVertical, Check, Truck, X, Eye, Package, Pencil, Send } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import OrdemCompraViewDialog from './OrdemCompraViewDialog';
+import EditarOrdemCompraDialog from './EditarOrdemCompraDialog';
 
 interface OrdemCompra {
   id: string;
@@ -55,6 +57,7 @@ export default function OrdensCompraTable({ integradoId, onRefresh }: OrdensComp
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrdem, setSelectedOrdem] = useState<string | null>(null);
+  const [editingOrdem, setEditingOrdem] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrdens();
@@ -172,6 +175,24 @@ export default function OrdensCompraTable({ integradoId, onRefresh }: OrdensComp
     } catch (error) {
       console.error('Erro ao cancelar ordem:', error);
       toast.error('Erro ao cancelar ordem');
+    }
+  };
+
+  const handleEnviarAprovacao = async (ordemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('ordens_compra')
+        .update({ status: 'pendente' })
+        .eq('id', ordemId);
+
+      if (error) throw error;
+
+      toast.success('Ordem enviada para aprovação');
+      fetchOrdens();
+      onRefresh();
+    } catch (error) {
+      console.error('Erro ao enviar para aprovação:', error);
+      toast.error('Erro ao enviar para aprovação');
     }
   };
 
@@ -338,6 +359,19 @@ export default function OrdensCompraTable({ integradoId, onRefresh }: OrdensComp
                             <Eye className="w-4 h-4 mr-2" />
                             Visualizar
                           </DropdownMenuItem>
+                          {ordem.status === 'rascunho' && (
+                            <>
+                              <DropdownMenuItem onClick={() => setEditingOrdem(ordem.id)}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEnviarAprovacao(ordem.id)}>
+                                <Send className="w-4 h-4 mr-2" />
+                                Enviar para Aprovação
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           {ordem.status === 'pendente' && (
                             <DropdownMenuItem onClick={() => handleAprovar(ordem.id)}>
                               <Check className="w-4 h-4 mr-2" />
@@ -351,13 +385,16 @@ export default function OrdensCompraTable({ integradoId, onRefresh }: OrdensComp
                             </DropdownMenuItem>
                           )}
                           {['rascunho', 'pendente'].includes(ordem.status) && (
-                            <DropdownMenuItem 
-                              onClick={() => handleCancelar(ordem.id)}
-                              className="text-destructive"
-                            >
-                              <X className="w-4 h-4 mr-2" />
-                              Cancelar
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => handleCancelar(ordem.id)}
+                                className="text-destructive"
+                              >
+                                <X className="w-4 h-4 mr-2" />
+                                Cancelar
+                              </DropdownMenuItem>
+                            </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -375,6 +412,19 @@ export default function OrdensCompraTable({ integradoId, onRefresh }: OrdensComp
           open={!!selectedOrdem}
           onOpenChange={(open) => !open && setSelectedOrdem(null)}
           ordemId={selectedOrdem}
+        />
+      )}
+
+      {editingOrdem && (
+        <EditarOrdemCompraDialog
+          open={!!editingOrdem}
+          onOpenChange={(open) => !open && setEditingOrdem(null)}
+          ordemId={editingOrdem}
+          integradoId={integradoId}
+          onSuccess={() => {
+            fetchOrdens();
+            onRefresh();
+          }}
         />
       )}
     </Card>
