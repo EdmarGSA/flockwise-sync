@@ -417,79 +417,54 @@ export default function MetasPesoLote() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 7 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_7_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_7_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 14 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_14_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_14_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 21 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_21_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_21_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 28 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_28_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_28_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 35 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_35_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_35_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Meta 42 dias (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.meta_42_dias_kg.toFixed(3)}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            meta_42_dias_kg: parseFloat(e.target.value) || 0
-                          })}
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      {[
+                        { dia: 7, key: 'meta_7_dias_kg' },
+                        { dia: 14, key: 'meta_14_dias_kg' },
+                        { dia: 21, key: 'meta_21_dias_kg' },
+                        { dia: 28, key: 'meta_28_dias_kg' },
+                        { dia: 35, key: 'meta_35_dias_kg' },
+                        { dia: 42, key: 'meta_42_dias_kg' },
+                      ].map(({ dia, key }) => {
+                        const metaValue = (editingMetas as any)[key] as number;
+                        const refData = desempenhoReferencia.find(d => d.dia === dia);
+                        const refValue = refData ? refData.peso_g / 1000 : 0;
+                        const diff = refValue > 0 ? ((metaValue - refValue) / refValue) * 100 : 0;
+                        
+                        return (
+                          <div key={dia} className="grid grid-cols-12 gap-2 items-center">
+                            <Label className="col-span-3 text-xs">{dia} dias</Label>
+                            <div className="col-span-4">
+                              <Input
+                                type="number"
+                                step="0.001"
+                                value={metaValue.toFixed(3)}
+                                onChange={(e) => setEditingMetas({
+                                  ...editingMetas,
+                                  [key]: parseFloat(e.target.value) || 0
+                                })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            {refValue > 0 && (
+                              <>
+                                <div className="col-span-3 text-xs text-muted-foreground text-center">
+                                  Ref: {refValue.toFixed(3)}
+                                </div>
+                                <div className="col-span-2">
+                                  <Badge 
+                                    variant={diff >= 0 ? 'default' : 'destructive'}
+                                    className="text-[10px] w-full justify-center"
+                                  >
+                                    {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
+                                  </Badge>
+                                </div>
+                              </>
+                            )}
+                            {refValue === 0 && <div className="col-span-5" />}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="pt-2 border-t border-border">
