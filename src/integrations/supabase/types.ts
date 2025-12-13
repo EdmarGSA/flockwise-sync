@@ -943,6 +943,9 @@ export type Database = {
           aprovado_por: string | null
           created_at: string
           criado_por: string | null
+          custo_por_kg: number | null
+          custo_total_estimado: number | null
+          custo_total_real: number | null
           data_aprovacao: string | null
           data_finalizacao: string | null
           data_inicio_producao: string | null
@@ -961,6 +964,9 @@ export type Database = {
           aprovado_por?: string | null
           created_at?: string
           criado_por?: string | null
+          custo_por_kg?: number | null
+          custo_total_estimado?: number | null
+          custo_total_real?: number | null
           data_aprovacao?: string | null
           data_finalizacao?: string | null
           data_inicio_producao?: string | null
@@ -979,6 +985,9 @@ export type Database = {
           aprovado_por?: string | null
           created_at?: string
           criado_por?: string | null
+          custo_por_kg?: number | null
+          custo_total_estimado?: number | null
+          custo_total_real?: number | null
           data_aprovacao?: string | null
           data_finalizacao?: string | null
           data_inicio_producao?: string | null
@@ -1006,6 +1015,8 @@ export type Database = {
       ordens_producao_itens: {
         Row: {
           created_at: string
+          custo_total: number | null
+          custo_unitario: number | null
           estoque_disponivel: number | null
           id: string
           insumo_id: string
@@ -1016,6 +1027,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custo_total?: number | null
+          custo_unitario?: number | null
           estoque_disponivel?: number | null
           id?: string
           insumo_id: string
@@ -1026,6 +1039,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custo_total?: number | null
+          custo_unitario?: number | null
           estoque_disponivel?: number | null
           id?: string
           insumo_id?: string
