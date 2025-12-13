@@ -43,6 +43,7 @@ interface LoteComPesagem extends Lote {
   diasDesdeAlojamento?: number;
   precisaPesar?: boolean;
   quantidadeAlojada?: number | null;
+  temSolicitacaoPendente?: boolean;
 }
 
 export default function MeusLotes() {
@@ -111,7 +112,17 @@ export default function MeusLotes() {
           .eq('lote_id', loteData.id)
           .maybeSingle();
 
+        // Check for pending feed requests (solicitado, confirmado, or enviado status)
+        const { data: solicitacaoData } = await supabase
+          .from('solicitacoes_racao')
+          .select('id')
+          .eq('lote_id', loteData.id)
+          .in('status', ['solicitado', 'confirmado', 'enviado'])
+          .limit(1)
+          .maybeSingle();
+
         const ultimaPesagem = pesagemData?.data_pesagem || null;
+        const temSolicitacaoPendente = !!solicitacaoData;
         
         // Calculate quantidade alojada
         let quantidadeAlojada: number | null = null;
@@ -145,6 +156,7 @@ export default function MeusLotes() {
           diasDesdeAlojamento,
           precisaPesar,
           quantidadeAlojada,
+          temSolicitacaoPendente,
         };
       })
     );
@@ -415,40 +427,53 @@ export default function MeusLotes() {
                               </Button>
                             )}
                             {lote.status === 'alojado' && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    size="sm" 
-                                    variant={lote.precisaPesar ? 'destructive' : 'default'}
-                                    className="gap-1"
-                                  >
-                                    <ClipboardCheck className="w-4 h-4" />
-                                    Adm.
-                                    <ChevronDown className="w-3 h-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
-                                    <Scale className="w-4 h-4" />
-                                    Pesagem
-                                    {lote.precisaPesar && (
-                                      <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
-                                    )}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
-                                    <Skull className="w-4 h-4" />
-                                    Mortalidade
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
-                                    <Target className="w-4 h-4" />
-                                    Metas de Peso
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleRacao(lote)} className="gap-2">
-                                    <Package className="w-4 h-4" />
-                                    Ração
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant={lote.precisaPesar ? 'destructive' : 'default'}
+                                      className="gap-1"
+                                    >
+                                      <ClipboardCheck className="w-4 h-4" />
+                                      Adm.
+                                      <ChevronDown className="w-3 h-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
+                                      <Scale className="w-4 h-4" />
+                                      Pesagem
+                                      {lote.precisaPesar && (
+                                        <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
+                                      )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
+                                      <Skull className="w-4 h-4" />
+                                      Mortalidade
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
+                                      <Target className="w-4 h-4" />
+                                      Metas de Peso
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <Button 
+                                  size="sm" 
+                                  variant={lote.temSolicitacaoPendente ? 'destructive' : 'outline'}
+                                  onClick={() => handleRacao(lote)}
+                                  className="gap-1 relative"
+                                >
+                                  <Package className="w-4 h-4" />
+                                  Ração
+                                  {lote.temSolicitacaoPendente && (
+                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                                    </span>
+                                  )}
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>
