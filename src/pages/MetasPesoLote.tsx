@@ -118,11 +118,25 @@ export default function MetasPesoLote() {
       };
       setMetas(metas);
       setEditingMetas(metas);
-    } else if (loteData.peso_medio_pintinhos) {
-      // Calculate default metas based on peso_medio_pintinhos
-      const pesoInicial = Number(loteData.peso_medio_pintinhos);
-      const calculatedMetas = calcularMetas(pesoInicial);
-      setEditingMetas(calculatedMetas);
+    } else {
+      // Pre-fill with peso_medio_pintinhos from lote if available
+      const pesoInicial = loteData.peso_medio_pintinhos ? Number(loteData.peso_medio_pintinhos) : 0;
+      if (pesoInicial > 0) {
+        const calculatedMetas = calcularMetas(pesoInicial);
+        setEditingMetas(calculatedMetas);
+      } else {
+        // Initialize with empty metas for manual input
+        setEditingMetas({
+          peso_inicial_kg: 0,
+          meta_7_dias_kg: 0,
+          meta_14_dias_kg: 0,
+          meta_21_dias_kg: 0,
+          meta_28_dias_kg: 0,
+          meta_35_dias_kg: 0,
+          meta_42_dias_kg: 0,
+          gpd_kg: 0,
+        });
+      }
     }
 
     // Fetch desempenho de referência para linhagem e sexo do lote
@@ -400,7 +414,14 @@ export default function MetasPesoLote() {
                 {editingMetas && (
                   <>
                     <div className="space-y-2">
-                      <Label>Peso Inicial (kg)</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Peso Inicial (kg)</Label>
+                        {lote?.peso_medio_pintinhos && (
+                          <span className="text-xs text-muted-foreground">
+                            Do lote: {Number(lote.peso_medio_pintinhos).toFixed(3)} kg
+                          </span>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <Input
                           type="number"
@@ -410,6 +431,7 @@ export default function MetasPesoLote() {
                             ...editingMetas,
                             peso_inicial_kg: parseFloat(e.target.value) || 0
                           })}
+                          placeholder={lote?.peso_medio_pintinhos ? `${Number(lote.peso_medio_pintinhos).toFixed(3)}` : 'Digite o peso inicial'}
                         />
                         <Button variant="outline" onClick={handleRecalcular} size="icon" title="Recalcular">
                           <TrendingUp className="w-4 h-4" />
