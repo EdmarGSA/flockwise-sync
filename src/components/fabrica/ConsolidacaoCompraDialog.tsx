@@ -27,6 +27,8 @@ interface ProdutoComFornecedor {
   estoque_atual: number;
   estoque_minimo: number;
   unidade_medida: string;
+  unidade_compra: string;
+  fator_conversao: number;
   consumo_medio_diario: number;
   dias_restantes: number;
   nivel_critico: 'critico' | 'atencao' | 'ok';
