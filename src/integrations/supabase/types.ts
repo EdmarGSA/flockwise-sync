@@ -822,6 +822,7 @@ export type Database = {
           parceiro_id: string
           prazo_pagamento_dias: number | null
           status: Database["public"]["Enums"]["ordem_compra_status"]
+          tipo_frete: string | null
           updated_at: string
           valor_frete: number | null
           valor_total: number
@@ -843,6 +844,7 @@ export type Database = {
           parceiro_id: string
           prazo_pagamento_dias?: number | null
           status?: Database["public"]["Enums"]["ordem_compra_status"]
+          tipo_frete?: string | null
           updated_at?: string
           valor_frete?: number | null
           valor_total?: number
@@ -864,6 +866,7 @@ export type Database = {
           parceiro_id?: string
           prazo_pagamento_dias?: number | null
           status?: Database["public"]["Enums"]["ordem_compra_status"]
+          tipo_frete?: string | null
           updated_at?: string
           valor_frete?: number | null
           valor_total?: number

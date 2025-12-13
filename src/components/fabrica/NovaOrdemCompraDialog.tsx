@@ -89,6 +89,7 @@ export default function NovaOrdemCompraDialog({
     data_prevista_entrega: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
     forma_pagamento: 'boleto',
     prazo_pagamento_dias: 30,
+    tipo_frete: 'cif',
     valor_frete: 0,
     desconto: 0,
     observacoes: ''
@@ -255,6 +256,7 @@ export default function NovaOrdemCompraDialog({
           prazo_pagamento_dias: formData.prazo_pagamento_dias,
           data_vencimento: format(dataVencimento, 'yyyy-MM-dd'),
           valor_total: valorTotal,
+          tipo_frete: formData.tipo_frete,
           valor_frete: formData.valor_frete,
           desconto: formData.desconto,
           observacoes: formData.observacoes,
@@ -344,13 +346,34 @@ export default function NovaOrdemCompraDialog({
                 onChange={(e) => setFormData(prev => ({ ...prev, prazo_pagamento_dias: parseInt(e.target.value) || 0 }))}
               />
             </div>
+          </div>
+
+          {/* Freight and Delivery */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <Label>Frete (R$)</Label>
+              <Label>Tipo de Frete</Label>
+              <Select 
+                value={formData.tipo_frete}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, tipo_frete: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cif">CIF (Frete Incluso)</SelectItem>
+                  <SelectItem value="fob">FOB (Frete por Conta)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Valor Frete (R$)</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={formData.valor_frete}
                 onChange={(e) => setFormData(prev => ({ ...prev, valor_frete: parseFloat(e.target.value) || 0 }))}
+                disabled={formData.tipo_frete === 'cif'}
+                placeholder={formData.tipo_frete === 'cif' ? 'Incluso' : '0.00'}
               />
             </div>
           </div>
