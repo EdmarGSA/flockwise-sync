@@ -695,6 +695,93 @@ export type Database = {
         }
         Relationships: []
       }
+      parceiros: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          celular: string | null
+          cep: string | null
+          cidade: string | null
+          codigo_ibge: string | null
+          complemento: string | null
+          cpf_cnpj: string
+          created_at: string
+          email: string | null
+          estado: string | null
+          id: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          inscricao_produtor: string | null
+          integrado_id: string
+          logradouro: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          observacoes: string | null
+          razao_social_nome: string
+          rg: string | null
+          telefone: string | null
+          tipo_cadastro: Database["public"]["Enums"]["tipo_cadastro"]
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_ibge?: string | null
+          complemento?: string | null
+          cpf_cnpj: string
+          created_at?: string
+          email?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          inscricao_produtor?: string | null
+          integrado_id: string
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social_nome: string
+          rg?: string | null
+          telefone?: string | null
+          tipo_cadastro?: Database["public"]["Enums"]["tipo_cadastro"]
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_ibge?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string
+          created_at?: string
+          email?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          inscricao_produtor?: string | null
+          integrado_id?: string
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social_nome?: string
+          rg?: string | null
+          telefone?: string | null
+          tipo_cadastro?: Database["public"]["Enums"]["tipo_cadastro"]
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pesagem_itens: {
         Row: {
           created_at: string
@@ -1155,7 +1242,9 @@ export type Database = {
       sexo_ave: "macho" | "femea" | "misto"
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
       tipo_bebedouro: "niple" | "tacas"
+      tipo_cadastro: "cliente" | "fornecedor" | "ambos"
       tipo_comedouro: "manual" | "automatico"
+      tipo_pessoa: "pf" | "pj" | "produtor_rural"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
       tipo_producao: "corte" | "postura"
     }
@@ -1292,7 +1381,9 @@ export const Constants = {
       sexo_ave: ["macho", "femea", "misto"],
       submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
       tipo_bebedouro: ["niple", "tacas"],
+      tipo_cadastro: ["cliente", "fornecedor", "ambos"],
       tipo_comedouro: ["manual", "automatico"],
+      tipo_pessoa: ["pf", "pj", "produtor_rural"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
       tipo_producao: ["corte", "postura"],
     },
