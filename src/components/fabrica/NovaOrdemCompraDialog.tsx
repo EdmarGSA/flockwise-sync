@@ -122,10 +122,11 @@ export default function NovaOrdemCompraDialog({
         .select(`
           produto_id,
           preco_compra,
-          produtos!inner(id, nome, sku, unidade_medida, estoque_atual)
+          produtos!inner(id, nome, sku, unidade_medida, estoque_atual, categorias!inner(tipo_origem))
         `)
         .eq('parceiro_id', fornecedor.parceiro_id)
-        .eq('ativo', true);
+        .eq('ativo', true)
+        .eq('produtos.categorias.tipo_origem', 'terceiros');
 
       if (error) throw error;
 

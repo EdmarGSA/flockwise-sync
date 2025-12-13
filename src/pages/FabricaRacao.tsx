@@ -95,12 +95,13 @@ export default function FabricaRacao() {
     setLoading(true);
 
     try {
-      // Fetch products with stock info
+      // Fetch products with stock info - only "Terceiros" category
       const { data: produtos, error: produtosError } = await supabase
         .from('produtos')
-        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida')
+        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, categorias!inner(tipo_origem)')
         .eq('integrado_id', user.id)
-        .eq('ativo', true);
+        .eq('ativo', true)
+        .eq('categorias.tipo_origem', 'terceiros');
 
       if (produtosError) throw produtosError;
 
