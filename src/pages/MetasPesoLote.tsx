@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Save, TrendingUp, Scale } from 'lucide-react';
+import { ArrowLeft, Target, Save, TrendingUp, Scale, Book } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -42,6 +43,14 @@ interface PesagemData {
   data_pesagem: string;
 }
 
+interface DesempenhoReferencia {
+  dia: number;
+  peso_g: number;
+  ganho_diario_g: number;
+  consumo_diario_racao_g: number;
+  conversao_alimentar_acumulada: number;
+}
+
 export default function MetasPesoLote() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -49,6 +58,7 @@ export default function MetasPesoLote() {
   const [lote, setLote] = useState<Lote | null>(null);
   const [metas, setMetas] = useState<MetasPeso | null>(null);
   const [pesagens, setPesagens] = useState<PesagemData[]>([]);
+  const [desempenhoReferencia, setDesempenhoReferencia] = useState<DesempenhoReferencia[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingMetas, setEditingMetas] = useState<MetasPeso | null>(null);
@@ -113,6 +123,18 @@ export default function MetasPesoLote() {
       const pesoInicial = Number(loteData.peso_medio_pintinhos);
       const calculatedMetas = calcularMetas(pesoInicial);
       setEditingMetas(calculatedMetas);
+    }
+
+    // Fetch desempenho de referência para linhagem e sexo do lote
+    const { data: desempenhoData } = await supabase
+      .from('desempenho_aves')
+      .select('dia, peso_g, ganho_diario_g, consumo_diario_racao_g, conversao_alimentar_acumulada')
+      .eq('linhagem', loteData.linhagem)
+      .eq('sexo', loteData.sexo)
+      .order('dia', { ascending: true });
+
+    if (desempenhoData) {
+      setDesempenhoReferencia(desempenhoData);
     }
 
     // Fetch pesagens
@@ -491,15 +513,76 @@ export default function MetasPesoLote() {
                 )}
 
                 {!editingMetas && (
-                  <div className="text-center py-8">
-                    <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Defina o peso inicial do lote para calcular as metas
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Defina o peso inicial do lote para calcular as metas personalizadas
                     </p>
+                    <div className="space-y-2">
+                      <Label>Peso Inicial (kg)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          placeholder="Ex: 0.042"
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            if (value > 0) {
+                              setEditingMetas(calcularMetas(value));
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Tabela de Referência de Desempenho */}
+            {desempenhoReferencia.length > 0 && (
+              <Card className="lg:col-span-3 bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Book className="w-5 h-5" />
+                    Referência de Desempenho - {lote?.linhagem?.replace('_', ' ').toUpperCase()} ({lote?.sexo})
+                  </CardTitle>
+                  <CardDescription>
+                    Tabela de referência padrão para comparação de desempenho do lote
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-center">Dia</TableHead>
+                          <TableHead className="text-center">Peso (g)</TableHead>
+                          <TableHead className="text-center">Ganho Diário (g)</TableHead>
+                          <TableHead className="text-center">Consumo Diário (g)</TableHead>
+                          <TableHead className="text-center">CA Acumulada</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {desempenhoReferencia.filter(d => [0, 7, 14, 21, 28, 35, 42].includes(d.dia)).map((d) => (
+                          <TableRow key={d.dia} className={d.dia === diasDesdeAlojamento ? 'bg-primary/10' : ''}>
+                            <TableCell className="text-center font-medium">
+                              {d.dia}
+                              {d.dia === diasDesdeAlojamento && (
+                                <Badge variant="secondary" className="ml-2">Hoje</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">{d.peso_g.toFixed(0)}</TableCell>
+                            <TableCell className="text-center">{d.ganho_diario_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-center">{d.consumo_diario_racao_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-center">{d.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Pesagens Summary */}
             <Card className="lg:col-span-3 bg-card border-border">
