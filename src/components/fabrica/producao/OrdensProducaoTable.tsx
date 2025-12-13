@@ -35,6 +35,9 @@ interface OrdemProducao {
   data_finalizacao: string | null;
   observacoes: string | null;
   created_at: string;
+  custo_total_estimado?: number;
+  custo_total_real?: number;
+  custo_por_kg?: number;
   produto?: {
     nome: string;
     unidade_medida: string;
@@ -208,10 +211,10 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
                 <TableRow>
                   <TableHead>Nº OP</TableHead>
                   <TableHead>Ração</TableHead>
-                  <TableHead className="text-right">Qtd. Planejada</TableHead>
-                  <TableHead className="text-right">Qtd. Produzida</TableHead>
+                  <TableHead className="text-right">Qtd. Plan.</TableHead>
+                  <TableHead className="text-right">Qtd. Prod.</TableHead>
+                  <TableHead className="text-right">Custo/kg</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Data Prevista</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -224,14 +227,16 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
                       {ordem.quantidade_planejada.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} {ordem.produto?.unidade_medida || 'kg'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {ordem.quantidade_produzida.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} {ordem.produto?.unidade_medida || 'kg'}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(ordem.status)}</TableCell>
-                    <TableCell>
-                      {ordem.data_prevista_producao 
-                        ? format(new Date(ordem.data_prevista_producao), 'dd/MM/yyyy', { locale: ptBR })
+                      {ordem.quantidade_produzida > 0 
+                        ? `${ordem.quantidade_produzida.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ${ordem.produto?.unidade_medida || 'kg'}`
                         : '-'}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {ordem.custo_por_kg && ordem.custo_por_kg > 0 
+                        ? <span className="text-amber-500 font-medium">R$ {ordem.custo_por_kg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(ordem.status)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

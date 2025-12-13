@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Factory, Package, Calendar, User, Loader2 } from 'lucide-react';
+import { Factory, Package, Calendar, DollarSign, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +20,9 @@ interface OrdemProducao {
   data_finalizacao: string | null;
   observacoes: string | null;
   created_at: string;
+  custo_total_estimado?: number;
+  custo_total_real?: number;
+  custo_por_kg?: number;
   produto?: {
     nome: string;
     unidade_medida: string;
@@ -33,6 +36,8 @@ interface ItemOP {
   quantidade_utilizada: number;
   unidade_medida: string;
   estoque_disponivel: number | null;
+  custo_unitario?: number;
+  custo_total?: number;
   insumo?: {
     nome: string;
   };
@@ -127,7 +132,7 @@ export default function OrdemProducaoViewDialog({
           </div>
 
           {/* Main Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card className="bg-muted/50">
               <CardContent className="pt-4">
                 <p className="text-sm text-muted-foreground">Qtd. Planejada</p>
@@ -156,17 +161,37 @@ export default function OrdemProducaoViewDialog({
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-muted/50">
-              <CardContent className="pt-4">
-                <p className="text-sm text-muted-foreground">Finalização</p>
-                <p className="text-lg font-bold">
-                  {ordem.data_finalizacao 
-                    ? format(new Date(ordem.data_finalizacao), 'dd/MM/yyyy', { locale: ptBR })
-                    : '-'}
-                </p>
-              </CardContent>
-            </Card>
           </div>
+
+          {/* Cost Info */}
+          <Card className="bg-green-500/10 border-green-500/30">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                    <DollarSign className="w-3 h-3" /> Custo Estimado
+                  </p>
+                  <p className="text-lg font-bold text-muted-foreground">
+                    R$ {(ordem.custo_total_estimado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                    <DollarSign className="w-3 h-3" /> Custo Real
+                  </p>
+                  <p className="text-lg font-bold text-green-500">
+                    R$ {(ordem.custo_total_real || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Custo/kg</p>
+                  <p className="text-lg font-bold text-amber-500">
+                    R$ {(ordem.custo_por_kg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Ingredients */}
           <Card className="border-border">
@@ -192,7 +217,8 @@ export default function OrdemProducaoViewDialog({
                       <TableHead>Insumo</TableHead>
                       <TableHead className="text-right">Qtd. Necessária</TableHead>
                       <TableHead className="text-right">Qtd. Utilizada</TableHead>
-                      <TableHead className="text-right">Estoque (no momento)</TableHead>
+                      <TableHead className="text-right">Custo Unit.</TableHead>
+                      <TableHead className="text-right">Custo Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -208,9 +234,10 @@ export default function OrdemProducaoViewDialog({
                             : '-'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {item.estoque_disponivel !== null 
-                            ? `${item.estoque_disponivel.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${item.unidade_medida}`
-                            : '-'}
+                          R$ {(item.custo_unitario || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          R$ {(item.custo_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, CheckCircle, Factory, Package, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Factory, Package, Loader2, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -19,6 +19,8 @@ interface InsumoVerificacao {
   unidade_medida: string;
   isCritico: boolean;
   maxProduzivel: number;
+  custoUnitario: number;
+  custoTotal: number;
 }
 
 interface RacaoCritica {
@@ -82,7 +84,7 @@ export default function GerarOPDialog({
           quantidade,
           unidade_medida,
           insumo:produtos!produto_formulacao_insumo_id_fkey(
-            id, nome, estoque_atual, unidade_medida
+            id, nome, estoque_atual, unidade_medida, custo_unitario, custo_medio
           )
         `)
         .eq('produto_id', racao.id)
@@ -108,6 +110,12 @@ export default function GerarOPDialog({
         const maxProd = Number(item.quantidade) > 0 
           ? (estoqueDisponivel / Number(item.quantidade)) * 1000 
           : 999999;
+        
+        // Use custo_medio if available, otherwise custo_unitario
+        const custoUnitario = Number(insumo.custo_medio) > 0 
+          ? Number(insumo.custo_medio) 
+          : Number(insumo.custo_unitario) || 0;
+        const custoTotal = qtdNecessaria * custoUnitario;
 
         return {
           id: insumo.id,
@@ -116,7 +124,9 @@ export default function GerarOPDialog({
           estoqueDisponivel,
           unidade_medida: insumo.unidade_medida,
           isCritico,
-          maxProduzivel: maxProd
+          maxProduzivel: maxProd,
+          custoUnitario,
+          custoTotal
         };
       });
 
@@ -142,23 +152,29 @@ export default function GerarOPDialog({
       const qtdOriginal = (racao.sugestaoProducao / 1000) * (item.quantidadeNecessaria / (racao.sugestaoProducao / 1000));
       const qtdNecessaria = (quantidade / 1000) * (item.quantidadeNecessaria / (racao.sugestaoProducao / 1000)) || 0;
       const isCritico = item.estoqueDisponivel < qtdNecessaria;
+      const custoTotal = qtdNecessaria * item.custoUnitario;
 
       return {
         ...item,
         quantidadeNecessaria: qtdNecessaria,
-        isCritico
+        isCritico,
+        custoTotal
       };
     });
 
     setInsumos(insumosAtualizados);
   };
 
+  // Calculate total estimated cost
+  const custoTotalEstimado = insumos.reduce((sum, i) => sum + i.custoTotal, 0);
+  const custoPorKg = quantidade > 0 ? custoTotalEstimado / quantidade : 0;
+
   const handleSave = async (status: 'rascunho' | 'pendente') => {
     if (!racao) return;
     setSaving(true);
 
     try {
-      // Create production order
+      // Create production order with cost
       const { data: op, error: opError } = await supabase
         .from('ordens_producao')
         .insert({
@@ -168,21 +184,25 @@ export default function GerarOPDialog({
           status,
           data_prevista_producao: dataPrevista || null,
           observacoes: observacoes || null,
-          criado_por: integradoId
+          criado_por: integradoId,
+          custo_total_estimado: custoTotalEstimado,
+          custo_por_kg: custoPorKg
         })
         .select()
         .single();
 
       if (opError) throw opError;
 
-      // Create production order items (ingredients)
+      // Create production order items (ingredients) with cost
       if (insumos.length > 0) {
         const itens = insumos.map(insumo => ({
           ordem_producao_id: op.id,
           insumo_id: insumo.id,
           quantidade_necessaria: insumo.quantidadeNecessaria,
           unidade_medida: insumo.unidade_medida,
-          estoque_disponivel: insumo.estoqueDisponivel
+          estoque_disponivel: insumo.estoqueDisponivel,
+          custo_unitario: insumo.custoUnitario,
+          custo_total: insumo.custoTotal
         }));
 
         const { error: itensError } = await supabase
@@ -247,10 +267,10 @@ export default function GerarOPDialog({
             </div>
           </div>
 
-          {/* Summary Card */}
+          {/* Summary Card with Cost */}
           <Card className="bg-muted/50">
             <CardContent className="pt-4">
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-5 gap-4 text-center">
                 <div>
                   <p className="text-sm text-muted-foreground">Demanda Total</p>
                   <p className="text-lg font-bold">{racao?.demandaTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</p>
@@ -267,9 +287,34 @@ export default function GerarOPDialog({
                   <p className="text-sm text-muted-foreground">Produzindo</p>
                   <p className="text-lg font-bold text-primary">{quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</p>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                    <DollarSign className="w-3 h-3" /> Custo/kg
+                  </p>
+                  <p className="text-lg font-bold text-amber-500">
+                    R$ {custoPorKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Cost Summary Card */}
+          {insumos.length > 0 && (
+            <Card className="bg-green-500/10 border-green-500/30">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-500" />
+                    <span className="font-medium">Custo Total Estimado</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-500">
+                    R$ {custoTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Ingredients Verification */}
           <Card className="border-border">
@@ -300,7 +345,8 @@ export default function GerarOPDialog({
                     <TableRow>
                       <TableHead>Insumo</TableHead>
                       <TableHead className="text-right">Necessário</TableHead>
-                      <TableHead className="text-right">Disponível</TableHead>
+                      <TableHead className="text-right">Custo Unit.</TableHead>
+                      <TableHead className="text-right">Custo Total</TableHead>
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -311,8 +357,11 @@ export default function GerarOPDialog({
                         <TableCell className="text-right">
                           {insumo.quantidadeNecessaria.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} {insumo.unidade_medida}
                         </TableCell>
-                        <TableCell className="text-right">
-                          {insumo.estoqueDisponivel.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} {insumo.unidade_medida}
+                        <TableCell className="text-right text-muted-foreground">
+                          R$ {insumo.custoUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          R$ {insumo.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right">
                           {insumo.isCritico ? (

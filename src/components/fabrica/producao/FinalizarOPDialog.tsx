@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, Factory, Loader2, Package } from 'lucide-react';
+import { CheckCircle, Factory, Loader2, Package, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ interface OrdemProducao {
   produto_id: string;
   quantidade_planejada: number;
   quantidade_produzida: number;
+  custo_total_estimado?: number;
   produto?: {
     nome: string;
     unidade_medida: string;
@@ -28,6 +29,8 @@ interface InsumoUtilizado {
   quantidade_necessaria: number;
   quantidade_utilizada: number;
   unidade_medida: string;
+  custo_unitario: number;
+  custo_total: number;
 }
 
 interface FinalizarOPDialogProps {
@@ -70,20 +73,32 @@ export default function FinalizarOPDialog({
           quantidade_necessaria,
           quantidade_utilizada,
           unidade_medida,
-          insumo:produtos!ordens_producao_itens_insumo_id_fkey(nome)
+          custo_unitario,
+          custo_total,
+          insumo:produtos!ordens_producao_itens_insumo_id_fkey(nome, custo_unitario, custo_medio)
         `)
         .eq('ordem_producao_id', ordem.id);
 
       if (error) throw error;
 
-      setInsumos((data || []).map(item => ({
-        id: item.id,
-        insumo_id: item.insumo_id,
-        nome: (item.insumo as any)?.nome || '-',
-        quantidade_necessaria: item.quantidade_necessaria,
-        quantidade_utilizada: item.quantidade_necessaria, // Default to required
-        unidade_medida: item.unidade_medida
-      })));
+      setInsumos((data || []).map(item => {
+        const insumoData = item.insumo as any;
+        // Use stored cost or fetch from product
+        const custoUnit = Number(item.custo_unitario) > 0 
+          ? Number(item.custo_unitario)
+          : (Number(insumoData?.custo_medio) > 0 ? Number(insumoData.custo_medio) : Number(insumoData?.custo_unitario) || 0);
+        
+        return {
+          id: item.id,
+          insumo_id: item.insumo_id,
+          nome: insumoData?.nome || '-',
+          quantidade_necessaria: item.quantidade_necessaria,
+          quantidade_utilizada: item.quantidade_necessaria, // Default to required
+          unidade_medida: item.unidade_medida,
+          custo_unitario: custoUnit,
+          custo_total: item.quantidade_necessaria * custoUnit
+        };
+      }));
     } catch (error) {
       console.error('Erro ao buscar insumos:', error);
       toast.error('Erro ao carregar insumos da OP');
@@ -94,32 +109,41 @@ export default function FinalizarOPDialog({
 
   const updateInsumoQuantidade = (id: string, quantidade: number) => {
     setInsumos(prev => prev.map(i => 
-      i.id === id ? { ...i, quantidade_utilizada: quantidade } : i
+      i.id === id ? { ...i, quantidade_utilizada: quantidade, custo_total: quantidade * i.custo_unitario } : i
     ));
   };
+
+  // Calculate real cost based on utilized quantities
+  const custoTotalReal = insumos.reduce((sum, i) => sum + (i.quantidade_utilizada * i.custo_unitario), 0);
+  const custoPorKgReal = quantidadeProduzida > 0 ? custoTotalReal / quantidadeProduzida : 0;
 
   const handleFinalizar = async () => {
     if (!ordem) return;
     setSaving(true);
 
     try {
-      // 1. Update production order
+      // 1. Update production order with real cost
       const { error: opError } = await supabase
         .from('ordens_producao')
         .update({
           status: 'finalizada',
           quantidade_produzida: quantidadeProduzida,
-          data_finalizacao: new Date().toISOString()
+          data_finalizacao: new Date().toISOString(),
+          custo_total_real: custoTotalReal,
+          custo_por_kg: custoPorKgReal
         })
         .eq('id', ordem.id);
 
       if (opError) throw opError;
 
-      // 2. Update each item with utilized quantity
+      // 2. Update each item with utilized quantity and cost
       for (const insumo of insumos) {
         await supabase
           .from('ordens_producao_itens')
-          .update({ quantidade_utilizada: insumo.quantidade_utilizada })
+          .update({ 
+            quantidade_utilizada: insumo.quantidade_utilizada,
+            custo_total: insumo.quantidade_utilizada * insumo.custo_unitario
+          })
           .eq('id', insumo.id);
       }
 
@@ -215,7 +239,7 @@ export default function FinalizarOPDialog({
           {/* Production Summary */}
           <Card className="bg-muted/50">
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Quantidade Planejada</Label>
                   <p className="text-lg font-bold">
@@ -231,6 +255,35 @@ export default function FinalizarOPDialog({
                     onChange={(e) => setQuantidadeProduzida(Number(e.target.value))}
                     min={0}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Custo Estimado</Label>
+                  <p className="text-lg font-bold text-muted-foreground">
+                    R$ {(ordem?.custo_total_estimado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Real Cost Summary */}
+          <Card className="bg-green-500/10 border-green-500/30">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-500" />
+                    <span className="font-medium">Custo Total Real</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-500">
+                    R$ {custoTotalReal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Custo por kg</span>
+                  <p className="text-xl font-bold text-amber-500">
+                    R$ {custoPorKgReal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kg
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -257,6 +310,8 @@ export default function FinalizarOPDialog({
                     <TableHead>Insumo</TableHead>
                     <TableHead className="text-right">Qtd. Prevista</TableHead>
                     <TableHead className="text-right">Qtd. Utilizada</TableHead>
+                    <TableHead className="text-right">Custo Unit.</TableHead>
+                    <TableHead className="text-right">Custo Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -271,10 +326,16 @@ export default function FinalizarOPDialog({
                           type="number"
                           value={insumo.quantidade_utilizada}
                           onChange={(e) => updateInsumoQuantidade(insumo.id, Number(e.target.value))}
-                          className="w-32 text-right ml-auto"
+                          className="w-28 text-right ml-auto"
                           min={0}
                           step={0.01}
                         />
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        R$ {insumo.custo_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        R$ {(insumo.quantidade_utilizada * insumo.custo_unitario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))}
