@@ -80,6 +80,69 @@ export type Database = {
         }
         Relationships: []
       }
+      contas_pagar: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string
+          id: string
+          integrado_id: string
+          observacoes: string | null
+          ordem_compra_id: string | null
+          parceiro_id: string | null
+          status: Database["public"]["Enums"]["conta_pagar_status"]
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao: string
+          id?: string
+          integrado_id: string
+          observacoes?: string | null
+          ordem_compra_id?: string | null
+          parceiro_id?: string | null
+          status?: Database["public"]["Enums"]["conta_pagar_status"]
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          id?: string
+          integrado_id?: string
+          observacoes?: string | null
+          ordem_compra_id?: string | null
+          parceiro_id?: string | null
+          status?: Database["public"]["Enums"]["conta_pagar_status"]
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_pagar_ordem_compra_id_fkey"
+            columns: ["ordem_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_pagar_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       desempenho_aves: {
         Row: {
           consumo_acumulado_racao_g: number
@@ -640,6 +703,131 @@ export type Database = {
             columns: ["integrado_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_compra: {
+        Row: {
+          aprovado_por: string | null
+          created_at: string
+          criado_por: string | null
+          data_aprovacao: string | null
+          data_emissao: string
+          data_prevista_entrega: string | null
+          data_vencimento: string | null
+          desconto: number | null
+          forma_pagamento: string | null
+          id: string
+          integrado_id: string
+          numero_oc: number
+          observacoes: string | null
+          parceiro_id: string
+          prazo_pagamento_dias: number | null
+          status: Database["public"]["Enums"]["ordem_compra_status"]
+          updated_at: string
+          valor_frete: number | null
+          valor_total: number
+        }
+        Insert: {
+          aprovado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_aprovacao?: string | null
+          data_emissao?: string
+          data_prevista_entrega?: string | null
+          data_vencimento?: string | null
+          desconto?: number | null
+          forma_pagamento?: string | null
+          id?: string
+          integrado_id: string
+          numero_oc?: number
+          observacoes?: string | null
+          parceiro_id: string
+          prazo_pagamento_dias?: number | null
+          status?: Database["public"]["Enums"]["ordem_compra_status"]
+          updated_at?: string
+          valor_frete?: number | null
+          valor_total?: number
+        }
+        Update: {
+          aprovado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_aprovacao?: string | null
+          data_emissao?: string
+          data_prevista_entrega?: string | null
+          data_vencimento?: string | null
+          desconto?: number | null
+          forma_pagamento?: string | null
+          id?: string
+          integrado_id?: string
+          numero_oc?: number
+          observacoes?: string | null
+          parceiro_id?: string
+          prazo_pagamento_dias?: number | null
+          status?: Database["public"]["Enums"]["ordem_compra_status"]
+          updated_at?: string
+          valor_frete?: number | null
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_compra_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_compra_itens: {
+        Row: {
+          created_at: string
+          id: string
+          ordem_compra_id: string
+          preco_total: number
+          preco_unitario: number
+          produto_id: string
+          quantidade: number
+          quantidade_recebida: number | null
+          unidade_medida: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordem_compra_id: string
+          preco_total?: number
+          preco_unitario?: number
+          produto_id: string
+          quantidade: number
+          quantidade_recebida?: number | null
+          unidade_medida?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordem_compra_id?: string
+          preco_total?: number
+          preco_unitario?: number
+          produto_id?: string
+          quantidade?: number
+          quantidade_recebida?: number | null
+          unidade_medida?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_compra_itens_ordem_compra_id_fkey"
+            columns: ["ordem_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_compra_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -1296,9 +1484,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "integrado" | "veterinario" | "tecnico"
+      conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
+      ordem_compra_status:
+        | "rascunho"
+        | "pendente"
+        | "aprovada"
+        | "parcial_recebida"
+        | "recebida"
+        | "cancelada"
       sexo_ave: "macho" | "femea" | "misto"
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
       tipo_bebedouro: "niple" | "tacas"
@@ -1435,9 +1631,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "integrado", "veterinario", "tecnico"],
+      conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
+      ordem_compra_status: [
+        "rascunho",
+        "pendente",
+        "aprovada",
+        "parcial_recebida",
+        "recebida",
+        "cancelada",
+      ],
       sexo_ave: ["macho", "femea", "misto"],
       submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
       tipo_bebedouro: ["niple", "tacas"],

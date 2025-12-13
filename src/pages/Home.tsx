@@ -76,11 +76,11 @@ const modules: ModuleCard[] = [
   {
     id: 'fabrica-racao',
     title: 'Fábrica de Ração',
-    description: 'Estoque e produção de ração',
+    description: 'Gestão de compras e estoque',
     icon: Factory,
     path: '/fabrica-racao',
     color: 'from-amber-500 to-amber-700',
-    available: false,
+    available: true,
   },
   {
     id: 'apanha',
