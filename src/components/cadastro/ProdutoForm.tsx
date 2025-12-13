@@ -35,6 +35,9 @@ const formSchema = z.object({
   embalagem_tipo: z.string().optional(),
   embalagem_primaria: z.string().optional(),
   embalagem_secundaria: z.string().optional(),
+  unidade_compra: z.string().default("UN"),
+  embalagem_quantidade: z.coerce.number().default(1),
+  fator_conversao: z.coerce.number().default(1),
 });
 
 interface ProdutoFormProps {
@@ -96,8 +99,16 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       embalagem_tipo: "",
       embalagem_primaria: "",
       embalagem_secundaria: "",
+      unidade_compra: "UN",
+      embalagem_quantidade: 1,
+      fator_conversao: 1,
     },
   });
+
+  const unidadeCompra = form.watch("unidade_compra");
+  const embalagemQuantidade = form.watch("embalagem_quantidade");
+  const fatorConversao = form.watch("fator_conversao");
+  const unidadeEstoque = form.watch("unidade_medida");
 
   const selectedGrupoAnimal = form.watch("grupo_animal_id");
 
@@ -502,10 +513,10 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
 
         <Separator />
 
-        {/* Embalagens */}
+        {/* Embalagens e Conversão */}
         <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            📦 Embalagens
+            📦 Embalagens e Conversão
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
@@ -547,6 +558,64 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                 </FormItem>
               )}
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <FormField
+              control={form.control}
+              name="unidade_compra"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unidade de Compra</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {unidadesMedida.map((un) => (
+                        <SelectItem key={un} value={un}>{un}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="embalagem_quantidade"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Qtd por Embalagem</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.001" min="0.001" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fator_conversao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fator de Conversão</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.001" min="0.001" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Preview de conversão */}
+          <div className="mt-4 p-3 bg-muted rounded-lg border">
+            <p className="text-sm text-muted-foreground">
+              🔄 <strong>Conversão:</strong> 1 {unidadeCompra} ({embalagemQuantidade} unid.) = {fatorConversao} {unidadeEstoque} no estoque
+            </p>
           </div>
         </div>
 

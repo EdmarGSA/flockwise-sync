@@ -826,11 +826,13 @@ export type Database = {
           custo_unitario: number
           descricao: string | null
           embalagem_primaria: string | null
+          embalagem_quantidade: number | null
           embalagem_secundaria: string | null
           embalagem_tipo: string | null
           estoque_atual: number
           estoque_minimo: number
           fase_animal_id: string | null
+          fator_conversao: number | null
           grupo_animal_id: string | null
           grupo_produto_id: string | null
           id: string
@@ -842,6 +844,7 @@ export type Database = {
           origem_mercadoria: string | null
           preco_venda: number
           sku: string
+          unidade_compra: string | null
           unidade_medida: string
           updated_at: string
         }
@@ -857,11 +860,13 @@ export type Database = {
           custo_unitario?: number
           descricao?: string | null
           embalagem_primaria?: string | null
+          embalagem_quantidade?: number | null
           embalagem_secundaria?: string | null
           embalagem_tipo?: string | null
           estoque_atual?: number
           estoque_minimo?: number
           fase_animal_id?: string | null
+          fator_conversao?: number | null
           grupo_animal_id?: string | null
           grupo_produto_id?: string | null
           id?: string
@@ -873,6 +878,7 @@ export type Database = {
           origem_mercadoria?: string | null
           preco_venda?: number
           sku: string
+          unidade_compra?: string | null
           unidade_medida?: string
           updated_at?: string
         }
@@ -888,11 +894,13 @@ export type Database = {
           custo_unitario?: number
           descricao?: string | null
           embalagem_primaria?: string | null
+          embalagem_quantidade?: number | null
           embalagem_secundaria?: string | null
           embalagem_tipo?: string | null
           estoque_atual?: number
           estoque_minimo?: number
           fase_animal_id?: string | null
+          fator_conversao?: number | null
           grupo_animal_id?: string | null
           grupo_produto_id?: string | null
           id?: string
@@ -904,6 +912,7 @@ export type Database = {
           origem_mercadoria?: string | null
           preco_venda?: number
           sku?: string
+          unidade_compra?: string | null
           unidade_medida?: string
           updated_at?: string
         }
