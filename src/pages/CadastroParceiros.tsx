@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, Plus, Search, Pencil, Building2, User, Tractor } from "lucide-react";
+import { ArrowLeft, Users, Plus, Search, Pencil, Building2, User, Tractor, Link2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ParceiroForm from "@/components/cadastro/ParceiroForm";
 import ParceiroEditDialog from "@/components/cadastro/ParceiroEditDialog";
+import VincularProdutosDialog from "@/components/cadastro/VincularProdutosDialog";
 
 interface Parceiro {
   id: string;
@@ -27,6 +28,7 @@ interface Parceiro {
   cidade: string | null;
   estado: string | null;
   ativo: boolean;
+  produtos_vinculados?: number;
 }
 
 const CadastroParceiros = () => {
@@ -38,6 +40,7 @@ const CadastroParceiros = () => {
   const [activeTab, setActiveTab] = useState("todos");
   const [showForm, setShowForm] = useState(false);
   const [editingParceiro, setEditingParceiro] = useState<Parceiro | null>(null);
+  const [vincularParceiro, setVincularParceiro] = useState<Parceiro | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -47,14 +50,36 @@ const CadastroParceiros = () => {
 
   const fetchParceiros = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch parceiros
+      const { data: parceirosData, error: parceirosError } = await supabase
         .from('parceiros')
         .select('*')
         .eq('integrado_id', user?.id)
         .order('razao_social_nome');
 
-      if (error) throw error;
-      setParceiros((data || []) as Parceiro[]);
+      if (parceirosError) throw parceirosError;
+
+      // Fetch product link counts for suppliers
+      const { data: vinculosData, error: vinculosError } = await supabase
+        .from('produto_fornecedor')
+        .select('parceiro_id')
+        .eq('integrado_id', user?.id);
+
+      if (vinculosError) throw vinculosError;
+
+      // Count products per supplier
+      const countMap: Record<string, number> = {};
+      (vinculosData || []).forEach((v: any) => {
+        countMap[v.parceiro_id] = (countMap[v.parceiro_id] || 0) + 1;
+      });
+
+      // Merge counts into parceiros
+      const parceirosComContagem = (parceirosData || []).map((p: any) => ({
+        ...p,
+        produtos_vinculados: countMap[p.id] || 0,
+      }));
+
+      setParceiros(parceirosComContagem as Parceiro[]);
     } catch (error: any) {
       toast.error("Erro ao carregar parceiros: " + error.message);
     } finally {
@@ -249,13 +274,34 @@ const CadastroParceiros = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setEditingParceiro(parceiro)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  {(parceiro.tipo_cadastro === 'fornecedor' || parceiro.tipo_cadastro === 'ambos') && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setVincularParceiro(parceiro)}
+                                      className="relative"
+                                      title="Vincular Produtos"
+                                    >
+                                      <Link2 className="h-4 w-4" />
+                                      {parceiro.produtos_vinculados && parceiro.produtos_vinculados > 0 && (
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                                        >
+                                          {parceiro.produtos_vinculados}
+                                        </Badge>
+                                      )}
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setEditingParceiro(parceiro)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -278,6 +324,15 @@ const CadastroParceiros = () => {
             setEditingParceiro(null);
             fetchParceiros();
           }}
+        />
+
+        <VincularProdutosDialog
+          open={!!vincularParceiro}
+          onOpenChange={(open) => !open && setVincularParceiro(null)}
+          parceiroId={vincularParceiro?.id || ""}
+          parceiroNome={vincularParceiro?.razao_social_nome || ""}
+          integradoId={user.id}
+          onSuccess={fetchParceiros}
         />
       </main>
     </div>

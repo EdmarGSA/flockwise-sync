@@ -900,6 +900,66 @@ export type Database = {
           },
         ]
       }
+      produto_fornecedor: {
+        Row: {
+          ativo: boolean | null
+          codigo_produto_fornecedor: string | null
+          created_at: string
+          fornecedor_principal: boolean | null
+          id: string
+          integrado_id: string
+          parceiro_id: string
+          prazo_entrega_dias: number | null
+          preco_compra: number | null
+          produto_id: string
+          quantidade_minima: number | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo_produto_fornecedor?: string | null
+          created_at?: string
+          fornecedor_principal?: boolean | null
+          id?: string
+          integrado_id: string
+          parceiro_id: string
+          prazo_entrega_dias?: number | null
+          preco_compra?: number | null
+          produto_id: string
+          quantidade_minima?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo_produto_fornecedor?: string | null
+          created_at?: string
+          fornecedor_principal?: boolean | null
+          id?: string
+          integrado_id?: string
+          parceiro_id?: string
+          prazo_entrega_dias?: number | null
+          preco_compra?: number | null
+          produto_id?: string
+          quantidade_minima?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_fornecedor_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_fornecedor_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
