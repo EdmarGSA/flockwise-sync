@@ -11,7 +11,8 @@ import {
   ShoppingCart, 
   FileText, 
   DollarSign,
-  RefreshCw
+  RefreshCw,
+  Package
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ import AlertaEstoqueCard from '@/components/fabrica/AlertaEstoqueCard';
 import ProdutosCriticosDialog from '@/components/fabrica/ProdutosCriticosDialog';
 import OrdensCompraTable from '@/components/fabrica/OrdensCompraTable';
 import ContasPagarTable from '@/components/fabrica/ContasPagarTable';
+import RecebimentosTable from '@/components/fabrica/RecebimentosTable';
 
 interface ProdutoCritico {
   id: string;
@@ -192,7 +194,7 @@ export default function FabricaRacao() {
 
       <main className="container mx-auto px-4 py-8 pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               Dashboard
@@ -204,6 +206,10 @@ export default function FabricaRacao() {
             <TabsTrigger value="ordens" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Ordens de Compra
+            </TabsTrigger>
+            <TabsTrigger value="recebimento" className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Recebimento
             </TabsTrigger>
             <TabsTrigger value="financeiro" className="flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
@@ -321,6 +327,13 @@ export default function FabricaRacao() {
 
           <TabsContent value="ordens">
             <OrdensCompraTable 
+              integradoId={user?.id || ''} 
+              onRefresh={() => { fetchStats(); fetchProdutosCriticos(); }}
+            />
+          </TabsContent>
+
+          <TabsContent value="recebimento">
+            <RecebimentosTable 
               integradoId={user?.id || ''} 
               onRefresh={() => { fetchStats(); fetchProdutosCriticos(); }}
             />

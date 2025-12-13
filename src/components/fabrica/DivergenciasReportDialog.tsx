@@ -169,13 +169,13 @@ export default function DivergenciasReportDialog({
         const divergenciasToInsert = divergencias.map(d => ({
           recebimento_id: recebimentoId,
           recebimento_item_id: d.itemId || null,
-          tipo: d.tipo,
+          tipo: d.tipo as 'quantidade' | 'preco' | 'condicao_pagamento' | 'produto_nao_previsto',
           descricao: `${d.produtoNome}: ${d.descricao}`,
           valor_oc: d.valorOc,
           valor_nfe: d.valorNfe,
           valor_fisico: d.valorFisico || null,
           percentual_diferenca: d.percentualDiferenca,
-          status: d.aceita ? 'aceita_com_autorizacao' : 'aberta',
+          status: (d.aceita ? 'aceita_com_autorizacao' : 'aberta') as 'aberta' | 'em_negociacao' | 'resolvida' | 'aceita_com_autorizacao',
           aceita: d.aceita
         }));
 
