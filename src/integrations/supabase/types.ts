@@ -584,7 +584,7 @@ export type Database = {
           longitude: number | null
           nome: string
           numero: string | null
-          tipo_producao: Database["public"]["Enums"]["tipo_producao"]
+          tipo_producao: string
           updated_at: string
         }
         Insert: {
@@ -604,7 +604,7 @@ export type Database = {
           longitude?: number | null
           nome: string
           numero?: string | null
-          tipo_producao: Database["public"]["Enums"]["tipo_producao"]
+          tipo_producao: string
           updated_at?: string
         }
         Update: {
@@ -624,7 +624,7 @@ export type Database = {
           longitude?: number | null
           nome?: string
           numero?: string | null
-          tipo_producao?: Database["public"]["Enums"]["tipo_producao"]
+          tipo_producao?: string
           updated_at?: string
         }
         Relationships: [
