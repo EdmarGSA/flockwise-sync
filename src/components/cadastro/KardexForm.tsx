@@ -7,11 +7,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Package } from "lucide-react";
 
 const formSchema = z.object({
   tipo_movimento: z.string().min(1, "Tipo é obrigatório"),
+  usar_embalagem: z.boolean().default(false),
+  quantidade_embalagens: z.coerce.number().optional(),
   quantidade: z.coerce.number().positive("Quantidade deve ser positiva"),
   custo_unitario: z.coerce.number().optional(),
   documento_ref: z.string().optional(),
@@ -30,39 +34,66 @@ const KardexForm = ({ integradoId, produtoId, produtos, onSuccess }: KardexFormP
   const { user } = useAuth();
   const produto = produtos.find(p => p.id === produtoId);
 
+  const fatorConversao = Number(produto?.fator_conversao) || 1;
+  const unidadeCompra = produto?.unidade_compra || "UN";
+  const unidadeEstoque = produto?.unidade_medida || "UN";
+  const temConversao = fatorConversao > 1 || unidadeCompra !== unidadeEstoque;
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipo_movimento: "",
+      usar_embalagem: false,
+      quantidade_embalagens: 1,
       quantidade: 0,
       custo_unitario: produto?.custo_unitario || 0,
     },
   });
+
+  const usarEmbalagem = form.watch("usar_embalagem");
+  const quantidadeEmbalagens = form.watch("quantidade_embalagens") || 0;
+  const tipoMovimento = form.watch("tipo_movimento");
+
+  // Calcula quantidade convertida quando usar embalagem
+  useEffect(() => {
+    if (usarEmbalagem && tipoMovimento !== 'ajuste') {
+      const quantidadeConvertida = quantidadeEmbalagens * fatorConversao;
+      form.setValue("quantidade", quantidadeConvertida);
+    }
+  }, [usarEmbalagem, quantidadeEmbalagens, fatorConversao, tipoMovimento]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
     const saldoAnterior = Number(produto?.estoque_atual) || 0;
     let saldoAtual = saldoAnterior;
+    const quantidadeFinal = values.quantidade;
 
     if (values.tipo_movimento === 'entrada') {
-      saldoAtual = saldoAnterior + values.quantidade;
+      saldoAtual = saldoAnterior + quantidadeFinal;
     } else if (values.tipo_movimento === 'saida') {
-      saldoAtual = saldoAnterior - values.quantidade;
+      saldoAtual = saldoAnterior - quantidadeFinal;
     } else if (values.tipo_movimento === 'ajuste') {
-      saldoAtual = values.quantidade; // Ajuste define o valor absoluto
+      saldoAtual = quantidadeFinal;
+    }
+
+    // Observação automática para movimentos com conversão
+    let observacaoFinal = values.observacao || "";
+    if (values.usar_embalagem && values.tipo_movimento !== 'ajuste') {
+      const infoConversao = `[${values.quantidade_embalagens} ${unidadeCompra} x ${fatorConversao} = ${quantidadeFinal.toFixed(3)} ${unidadeEstoque}]`;
+      observacaoFinal = observacaoFinal ? `${infoConversao} ${observacaoFinal}` : infoConversao;
     }
 
     // Insert kardex movement
     const { error: kardexError } = await supabase.from('kardex').insert({
       produto_id: produtoId,
       tipo_movimento: values.tipo_movimento,
-      quantidade: values.quantidade,
+      quantidade: quantidadeFinal,
       custo_unitario: values.custo_unitario || null,
       saldo_anterior: saldoAnterior,
       saldo_atual: saldoAtual,
       documento_ref: values.documento_ref || null,
-      observacao: values.observacao || null,
+      observacao: observacaoFinal || null,
       integrado_id: integradoId,
       criado_por: user?.id,
     });
@@ -94,7 +125,13 @@ const KardexForm = ({ integradoId, produtoId, produtos, onSuccess }: KardexFormP
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="p-3 bg-muted rounded-lg mb-4">
           <p className="text-sm text-muted-foreground">Produto: <strong>{produto?.nome}</strong></p>
-          <p className="text-sm text-muted-foreground">Estoque Atual: <strong>{Number(produto?.estoque_atual).toFixed(3)} {produto?.unidade_medida}</strong></p>
+          <p className="text-sm text-muted-foreground">Estoque Atual: <strong>{Number(produto?.estoque_atual).toFixed(3)} {unidadeEstoque}</strong></p>
+          {temConversao && (
+            <p className="text-sm text-muted-foreground mt-1">
+              <Package className="inline h-3 w-3 mr-1" />
+              Conversão: <strong>1 {unidadeCompra} = {fatorConversao} {unidadeEstoque}</strong>
+            </p>
+          )}
         </div>
 
         <FormField
@@ -120,17 +157,68 @@ const KardexForm = ({ integradoId, produtoId, produtos, onSuccess }: KardexFormP
           )}
         />
 
+        {/* Toggle para usar embalagem - só aparece para entrada/saída */}
+        {temConversao && tipoMovimento && tipoMovimento !== 'ajuste' && (
+          <FormField
+            control={form.control}
+            name="usar_embalagem"
+            render={({ field }) => (
+              <FormItem className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+                <div className="flex-1">
+                  <FormLabel className="!mt-0 cursor-pointer">
+                    Informar em embalagens ({unidadeCompra})
+                  </FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    O sistema converterá automaticamente para {unidadeEstoque}
+                  </p>
+                </div>
+              </FormItem>
+            )}
+          />
+        )}
+
+        {/* Quantidade de embalagens */}
+        {usarEmbalagem && tipoMovimento !== 'ajuste' && (
+          <FormField
+            control={form.control}
+            name="quantidade_embalagens"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quantidade de Embalagens ({unidadeCompra}) *</FormLabel>
+                <FormControl>
+                  <Input type="number" step="1" min="1" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="quantidade"
           render={({ field }) => (
             <FormItem>
               <FormLabel>
-                {form.watch('tipo_movimento') === 'ajuste' ? 'Novo Saldo' : 'Quantidade'} *
+                {tipoMovimento === 'ajuste' ? 'Novo Saldo' : `Quantidade (${unidadeEstoque})`} *
               </FormLabel>
               <FormControl>
-                <Input type="number" step="0.001" {...field} />
+                <Input 
+                  type="number" 
+                  step="0.001" 
+                  {...field} 
+                  disabled={usarEmbalagem && tipoMovimento !== 'ajuste'}
+                  className={usarEmbalagem && tipoMovimento !== 'ajuste' ? "bg-muted" : ""}
+                />
               </FormControl>
+              {usarEmbalagem && tipoMovimento !== 'ajuste' && (
+                <p className="text-xs text-muted-foreground">
+                  Calculado: {quantidadeEmbalagens} {unidadeCompra} × {fatorConversao} = <strong>{field.value?.toFixed(3)} {unidadeEstoque}</strong>
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -177,6 +265,30 @@ const KardexForm = ({ integradoId, produtoId, produtos, onSuccess }: KardexFormP
             </FormItem>
           )}
         />
+
+        {/* Preview do saldo */}
+        {tipoMovimento && (
+          <div className="p-3 bg-muted rounded-lg border">
+            <p className="text-sm font-medium">Prévia do movimento:</p>
+            <p className="text-sm text-muted-foreground">
+              Saldo anterior: {Number(produto?.estoque_atual).toFixed(3)} {unidadeEstoque}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {tipoMovimento === 'entrada' && `+ ${form.watch('quantidade')?.toFixed(3) || 0} ${unidadeEstoque}`}
+              {tipoMovimento === 'saida' && `- ${form.watch('quantidade')?.toFixed(3) || 0} ${unidadeEstoque}`}
+              {tipoMovimento === 'ajuste' && `Novo saldo: ${form.watch('quantidade')?.toFixed(3) || 0} ${unidadeEstoque}`}
+            </p>
+            {tipoMovimento !== 'ajuste' && (
+              <p className="text-sm font-medium text-primary mt-1">
+                Saldo final: {(
+                  tipoMovimento === 'entrada' 
+                    ? Number(produto?.estoque_atual || 0) + (form.watch('quantidade') || 0)
+                    : Number(produto?.estoque_atual || 0) - (form.watch('quantidade') || 0)
+                ).toFixed(3)} {unidadeEstoque}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-4">
           <Button type="submit" disabled={loading}>
