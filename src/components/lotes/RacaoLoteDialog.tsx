@@ -32,6 +32,8 @@ interface SolicitacaoRacao {
 interface ProdutoRacao {
   id: string;
   nome: string;
+  estoque_atual: number;
+  unidade_medida: string;
 }
 
 interface RacaoLoteDialogProps {
@@ -112,7 +114,7 @@ export function RacaoLoteDialog({
     // Then fetch products from that group, filtered by animal group
     let query = supabase
       .from('produtos')
-      .select('id, nome')
+      .select('id, nome, estoque_atual, unidade_medida')
       .eq('grupo_produto_id', grupoData.id)
       .eq('ativo', true)
       .order('nome');
@@ -340,7 +342,12 @@ export function RacaoLoteDialog({
                       ) : (
                         produtosRacao.map((produto) => (
                           <SelectItem key={produto.id} value={produto.nome}>
-                            {produto.nome}
+                            <div className="flex items-center justify-between w-full gap-4">
+                              <span>{produto.nome}</span>
+                              <span className="text-xs text-muted-foreground">
+                                Estoque: {produto.estoque_atual.toLocaleString('pt-BR')} {produto.unidade_medida}
+                              </span>
+                            </div>
                           </SelectItem>
                         ))
                       )}
