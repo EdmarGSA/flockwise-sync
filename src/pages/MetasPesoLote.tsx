@@ -533,6 +533,42 @@ export default function MetasPesoLote() {
                         />
                       </div>
                     </div>
+                    
+                    {desempenhoReferencia.length > 0 && (
+                      <div className="pt-4 border-t border-border">
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Ou use os valores de referência da linhagem:
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => {
+                            const getRefValue = (dia: number) => {
+                              const ref = desempenhoReferencia.find(d => d.dia === dia);
+                              return ref ? ref.peso_g / 1000 : 0;
+                            };
+                            const pesoInicial = getRefValue(0);
+                            const meta42 = getRefValue(42);
+                            const gpd = pesoInicial > 0 && meta42 > 0 ? (meta42 - pesoInicial) / 42 : 0;
+                            
+                            setEditingMetas({
+                              peso_inicial_kg: pesoInicial,
+                              meta_7_dias_kg: getRefValue(7),
+                              meta_14_dias_kg: getRefValue(14),
+                              meta_21_dias_kg: getRefValue(21),
+                              meta_28_dias_kg: getRefValue(28),
+                              meta_35_dias_kg: getRefValue(35),
+                              meta_42_dias_kg: meta42,
+                              gpd_kg: gpd,
+                            });
+                            toast.success('Metas preenchidas com valores de referência');
+                          }}
+                        >
+                          <Book className="w-4 h-4" />
+                          Usar Referência ({lote?.linhagem?.replace('_', ' ').toUpperCase()})
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
