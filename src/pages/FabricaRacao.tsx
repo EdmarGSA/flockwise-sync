@@ -29,6 +29,8 @@ interface ProdutoCritico {
   estoque_atual: number;
   estoque_minimo: number;
   unidade_medida: string;
+  unidade_compra: string;
+  fator_conversao: number;
   consumo_medio_diario: number;
   dias_restantes: number;
   nivel_critico: 'critico' | 'atencao' | 'ok';
@@ -100,7 +102,7 @@ export default function FabricaRacao() {
       // Fetch products with stock info - only "Terceiros" category
       const { data: produtos, error: produtosError } = await supabase
         .from('produtos')
-        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, categorias!inner(tipo_origem)')
+        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, unidade_compra, fator_conversao, categorias!inner(tipo_origem)')
         .eq('integrado_id', user.id)
         .eq('ativo', true)
         .eq('categorias.tipo_origem', 'terceiros');
@@ -151,6 +153,8 @@ export default function FabricaRacao() {
           estoque_atual: produto.estoque_atual,
           estoque_minimo: produto.estoque_minimo,
           unidade_medida: produto.unidade_medida,
+          unidade_compra: produto.unidade_compra || 'UN',
+          fator_conversao: produto.fator_conversao || 1,
           consumo_medio_diario: consumoMedioDiario,
           dias_restantes: diasRestantes,
           nivel_critico: nivelCritico
