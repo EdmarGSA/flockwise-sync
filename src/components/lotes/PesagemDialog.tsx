@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface PesagemItem {
   id: string;
@@ -97,7 +98,7 @@ export function PesagemDialog({
       setItens([]);
       setQuantidadeAves('');
       setPesoBruto('');
-      setPesoTara('');
+      // Não limpa a tara - mantém o valor anterior
       
       // Calculate metas if initial weight available (convert g to kg)
       if (pesoInicialPintinhos && pesoInicialPintinhos > 0) {
@@ -142,10 +143,9 @@ export function PesagemDialog({
 
     setItens([...itens, novoItem]);
     
-    // Clear inputs
+    // Clear inputs - mantém a tara para reutilização
     setQuantidadeAves('');
     setPesoBruto('');
-    setPesoTara('');
   };
 
   const handleRemoveItem = (id: string) => {
@@ -295,10 +295,37 @@ export function PesagemDialog({
             </Card>
           )}
 
+          {/* Tara Configuration */}
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="tara" className="font-medium">Peso Tara (kg)</Label>
+                </div>
+                <Input
+                  id="tara"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={pesoTara}
+                  onChange={(e) => setPesoTara(e.target.value)}
+                  placeholder="Ex: 0.500"
+                  className="w-32"
+                />
+                {parseFloat(pesoTara) > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    Tara fixa: {parseFloat(pesoTara).toFixed(3)} kg
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Input Form */}
           <Card className="bg-secondary/30">
             <CardContent className="pt-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="quantidade">Qtd. Aves</Label>
                   <Input
@@ -320,18 +347,6 @@ export function PesagemDialog({
                     value={pesoBruto}
                     onChange={(e) => setPesoBruto(e.target.value)}
                     placeholder="Ex: 5.250"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tara">Peso Tara (kg)</Label>
-                  <Input
-                    id="tara"
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={pesoTara}
-                    onChange={(e) => setPesoTara(e.target.value)}
-                    placeholder="Ex: 0.500"
                   />
                 </div>
                 <div className="flex items-end">
