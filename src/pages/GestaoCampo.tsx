@@ -30,6 +30,11 @@ type NucleoRow = Database['public']['Tables']['nucleos']['Row'];
 type AreaRow = Database['public']['Tables']['areas']['Row'];
 type LoteRow = Database['public']['Tables']['lotes']['Row'];
 
+interface GrupoAnimal {
+  id: string;
+  nome: string;
+}
+
 interface Nucleo {
   id: string;
   nome: string;
@@ -95,6 +100,7 @@ export default function GestaoCampo() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [desempenhoData, setDesempenhoData] = useState<DesempenhoAve[]>([]);
+  const [gruposAnimal, setGruposAnimal] = useState<GrupoAnimal[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState('lotes');
   const [showForm, setShowForm] = useState(false);
@@ -114,7 +120,7 @@ export default function GestaoCampo() {
   const fetchData = async () => {
     setLoadingData(true);
     
-    const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes] = await Promise.all([
+    const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes, gruposRes] = await Promise.all([
       supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude'),
       supabase.from('galpoes').select('*,nucleo:nucleos(nome)'),
       supabase.from('areas').select('id, nome, descricao, cor, ativo'),
@@ -122,7 +128,8 @@ export default function GestaoCampo() {
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
         linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
       `).order('created_at', { ascending: false }),
-      supabase.from('desempenho_aves').select('*').order('dia', { ascending: true })
+      supabase.from('desempenho_aves').select('*').order('dia', { ascending: true }),
+      supabase.from('grupos_animal').select('id, nome').eq('ativo', true)
     ]);
 
     if (nucleosRes.data) setNucleos(nucleosRes.data);
@@ -130,6 +137,7 @@ export default function GestaoCampo() {
     if (areasRes.data) setAreas(areasRes.data);
     if (lotesRes.data) setLotes(lotesRes.data as Lote[]);
     if (desempenhoRes.data) setDesempenhoData(desempenhoRes.data);
+    if (gruposRes.data) setGruposAnimal(gruposRes.data);
     
     setLoadingData(false);
   };
@@ -146,8 +154,15 @@ export default function GestaoCampo() {
     return <Navigate to="/auth" replace />;
   }
 
-  const getTipoProducaoLabel = (tipo: string) => {
-    return tipo === 'corte' ? 'Aves de Corte' : 'Aves de Postura';
+  const getTipoProducaoLabel = (tipoId: string) => {
+    // Check if it's a UUID (grupo_animal id)
+    const grupo = gruposAnimal.find(g => g.id === tipoId);
+    if (grupo) return grupo.nome;
+    
+    // Fallback for old enum values
+    if (tipoId === 'corte') return 'Aves de Corte';
+    if (tipoId === 'postura') return 'Aves de Postura';
+    return tipoId;
   };
 
   const getTipoPressaoLabel = (tipo: string) => {
