@@ -6,16 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Users, Shield } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Users, Shield, Plus, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import MembroForm from "@/components/cadastro/MembroForm";
+import MembroEditDialog from "@/components/cadastro/MembroEditDialog";
 
 const CadastroMembros = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [members, setMembers] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedMembro, setSelectedMembro] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -29,7 +35,8 @@ const CadastroMembros = () => {
     // Get profiles with their roles
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: false });
     
     const { data: roles } = await supabase
       .from('user_roles')
@@ -65,6 +72,22 @@ const CadastroMembros = () => {
     }
   };
 
+  const handleAddSuccess = () => {
+    setDialogOpen(false);
+    fetchMembers();
+  };
+
+  const handleEditSuccess = () => {
+    setEditDialogOpen(false);
+    setSelectedMembro(null);
+    fetchMembers();
+  };
+
+  const handleEditClick = (membro: any) => {
+    setSelectedMembro(membro);
+    setEditDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -82,26 +105,43 @@ const CadastroMembros = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-6 pt-24 pb-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Users className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Cadastro de Membros</h1>
-              <p className="text-muted-foreground">Visualize os usuários do sistema</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Cadastro de Membros</h1>
+                <p className="text-muted-foreground">Gerencie os usuários do sistema</p>
+              </div>
             </div>
           </div>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Novo Membro
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Cadastrar Novo Membro</DialogTitle>
+              </DialogHeader>
+              <MembroForm onSuccess={handleAddSuccess} />
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="w-5 h-5" />
-              Usuários do Sistema
+              Usuários do Sistema ({members.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -110,7 +150,14 @@ const CadastroMembros = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : members.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhum membro encontrado</p>
+              <div className="text-center py-8">
+                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-4">Nenhum membro cadastrado</p>
+                <Button onClick={() => setDialogOpen(true)} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Cadastrar Primeiro Membro
+                </Button>
+              </div>
             ) : (
               <Table>
                 <TableHeader>
@@ -121,6 +168,7 @@ const CadastroMembros = () => {
                     <TableHead>Função</TableHead>
                     <TableHead>Papéis</TableHead>
                     <TableHead>Cadastrado em</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -129,7 +177,9 @@ const CadastroMembros = () => {
                       <TableCell className="font-medium">{member.full_name || '-'}</TableCell>
                       <TableCell>{member.company_name || '-'}</TableCell>
                       <TableCell>{member.phone || '-'}</TableCell>
-                      <TableCell>{member.role || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getRoleLabel(member.role)}</Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {member.roles.length > 0 ? (
@@ -146,6 +196,15 @@ const CadastroMembros = () => {
                       <TableCell>
                         {format(new Date(member.created_at), "dd/MM/yyyy", { locale: ptBR })}
                       </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditClick(member)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -153,6 +212,13 @@ const CadastroMembros = () => {
             )}
           </CardContent>
         </Card>
+
+        <MembroEditDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          membro={selectedMembro}
+          onSuccess={handleEditSuccess}
+        />
       </main>
     </div>
   );
