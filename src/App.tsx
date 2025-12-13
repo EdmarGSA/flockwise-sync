@@ -18,6 +18,7 @@ import CadastroMembros from "./pages/CadastroMembros";
 import CadastroProdutos from "./pages/CadastroProdutos";
 import CadastroGruposAnimal from "./pages/CadastroGruposAnimal";
 import CadastroDesempenhoAves from "./pages/CadastroDesempenhoAves";
+import CadastroParceiros from "./pages/CadastroParceiros";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -133,6 +134,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/desempenho-aves" element={
       <ProtectedRoute>
         <CadastroDesempenhoAves />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/parceiros" element={
+      <ProtectedRoute>
+        <CadastroParceiros />
       </ProtectedRoute>
     } />
     

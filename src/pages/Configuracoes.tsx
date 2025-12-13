@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -52,6 +52,12 @@ const Configuracoes = () => {
       description: "Multiplicadores e tabela de desempenho",
       icon: Target,
       path: "/configuracoes/desempenho-aves"
+    },
+    {
+      title: "Fornecedores e Clientes",
+      description: "Cadastro de parceiros comerciais",
+      icon: Handshake,
+      path: "/configuracoes/parceiros"
     }
   ];
 
