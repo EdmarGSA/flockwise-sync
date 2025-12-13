@@ -275,16 +275,24 @@ export default function MetasPesoLote() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Prepare chart data
-  const chartData = [
-    { dia: 0, meta: editingMetas?.peso_inicial_kg || 0 },
-    { dia: 7, meta: editingMetas?.meta_7_dias_kg || 0 },
-    { dia: 14, meta: editingMetas?.meta_14_dias_kg || 0 },
-    { dia: 21, meta: editingMetas?.meta_21_dias_kg || 0 },
-    { dia: 28, meta: editingMetas?.meta_28_dias_kg || 0 },
-    { dia: 35, meta: editingMetas?.meta_35_dias_kg || 0 },
-    { dia: 42, meta: editingMetas?.meta_42_dias_kg || 0 },
-  ];
+  // Prepare chart data with reference line
+  const chartData = [0, 7, 14, 21, 28, 35, 42].map(dia => {
+    const refData = desempenhoReferencia.find(d => d.dia === dia);
+    const metaKeys: Record<number, keyof MetasPeso> = {
+      0: 'peso_inicial_kg',
+      7: 'meta_7_dias_kg',
+      14: 'meta_14_dias_kg',
+      21: 'meta_21_dias_kg',
+      28: 'meta_28_dias_kg',
+      35: 'meta_35_dias_kg',
+      42: 'meta_42_dias_kg',
+    };
+    return {
+      dia,
+      meta: editingMetas ? editingMetas[metaKeys[dia]] || 0 : 0,
+      referencia: refData ? refData.peso_g / 1000 : undefined,
+    };
+  });
 
   // Merge pesagens into chart data
   pesagens.forEach((p) => {
@@ -292,7 +300,13 @@ export default function MetasPesoLote() {
     if (existing) {
       (existing as any).real = p.peso_real_kg;
     } else {
-      chartData.push({ dia: p.dia, meta: 0, real: p.peso_real_kg } as any);
+      const refData = desempenhoReferencia.find(d => d.dia === p.dia);
+      chartData.push({ 
+        dia: p.dia, 
+        meta: 0, 
+        real: p.peso_real_kg,
+        referencia: refData ? refData.peso_g / 1000 : undefined,
+      } as any);
     }
   });
 
@@ -370,11 +384,21 @@ export default function MetasPesoLote() {
                         }}
                         formatter={(value: number, name: string) => [
                           `${value.toFixed(3)} kg`,
-                          name === 'meta' ? 'Meta' : 'Peso Real'
+                          name === 'meta' ? 'Meta' : name === 'referencia' ? 'Ref. Linhagem' : 'Peso Real'
                         ]}
                       />
                       <Legend />
                       <ReferenceLine x={diasDesdeAlojamento} stroke="hsl(var(--primary))" strokeDasharray="5 5" label="Hoje" />
+                      <Line 
+                        type="monotone" 
+                        dataKey="referencia" 
+                        stroke="hsl(var(--chart-3))" 
+                        strokeWidth={2}
+                        strokeDasharray="3 3"
+                        dot={{ fill: 'hsl(var(--chart-3))' }}
+                        name="Ref. Linhagem"
+                        connectNulls
+                      />
                       <Line 
                         type="monotone" 
                         dataKey="meta" 
