@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download } from 'lucide-react';
@@ -28,6 +29,11 @@ interface SolicitacaoRacao {
   observacoes: string | null;
 }
 
+interface ProdutoRacao {
+  id: string;
+  nome: string;
+}
+
 interface RacaoLoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +41,7 @@ interface RacaoLoteDialogProps {
   integradoId: string;
   nucleo: string;
   galpao: string;
+  tipoProducao: string | null;
   onSuccess: () => void;
 }
 
@@ -45,10 +52,12 @@ export function RacaoLoteDialog({
   integradoId,
   nucleo,
   galpao,
+  tipoProducao,
   onSuccess 
 }: RacaoLoteDialogProps) {
   const { user } = useAuth();
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoRacao[]>([]);
+  const [produtosRacao, setProdutosRacao] = useState<ProdutoRacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('solicitar');
 
@@ -67,8 +76,9 @@ export function RacaoLoteDialog({
   useEffect(() => {
     if (open) {
       fetchSolicitacoes();
+      fetchProdutosRacao();
     }
-  }, [open, loteId]);
+  }, [open, loteId, tipoProducao]);
 
   const fetchSolicitacoes = async () => {
     const { data, error } = await supabase
@@ -83,6 +93,43 @@ export function RacaoLoteDialog({
     }
 
     setSolicitacoes(data || []);
+  };
+
+  const fetchProdutosRacao = async () => {
+    // First, find the "Ração" product group
+    const { data: grupoData, error: grupoError } = await supabase
+      .from('grupos_produto')
+      .select('id')
+      .eq('nome', 'Ração')
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (grupoError || !grupoData) {
+      console.error('Erro ao buscar grupo Ração:', grupoError);
+      return;
+    }
+
+    // Then fetch products from that group, filtered by animal group
+    let query = supabase
+      .from('produtos')
+      .select('id, nome')
+      .eq('grupo_produto_id', grupoData.id)
+      .eq('ativo', true)
+      .order('nome');
+
+    // Filter by animal group if tipoProducao is available
+    if (tipoProducao) {
+      query = query.eq('grupo_animal_id', tipoProducao);
+    }
+
+    const { data: produtosData, error: produtosError } = await query;
+
+    if (produtosError) {
+      console.error('Erro ao buscar produtos de ração:', produtosError);
+      return;
+    }
+
+    setProdutosRacao(produtosData || []);
   };
 
   const handleNovaSolicitacao = async (e: React.FormEvent) => {
@@ -281,12 +328,24 @@ export function RacaoLoteDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tipoRacao">Tipo de Ração *</Label>
-                  <Input
-                    id="tipoRacao"
-                    value={tipoRacao}
-                    onChange={(e) => setTipoRacao(e.target.value)}
-                    placeholder="Ex: Inicial, Crescimento, Final"
-                  />
+                  <Select value={tipoRacao} onValueChange={setTipoRacao}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a ração" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {produtosRacao.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          Nenhum produto de ração cadastrado
+                        </SelectItem>
+                      ) : (
+                        produtosRacao.map((produto) => (
+                          <SelectItem key={produto.id} value={produto.nome}>
+                            {produto.nome}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quantidade">Quantidade (kg) *</Label>
@@ -334,7 +393,7 @@ export function RacaoLoteDialog({
                 />
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full gap-2">
+              <Button type="submit" disabled={loading || produtosRacao.length === 0} className="w-full gap-2">
                 <Plus className="w-4 h-4" />
                 {loading ? 'Enviando...' : 'Enviar Solicitação'}
               </Button>

@@ -33,7 +33,8 @@ interface Lote {
   veterinario_id: string | null;
   integrado_id: string;
   peso_medio_pintinhos: number | null;
-  nucleo: { nome: string } | null;
+  nucleo_id: string;
+  nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
 }
 
@@ -76,7 +77,8 @@ export default function MeusLotes() {
         status,
         integrado_id,
         peso_medio_pintinhos,
-        nucleo:nucleos(nome),
+        nucleo_id,
+        nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome),
         veterinario_id
       `)
@@ -493,6 +495,7 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             nucleo={selectedLote.nucleo?.nome || '-'}
             galpao={selectedLote.galpao?.nome || '-'}
+            tipoProducao={selectedLote.nucleo?.tipo_producao || null}
             onSuccess={fetchLotes}
           />
         </>

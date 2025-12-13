@@ -20,7 +20,8 @@ interface LoteConsumo {
   data_alojamento: string | null;
   status: string;
   integrado_id: string;
-  nucleo: { nome: string } | null;
+  nucleo_id: string;
+  nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
   quantidadeAlojada?: number | null;
   diasDesdeAlojamento?: number;
@@ -93,7 +94,8 @@ export default function GestaoConsumo() {
         data_alojamento,
         status,
         integrado_id,
-        nucleo:nucleos(nome),
+        nucleo_id,
+        nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome)
       `)
       .in('status', ['previsao', 'saiu_para_entrega', 'alojado'])
