@@ -938,6 +938,119 @@ export type Database = {
           },
         ]
       }
+      ordens_producao: {
+        Row: {
+          aprovado_por: string | null
+          created_at: string
+          criado_por: string | null
+          data_aprovacao: string | null
+          data_finalizacao: string | null
+          data_inicio_producao: string | null
+          data_prevista_producao: string | null
+          id: string
+          integrado_id: string
+          numero_op: number
+          observacoes: string | null
+          produto_id: string
+          quantidade_planejada: number
+          quantidade_produzida: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          aprovado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_aprovacao?: string | null
+          data_finalizacao?: string | null
+          data_inicio_producao?: string | null
+          data_prevista_producao?: string | null
+          id?: string
+          integrado_id: string
+          numero_op?: number
+          observacoes?: string | null
+          produto_id: string
+          quantidade_planejada: number
+          quantidade_produzida?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          aprovado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_aprovacao?: string | null
+          data_finalizacao?: string | null
+          data_inicio_producao?: string | null
+          data_prevista_producao?: string | null
+          id?: string
+          integrado_id?: string
+          numero_op?: number
+          observacoes?: string | null
+          produto_id?: string
+          quantidade_planejada?: number
+          quantidade_produzida?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_producao_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_producao_itens: {
+        Row: {
+          created_at: string
+          estoque_disponivel: number | null
+          id: string
+          insumo_id: string
+          ordem_producao_id: string
+          quantidade_necessaria: number
+          quantidade_utilizada: number | null
+          unidade_medida: string
+        }
+        Insert: {
+          created_at?: string
+          estoque_disponivel?: number | null
+          id?: string
+          insumo_id: string
+          ordem_producao_id: string
+          quantidade_necessaria: number
+          quantidade_utilizada?: number | null
+          unidade_medida?: string
+        }
+        Update: {
+          created_at?: string
+          estoque_disponivel?: number | null
+          id?: string
+          insumo_id?: string
+          ordem_producao_id?: string
+          quantidade_necessaria?: number
+          quantidade_utilizada?: number | null
+          unidade_medida?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_producao_itens_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_producao_itens_ordem_producao_id_fkey"
+            columns: ["ordem_producao_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizacoes: {
         Row: {
           ativo: boolean

@@ -12,7 +12,8 @@ import {
   FileText, 
   DollarSign,
   RefreshCw,
-  Package
+  Package,
+  Cog
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -21,6 +22,7 @@ import ProdutosCriticosDialog from '@/components/fabrica/ProdutosCriticosDialog'
 import OrdensCompraTable from '@/components/fabrica/OrdensCompraTable';
 import ContasPagarTable from '@/components/fabrica/ContasPagarTable';
 import RecebimentosTable from '@/components/fabrica/RecebimentosTable';
+import GestaoProducaoTab from '@/components/fabrica/producao/GestaoProducaoTab';
 
 interface ProdutoCritico {
   id: string;
@@ -198,18 +200,22 @@ export default function FabricaRacao() {
 
       <main className="container mx-auto px-4 py-8 pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               Dashboard
             </TabsTrigger>
+            <TabsTrigger value="producao" className="flex items-center gap-2">
+              <Cog className="w-4 h-4" />
+              Produção
+            </TabsTrigger>
             <TabsTrigger value="compras" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
-              Gestão de Compras
+              Compras
             </TabsTrigger>
             <TabsTrigger value="ordens" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
-              Ordens de Compra
+              Ordens Compra
             </TabsTrigger>
             <TabsTrigger value="recebimento" className="flex items-center gap-2">
               <Package className="w-4 h-4" />
@@ -217,7 +223,7 @@ export default function FabricaRacao() {
             </TabsTrigger>
             <TabsTrigger value="financeiro" className="flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
-              Contas a Pagar
+              Contas Pagar
             </TabsTrigger>
           </TabsList>
 
@@ -304,6 +310,10 @@ export default function FabricaRacao() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="producao">
+            <GestaoProducaoTab integradoId={user?.id || ''} />
           </TabsContent>
 
           <TabsContent value="compras">
