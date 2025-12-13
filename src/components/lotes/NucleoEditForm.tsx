@@ -21,12 +21,17 @@ const nucleoSchema = z.object({
   cidade: z.string().min(2, 'Cidade obrigatória'),
   estado: z.string().min(2, 'Estado obrigatório'),
   codigo_ibge: z.string().optional(),
-  tipo_producao: z.enum(['corte', 'postura']),
+  tipo_producao: z.string().min(1, 'Selecione o tipo de produção'),
   ativo: z.boolean(),
 });
 
 type NucleoFormData = z.infer<typeof nucleoSchema>;
 type NucleoRow = Database['public']['Tables']['nucleos']['Row'];
+
+interface GrupoAnimal {
+  id: string;
+  nome: string;
+}
 
 interface NucleoEditFormProps {
   nucleo: NucleoRow;
@@ -38,6 +43,7 @@ export function NucleoEditForm({ nucleo, onSuccess, onCancel }: NucleoEditFormPr
   const [loading, setLoading] = useState(false);
   const [searchingCep, setSearchingCep] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [gruposAnimal, setGruposAnimal] = useState<GrupoAnimal[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
     nucleo.latitude && nucleo.longitude 
       ? { lat: nucleo.latitude, lng: nucleo.longitude } 
@@ -60,6 +66,24 @@ export function NucleoEditForm({ nucleo, onSuccess, onCancel }: NucleoEditFormPr
       ativo: nucleo.ativo,
     },
   });
+
+  useEffect(() => {
+    fetchGruposAnimal();
+  }, []);
+
+  const fetchGruposAnimal = async () => {
+    const { data, error } = await supabase
+      .from('grupos_animal')
+      .select('id, nome')
+      .eq('ativo', true)
+      .order('nome');
+    
+    if (error) {
+      console.error('Erro ao buscar grupos de animais:', error);
+      return;
+    }
+    setGruposAnimal(data || []);
+  };
 
   const searchCep = async () => {
     const cep = form.getValues('cep').replace(/\D/g, '');
@@ -322,12 +346,15 @@ export function NucleoEditForm({ nucleo, onSuccess, onCancel }: NucleoEditFormPr
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o tipo" />
+                      <SelectValue placeholder="Selecione o grupo de animal" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="corte">Aves de Corte</SelectItem>
-                    <SelectItem value="postura">Aves de Postura</SelectItem>
+                    {gruposAnimal.map((grupo) => (
+                      <SelectItem key={grupo.id} value={grupo.id}>
+                        {grupo.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
