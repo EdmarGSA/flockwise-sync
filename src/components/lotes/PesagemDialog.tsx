@@ -36,6 +36,8 @@ interface PesagemDialogProps {
   integradoId: string;
   pesoInicialPintinhos?: number | null;
   diasDesdeAlojamento?: number;
+  linhagem?: 'cobb_500' | 'ross_308' | 'hubbard';
+  sexo?: 'macho' | 'femea' | 'misto';
   onSuccess?: () => void;
 }
 
@@ -82,16 +84,46 @@ export function PesagemDialog({
   integradoId,
   pesoInicialPintinhos,
   diasDesdeAlojamento = 0,
+  linhagem,
+  sexo,
   onSuccess 
 }: PesagemDialogProps) {
   const [loading, setLoading] = useState(false);
   const [itens, setItens] = useState<PesagemItem[]>([]);
   const [metas, setMetas] = useState<MetasPeso | null>(null);
+  const [pesoReferencia, setPesoReferencia] = useState<number | null>(null);
   
   // Form inputs
   const [quantidadeAves, setQuantidadeAves] = useState('');
   const [pesoBruto, setPesoBruto] = useState('');
   const [pesoTara, setPesoTara] = useState('');
+
+  // Fetch reference weight from desempenho_aves
+  useEffect(() => {
+    const fetchPesoReferencia = async () => {
+      if (!open || !linhagem || !sexo || diasDesdeAlojamento <= 0) {
+        setPesoReferencia(null);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('desempenho_aves')
+        .select('peso_g')
+        .eq('linhagem', linhagem)
+        .eq('sexo', sexo)
+        .eq('dia', diasDesdeAlojamento)
+        .maybeSingle();
+      
+      if (data) {
+        // Convert grams to kg
+        setPesoReferencia(data.peso_g / 1000);
+      } else {
+        setPesoReferencia(null);
+      }
+    };
+    
+    fetchPesoReferencia();
+  }, [open, linhagem, sexo, diasDesdeAlojamento]);
 
   useEffect(() => {
     if (open) {
@@ -142,6 +174,21 @@ export function PesagemDialog({
     };
 
     setItens([...itens, novoItem]);
+    
+    // Check if average weight is more than 20% different from reference
+    const pesoMedioItem = liquido / quantidade;
+    if (pesoReferencia && pesoReferencia > 0) {
+      const diferenca = ((pesoMedioItem - pesoReferencia) / pesoReferencia) * 100;
+      if (Math.abs(diferenca) > 20) {
+        const status = diferenca > 0 ? 'acima' : 'abaixo';
+        const emoji = diferenca > 0 ? '⬆️' : '⬇️';
+        toast.warning(
+          `${emoji} Peso médio ${Math.abs(diferenca).toFixed(1)}% ${status} da referência! ` +
+          `(${pesoMedioItem.toFixed(3)} kg vs ${pesoReferencia.toFixed(3)} kg ref.)`,
+          { duration: 5000 }
+        );
+      }
+    }
     
     // Clear inputs - mantém a tara para reutilização
     setQuantidadeAves('');
