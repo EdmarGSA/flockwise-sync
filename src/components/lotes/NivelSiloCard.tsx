@@ -97,7 +97,8 @@ export function NivelSiloCard({
         badgeVariant: 'destructive' as const
       };
     }
-    if (diasRestantes < 3) {
+    // Critical: < 2 days
+    if (diasRestantes < 2) {
       return { 
         color: 'destructive', 
         bgClass: 'bg-destructive/10 border-destructive/30',
@@ -106,7 +107,8 @@ export function NivelSiloCard({
         badgeVariant: 'destructive' as const
       };
     }
-    if (diasRestantes <= 7) {
+    // Warning: 2-4 days
+    if (diasRestantes <= 4) {
       return { 
         color: 'warning', 
         bgClass: 'bg-amber-500/10 border-amber-500/30',
@@ -115,6 +117,7 @@ export function NivelSiloCard({
         badgeVariant: 'secondary' as const
       };
     }
+    // OK: > 5 days
     return { 
       color: 'success', 
       bgClass: 'bg-green-500/10 border-green-500/30',
@@ -191,7 +194,7 @@ export function NivelSiloCard({
             <Clock className="w-4 h-4" />
             <span>Duração estimada:</span>
           </div>
-          <span className={`font-bold ${diasRestantes < 3 ? 'text-destructive' : diasRestantes <= 7 ? 'text-amber-500' : 'text-green-500'}`}>
+          <span className={`font-bold ${diasRestantes < 2 ? 'text-destructive' : diasRestantes <= 4 ? 'text-amber-500' : 'text-green-500'}`}>
             {diasRestantes < 0 ? 'Déficit' : `${diasRestantes} dias`}
           </span>
         </div>
