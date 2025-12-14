@@ -10,9 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Package, MoreHorizontal, Eye, FileCheck, AlertTriangle, Plus, Search } from 'lucide-react';
+import { Package, MoreHorizontal, Eye, FileCheck, AlertTriangle, Plus, Search, DollarSign } from 'lucide-react';
 import IniciarRecebimentoDialog from './IniciarRecebimentoDialog';
 import RecebimentoViewDialog from './RecebimentoViewDialog';
+import LiberacaoPrecoDialog from './LiberacaoPrecoDialog';
 
 interface Recebimento {
   id: string;
@@ -41,6 +42,8 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showIniciar, setShowIniciar] = useState(false);
   const [selectedRecebimento, setSelectedRecebimento] = useState<Recebimento | null>(null);
+  const [showLiberacao, setShowLiberacao] = useState(false);
+  const [liberacaoRecebimento, setLiberacaoRecebimento] = useState<Recebimento | null>(null);
 
   useEffect(() => {
     fetchRecebimentos();
@@ -82,6 +85,7 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
     const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       'em_conferencia': { label: 'Em Conferência', variant: 'secondary' },
       'divergente': { label: 'Divergente', variant: 'destructive' },
+      'divergente_preco': { label: 'Divergente Preço', variant: 'destructive' },
       'aguardando_autorizacao': { label: 'Aguardando Autorização', variant: 'outline' },
       'finalizado': { label: 'Finalizado', variant: 'default' },
       'cancelado': { label: 'Cancelado', variant: 'destructive' }
@@ -151,6 +155,7 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="em_conferencia">Em Conferência</SelectItem>
                 <SelectItem value="divergente">Divergente</SelectItem>
+                <SelectItem value="divergente_preco">Divergente Preço</SelectItem>
                 <SelectItem value="aguardando_autorizacao">Aguardando Autorização</SelectItem>
                 <SelectItem value="finalizado">Finalizado</SelectItem>
                 <SelectItem value="cancelado">Cancelado</SelectItem>
@@ -231,6 +236,15 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
                               Ver Divergências
                             </DropdownMenuItem>
                           )}
+                          {rec.status === 'divergente_preco' && (
+                            <DropdownMenuItem onClick={() => {
+                              setLiberacaoRecebimento(rec);
+                              setShowLiberacao(true);
+                            }}>
+                              <DollarSign className="w-4 h-4 mr-2" />
+                              Liberar Preço
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -254,6 +268,19 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
           open={!!selectedRecebimento}
           onOpenChange={(open) => !open && setSelectedRecebimento(null)}
           recebimentoId={selectedRecebimento.id}
+          integradoId={integradoId}
+          onSuccess={handleSuccess}
+        />
+      )}
+
+      {liberacaoRecebimento && (
+        <LiberacaoPrecoDialog
+          open={showLiberacao}
+          onOpenChange={(open) => {
+            setShowLiberacao(open);
+            if (!open) setLiberacaoRecebimento(null);
+          }}
+          recebimentoId={liberacaoRecebimento.id}
           integradoId={integradoId}
           onSuccess={handleSuccess}
         />

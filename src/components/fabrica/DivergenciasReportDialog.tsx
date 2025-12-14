@@ -261,7 +261,7 @@ export default function DivergenciasReportDialog({
 
       if (fetchError) throw fetchError;
 
-      // Create kardex entries for each item (with quarantine status)
+      // Create kardex entries for each item (with quarantine status based on product setting)
       for (const item of itens) {
         const fatorConversao = item.fator_conversao || 1;
         const quantidadeEstoque = item.quantidade_fisica * fatorConversao;
@@ -269,7 +269,7 @@ export default function DivergenciasReportDialog({
         if (quantidadeEstoque > 0) {
           const { data: produto, error: prodError } = await supabase
             .from('produtos')
-            .select('estoque_atual')
+            .select('estoque_atual, requer_quarentena')
             .eq('id', item.produto_id)
             .single();
 
@@ -277,6 +277,7 @@ export default function DivergenciasReportDialog({
 
           const saldoAnterior = produto?.estoque_atual || 0;
           const saldoAtual = saldoAnterior + quantidadeEstoque;
+          const requerQuarentena = produto?.requer_quarentena ?? true;
 
           const { error: kardexError } = await supabase
             .from('kardex')
@@ -291,7 +292,7 @@ export default function DivergenciasReportDialog({
               documento_ref: `NF-e ${recebimento?.numero_nfe || 'S/N'}`,
               observacao: `Recebimento - ${item.quantidade_fisica} ${item.unidade_compra || item.produtos.unidade_medida} (${quantidadeEstoque} ${item.produtos.unidade_medida}) - Lote: ${item.lote_fornecedor || 'N/A'}`,
               lote_fornecedor: item.lote_fornecedor || null,
-              status_quarentena: 'quarentena',
+              status_quarentena: requerQuarentena ? 'quarentena' : null,
               recebimento_id: recebimentoId
             });
 

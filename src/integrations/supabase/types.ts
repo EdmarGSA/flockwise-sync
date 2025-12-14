@@ -1521,6 +1521,7 @@ export type Database = {
           nome: string
           origem_mercadoria: string | null
           preco_venda: number
+          requer_quarentena: boolean | null
           sku: string
           unidade_compra: string | null
           unidade_medida: string
@@ -1555,6 +1556,7 @@ export type Database = {
           nome: string
           origem_mercadoria?: string | null
           preco_venda?: number
+          requer_quarentena?: boolean | null
           sku: string
           unidade_compra?: string | null
           unidade_medida?: string
@@ -1589,6 +1591,7 @@ export type Database = {
           nome?: string
           origem_mercadoria?: string | null
           preco_venda?: number
+          requer_quarentena?: boolean | null
           sku?: string
           unidade_compra?: string | null
           unidade_medida?: string
@@ -1808,10 +1811,12 @@ export type Database = {
           created_at: string
           data_autorizacao: string | null
           data_emissao_nfe: string | null
+          data_liberacao: string | null
           data_recebimento: string
           id: string
           integrado_id: string
           justificativa_autorizacao: string | null
+          liberado_por: string | null
           numero_nfe: string | null
           observacoes: string | null
           ordem_compra_id: string | null
@@ -1832,10 +1837,12 @@ export type Database = {
           created_at?: string
           data_autorizacao?: string | null
           data_emissao_nfe?: string | null
+          data_liberacao?: string | null
           data_recebimento?: string
           id?: string
           integrado_id: string
           justificativa_autorizacao?: string | null
+          liberado_por?: string | null
           numero_nfe?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
@@ -1856,10 +1863,12 @@ export type Database = {
           created_at?: string
           data_autorizacao?: string | null
           data_emissao_nfe?: string | null
+          data_liberacao?: string | null
           data_recebimento?: string
           id?: string
           integrado_id?: string
           justificativa_autorizacao?: string | null
+          liberado_por?: string | null
           numero_nfe?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
@@ -1994,7 +2003,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "integrado" | "veterinario" | "tecnico"
+      app_role:
+        | "admin"
+        | "integrado"
+        | "veterinario"
+        | "tecnico"
+        | "comprador"
+        | "conferente"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
       divergencia_status:
         | "aberta"
@@ -2016,12 +2031,14 @@ export type Database = {
         | "parcial_recebida"
         | "recebida"
         | "cancelada"
+        | "refaturamento"
       recebimento_status:
         | "em_conferencia"
         | "divergente"
         | "aguardando_autorizacao"
         | "finalizado"
         | "cancelado"
+        | "divergente_preco"
       sexo_ave: "macho" | "femea" | "misto"
       status_quarentena: "quarentena" | "liberado" | "rejeitado"
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
@@ -2158,7 +2175,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "integrado", "veterinario", "tecnico"],
+      app_role: [
+        "admin",
+        "integrado",
+        "veterinario",
+        "tecnico",
+        "comprador",
+        "conferente",
+      ],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
       divergencia_status: [
         "aberta",
@@ -2182,6 +2206,7 @@ export const Constants = {
         "parcial_recebida",
         "recebida",
         "cancelada",
+        "refaturamento",
       ],
       recebimento_status: [
         "em_conferencia",
@@ -2189,6 +2214,7 @@ export const Constants = {
         "aguardando_autorizacao",
         "finalizado",
         "cancelado",
+        "divergente_preco",
       ],
       sexo_ave: ["macho", "femea", "misto"],
       status_quarentena: ["quarentena", "liberado", "rejeitado"],
