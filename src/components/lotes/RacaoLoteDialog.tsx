@@ -16,6 +16,7 @@ import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download, Calendar
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { NivelSiloCard } from './NivelSiloCard';
 
 interface SolicitacaoRacao {
   id: string;
@@ -46,6 +47,10 @@ interface RacaoLoteDialogProps {
   nucleo: string;
   galpao: string;
   tipoProducao: string | null;
+  linhagem?: 'cobb_500' | 'ross_308' | 'hubbard';
+  sexo?: 'macho' | 'femea' | 'misto';
+  diasDesdeAlojamento?: number;
+  avesVivas?: number;
   onSuccess: () => void;
 }
 
@@ -57,6 +62,10 @@ export function RacaoLoteDialog({
   nucleo,
   galpao,
   tipoProducao,
+  linhagem,
+  sexo,
+  diasDesdeAlojamento,
+  avesVivas,
   onSuccess 
 }: RacaoLoteDialogProps) {
   const { user } = useAuth();
@@ -304,15 +313,28 @@ export function RacaoLoteDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="mb-4 p-4 bg-muted/50 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Ração Recebida no Lote</p>
-              <p className="text-2xl font-bold text-primary">{totalRacaoRecebida.toLocaleString('pt-BR')} kg</p>
-            </div>
-            <Package className="w-8 h-8 text-primary/50" />
+        {/* Nível do Silo - show only when we have the required data */}
+        {linhagem && sexo && diasDesdeAlojamento !== undefined && diasDesdeAlojamento > 0 && avesVivas && avesVivas > 0 ? (
+          <div className="mb-4">
+            <NivelSiloCard
+              loteId={loteId}
+              linhagem={linhagem}
+              sexo={sexo}
+              diasDesdeAlojamento={diasDesdeAlojamento}
+              avesVivas={avesVivas}
+            />
           </div>
-        </div>
+        ) : (
+          <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Ração Recebida no Lote</p>
+                <p className="text-2xl font-bold text-primary">{totalRacaoRecebida.toLocaleString('pt-BR')} kg</p>
+              </div>
+              <Package className="w-8 h-8 text-primary/50" />
+            </div>
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
