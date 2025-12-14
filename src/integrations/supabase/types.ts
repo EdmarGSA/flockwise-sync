@@ -1709,6 +1709,7 @@ export type Database = {
           preco_venda: number
           requer_quarentena: boolean | null
           sku: string
+          status_comercial: string
           unidade_compra: string | null
           unidade_medida: string
           updated_at: string
@@ -1744,6 +1745,7 @@ export type Database = {
           preco_venda?: number
           requer_quarentena?: boolean | null
           sku: string
+          status_comercial?: string
           unidade_compra?: string | null
           unidade_medida?: string
           updated_at?: string
@@ -1779,6 +1781,7 @@ export type Database = {
           preco_venda?: number
           requer_quarentena?: boolean | null
           sku?: string
+          status_comercial?: string
           unidade_compra?: string | null
           unidade_medida?: string
           updated_at?: string
