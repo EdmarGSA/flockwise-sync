@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Save, TrendingUp, Scale, Book } from 'lucide-react';
+import { ArrowLeft, Target, Save, TrendingUp, Scale, Book, Skull, AlertTriangle, CheckCircle, Settings } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -60,6 +61,30 @@ interface Multiplicadores {
   mult_42_dias: number;
 }
 
+interface MortalidadeMedia {
+  mortalidade_7_dias: number;
+  mortalidade_14_dias: number;
+  mortalidade_21_dias: number;
+  mortalidade_28_dias: number;
+  mortalidade_35_dias: number;
+  mortalidade_42_dias: number;
+  mortalidade_acima_42_dias: number;
+}
+
+interface MortalidadePorSemana {
+  dia: number;
+  mortalidade_real: number;
+  mortalidade_referencia: number | null;
+  acima_limite: boolean;
+}
+
+interface RecebimentoLote {
+  quantidade_mortos: number;
+  quantidade_eliminados: number;
+  quantidade_eliminados_classificacao: number;
+  quantidade_eliminados_locomotor: number;
+}
+
 const DEFAULT_MULTIPLICADORES: Multiplicadores = {
   mult_7_dias: 4.5,
   mult_14_dias: 2.6,
@@ -69,7 +94,6 @@ const DEFAULT_MULTIPLICADORES: Multiplicadores = {
   mult_42_dias: 1.3,
 };
 
-// Load multiplicadores from localStorage (same as CadastroDesempenhoAves)
 const loadMultiplicadores = (): Multiplicadores => {
   try {
     const saved = localStorage.getItem('metas_peso_multiplicadores');
@@ -94,6 +118,12 @@ export default function MetasPesoLote() {
   const [saving, setSaving] = useState(false);
   const [editingMetas, setEditingMetas] = useState<MetasPeso | null>(null);
   const [multiplicadores] = useState<Multiplicadores>(loadMultiplicadores());
+  
+  // Mortalidade states
+  const [mortalidadeMedia, setMortalidadeMedia] = useState<MortalidadeMedia | null>(null);
+  const [mortalidadePorSemana, setMortalidadePorSemana] = useState<MortalidadePorSemana[]>([]);
+  const [quantidadeAlojada, setQuantidadeAlojada] = useState<number>(0);
+  const [alertasMortalidade, setAlertasMortalidade] = useState<MortalidadePorSemana[]>([]);
 
   useEffect(() => {
     if (user && loteId) {
@@ -129,6 +159,24 @@ export default function MetasPesoLote() {
 
     setLote(loteData as Lote);
 
+    // Fetch recebimento_lotes para obter quantidade alojada
+    const { data: recebimentoData } = await supabase
+      .from('recebimento_lotes')
+      .select('quantidade_mortos, quantidade_eliminados, quantidade_eliminados_classificacao, quantidade_eliminados_locomotor')
+      .eq('lote_id', loteId)
+      .maybeSingle();
+
+    let qtdAlojada = loteData.quantidade_aves;
+    if (recebimentoData) {
+      const rec = recebimentoData as RecebimentoLote;
+      const eliminadosTotal = (rec.quantidade_mortos || 0) + 
+                             (rec.quantidade_eliminados || 0) + 
+                             (rec.quantidade_eliminados_classificacao || 0) + 
+                             (rec.quantidade_eliminados_locomotor || 0);
+      qtdAlojada = loteData.quantidade_aves - eliminadosTotal;
+    }
+    setQuantidadeAlojada(qtdAlojada);
+
     // Fetch metas de peso
     const { data: metasData } = await supabase
       .from('metas_peso')
@@ -151,13 +199,11 @@ export default function MetasPesoLote() {
       setMetas(metas);
       setEditingMetas(metas);
     } else {
-      // Pre-fill with peso_medio_pintinhos from lote if available
       const pesoInicial = loteData.peso_medio_pintinhos ? Number(loteData.peso_medio_pintinhos) : 0;
       if (pesoInicial > 0) {
         const calculatedMetas = calcularMetas(pesoInicial);
         setEditingMetas(calculatedMetas);
       } else {
-        // Initialize with empty metas for manual input
         setEditingMetas({
           peso_inicial_kg: 0,
           meta_7_dias_kg: 0,
@@ -171,7 +217,7 @@ export default function MetasPesoLote() {
       }
     }
 
-    // Fetch desempenho de referência para linhagem e sexo do lote
+    // Fetch desempenho de referência
     const { data: desempenhoData } = await supabase
       .from('desempenho_aves')
       .select('dia, peso_g, ganho_diario_g, consumo_diario_racao_g, conversao_alimentar_acumulada')
@@ -212,6 +258,80 @@ export default function MetasPesoLote() {
       setPesagens(pesagensProcessed);
     }
 
+    // Fetch mortalidade média de referência
+    const { data: mortalidadeMediaData } = await supabase
+      .from('mortalidade_media')
+      .select('*')
+      .eq('integrado_id', user!.id)
+      .maybeSingle();
+
+    if (mortalidadeMediaData) {
+      setMortalidadeMedia({
+        mortalidade_7_dias: Number(mortalidadeMediaData.mortalidade_7_dias),
+        mortalidade_14_dias: Number(mortalidadeMediaData.mortalidade_14_dias),
+        mortalidade_21_dias: Number(mortalidadeMediaData.mortalidade_21_dias),
+        mortalidade_28_dias: Number(mortalidadeMediaData.mortalidade_28_dias),
+        mortalidade_35_dias: Number(mortalidadeMediaData.mortalidade_35_dias),
+        mortalidade_42_dias: Number(mortalidadeMediaData.mortalidade_42_dias),
+        mortalidade_acima_42_dias: Number(mortalidadeMediaData.mortalidade_acima_42_dias),
+      });
+    }
+
+    // Fetch mortalidade do lote
+    if (loteData.data_alojamento && qtdAlojada > 0) {
+      const { data: mortalidadeData } = await supabase
+        .from('mortalidade')
+        .select(`
+          data_registro,
+          mortalidade_itens (quantidade)
+        `)
+        .eq('lote_id', loteId);
+
+      if (mortalidadeData) {
+        const dataAlojamento = new Date(loteData.data_alojamento);
+        const semanas = [7, 14, 21, 28, 35, 42, 49];
+        
+        const mortalidadeSemanal: MortalidadePorSemana[] = semanas.map(dia => {
+          // Calcular mortes acumuladas até este dia
+          let mortesAcumuladas = 0;
+          mortalidadeData.forEach((m: any) => {
+            const diasDesdeMort = differenceInDays(new Date(m.data_registro), dataAlojamento);
+            if (diasDesdeMort <= dia) {
+              mortesAcumuladas += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
+            }
+          });
+
+          const mortalidadeReal = (mortesAcumuladas / qtdAlojada) * 100;
+          
+          // Obter referência
+          let refKey: keyof MortalidadeMedia | null = null;
+          if (dia <= 7) refKey = 'mortalidade_7_dias';
+          else if (dia <= 14) refKey = 'mortalidade_14_dias';
+          else if (dia <= 21) refKey = 'mortalidade_21_dias';
+          else if (dia <= 28) refKey = 'mortalidade_28_dias';
+          else if (dia <= 35) refKey = 'mortalidade_35_dias';
+          else if (dia <= 42) refKey = 'mortalidade_42_dias';
+          else refKey = 'mortalidade_acima_42_dias';
+
+          const refValue = mortalidadeMediaData && refKey ? Number((mortalidadeMediaData as any)[refKey]) : null;
+
+          return {
+            dia,
+            mortalidade_real: mortalidadeReal,
+            mortalidade_referencia: refValue,
+            acima_limite: refValue !== null && mortalidadeReal > refValue,
+          };
+        });
+
+        setMortalidadePorSemana(mortalidadeSemanal);
+        
+        // Filtrar alertas
+        const diasDesdeAloj = differenceInDays(new Date(), dataAlojamento);
+        const alertas = mortalidadeSemanal.filter(m => m.acima_limite && m.dia <= diasDesdeAloj);
+        setAlertasMortalidade(alertas);
+      }
+    }
+
     setLoadingData(false);
   };
 
@@ -243,7 +363,6 @@ export default function MetasPesoLote() {
 
     try {
       if (metas?.id) {
-        // Update existing
         const { error } = await supabase
           .from('metas_peso')
           .update({
@@ -260,7 +379,6 @@ export default function MetasPesoLote() {
 
         if (error) throw error;
       } else {
-        // Create new
         const { error } = await supabase
           .from('metas_peso')
           .insert({
@@ -279,11 +397,11 @@ export default function MetasPesoLote() {
         if (error) throw error;
       }
 
-      toast.success('Metas de peso salvas com sucesso!');
+      toast.success('Metas salvas com sucesso!');
       fetchData();
     } catch (error) {
       console.error('Erro ao salvar metas:', error);
-      toast.error('Erro ao salvar metas de peso');
+      toast.error('Erro ao salvar metas');
     } finally {
       setSaving(false);
     }
@@ -307,7 +425,7 @@ export default function MetasPesoLote() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Prepare chart data with reference line
+  // Prepare chart data for peso
   const chartData = [0, 7, 14, 21, 28, 35, 42].map(dia => {
     const refData = desempenhoReferencia.find(d => d.dia === dia);
     const metaKeys: Record<number, keyof MetasPeso> = {
@@ -326,7 +444,6 @@ export default function MetasPesoLote() {
     };
   });
 
-  // Merge pesagens into chart data
   pesagens.forEach((p) => {
     const existing = chartData.find((c) => c.dia === p.dia);
     if (existing) {
@@ -343,6 +460,13 @@ export default function MetasPesoLote() {
   });
 
   chartData.sort((a, b) => a.dia - b.dia);
+
+  // Prepare chart data for mortalidade
+  const mortalidadeChartData = mortalidadePorSemana.map(m => ({
+    dia: m.dia,
+    real: m.mortalidade_real,
+    referencia: m.mortalidade_referencia,
+  }));
 
   const diasDesdeAlojamento = lote?.data_alojamento 
     ? differenceInDays(new Date(), new Date(lote.data_alojamento))
@@ -361,7 +485,15 @@ export default function MetasPesoLote() {
                 <Target className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <span className="text-xl font-bold text-foreground">Metas de Peso</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-foreground">Metas</span>
+                  {alertasMortalidade.length > 0 && (
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                    </span>
+                  )}
+                </div>
                 {lote && (
                   <p className="text-sm text-muted-foreground">
                     {lote.nucleo?.nome} - {lote.galpao?.nome}
@@ -382,340 +514,478 @@ export default function MetasPesoLote() {
         {loadingData ? (
           <p className="text-muted-foreground">Carregando...</p>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Chart */}
-            <Card className="lg:col-span-2 bg-card border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  Peso Real vs Meta
-                </CardTitle>
-                <CardDescription>
-                  Comparativo de peso ao longo do ciclo do lote
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis 
-                        dataKey="dia" 
-                        label={{ value: 'Dias', position: 'insideBottom', offset: -5 }}
-                        className="text-muted-foreground"
-                      />
-                      <YAxis 
-                        label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft' }}
-                        className="text-muted-foreground"
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }}
-                        formatter={(value: number, name: string) => [
-                          `${value.toFixed(3)} kg`,
-                          name === 'meta' ? 'Meta' : name === 'referencia' ? 'Ref. Linhagem' : 'Peso Real'
-                        ]}
-                      />
-                      <Legend />
-                      <ReferenceLine x={diasDesdeAlojamento} stroke="hsl(var(--primary))" strokeDasharray="5 5" label="Hoje" />
-                      <Line 
-                        type="monotone" 
-                        dataKey="referencia" 
-                        stroke="hsl(var(--chart-3))" 
-                        strokeWidth={2}
-                        strokeDasharray="3 3"
-                        dot={{ fill: 'hsl(var(--chart-3))' }}
-                        name="Ref. Linhagem"
-                        connectNulls
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="meta" 
-                        stroke="hsl(var(--muted-foreground))" 
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={{ fill: 'hsl(var(--muted-foreground))' }}
-                        name="Meta"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="real" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={3}
-                        dot={{ fill: 'hsl(var(--primary))' }}
-                        name="Peso Real"
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
+            {/* Alertas de Mortalidade */}
+            {alertasMortalidade.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Mortalidade acima da referência!</AlertTitle>
+                <AlertDescription>
+                  {alertasMortalidade.map(a => (
+                    <span key={a.dia} className="block">
+                      Dia {a.dia}: {a.mortalidade_real.toFixed(2)}% (Ref: {a.mortalidade_referencia?.toFixed(2)}%)
+                    </span>
+                  ))}
+                </AlertDescription>
+              </Alert>
+            )}
 
-            {/* Metas Form */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  Configurar Metas
-                </CardTitle>
-                <CardDescription>
-                  Defina as metas de peso para cada semana
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {editingMetas && (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Peso Inicial (kg)</Label>
-                        {lote?.peso_medio_pintinhos && (
-                          <span className="text-xs text-muted-foreground">
-                            Do lote: {Number(lote.peso_medio_pintinhos).toFixed(3)} kg
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={editingMetas.peso_inicial_kg}
-                          onChange={(e) => setEditingMetas({
-                            ...editingMetas,
-                            peso_inicial_kg: parseFloat(e.target.value) || 0
-                          })}
-                          placeholder={lote?.peso_medio_pintinhos ? `${Number(lote.peso_medio_pintinhos).toFixed(3)}` : 'Digite o peso inicial'}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Chart Peso */}
+              <Card className="lg:col-span-2 bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Peso Real vs Meta
+                  </CardTitle>
+                  <CardDescription>
+                    Comparativo de peso ao longo do ciclo do lote
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis 
+                          dataKey="dia" 
+                          label={{ value: 'Dias', position: 'insideBottom', offset: -5 }}
+                          className="text-muted-foreground"
                         />
-                        <Button variant="outline" onClick={handleRecalcular} size="icon" title="Recalcular">
-                          <TrendingUp className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                        <YAxis 
+                          label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft' }}
+                          className="text-muted-foreground"
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--card))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px'
+                          }}
+                          formatter={(value: number, name: string) => [
+                            `${value.toFixed(3)} kg`,
+                            name === 'meta' ? 'Meta' : name === 'referencia' ? 'Ref. Linhagem' : 'Peso Real'
+                          ]}
+                        />
+                        <Legend />
+                        <ReferenceLine x={diasDesdeAlojamento} stroke="hsl(var(--primary))" strokeDasharray="5 5" label="Hoje" />
+                        <Line 
+                          type="monotone" 
+                          dataKey="referencia" 
+                          stroke="hsl(var(--chart-3))" 
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          dot={{ fill: 'hsl(var(--chart-3))' }}
+                          name="Ref. Linhagem"
+                          connectNulls
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="meta" 
+                          stroke="hsl(var(--muted-foreground))" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={{ fill: 'hsl(var(--muted-foreground))' }}
+                          name="Meta"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="real" 
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={3}
+                          dot={{ fill: 'hsl(var(--primary))' }}
+                          name="Peso Real"
+                          connectNulls
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-                    <div className="space-y-3">
-                      {[
-                        { dia: 7, key: 'meta_7_dias_kg' },
-                        { dia: 14, key: 'meta_14_dias_kg' },
-                        { dia: 21, key: 'meta_21_dias_kg' },
-                        { dia: 28, key: 'meta_28_dias_kg' },
-                        { dia: 35, key: 'meta_35_dias_kg' },
-                        { dia: 42, key: 'meta_42_dias_kg' },
-                      ].map(({ dia, key }) => {
-                        const metaValue = (editingMetas as any)[key] as number;
-                        const refData = desempenhoReferencia.find(d => d.dia === dia);
-                        const refValue = refData ? refData.peso_g / 1000 : 0;
-                        const diff = refValue > 0 ? ((metaValue - refValue) / refValue) * 100 : 0;
+              {/* Metas Form */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="w-5 h-5" />
+                    Configurar Metas
+                  </CardTitle>
+                  <CardDescription>
+                    Defina as metas de peso para cada semana
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {editingMetas && (
+                    <>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Peso Inicial (kg)</Label>
+                          {lote?.peso_medio_pintinhos && (
+                            <span className="text-xs text-muted-foreground">
+                              Do lote: {Number(lote.peso_medio_pintinhos).toFixed(3)} kg
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={editingMetas.peso_inicial_kg}
+                            onChange={(e) => setEditingMetas({
+                              ...editingMetas,
+                              peso_inicial_kg: parseFloat(e.target.value) || 0
+                            })}
+                            placeholder={lote?.peso_medio_pintinhos ? `${Number(lote.peso_medio_pintinhos).toFixed(3)}` : 'Digite o peso inicial'}
+                          />
+                          <Button variant="outline" onClick={handleRecalcular} size="icon" title="Recalcular">
+                            <TrendingUp className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {[
+                          { dia: 7, key: 'meta_7_dias_kg' },
+                          { dia: 14, key: 'meta_14_dias_kg' },
+                          { dia: 21, key: 'meta_21_dias_kg' },
+                          { dia: 28, key: 'meta_28_dias_kg' },
+                          { dia: 35, key: 'meta_35_dias_kg' },
+                          { dia: 42, key: 'meta_42_dias_kg' },
+                        ].map(({ dia, key }) => {
+                          const metaValue = (editingMetas as any)[key] as number;
+                          const refData = desempenhoReferencia.find(d => d.dia === dia);
+                          const refValue = refData ? refData.peso_g / 1000 : 0;
+                          const diff = refValue > 0 ? ((metaValue - refValue) / refValue) * 100 : 0;
+                          
+                          return (
+                            <div key={dia} className="grid grid-cols-12 gap-2 items-center">
+                              <Label className="col-span-3 text-xs">{dia} dias</Label>
+                              <div className="col-span-4">
+                                <Input
+                                  type="number"
+                                  step="0.001"
+                                  value={metaValue.toFixed(3)}
+                                  onChange={(e) => setEditingMetas({
+                                    ...editingMetas,
+                                    [key]: parseFloat(e.target.value) || 0
+                                  })}
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              {refValue > 0 && (
+                                <>
+                                  <div className="col-span-3 text-xs text-muted-foreground text-center">
+                                    Ref: {refValue.toFixed(3)}
+                                  </div>
+                                  <div className="col-span-2">
+                                    <Badge 
+                                      variant={diff >= 0 ? 'default' : 'destructive'}
+                                      className="text-[10px] w-full justify-center"
+                                    >
+                                      {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
+                                    </Badge>
+                                  </div>
+                                </>
+                              )}
+                              {refValue === 0 && <div className="col-span-5" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-border">
+                        <div className="flex justify-between items-center p-3 rounded-lg bg-primary/10">
+                          <span className="font-medium">GPD (kg/dia)</span>
+                          <span className="text-lg font-bold text-primary">
+                            {editingMetas.gpd_kg.toFixed(4)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button 
+                        className="w-full gap-2" 
+                        onClick={handleSaveMetas}
+                        disabled={saving}
+                      >
+                        <Save className="w-4 h-4" />
+                        {saving ? 'Salvando...' : 'Salvar Metas'}
+                      </Button>
+                    </>
+                  )}
+
+                  {!editingMetas && (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Defina o peso inicial do lote para calcular as metas personalizadas
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Peso Inicial (kg)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            placeholder="Ex: 0.042"
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              if (value > 0) {
+                                setEditingMetas(calcularMetas(value));
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      
+                      {desempenhoReferencia.length > 0 && (
+                        <div className="pt-4 border-t border-border">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Ou use os valores de referência da linhagem:
+                          </p>
+                          <Button
+                            variant="outline"
+                            className="w-full gap-2"
+                            onClick={() => {
+                              const getRefValue = (dia: number) => {
+                                const ref = desempenhoReferencia.find(d => d.dia === dia);
+                                return ref ? ref.peso_g / 1000 : 0;
+                              };
+                              const pesoInicial = getRefValue(0);
+                              const meta42 = getRefValue(42);
+                              const gpd = pesoInicial > 0 && meta42 > 0 ? (meta42 - pesoInicial) / 42 : 0;
+                              
+                              setEditingMetas({
+                                peso_inicial_kg: pesoInicial,
+                                meta_7_dias_kg: getRefValue(7),
+                                meta_14_dias_kg: getRefValue(14),
+                                meta_21_dias_kg: getRefValue(21),
+                                meta_28_dias_kg: getRefValue(28),
+                                meta_35_dias_kg: getRefValue(35),
+                                meta_42_dias_kg: meta42,
+                                gpd_kg: gpd,
+                              });
+                              toast.success('Metas preenchidas com valores de referência');
+                            }}
+                          >
+                            <Book className="w-4 h-4" />
+                            Usar Referência ({lote?.linhagem?.replace('_', ' ').toUpperCase()})
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Gráfico de Mortalidade */}
+              <Card className="lg:col-span-3 bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Skull className="w-5 h-5" />
+                    Mortalidade Real vs Referência
+                  </CardTitle>
+                  <CardDescription>
+                    Comparativo de mortalidade acumulada ao longo do ciclo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!mortalidadeMedia ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Settings className="w-12 h-12 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        Configure a mortalidade média de referência para comparação
+                      </p>
+                      <Button variant="outline" asChild>
+                        <Link to="/configuracoes/mortalidade-media">
+                          <Settings className="w-4 h-4 mr-2" />
+                          Configurar Referência
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={mortalidadeChartData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis 
+                            dataKey="dia" 
+                            label={{ value: 'Dias', position: 'insideBottom', offset: -5 }}
+                            className="text-muted-foreground"
+                          />
+                          <YAxis 
+                            label={{ value: 'Mortalidade (%)', angle: -90, position: 'insideLeft' }}
+                            className="text-muted-foreground"
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }}
+                            formatter={(value: number, name: string) => [
+                              `${value.toFixed(2)}%`,
+                              name === 'referencia' ? 'Referência' : 'Mortalidade Real'
+                            ]}
+                          />
+                          <Legend />
+                          <ReferenceLine x={diasDesdeAlojamento} stroke="hsl(var(--primary))" strokeDasharray="5 5" label="Hoje" />
+                          <Line 
+                            type="monotone" 
+                            dataKey="referencia" 
+                            stroke="hsl(var(--chart-4))" 
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={{ fill: 'hsl(var(--chart-4))' }}
+                            name="Referência"
+                            connectNulls
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="real" 
+                            stroke="hsl(var(--destructive))" 
+                            strokeWidth={3}
+                            dot={{ fill: 'hsl(var(--destructive))' }}
+                            name="Mortalidade Real"
+                            connectNulls
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Histórico Mortalidade por Semana */}
+              {mortalidadePorSemana.length > 0 && (
+                <Card className="lg:col-span-3 bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Skull className="w-5 h-5" />
+                      Histórico de Mortalidade por Semana
+                    </CardTitle>
+                    <CardDescription>
+                      Quantidade alojada: {quantidadeAlojada.toLocaleString('pt-BR')} aves
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                      {mortalidadePorSemana.filter(m => m.dia <= Math.max(diasDesdeAlojamento + 7, 7)).map((m) => (
+                        <div 
+                          key={m.dia} 
+                          className={`p-4 rounded-lg text-center ${
+                            m.acima_limite ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'
+                          }`}
+                        >
+                          <p className="text-xs text-muted-foreground">Dia {m.dia}</p>
+                          <p className={`text-lg font-bold ${m.acima_limite ? 'text-destructive' : ''}`}>
+                            {m.mortalidade_real.toFixed(2)}%
+                          </p>
+                          {m.mortalidade_referencia !== null && (
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              {m.acima_limite ? (
+                                <AlertTriangle className="w-3 h-3 text-destructive" />
+                              ) : (
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                Ref: {m.mortalidade_referencia.toFixed(2)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tabela de Referência de Desempenho */}
+              {desempenhoReferencia.length > 0 && (
+                <Card className="lg:col-span-3 bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Book className="w-5 h-5" />
+                      Referência de Desempenho - {lote?.linhagem?.replace('_', ' ').toUpperCase()} ({lote?.sexo})
+                    </CardTitle>
+                    <CardDescription>
+                      Tabela de referência padrão para comparação de desempenho do lote
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-center">Dia</TableHead>
+                            <TableHead className="text-center">Peso (g)</TableHead>
+                            <TableHead className="text-center">Ganho Diário (g)</TableHead>
+                            <TableHead className="text-center">Consumo Diário (g)</TableHead>
+                            <TableHead className="text-center">CA Acumulada</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {desempenhoReferencia.filter(d => [0, 7, 14, 21, 28, 35, 42].includes(d.dia)).map((d) => (
+                            <TableRow key={d.dia} className={d.dia === diasDesdeAlojamento ? 'bg-primary/10' : ''}>
+                              <TableCell className="text-center font-medium">
+                                {d.dia}
+                                {d.dia === diasDesdeAlojamento && (
+                                  <Badge variant="secondary" className="ml-2">Hoje</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">{d.peso_g.toFixed(0)}</TableCell>
+                              <TableCell className="text-center">{d.ganho_diario_g.toFixed(1)}</TableCell>
+                              <TableCell className="text-center">{d.consumo_diario_racao_g.toFixed(1)}</TableCell>
+                              <TableCell className="text-center">{d.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Pesagens Summary */}
+              <Card className="lg:col-span-3 bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Scale className="w-5 h-5" />
+                    Histórico de Pesagens
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {pesagens.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">
+                      Nenhuma pesagem registrada ainda
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                      {pesagens.map((p, index) => {
+                        const metaDia = [0, 7, 14, 21, 28, 35, 42].reduce((prev, curr) =>
+                          Math.abs(curr - p.dia) < Math.abs(prev - p.dia) ? curr : prev
+                        );
+                        const metaValue = editingMetas ? (editingMetas as any)[`meta_${metaDia}_dias_kg`] || editingMetas.peso_inicial_kg : 0;
+                        const diff = metaValue > 0 ? ((p.peso_real_kg - metaValue) / metaValue) * 100 : 0;
                         
                         return (
-                          <div key={dia} className="grid grid-cols-12 gap-2 items-center">
-                            <Label className="col-span-3 text-xs">{dia} dias</Label>
-                            <div className="col-span-4">
-                              <Input
-                                type="number"
-                                step="0.001"
-                                value={metaValue.toFixed(3)}
-                                onChange={(e) => setEditingMetas({
-                                  ...editingMetas,
-                                  [key]: parseFloat(e.target.value) || 0
-                                })}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            {refValue > 0 && (
-                              <>
-                                <div className="col-span-3 text-xs text-muted-foreground text-center">
-                                  Ref: {refValue.toFixed(3)}
-                                </div>
-                                <div className="col-span-2">
-                                  <Badge 
-                                    variant={diff >= 0 ? 'default' : 'destructive'}
-                                    className="text-[10px] w-full justify-center"
-                                  >
-                                    {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
-                                  </Badge>
-                                </div>
-                              </>
-                            )}
-                            {refValue === 0 && <div className="col-span-5" />}
+                          <div key={index} className="p-4 rounded-lg bg-muted/50 text-center">
+                            <p className="text-xs text-muted-foreground">Dia {p.dia}</p>
+                            <p className="text-lg font-bold">{p.peso_real_kg.toFixed(3)} kg</p>
+                            <Badge 
+                              variant={diff >= 0 ? 'default' : 'destructive'}
+                              className="text-xs mt-1"
+                            >
+                              {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(p.data_pesagem), 'dd/MM', { locale: ptBR })}
+                            </p>
                           </div>
                         );
                       })}
                     </div>
-
-                    <div className="pt-2 border-t border-border">
-                      <div className="flex justify-between items-center p-3 rounded-lg bg-primary/10">
-                        <span className="font-medium">GPD (kg/dia)</span>
-                        <span className="text-lg font-bold text-primary">
-                          {editingMetas.gpd_kg.toFixed(4)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button 
-                      className="w-full gap-2" 
-                      onClick={handleSaveMetas}
-                      disabled={saving}
-                    >
-                      <Save className="w-4 h-4" />
-                      {saving ? 'Salvando...' : 'Salvar Metas'}
-                    </Button>
-                  </>
-                )}
-
-                {!editingMetas && (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Defina o peso inicial do lote para calcular as metas personalizadas
-                    </p>
-                    <div className="space-y-2">
-                      <Label>Peso Inicial (kg)</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="Ex: 0.042"
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            if (value > 0) {
-                              setEditingMetas(calcularMetas(value));
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {desempenhoReferencia.length > 0 && (
-                      <div className="pt-4 border-t border-border">
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Ou use os valores de referência da linhagem:
-                        </p>
-                        <Button
-                          variant="outline"
-                          className="w-full gap-2"
-                          onClick={() => {
-                            const getRefValue = (dia: number) => {
-                              const ref = desempenhoReferencia.find(d => d.dia === dia);
-                              return ref ? ref.peso_g / 1000 : 0;
-                            };
-                            const pesoInicial = getRefValue(0);
-                            const meta42 = getRefValue(42);
-                            const gpd = pesoInicial > 0 && meta42 > 0 ? (meta42 - pesoInicial) / 42 : 0;
-                            
-                            setEditingMetas({
-                              peso_inicial_kg: pesoInicial,
-                              meta_7_dias_kg: getRefValue(7),
-                              meta_14_dias_kg: getRefValue(14),
-                              meta_21_dias_kg: getRefValue(21),
-                              meta_28_dias_kg: getRefValue(28),
-                              meta_35_dias_kg: getRefValue(35),
-                              meta_42_dias_kg: meta42,
-                              gpd_kg: gpd,
-                            });
-                            toast.success('Metas preenchidas com valores de referência');
-                          }}
-                        >
-                          <Book className="w-4 h-4" />
-                          Usar Referência ({lote?.linhagem?.replace('_', ' ').toUpperCase()})
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Tabela de Referência de Desempenho */}
-            {desempenhoReferencia.length > 0 && (
-              <Card className="lg:col-span-3 bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Book className="w-5 h-5" />
-                    Referência de Desempenho - {lote?.linhagem?.replace('_', ' ').toUpperCase()} ({lote?.sexo})
-                  </CardTitle>
-                  <CardDescription>
-                    Tabela de referência padrão para comparação de desempenho do lote
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-center">Dia</TableHead>
-                          <TableHead className="text-center">Peso (g)</TableHead>
-                          <TableHead className="text-center">Ganho Diário (g)</TableHead>
-                          <TableHead className="text-center">Consumo Diário (g)</TableHead>
-                          <TableHead className="text-center">CA Acumulada</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {desempenhoReferencia.filter(d => [0, 7, 14, 21, 28, 35, 42].includes(d.dia)).map((d) => (
-                          <TableRow key={d.dia} className={d.dia === diasDesdeAlojamento ? 'bg-primary/10' : ''}>
-                            <TableCell className="text-center font-medium">
-                              {d.dia}
-                              {d.dia === diasDesdeAlojamento && (
-                                <Badge variant="secondary" className="ml-2">Hoje</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center">{d.peso_g.toFixed(0)}</TableCell>
-                            <TableCell className="text-center">{d.ganho_diario_g.toFixed(1)}</TableCell>
-                            <TableCell className="text-center">{d.consumo_diario_racao_g.toFixed(1)}</TableCell>
-                            <TableCell className="text-center">{d.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
-
-            {/* Pesagens Summary */}
-            <Card className="lg:col-span-3 bg-card border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Scale className="w-5 h-5" />
-                  Histórico de Pesagens
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pesagens.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Nenhuma pesagem registrada ainda
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                    {pesagens.map((p, index) => {
-                      // Find the closest meta for comparison
-                      const metaDia = [0, 7, 14, 21, 28, 35, 42].reduce((prev, curr) =>
-                        Math.abs(curr - p.dia) < Math.abs(prev - p.dia) ? curr : prev
-                      );
-                      const metaValue = editingMetas ? (editingMetas as any)[`meta_${metaDia}_dias_kg`] || editingMetas.peso_inicial_kg : 0;
-                      const diff = metaValue > 0 ? ((p.peso_real_kg - metaValue) / metaValue) * 100 : 0;
-                      
-                      return (
-                        <div key={index} className="p-4 rounded-lg bg-muted/50 text-center">
-                          <p className="text-xs text-muted-foreground">Dia {p.dia}</p>
-                          <p className="text-lg font-bold">{p.peso_real_kg.toFixed(3)} kg</p>
-                          <Badge 
-                            variant={diff >= 0 ? 'default' : 'destructive'}
-                            className="text-xs mt-1"
-                          >
-                            {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(p.data_pesagem), 'dd/MM', { locale: ptBR })}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            </div>
           </div>
         )}
       </main>
