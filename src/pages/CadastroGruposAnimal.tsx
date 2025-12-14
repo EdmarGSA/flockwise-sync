@@ -10,9 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Edit2, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+interface RacaoDisponivel {
+  id: string;
+  nome: string;
+  sku: string;
+}
 
 interface GrupoAnimal {
   id: string;
@@ -29,6 +36,8 @@ interface FaseAnimal {
   dia_fim: number;
   descricao: string | null;
   ativo: boolean;
+  produto_racao_id: string | null;
+  produto_racao?: { id: string; nome: string; sku: string } | null;
 }
 
 const CadastroGruposAnimal = () => {
@@ -42,9 +51,11 @@ const CadastroGruposAnimal = () => {
   const [editingGrupo, setEditingGrupo] = useState<GrupoAnimal | null>(null);
   const [editingFase, setEditingFase] = useState<FaseAnimal | null>(null);
   const [selectedGrupoId, setSelectedGrupoId] = useState<string | null>(null);
+  const [racoesDisponiveis, setRacoesDisponiveis] = useState<RacaoDisponivel[]>([]);
+  const [loadingRacoes, setLoadingRacoes] = useState(false);
   
   const [grupoForm, setGrupoForm] = useState({ nome: "", descricao: "" });
-  const [faseForm, setFaseForm] = useState({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "" });
+  const [faseForm, setFaseForm] = useState({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "", produto_racao_id: "" });
 
   useEffect(() => {
     if (user) {
@@ -104,7 +115,7 @@ const CadastroGruposAnimal = () => {
   const fetchFases = async () => {
     const { data, error } = await supabase
       .from("fases_animal")
-      .select("*")
+      .select("*, produto_racao:produtos!fases_animal_produto_racao_id_fkey(id, nome, sku)")
       .eq("integrado_id", user?.id)
       .order("dia_inicio");
     
@@ -113,6 +124,43 @@ const CadastroGruposAnimal = () => {
       return;
     }
     setFases(data || []);
+  };
+
+  const fetchRacoesDisponiveis = async (grupoAnimalId: string) => {
+    setLoadingRacoes(true);
+    try {
+      // First get the grupo_produto "Ração"
+      const { data: grupoProduto } = await supabase
+        .from("grupos_produto")
+        .select("id")
+        .eq("nome", "Ração")
+        .eq("integrado_id", user?.id)
+        .single();
+
+      if (!grupoProduto) {
+        setRacoesDisponiveis([]);
+        return;
+      }
+
+      // Then get products matching grupo_produto and grupo_animal
+      const { data: produtos, error } = await supabase
+        .from("produtos")
+        .select("id, nome, sku")
+        .eq("grupo_produto_id", grupoProduto.id)
+        .eq("grupo_animal_id", grupoAnimalId)
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) {
+        console.error("Erro ao buscar rações:", error);
+        setRacoesDisponiveis([]);
+        return;
+      }
+
+      setRacoesDisponiveis(produtos || []);
+    } finally {
+      setLoadingRacoes(false);
+    }
   };
 
   const handleSaveGrupo = async () => {
@@ -165,6 +213,8 @@ const CadastroGruposAnimal = () => {
       return;
     }
 
+    const racaoId = faseForm.produto_racao_id || null;
+
     if (editingFase) {
       const { error } = await supabase
         .from("fases_animal")
@@ -172,7 +222,8 @@ const CadastroGruposAnimal = () => {
           nome: faseForm.nome, 
           dia_inicio: faseForm.dia_inicio,
           dia_fim: faseForm.dia_fim,
-          descricao: faseForm.descricao || null 
+          descricao: faseForm.descricao || null,
+          produto_racao_id: racaoId
         })
         .eq("id", editingFase.id);
       
@@ -189,6 +240,7 @@ const CadastroGruposAnimal = () => {
           dia_inicio: faseForm.dia_inicio,
           dia_fim: faseForm.dia_fim,
           descricao: faseForm.descricao || null,
+          produto_racao_id: racaoId,
           grupo_id: selectedGrupoId,
           integrado_id: user?.id 
         });
@@ -202,7 +254,8 @@ const CadastroGruposAnimal = () => {
 
     setIsFaseDialogOpen(false);
     setEditingFase(null);
-    setFaseForm({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "" });
+    setFaseForm({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "", produto_racao_id: "" });
+    setRacoesDisponiveis([]);
     fetchFases();
   };
 
@@ -215,7 +268,8 @@ const CadastroGruposAnimal = () => {
   const openAddFase = (grupoId: string) => {
     setSelectedGrupoId(grupoId);
     setEditingFase(null);
-    setFaseForm({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "" });
+    setFaseForm({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "", produto_racao_id: "" });
+    fetchRacoesDisponiveis(grupoId);
     setIsFaseDialogOpen(true);
   };
 
@@ -226,8 +280,10 @@ const CadastroGruposAnimal = () => {
       nome: fase.nome, 
       dia_inicio: fase.dia_inicio, 
       dia_fim: fase.dia_fim, 
-      descricao: fase.descricao || "" 
+      descricao: fase.descricao || "",
+      produto_racao_id: fase.produto_racao_id || ""
     });
+    fetchRacoesDisponiveis(fase.grupo_id);
     setIsFaseDialogOpen(true);
   };
 
@@ -356,6 +412,31 @@ const CadastroGruposAnimal = () => {
                   placeholder="Descrição da fase"
                 />
               </div>
+              <div>
+                <Label htmlFor="produto_racao">Ração Vinculada</Label>
+                <Select 
+                  value={faseForm.produto_racao_id} 
+                  onValueChange={(value) => setFaseForm({ ...faseForm, produto_racao_id: value })}
+                  disabled={loadingRacoes}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingRacoes ? "Carregando..." : "Selecione uma ração (opcional)"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhuma ração</SelectItem>
+                    {racoesDisponiveis.map((racao) => (
+                      <SelectItem key={racao.id} value={racao.id}>
+                        {racao.nome} ({racao.sku})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {racoesDisponiveis.length === 0 && !loadingRacoes && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nenhuma ração disponível para este grupo de animal.
+                  </p>
+                )}
+              </div>
               <Button onClick={handleSaveFase} className="w-full">
                 {editingFase ? "Salvar Alterações" : "Criar Fase"}
               </Button>
@@ -427,6 +508,7 @@ const CadastroGruposAnimal = () => {
                               <TableRow>
                                 <TableHead>Nome</TableHead>
                                 <TableHead>Período (dias)</TableHead>
+                                <TableHead>Ração Vinculada</TableHead>
                                 <TableHead>Descrição</TableHead>
                                 <TableHead className="w-[80px]">Ações</TableHead>
                               </TableRow>
@@ -439,6 +521,15 @@ const CadastroGruposAnimal = () => {
                                     <Badge variant="outline">
                                       {fase.dia_inicio} - {fase.dia_fim}
                                     </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {fase.produto_racao ? (
+                                      <Badge variant="secondary">
+                                        {fase.produto_racao.nome}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-sm">Sem ração</span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-muted-foreground">
                                     {fase.descricao || "-"}
