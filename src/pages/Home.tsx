@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   LogOut,
   Settings,
-  Package
+  Package,
+  DollarSign
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -90,6 +91,15 @@ const modules: ModuleCard[] = [
     path: '/apanha',
     color: 'from-rose-500 to-rose-700',
     available: false,
+  },
+  {
+    id: 'financeiro',
+    title: 'Financeiro',
+    description: 'Contas a pagar, bancos e plano de contas',
+    icon: DollarSign,
+    path: '/configuracoes/financeiro',
+    color: 'from-teal-500 to-teal-700',
+    available: true,
   },
 ];
 
