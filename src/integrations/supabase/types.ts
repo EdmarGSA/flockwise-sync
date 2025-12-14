@@ -814,6 +814,95 @@ export type Database = {
           },
         ]
       }
+      nutricao_itens: {
+        Row: {
+          created_at: string
+          id: string
+          insumo_id: string
+          integrado_id: string
+          nutricao_id: string
+          quantidade: number
+          unidade_medida: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          insumo_id: string
+          integrado_id: string
+          nutricao_id: string
+          quantidade: number
+          unidade_medida?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          insumo_id?: string
+          integrado_id?: string
+          nutricao_id?: string
+          quantidade?: number
+          unidade_medida?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutricao_itens_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutricao_itens_nutricao_id_fkey"
+            columns: ["nutricao_id"]
+            isOneToOne: false
+            referencedRelation: "nutricoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nutricoes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          padrao: boolean
+          produto_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          padrao?: boolean
+          produto_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          padrao?: boolean
+          produto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutricoes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordens_compra: {
         Row: {
           aprovado_por: string | null
@@ -963,6 +1052,7 @@ export type Database = {
           id: string
           integrado_id: string
           numero_op: number
+          nutricao_id: string | null
           observacoes: string | null
           produto_id: string
           quantidade_planejada: number
@@ -984,6 +1074,7 @@ export type Database = {
           id?: string
           integrado_id: string
           numero_op?: number
+          nutricao_id?: string | null
           observacoes?: string | null
           produto_id: string
           quantidade_planejada: number
@@ -1005,6 +1096,7 @@ export type Database = {
           id?: string
           integrado_id?: string
           numero_op?: number
+          nutricao_id?: string | null
           observacoes?: string | null
           produto_id?: string
           quantidade_planejada?: number
@@ -1013,6 +1105,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_producao_nutricao_id_fkey"
+            columns: ["nutricao_id"]
+            isOneToOne: false
+            referencedRelation: "nutricoes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordens_producao_produto_id_fkey"
             columns: ["produto_id"]
