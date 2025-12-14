@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+import { useConfigSilo } from '@/hooks/useConfigSilo';
 import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle, Truck, Sparkles } from 'lucide-react';
 
 interface NivelSiloCardProps {
@@ -29,6 +30,7 @@ export function NivelSiloCard({
   avesVivas,
   onSugerirQuantidade
 }: NivelSiloCardProps) {
+  const { config } = useConfigSilo();
   const [totalRecebido, setTotalRecebido] = useState(0);
   const [consumoEstimado, setConsumoEstimado] = useState(0);
   const [consumoDiarioEstimado, setConsumoDiarioEstimado] = useState(0);
@@ -90,10 +92,9 @@ export function NivelSiloCard({
   const diasRestantes = consumoDiarioEstimado > 0 ? Math.floor(nivelSilo / consumoDiarioEstimado) : 0;
   const percentualConsumido = totalRecebido > 0 ? Math.min((consumoEstimado / totalRecebido) * 100, 100) : 0;
   
-  // Calculate suggested quantity for 7 days of stock
-  const DIAS_ESTOQUE_SUGERIDO = 7;
-  const quantidadeSugerida = Math.max(0, Math.ceil((DIAS_ESTOQUE_SUGERIDO - diasRestantes) * consumoDiarioEstimado));
-  const isCritical = diasRestantes < 2 || nivelSilo < 0;
+  // Use dynamic config for thresholds
+  const quantidadeSugerida = Math.max(0, Math.ceil((config.diasEstoqueSugerido - diasRestantes) * consumoDiarioEstimado));
+  const isCritical = diasRestantes < config.diasCritico || nivelSilo < 0;
 
   const getStatusConfig = () => {
     if (diasRestantes < 0 || nivelSilo < 0) {
@@ -105,8 +106,8 @@ export function NivelSiloCard({
         badgeVariant: 'destructive' as const
       };
     }
-    // Critical: < 2 days
-    if (diasRestantes < 2) {
+    // Critical: < diasCritico
+    if (diasRestantes < config.diasCritico) {
       return { 
         color: 'destructive', 
         bgClass: 'bg-destructive/10 border-destructive/30',
@@ -115,8 +116,8 @@ export function NivelSiloCard({
         badgeVariant: 'destructive' as const
       };
     }
-    // Warning: 2-4 days
-    if (diasRestantes <= 4) {
+    // Warning: diasCritico to diasAtencao
+    if (diasRestantes <= config.diasAtencao) {
       return { 
         color: 'warning', 
         bgClass: 'bg-amber-500/10 border-amber-500/30',
@@ -125,7 +126,7 @@ export function NivelSiloCard({
         badgeVariant: 'secondary' as const
       };
     }
-    // OK: > 5 days
+    // OK: > diasOk
     return { 
       color: 'success', 
       bgClass: 'bg-green-500/10 border-green-500/30',
@@ -202,7 +203,7 @@ export function NivelSiloCard({
             <Clock className="w-4 h-4" />
             <span>Duração estimada:</span>
           </div>
-          <span className={`font-bold ${diasRestantes < 2 ? 'text-destructive' : diasRestantes <= 4 ? 'text-amber-500' : 'text-green-500'}`}>
+          <span className={`font-bold ${diasRestantes < config.diasCritico ? 'text-destructive' : diasRestantes <= config.diasAtencao ? 'text-amber-500' : 'text-green-500'}`}>
             {diasRestantes < 0 ? 'Déficit' : `${diasRestantes} dias`}
           </span>
         </div>
@@ -221,7 +222,7 @@ export function NivelSiloCard({
               <AlertDescription className="flex-1">
                 <p className="font-semibold text-destructive mb-1">Solicitar Ração Urgente!</p>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Nível crítico detectado. Sugerimos solicitar ração para manter estoque de {DIAS_ESTOQUE_SUGERIDO} dias.
+                  Nível crítico detectado. Sugerimos solicitar ração para manter estoque de {config.diasEstoqueSugerido} dias.
                 </p>
                 <div className="flex items-center gap-2 bg-background/50 rounded-lg px-3 py-2 border border-border">
                   <Sparkles className="w-4 h-4 text-primary" />

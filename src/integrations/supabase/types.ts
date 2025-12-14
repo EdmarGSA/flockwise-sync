@@ -80,6 +80,47 @@ export type Database = {
         }
         Relationships: []
       }
+      config_silo: {
+        Row: {
+          created_at: string
+          dias_atencao: number
+          dias_critico: number
+          dias_estoque_sugerido: number
+          dias_ok: number
+          id: string
+          integrado_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dias_atencao?: number
+          dias_critico?: number
+          dias_estoque_sugerido?: number
+          dias_ok?: number
+          id?: string
+          integrado_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dias_atencao?: number
+          dias_critico?: number
+          dias_estoque_sugerido?: number
+          dias_ok?: number
+          id?: string
+          integrado_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "config_silo_integrado_id_fkey"
+            columns: ["integrado_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contas_pagar: {
         Row: {
           categoria: string | null
