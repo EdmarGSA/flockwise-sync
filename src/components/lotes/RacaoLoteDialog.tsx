@@ -322,6 +322,10 @@ export function RacaoLoteDialog({
               sexo={sexo}
               diasDesdeAlojamento={diasDesdeAlojamento}
               avesVivas={avesVivas}
+              onSugerirQuantidade={(qtd) => {
+                setQuantidade(qtd.toString());
+                setActiveTab('solicitar');
+              }}
             />
           </div>
         ) : (

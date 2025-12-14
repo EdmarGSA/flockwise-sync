@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle, Truck, Sparkles } from 'lucide-react';
 
 interface NivelSiloCardProps {
   loteId: string;
@@ -11,6 +12,7 @@ interface NivelSiloCardProps {
   sexo: 'macho' | 'femea' | 'misto';
   diasDesdeAlojamento: number;
   avesVivas: number;
+  onSugerirQuantidade?: (quantidade: number) => void;
 }
 
 interface DesempenhoAve {
@@ -24,7 +26,8 @@ export function NivelSiloCard({
   linhagem, 
   sexo, 
   diasDesdeAlojamento, 
-  avesVivas 
+  avesVivas,
+  onSugerirQuantidade
 }: NivelSiloCardProps) {
   const [totalRecebido, setTotalRecebido] = useState(0);
   const [consumoEstimado, setConsumoEstimado] = useState(0);
@@ -86,6 +89,11 @@ export function NivelSiloCard({
   const nivelSilo = totalRecebido - consumoEstimado;
   const diasRestantes = consumoDiarioEstimado > 0 ? Math.floor(nivelSilo / consumoDiarioEstimado) : 0;
   const percentualConsumido = totalRecebido > 0 ? Math.min((consumoEstimado / totalRecebido) * 100, 100) : 0;
+  
+  // Calculate suggested quantity for 7 days of stock
+  const DIAS_ESTOQUE_SUGERIDO = 7;
+  const quantidadeSugerida = Math.max(0, Math.ceil((DIAS_ESTOQUE_SUGERIDO - diasRestantes) * consumoDiarioEstimado));
+  const isCritical = diasRestantes < 2 || nivelSilo < 0;
 
   const getStatusConfig = () => {
     if (diasRestantes < 0 || nivelSilo < 0) {
@@ -198,6 +206,42 @@ export function NivelSiloCard({
             {diasRestantes < 0 ? 'Déficit' : `${diasRestantes} dias`}
           </span>
         </div>
+
+        {/* Alert for critical silo level */}
+        {isCritical && quantidadeSugerida > 0 && (
+          <Alert className="bg-destructive/10 border-destructive/30 mt-4">
+            <div className="flex items-start gap-3">
+              <div className="relative">
+                <Truck className="w-5 h-5 text-destructive" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+                </span>
+              </div>
+              <AlertDescription className="flex-1">
+                <p className="font-semibold text-destructive mb-1">Solicitar Ração Urgente!</p>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Nível crítico detectado. Sugerimos solicitar ração para manter estoque de {DIAS_ESTOQUE_SUGERIDO} dias.
+                </p>
+                <div className="flex items-center gap-2 bg-background/50 rounded-lg px-3 py-2 border border-border">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Quantidade sugerida:</span>
+                  <span className="text-lg font-bold text-primary">
+                    {quantidadeSugerida.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                  </span>
+                  {onSugerirQuantidade && (
+                    <button
+                      onClick={() => onSugerirQuantidade(quantidadeSugerida)}
+                      className="ml-auto text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:bg-primary/90 transition-colors"
+                    >
+                      Usar sugestão
+                    </button>
+                  )}
+                </div>
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );
