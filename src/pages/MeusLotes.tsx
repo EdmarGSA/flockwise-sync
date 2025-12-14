@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ import { PesagemDialog } from '@/components/lotes/PesagemDialog';
 import { MortalidadeDialog } from '@/components/lotes/MortalidadeDialog';
 import { RacaoLoteDialog } from '@/components/lotes/RacaoLoteDialog';
 import { SiloBadge } from '@/components/lotes/SiloBadge';
+import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog';
 
 interface Lote {
   id: string;
@@ -46,6 +47,7 @@ interface LoteComPesagem extends Lote {
   precisaPesar?: boolean;
   quantidadeAlojada?: number | null;
   temSolicitacaoPendente?: boolean;
+  pendenciasVet?: number;
 }
 
 export default function MeusLotes() {
@@ -57,6 +59,7 @@ export default function MeusLotes() {
   const [pesagemOpen, setPesagemOpen] = useState(false);
   const [mortalidadeOpen, setMortalidadeOpen] = useState(false);
   const [racaoOpen, setRacaoOpen] = useState(false);
+  const [notificacoesOpen, setNotificacoesOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -124,6 +127,23 @@ export default function MeusLotes() {
           .limit(1)
           .maybeSingle();
 
+        // Count pending vet notifications (unread orientacoes + unconfirmed tratamentos)
+        const { count: orientacoesCount } = await supabase
+          .from('observacoes_lote')
+          .select('id', { count: 'exact', head: true })
+          .eq('lote_id', loteData.id)
+          .eq('tipo', 'orientacao')
+          .is('lido_por', null);
+
+        const { count: tratamentosCount } = await supabase
+          .from('tratamentos_lote')
+          .select('id', { count: 'exact', head: true })
+          .eq('lote_id', loteData.id)
+          .eq('status', 'ativo')
+          .eq('aplicacao_confirmada', false);
+
+        const pendenciasVet = (orientacoesCount || 0) + (tratamentosCount || 0);
+
         const ultimaPesagem = pesagemData?.data_pesagem || null;
         const temSolicitacaoPendente = !!solicitacaoData;
         
@@ -160,6 +180,7 @@ export default function MeusLotes() {
           precisaPesar,
           quantidadeAlojada,
           temSolicitacaoPendente,
+          pendenciasVet,
         };
       })
     );
@@ -226,6 +247,11 @@ export default function MeusLotes() {
   const handleRacao = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setRacaoOpen(true);
+  };
+
+  const handleNotificacoesVet = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setNotificacoesOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -476,6 +502,20 @@ export default function MeusLotes() {
                                     </span>
                                   )}
                                 </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant={lote.pendenciasVet && lote.pendenciasVet > 0 ? 'destructive' : 'outline'}
+                                  onClick={() => handleNotificacoesVet(lote)}
+                                  className="gap-1 relative"
+                                >
+                                  <Stethoscope className="w-4 h-4" />
+                                  {lote.pendenciasVet && lote.pendenciasVet > 0 && (
+                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                                    </span>
+                                  )}
+                                </Button>
                                 <SiloBadge
                                   loteId={lote.id}
                                   linhagem={lote.linhagem}
@@ -537,6 +577,12 @@ export default function MeusLotes() {
             sexo={selectedLote.sexo}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
             avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            onSuccess={fetchLotes}
+          />
+          <NotificacoesVetDialog
+            open={notificacoesOpen}
+            onOpenChange={setNotificacoesOpen}
+            loteId={selectedLote.id}
             onSuccess={fetchLotes}
           />
         </>
