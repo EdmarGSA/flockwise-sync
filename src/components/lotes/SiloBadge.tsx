@@ -32,8 +32,8 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     return null;
   }
 
-  // Critical: less than 3 days or deficit
-  if (diasRestantes < 3 || nivelSilo < 0) {
+  // Critical: less than 2 days or deficit
+  if (diasRestantes < 2 || nivelSilo < 0) {
     return (
       <Badge variant="destructive" className="gap-1 relative">
         <AlertTriangle className="w-3 h-3" />
@@ -46,8 +46,8 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     );
   }
 
-  // Warning: 3-7 days
-  if (diasRestantes <= 7) {
+  // Warning: 2-4 days
+  if (diasRestantes <= 4) {
     return (
       <Badge variant="secondary" className="gap-1 bg-amber-500/20 text-amber-600 border-amber-500/30">
         <Package className="w-3 h-3" />
@@ -56,7 +56,7 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     );
   }
 
-  // OK: more than 7 days
+  // OK: more than 5 days
   return (
     <Badge variant="secondary" className="gap-1 bg-green-500/20 text-green-600 border-green-500/30">
       <Package className="w-3 h-3" />
