@@ -80,6 +80,63 @@ export type Database = {
         }
         Relationships: []
       }
+      centro_custos: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          lote_id: string | null
+          nome: string
+          nucleo_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_centro_custo"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          lote_id?: string | null
+          nome: string
+          nucleo_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_centro_custo"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          lote_id?: string | null
+          nome?: string
+          nucleo_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_centro_custo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "centro_custos_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "centro_custos_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_silo: {
         Row: {
           created_at: string
@@ -120,6 +177,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      contas_bancarias: {
+        Row: {
+          agencia: string
+          ativo: boolean
+          banco_codigo: string
+          banco_nome: string
+          conta: string
+          created_at: string
+          descricao: string | null
+          digito: string | null
+          id: string
+          integrado_id: string
+          saldo_atual: number
+          saldo_inicial: number
+          taxa_manutencao_mensal: number | null
+          tipo: Database["public"]["Enums"]["tipo_conta_bancaria"]
+          updated_at: string
+        }
+        Insert: {
+          agencia: string
+          ativo?: boolean
+          banco_codigo: string
+          banco_nome: string
+          conta: string
+          created_at?: string
+          descricao?: string | null
+          digito?: string | null
+          id?: string
+          integrado_id: string
+          saldo_atual?: number
+          saldo_inicial?: number
+          taxa_manutencao_mensal?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_conta_bancaria"]
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string
+          ativo?: boolean
+          banco_codigo?: string
+          banco_nome?: string
+          conta?: string
+          created_at?: string
+          descricao?: string | null
+          digito?: string | null
+          id?: string
+          integrado_id?: string
+          saldo_atual?: number
+          saldo_inicial?: number
+          taxa_manutencao_mensal?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_conta_bancaria"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       contas_pagar: {
         Row: {
@@ -1572,6 +1683,59 @@ export type Database = {
           },
         ]
       }
+      plano_contas: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          conta_pai_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          natureza: Database["public"]["Enums"]["natureza_conta"]
+          nivel: number
+          nome: string
+          tipo: Database["public"]["Enums"]["tipo_plano_conta"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          conta_pai_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          natureza?: Database["public"]["Enums"]["natureza_conta"]
+          nivel?: number
+          nome: string
+          tipo: Database["public"]["Enums"]["tipo_plano_conta"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          conta_pai_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          natureza?: Database["public"]["Enums"]["natureza_conta"]
+          nivel?: number
+          nome?: string
+          tipo?: Database["public"]["Enums"]["tipo_plano_conta"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plano_contas_conta_pai_id_fkey"
+            columns: ["conta_pai_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produto_formulacao: {
         Row: {
           created_at: string
@@ -2149,6 +2313,60 @@ export type Database = {
         }
         Relationships: []
       }
+      taxas_bancarias: {
+        Row: {
+          ativo: boolean
+          conta_bancaria_id: string | null
+          created_at: string
+          id: string
+          integrado_id: string
+          nome: string
+          plano_conta_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_taxa_bancaria"]
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          ativo?: boolean
+          conta_bancaria_id?: string | null
+          created_at?: string
+          id?: string
+          integrado_id: string
+          nome: string
+          plano_conta_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_taxa_bancaria"]
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          ativo?: boolean
+          conta_bancaria_id?: string | null
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          nome?: string
+          plano_conta_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_taxa_bancaria"]
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxas_bancarias_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taxas_bancarias_plano_conta_id_fkey"
+            columns: ["plano_conta_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tratamentos_lote: {
         Row: {
           aplicacao_confirmada: boolean | null
@@ -2303,6 +2521,7 @@ export type Database = {
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
+      natureza_conta: "devedora" | "credora"
       observacao_prioridade: "alta" | "media" | "baixa"
       observacao_tipo: "observacao" | "orientacao"
       ordem_compra_status:
@@ -2325,10 +2544,14 @@ export type Database = {
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
       tipo_bebedouro: "niple" | "tacas"
       tipo_cadastro: "cliente" | "fornecedor" | "ambos"
+      tipo_centro_custo: "lote" | "nucleo" | "geral" | "projeto"
       tipo_comedouro: "manual" | "automatico"
+      tipo_conta_bancaria: "corrente" | "poupanca" | "investimento"
       tipo_pessoa: "pf" | "pj" | "produtor_rural"
+      tipo_plano_conta: "receita" | "custo" | "despesa" | "investimento"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
       tipo_producao: "corte" | "postura"
+      tipo_taxa_bancaria: "fixo" | "percentual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2480,6 +2703,7 @@ export const Constants = {
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
+      natureza_conta: ["devedora", "credora"],
       observacao_prioridade: ["alta", "media", "baixa"],
       observacao_tipo: ["observacao", "orientacao"],
       ordem_compra_status: [
@@ -2504,10 +2728,14 @@ export const Constants = {
       submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_cadastro: ["cliente", "fornecedor", "ambos"],
+      tipo_centro_custo: ["lote", "nucleo", "geral", "projeto"],
       tipo_comedouro: ["manual", "automatico"],
+      tipo_conta_bancaria: ["corrente", "poupanca", "investimento"],
       tipo_pessoa: ["pf", "pj", "produtor_rural"],
+      tipo_plano_conta: ["receita", "custo", "despesa", "investimento"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
       tipo_producao: ["corte", "postura"],
+      tipo_taxa_bancaria: ["fixo", "percentual"],
     },
   },
 } as const
