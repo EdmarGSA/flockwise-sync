@@ -21,6 +21,7 @@ import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog'
 import { PesagemDialog } from '@/components/lotes/PesagemDialog';
 import { MortalidadeDialog } from '@/components/lotes/MortalidadeDialog';
 import { RacaoLoteDialog } from '@/components/lotes/RacaoLoteDialog';
+import { SiloBadge } from '@/components/lotes/SiloBadge';
 
 interface Lote {
   id: string;
@@ -475,6 +476,13 @@ export default function MeusLotes() {
                                     </span>
                                   )}
                                 </Button>
+                                <SiloBadge
+                                  loteId={lote.id}
+                                  linhagem={lote.linhagem}
+                                  sexo={lote.sexo}
+                                  diasDesdeAlojamento={lote.diasDesdeAlojamento || 0}
+                                  avesVivas={lote.quantidadeAlojada || lote.quantidade_aves}
+                                />
                               </>
                             )}
                           </div>
@@ -525,6 +533,10 @@ export default function MeusLotes() {
             nucleo={selectedLote.nucleo?.nome || '-'}
             galpao={selectedLote.galpao?.nome || '-'}
             tipoProducao={selectedLote.nucleo?.tipo_producao || null}
+            linhagem={selectedLote.linhagem}
+            sexo={selectedLote.sexo}
+            diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
+            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
             onSuccess={fetchLotes}
           />
         </>
