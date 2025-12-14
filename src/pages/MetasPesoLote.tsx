@@ -865,7 +865,79 @@ export default function MetasPesoLote() {
                       Quantidade alojada: {quantidadeAlojada.toLocaleString('pt-BR')} aves
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-6">
+                    {/* Resumo de Totais */}
+                    {(() => {
+                      const ultimaSemanaComDados = mortalidadePorSemana
+                        .filter(m => m.dia <= diasDesdeAlojamento)
+                        .slice(-1)[0];
+                      const totalMortalidadeReal = ultimaSemanaComDados?.mortalidade_real || 0;
+                      
+                      // Mortalidade máxima de referência = valor acumulado do dia 42 (ou acima de 42)
+                      const totalReferenciaMaxima = mortalidadeMedia 
+                        ? (mortalidadeMedia.mortalidade_acima_42_dias || mortalidadeMedia.mortalidade_42_dias || 0)
+                        : null;
+                      
+                      const dentroDoLimite = totalReferenciaMaxima !== null 
+                        ? totalMortalidadeReal <= totalReferenciaMaxima 
+                        : true;
+                      
+                      const diferencaPercentual = totalReferenciaMaxima && totalReferenciaMaxima > 0
+                        ? ((totalMortalidadeReal - totalReferenciaMaxima) / totalReferenciaMaxima) * 100
+                        : 0;
+
+                      return (
+                        <div className={`p-4 rounded-lg border ${
+                          dentroDoLimite 
+                            ? 'bg-green-500/10 border-green-500/30' 
+                            : 'bg-destructive/10 border-destructive/30'
+                        }`}>
+                          <div className="flex items-center justify-between flex-wrap gap-4">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide">Mortalidade Real Total</p>
+                                <p className={`text-2xl font-bold ${!dentroDoLimite ? 'text-destructive' : ''}`}>
+                                  {totalMortalidadeReal.toFixed(2)}%
+                                </p>
+                              </div>
+                              
+                              {totalReferenciaMaxima !== null && (
+                                <>
+                                  <div className="w-px h-12 bg-border" />
+                                  <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Máx. Referência</p>
+                                    <p className="text-2xl font-bold text-muted-foreground">
+                                      {totalReferenciaMaxima.toFixed(2)}%
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {dentroDoLimite ? (
+                                <>
+                                  <CheckCircle className="w-6 h-6 text-green-500" />
+                                  <span className="text-sm font-medium text-green-600">Dentro do limite</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle className="w-6 h-6 text-destructive" />
+                                  <div className="text-right">
+                                    <span className="text-sm font-medium text-destructive block">Acima do limite</span>
+                                    <Badge variant="destructive" className="text-xs">
+                                      +{diferencaPercentual.toFixed(1)}% acima
+                                    </Badge>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Grid de Semanas */}
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                       {mortalidadePorSemana.filter(m => m.dia <= Math.max(diasDesdeAlojamento + 7, 7)).map((m) => (
                         <div 
