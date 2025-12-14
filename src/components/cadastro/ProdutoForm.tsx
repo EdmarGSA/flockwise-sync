@@ -38,6 +38,7 @@ const formSchema = z.object({
   unidade_compra: z.string().default("UN"),
   embalagem_quantidade: z.coerce.number().default(1),
   fator_conversao: z.coerce.number().default(1),
+  requer_quarentena: z.boolean().default(true),
 });
 
 interface ProdutoFormProps {
@@ -102,6 +103,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       unidade_compra: "UN",
       embalagem_quantidade: 1,
       fator_conversao: 1,
+      requer_quarentena: true,
     },
   });
 
@@ -359,7 +361,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             📦 Inventário e Logística
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <FormField
               control={form.control}
               name="estoque_atual"
@@ -396,6 +398,18 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                     <Input placeholder="A1-01" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="requer_quarentena"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 pt-6">
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <FormLabel className="!mt-0">Requer Quarentena</FormLabel>
                 </FormItem>
               )}
             />

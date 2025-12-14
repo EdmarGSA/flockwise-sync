@@ -58,6 +58,8 @@ const CadastroMembros = () => {
       case 'admin': return 'destructive';
       case 'veterinario': return 'default';
       case 'tecnico': return 'secondary';
+      case 'comprador': return 'default';
+      case 'conferente': return 'secondary';
       default: return 'outline';
     }
   };
@@ -68,6 +70,8 @@ const CadastroMembros = () => {
       case 'integrado': return 'Integrado';
       case 'veterinario': return 'Veterinário';
       case 'tecnico': return 'Técnico';
+      case 'comprador': return 'Comprador';
+      case 'conferente': return 'Conferente';
       default: return role;
     }
   };
