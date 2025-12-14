@@ -986,6 +986,59 @@ export type Database = {
           },
         ]
       }
+      observacoes_lote: {
+        Row: {
+          created_at: string
+          criado_por: string
+          descricao: string
+          dia_ciclo: number
+          id: string
+          integrado_id: string
+          lote_id: string
+          prioridade:
+            | Database["public"]["Enums"]["observacao_prioridade"]
+            | null
+          tipo: Database["public"]["Enums"]["observacao_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          descricao: string
+          dia_ciclo: number
+          id?: string
+          integrado_id: string
+          lote_id: string
+          prioridade?:
+            | Database["public"]["Enums"]["observacao_prioridade"]
+            | null
+          tipo?: Database["public"]["Enums"]["observacao_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          descricao?: string
+          dia_ciclo?: number
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          prioridade?:
+            | Database["public"]["Enums"]["observacao_prioridade"]
+            | null
+          tipo?: Database["public"]["Enums"]["observacao_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observacoes_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordens_compra: {
         Row: {
           aprovado_por: string | null
@@ -2107,6 +2160,8 @@ export type Database = {
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
+      observacao_prioridade: "alta" | "media" | "baixa"
+      observacao_tipo: "observacao" | "orientacao"
       ordem_compra_status:
         | "rascunho"
         | "pendente"
@@ -2282,6 +2337,8 @@ export const Constants = {
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
+      observacao_prioridade: ["alta", "media", "baixa"],
+      observacao_tipo: ["observacao", "orientacao"],
       ordem_compra_status: [
         "rascunho",
         "pendente",

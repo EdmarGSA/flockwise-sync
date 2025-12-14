@@ -22,6 +22,8 @@ import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
 import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
 import FabricaRacao from "./pages/FabricaRacao";
+import Veterinario from "./pages/Veterinario";
+import VeterinarioLote from "./pages/VeterinarioLote";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -157,6 +159,16 @@ const AppRoutes = () => (
     <Route path="/fabrica-racao" element={
       <ProtectedRoute>
         <FabricaRacao />
+      </ProtectedRoute>
+    } />
+    <Route path="/veterinario" element={
+      <ProtectedRoute>
+        <Veterinario />
+      </ProtectedRoute>
+    } />
+    <Route path="/veterinario/:loteId" element={
+      <ProtectedRoute>
+        <VeterinarioLote />
       </ProtectedRoute>
     } />
     
