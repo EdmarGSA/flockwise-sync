@@ -20,6 +20,7 @@ import CadastroGruposAnimal from "./pages/CadastroGruposAnimal";
 import CadastroDesempenhoAves from "./pages/CadastroDesempenhoAves";
 import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
+import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
 import FabricaRacao from "./pages/FabricaRacao";
 import NotFound from "./pages/NotFound";
 
@@ -146,6 +147,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/mortalidade-media" element={
       <ProtectedRoute>
         <CadastroMortalidadeMedia />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/silo" element={
+      <ProtectedRoute>
+        <ConfiguracaoSilo />
       </ProtectedRoute>
     } />
     <Route path="/fabrica-racao" element={

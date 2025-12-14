@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { useSiloLevel } from './NivelSiloCard';
+import { useConfigSilo } from '@/hooks/useConfigSilo';
 import { Package, AlertTriangle } from 'lucide-react';
 import {
   Tooltip,
@@ -17,6 +18,7 @@ interface SiloBadgeProps {
 }
 
 export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas }: SiloBadgeProps) {
+  const { config } = useConfigSilo();
   const { diasRestantes, nivelSilo, consumoDiarioEstimado, loading } = useSiloLevel(
     loteId,
     linhagem,
@@ -57,8 +59,8 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     </div>
   );
 
-  // Critical: less than 2 days or deficit
-  if (diasRestantes < 2 || nivelSilo < 0) {
+  // Critical: less than diasCritico days or deficit
+  if (diasRestantes < config.diasCritico || nivelSilo < 0) {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -80,8 +82,8 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     );
   }
 
-  // Warning: 2-4 days
-  if (diasRestantes <= 4) {
+  // Warning: diasCritico to diasAtencao days
+  if (diasRestantes <= config.diasAtencao) {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -99,7 +101,7 @@ export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesViv
     );
   }
 
-  // OK: more than 5 days
+  // OK: more than diasOk days
   return (
     <TooltipProvider>
       <Tooltip>
