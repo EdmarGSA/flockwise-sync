@@ -16,7 +16,7 @@ import ProdutoForm from "@/components/cadastro/ProdutoForm";
 import ProdutoEditForm from "@/components/cadastro/ProdutoEditForm";
 import CategoriaForm from "@/components/cadastro/CategoriaForm";
 import GrupoProdutoForm from "@/components/cadastro/GrupoProdutoForm";
-import FormulacaoDialog from "@/components/cadastro/FormulacaoDialog";
+import NutricoesDialog from "@/components/cadastro/NutricoesDialog";
 import KardexView from "@/components/cadastro/KardexView";
 import FornecedoresVinculadosDialog from "@/components/cadastro/FornecedoresVinculadosDialog";
 
@@ -546,8 +546,8 @@ const CadastroProdutos = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Formulação Dialog */}
-        <FormulacaoDialog
+        {/* Nutrições Dialog */}
+        <NutricoesDialog
           open={!!formulacaoProduto}
           onOpenChange={() => setFormulacaoProduto(null)}
           produto={formulacaoProduto}

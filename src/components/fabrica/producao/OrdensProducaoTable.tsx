@@ -38,10 +38,14 @@ interface OrdemProducao {
   custo_total_estimado?: number;
   custo_total_real?: number;
   custo_por_kg?: number;
+  nutricao_id?: string | null;
   produto?: {
     nome: string;
     unidade_medida: string;
   };
+  nutricao?: {
+    nome: string;
+  } | null;
 }
 
 interface OrdensProducaoTableProps {
@@ -68,7 +72,8 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
         .from('ordens_producao')
         .select(`
           *,
-          produto:produtos!ordens_producao_produto_id_fkey(nome, unidade_medida)
+          produto:produtos!ordens_producao_produto_id_fkey(nome, unidade_medida),
+          nutricao:nutricoes(nome)
         `)
         .eq('integrado_id', integradoId)
         .order('created_at', { ascending: false });
@@ -211,6 +216,7 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
                 <TableRow>
                   <TableHead>Nº OP</TableHead>
                   <TableHead>Ração</TableHead>
+                  <TableHead>Nutrição</TableHead>
                   <TableHead className="text-right">Qtd. Plan.</TableHead>
                   <TableHead className="text-right">Qtd. Prod.</TableHead>
                   <TableHead className="text-right">Custo/kg</TableHead>
@@ -223,6 +229,13 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
                   <TableRow key={ordem.id}>
                     <TableCell className="font-medium">#{ordem.numero_op}</TableCell>
                     <TableCell>{ordem.produto?.nome || '-'}</TableCell>
+                    <TableCell>
+                      {ordem.nutricao?.nome ? (
+                        <Badge variant="outline" className="text-xs">{ordem.nutricao.nome}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {ordem.quantidade_planejada.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} {ordem.produto?.unidade_medida || 'kg'}
                     </TableCell>

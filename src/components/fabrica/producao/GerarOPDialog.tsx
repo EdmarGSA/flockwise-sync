@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, CheckCircle, Factory, Package, Loader2, DollarSign } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertTriangle, CheckCircle, Factory, Package, Loader2, DollarSign, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,6 +22,13 @@ interface InsumoVerificacao {
   maxProduzivel: number;
   custoUnitario: number;
   custoTotal: number;
+}
+
+interface Nutricao {
+  id: string;
+  nome: string;
+  padrao: boolean;
+  ativo: boolean;
 }
 
 interface RacaoCritica {
@@ -55,15 +63,27 @@ export default function GerarOPDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [maxProduzivel, setMaxProduzivel] = useState<number | null>(null);
+  
+  // Nutrition selection
+  const [nutricoes, setNutricoes] = useState<Nutricao[]>([]);
+  const [selectedNutricaoId, setSelectedNutricaoId] = useState<string>("");
+  const [loadingNutricoes, setLoadingNutricoes] = useState(false);
 
   useEffect(() => {
     if (open && racao) {
       setQuantidade(racao.sugestaoProducao);
       setDataPrevista(new Date().toISOString().split('T')[0]);
       setObservacoes('');
-      fetchFormulacao();
+      setSelectedNutricaoId("");
+      fetchNutricoes();
     }
   }, [open, racao]);
+
+  useEffect(() => {
+    if (selectedNutricaoId && quantidade > 0) {
+      fetchFormulacao();
+    }
+  }, [selectedNutricaoId]);
 
   useEffect(() => {
     if (racao && quantidade > 0 && insumos.length > 0) {
@@ -71,12 +91,83 @@ export default function GerarOPDialog({
     }
   }, [quantidade]);
 
+  const fetchNutricoes = async () => {
+    if (!racao) return;
+    setLoadingNutricoes(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('nutricoes')
+        .select('id, nome, padrao, ativo')
+        .eq('produto_id', racao.id)
+        .eq('ativo', true)
+        .order('padrao', { ascending: false })
+        .order('nome');
+
+      if (error) throw error;
+
+      setNutricoes(data || []);
+      
+      // Auto-select default nutrition if available
+      const padrao = data?.find(n => n.padrao);
+      if (padrao) {
+        setSelectedNutricaoId(padrao.id);
+      } else if (data && data.length > 0) {
+        setSelectedNutricaoId(data[0].id);
+      } else {
+        // No nutrition available, try to fetch from old produto_formulacao
+        fetchOldFormulacao();
+      }
+    } catch (error) {
+      console.error('Erro ao buscar nutrições:', error);
+    } finally {
+      setLoadingNutricoes(false);
+    }
+  };
+
   const fetchFormulacao = async () => {
+    if (!racao || !selectedNutricaoId) return;
+    setLoading(true);
+
+    try {
+      // Fetch BOM from nutricao_itens
+      const { data: formulacao, error: formError } = await supabase
+        .from('nutricao_itens')
+        .select(`
+          id,
+          quantidade,
+          unidade_medida,
+          insumo:produtos!nutricao_itens_insumo_id_fkey(
+            id, nome, estoque_atual, unidade_medida, custo_unitario, custo_medio
+          )
+        `)
+        .eq('nutricao_id', selectedNutricaoId);
+
+      if (formError) throw formError;
+
+      if (!formulacao || formulacao.length === 0) {
+        toast.warning('Esta nutrição não possui fórmula cadastrada');
+        setInsumos([]);
+        setMaxProduzivel(null);
+        setLoading(false);
+        return;
+      }
+
+      processFormulacao(formulacao);
+    } catch (error) {
+      console.error('Erro ao buscar formulação:', error);
+      toast.error('Erro ao carregar fórmula do produto');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchOldFormulacao = async () => {
     if (!racao) return;
     setLoading(true);
 
     try {
-      // Fetch BOM for the product
+      // Fallback to old produto_formulacao table
       const { data: formulacao, error: formError } = await supabase
         .from('produto_formulacao')
         .select(`
@@ -100,41 +191,7 @@ export default function GerarOPDialog({
         return;
       }
 
-      // Calculate required quantities based on BOM (quantity per 1000kg)
-      const insumosVerificados: InsumoVerificacao[] = formulacao.map(item => {
-        const insumo = item.insumo as any;
-        // Formula quantity is per 1000kg of final product
-        const qtdNecessaria = (racao.sugestaoProducao / 1000) * Number(item.quantidade);
-        const estoqueDisponivel = Number(insumo.estoque_atual);
-        const isCritico = estoqueDisponivel < qtdNecessaria;
-        const maxProd = Number(item.quantidade) > 0 
-          ? (estoqueDisponivel / Number(item.quantidade)) * 1000 
-          : 999999;
-        
-        // Use custo_medio if available, otherwise custo_unitario
-        const custoUnitario = Number(insumo.custo_medio) > 0 
-          ? Number(insumo.custo_medio) 
-          : Number(insumo.custo_unitario) || 0;
-        const custoTotal = qtdNecessaria * custoUnitario;
-
-        return {
-          id: insumo.id,
-          nome: insumo.nome,
-          quantidadeNecessaria: qtdNecessaria,
-          estoqueDisponivel,
-          unidade_medida: insumo.unidade_medida,
-          isCritico,
-          maxProduzivel: maxProd,
-          custoUnitario,
-          custoTotal
-        };
-      });
-
-      setInsumos(insumosVerificados);
-
-      // Calculate max producible quantity (limited by most scarce ingredient)
-      const minMax = Math.min(...insumosVerificados.map(i => i.maxProduzivel));
-      setMaxProduzivel(minMax === Infinity ? null : Math.floor(minMax));
+      processFormulacao(formulacao);
     } catch (error) {
       console.error('Erro ao buscar formulação:', error);
       toast.error('Erro ao carregar fórmula do produto');
@@ -143,14 +200,54 @@ export default function GerarOPDialog({
     }
   };
 
+  const processFormulacao = (formulacao: any[]) => {
+    if (!racao) return;
+
+    const insumosVerificados: InsumoVerificacao[] = formulacao.map(item => {
+      const insumo = item.insumo as any;
+      // Formula quantity is per 1000kg of final product
+      const qtdNecessaria = (quantidade / 1000) * Number(item.quantidade);
+      const estoqueDisponivel = Number(insumo.estoque_atual);
+      const isCritico = estoqueDisponivel < qtdNecessaria;
+      const maxProd = Number(item.quantidade) > 0 
+        ? (estoqueDisponivel / Number(item.quantidade)) * 1000 
+        : 999999;
+      
+      // Use custo_medio if available, otherwise custo_unitario
+      const custoUnitario = Number(insumo.custo_medio) > 0 
+        ? Number(insumo.custo_medio) 
+        : Number(insumo.custo_unitario) || 0;
+      const custoTotal = qtdNecessaria * custoUnitario;
+
+      return {
+        id: insumo.id,
+        nome: insumo.nome,
+        quantidadeNecessaria: qtdNecessaria,
+        estoqueDisponivel,
+        unidade_medida: insumo.unidade_medida,
+        isCritico,
+        maxProduzivel: maxProd,
+        custoUnitario,
+        custoTotal
+      };
+    });
+
+    setInsumos(insumosVerificados);
+
+    // Calculate max producible quantity (limited by most scarce ingredient)
+    const minMax = Math.min(...insumosVerificados.map(i => i.maxProduzivel));
+    setMaxProduzivel(minMax === Infinity ? null : Math.floor(minMax));
+  };
+
   const verificarInsumos = () => {
     if (!racao || insumos.length === 0) return;
 
     // Recalculate based on new quantity
     const insumosAtualizados = insumos.map(item => {
-      // Find original formula quantity
-      const qtdOriginal = (racao.sugestaoProducao / 1000) * (item.quantidadeNecessaria / (racao.sugestaoProducao / 1000));
-      const qtdNecessaria = (quantidade / 1000) * (item.quantidadeNecessaria / (racao.sugestaoProducao / 1000)) || 0;
+      // We need to find the original formula ratio
+      // Since we stored quantidadeNecessaria based on initial quantity, we need to recalculate
+      const baseRatio = item.quantidadeNecessaria / (quantidade > 0 ? quantidade : 1);
+      const qtdNecessaria = quantidade * baseRatio || 0;
       const isCritico = item.estoqueDisponivel < qtdNecessaria;
       const custoTotal = qtdNecessaria * item.custoUnitario;
 
@@ -174,7 +271,7 @@ export default function GerarOPDialog({
     setSaving(true);
 
     try {
-      // Create production order with cost
+      // Create production order with cost and nutrition
       const { data: op, error: opError } = await supabase
         .from('ordens_producao')
         .insert({
@@ -186,7 +283,8 @@ export default function GerarOPDialog({
           observacoes: observacoes || null,
           criado_por: integradoId,
           custo_total_estimado: custoTotalEstimado,
-          custo_por_kg: custoPorKg
+          custo_por_kg: custoPorKg,
+          nutricao_id: selectedNutricaoId || null
         })
         .select()
         .single();
@@ -224,6 +322,7 @@ export default function GerarOPDialog({
   };
 
   const hasInsumosCriticos = insumos.some(i => i.isCritico);
+  const selectedNutricao = nutricoes.find(n => n.id === selectedNutricaoId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -239,6 +338,38 @@ export default function GerarOPDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Nutrition Selection */}
+          {nutricoes.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4" />
+                Nutrição
+              </Label>
+              <Select 
+                value={selectedNutricaoId || "__none__"} 
+                onValueChange={(val) => setSelectedNutricaoId(val === "__none__" ? "" : val)}
+                disabled={loadingNutricoes}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a nutrição" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Selecione uma nutrição</SelectItem>
+                  {nutricoes.map(n => (
+                    <SelectItem key={n.id} value={n.id}>
+                      {n.nome} {n.padrao && "(Padrão)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedNutricao && (
+                <p className="text-sm text-muted-foreground">
+                  Fórmula selecionada: <span className="font-medium">{selectedNutricao.nome}</span>
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Production Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -337,7 +468,9 @@ export default function GerarOPDialog({
                 </div>
               ) : insumos.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">
-                  Nenhuma fórmula cadastrada para este produto
+                  {nutricoes.length === 0 
+                    ? "Nenhuma nutrição cadastrada para este produto" 
+                    : "Selecione uma nutrição para ver os insumos"}
                 </p>
               ) : (
                 <Table>

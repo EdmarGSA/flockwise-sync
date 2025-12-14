@@ -23,10 +23,14 @@ interface OrdemProducao {
   custo_total_estimado?: number;
   custo_total_real?: number;
   custo_por_kg?: number;
+  nutricao_id?: string | null;
   produto?: {
     nome: string;
     unidade_medida: string;
   };
+  nutricao?: {
+    nome: string;
+  } | null;
 }
 
 interface ItemOP {
@@ -117,8 +121,13 @@ export default function OrdemProducaoViewDialog({
             <Factory className="w-5 h-5 text-primary" />
             Ordem de Produção #{ordem.numero_op}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="flex items-center gap-2">
             {ordem.produto?.nome}
+            {ordem.nutricao && (
+              <Badge variant="outline" className="ml-2">
+                Nutrição: {ordem.nutricao.nome}
+              </Badge>
+            )}
           </DialogDescription>
         </DialogHeader>
 
