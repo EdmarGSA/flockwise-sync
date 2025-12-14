@@ -39,6 +39,7 @@ const formSchema = z.object({
   embalagem_quantidade: z.coerce.number().default(1),
   fator_conversao: z.coerce.number().default(1),
   requer_quarentena: z.boolean().default(true),
+  status_comercial: z.string().default("consumo"),
 });
 
 interface ProdutoFormProps {
@@ -62,6 +63,12 @@ const origensOptions = [
   { value: "6", label: "6 - Estrangeira - Importação Direta s/ Similar Nacional" },
   { value: "7", label: "7 - Estrangeira - Mercado Interno s/ Similar Nacional" },
   { value: "8", label: "8 - Nacional com Conteúdo de Importação > 70%" },
+];
+
+const statusComercialOptions = [
+  { value: "consumo", label: "Consumo" },
+  { value: "venda", label: "Venda" },
+  { value: "ambos", label: "Ambos" },
 ];
 
 const generateSKU = () => {
@@ -104,6 +111,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       embalagem_quantidade: 1,
       fator_conversao: 1,
       requer_quarentena: true,
+      status_comercial: "consumo",
     },
   });
 
@@ -348,6 +356,28 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
                     <Switch checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>
                   <FormLabel className="!mt-0">Ativo</FormLabel>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status_comercial"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status Comercial</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {statusComercialOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
