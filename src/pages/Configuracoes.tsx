@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Landmark } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -70,12 +70,6 @@ const Configuracoes = () => {
       description: "Thresholds de alerta e estoque sugerido",
       icon: Warehouse,
       path: "/configuracoes/silo"
-    },
-    {
-      title: "Financeiro",
-      description: "Contas bancárias, plano de contas e centros de custo",
-      icon: Landmark,
-      path: "/configuracoes/financeiro"
     }
   ];
 
