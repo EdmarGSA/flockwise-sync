@@ -274,6 +274,7 @@ export type Database = {
           id: string
           integrado_id: string
           nome: string
+          produto_racao_id: string | null
           updated_at: string
         }
         Insert: {
@@ -286,6 +287,7 @@ export type Database = {
           id?: string
           integrado_id: string
           nome: string
+          produto_racao_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -298,6 +300,7 @@ export type Database = {
           id?: string
           integrado_id?: string
           nome?: string
+          produto_racao_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -306,6 +309,13 @@ export type Database = {
             columns: ["grupo_id"]
             isOneToOne: false
             referencedRelation: "grupos_animal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fases_animal_produto_racao_id_fkey"
+            columns: ["produto_racao_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
