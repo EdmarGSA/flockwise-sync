@@ -12,7 +12,7 @@ import { AlertTriangle, Lock, Shield } from 'lucide-react';
 
 interface Divergencia {
   id: string;
-  tipo: 'quantidade' | 'preco' | 'condicao_pagamento';
+  tipo: 'quantidade' | 'preco' | 'condicao_pagamento' | 'produto_nao_previsto';
   descricao: string;
   produtoNome?: string;
   valorOc: number;
