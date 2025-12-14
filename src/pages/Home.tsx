@@ -71,7 +71,7 @@ const modules: ModuleCard[] = [
     icon: Stethoscope,
     path: '/veterinario',
     color: 'from-purple-500 to-purple-700',
-    available: false,
+    available: true,
   },
   {
     id: 'fabrica-racao',
