@@ -214,13 +214,14 @@ export function useSiloLevel(
   const [siloData, setSiloData] = useState<{
     nivelSilo: number;
     diasRestantes: number;
+    consumoDiarioEstimado: number;
     loading: boolean;
-  }>({ nivelSilo: 0, diasRestantes: 0, loading: true });
+  }>({ nivelSilo: 0, diasRestantes: 0, consumoDiarioEstimado: 0, loading: true });
 
   useEffect(() => {
     const fetchData = async () => {
       if (!loteId || diasDesdeAlojamento <= 0 || avesVivas <= 0) {
-        setSiloData({ nivelSilo: 0, diasRestantes: 0, loading: false });
+        setSiloData({ nivelSilo: 0, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
         return;
       }
 
@@ -257,13 +258,13 @@ export function useSiloLevel(
           const nivel = totalRecebido - consumoEstimadoKg;
           const dias = consumoDiarioKg > 0 ? Math.floor(nivel / consumoDiarioKg) : 0;
           
-          setSiloData({ nivelSilo: nivel, diasRestantes: dias, loading: false });
+          setSiloData({ nivelSilo: nivel, diasRestantes: dias, consumoDiarioEstimado: consumoDiarioKg, loading: false });
         } else {
-          setSiloData({ nivelSilo: totalRecebido, diasRestantes: 0, loading: false });
+          setSiloData({ nivelSilo: totalRecebido, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
         }
       } catch (error) {
         console.error('Erro ao calcular nível do silo:', error);
-        setSiloData({ nivelSilo: 0, diasRestantes: 0, loading: false });
+        setSiloData({ nivelSilo: 0, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
       }
     };
 
