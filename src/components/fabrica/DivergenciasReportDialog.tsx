@@ -3,10 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertTriangle, Check, CheckCircle, Lock, Shield } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { AlertTriangle, Check, CheckCircle, Lock, Shield, Settings } from 'lucide-react';
 import AutorizacaoDivergenciaDialog from './AutorizacaoDivergenciaDialog';
 
 interface ItemConferido {
@@ -31,7 +33,7 @@ interface ItemConferido {
 
 interface Divergencia {
   id: string;
-  tipo: 'quantidade' | 'preco' | 'condicao_pagamento';
+  tipo: 'quantidade' | 'preco' | 'condicao_pagamento' | 'produto_nao_previsto';
   descricao: string;
   itemId?: string;
   produtoNome?: string;
@@ -52,6 +54,12 @@ interface DivergenciasReportDialogProps {
   onSuccess: () => void;
 }
 
+// Default tolerance settings
+const DEFAULT_TOLERANCE = {
+  quantidadePercent: 5,
+  precoPercent: 5
+};
+
 export default function DivergenciasReportDialog({
   open,
   onOpenChange,
@@ -63,12 +71,31 @@ export default function DivergenciasReportDialog({
   const [divergencias, setDivergencias] = useState<Divergencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAutorizacao, setShowAutorizacao] = useState(false);
+  const [showToleranceSettings, setShowToleranceSettings] = useState(false);
+  
+  // Tolerance settings
+  const [toleranceQtd, setToleranceQtd] = useState(() => {
+    const saved = localStorage.getItem('divergencia_tolerance_qtd');
+    return saved ? parseFloat(saved) : DEFAULT_TOLERANCE.quantidadePercent;
+  });
+  const [tolerancePreco, setTolerancePreco] = useState(() => {
+    const saved = localStorage.getItem('divergencia_tolerance_preco');
+    return saved ? parseFloat(saved) : DEFAULT_TOLERANCE.precoPercent;
+  });
 
   useEffect(() => {
     if (open) {
       analisarDivergencias();
     }
-  }, [open, itens]);
+  }, [open, itens, toleranceQtd, tolerancePreco]);
+
+  const saveToleranceSettings = () => {
+    localStorage.setItem('divergencia_tolerance_qtd', toleranceQtd.toString());
+    localStorage.setItem('divergencia_tolerance_preco', tolerancePreco.toString());
+    setShowToleranceSettings(false);
+    toast.success('Tolerâncias salvas');
+    analisarDivergencias();
+  };
 
   const analisarDivergencias = () => {
     const divs: Divergencia[] = [];
@@ -77,6 +104,24 @@ export default function DivergenciasReportDialog({
     itens.forEach(item => {
       const referencia = item.quantidade_nfe > 0 ? item.quantidade_nfe : item.quantidade_oc;
       
+      // Check for "produto não previsto" - has physical qty but no OC or NF-e reference
+      if (item.quantidade_fisica > 0 && item.quantidade_oc === 0 && item.quantidade_nfe === 0) {
+        divs.push({
+          id: `extra-${divIndex++}`,
+          tipo: 'produto_nao_previsto',
+          descricao: `Produto não previsto na OC/NF-e - Recebido ${item.quantidade_fisica} ${item.unidade_compra || item.produtos.unidade_medida}`,
+          itemId: item.id,
+          produtoNome: item.produtos.nome,
+          valorOc: 0,
+          valorNfe: 0,
+          valorFisico: item.quantidade_fisica,
+          percentualDiferenca: 100,
+          critico: true,
+          aceita: false
+        });
+        return;
+      }
+      
       // Quantity divergence (Physical vs Reference)
       if (referencia > 0 && item.quantidade_fisica !== referencia) {
         const diferenca = item.quantidade_fisica - referencia;
@@ -84,6 +129,7 @@ export default function DivergenciasReportDialog({
         const unidade = item.unidade_compra || item.produtos.unidade_medida;
         
         if (Math.abs(percentual) > 0.5) {
+          const isCritical = Math.abs(percentual) > toleranceQtd;
           divs.push({
             id: `qty-${divIndex++}`,
             tipo: 'quantidade',
@@ -96,8 +142,8 @@ export default function DivergenciasReportDialog({
             valorNfe: item.quantidade_nfe,
             valorFisico: item.quantidade_fisica,
             percentualDiferenca: percentual,
-            critico: Math.abs(percentual) > 5,
-            aceita: false
+            critico: isCritical,
+            aceita: !isCritical // Auto-accept if within tolerance
           });
         }
       }
@@ -108,6 +154,7 @@ export default function DivergenciasReportDialog({
         const percentual = (diferenca / item.preco_oc) * 100;
         
         if (Math.abs(percentual) > 0.5) {
+          const isCritical = diferenca > 0 && percentual > tolerancePreco;
           divs.push({
             id: `price-${divIndex++}`,
             tipo: 'preco',
@@ -119,8 +166,8 @@ export default function DivergenciasReportDialog({
             valorOc: item.preco_oc,
             valorNfe: item.preco_nfe,
             percentualDiferenca: percentual,
-            critico: diferenca > 0 && percentual > 5, // Only critical if price increased significantly
-            aceita: false
+            critico: isCritical,
+            aceita: !isCritical
           });
         }
       }
@@ -148,19 +195,16 @@ export default function DivergenciasReportDialog({
   };
 
   const handleFinalizar = async () => {
-    // Check if there are critical divergences that need authorization
     if (hasDivergenciasCriticasNaoAceitas()) {
       toast.error('Existem divergências críticas que precisam ser aceitas');
       return;
     }
 
     if (hasDivergenciasNaoAceitas()) {
-      // Has non-critical divergences that were not accepted - needs manager auth
       setShowAutorizacao(true);
       return;
     }
 
-    // All accepted or no divergences - finalize directly
     await finalizarRecebimento();
   };
 
@@ -218,14 +262,11 @@ export default function DivergenciasReportDialog({
       if (fetchError) throw fetchError;
 
       // Create kardex entries for each item (with quarantine status)
-      // USE CONVERTED STOCK QUANTITY (quantidade_estoque)
       for (const item of itens) {
-        // Calculate stock quantity using conversion factor
         const fatorConversao = item.fator_conversao || 1;
         const quantidadeEstoque = item.quantidade_fisica * fatorConversao;
         
         if (quantidadeEstoque > 0) {
-          // Get current stock
           const { data: produto, error: prodError } = await supabase
             .from('produtos')
             .select('estoque_atual')
@@ -237,14 +278,13 @@ export default function DivergenciasReportDialog({
           const saldoAnterior = produto?.estoque_atual || 0;
           const saldoAtual = saldoAnterior + quantidadeEstoque;
 
-          // Insert kardex entry with quarantine - using STOCK QUANTITY
           const { error: kardexError } = await supabase
             .from('kardex')
             .insert({
               integrado_id: integradoId,
               produto_id: item.produto_id,
               tipo_movimento: 'entrada',
-              quantidade: quantidadeEstoque, // Stock quantity, not physical
+              quantidade: quantidadeEstoque,
               saldo_anterior: saldoAnterior,
               saldo_atual: saldoAtual,
               custo_unitario: item.preco_nfe || item.preco_oc,
@@ -257,7 +297,6 @@ export default function DivergenciasReportDialog({
 
           if (kardexError) throw kardexError;
 
-          // Update product stock with CONVERTED quantity
           const { error: stockError } = await supabase
             .from('produtos')
             .update({ estoque_atual: saldoAtual })
@@ -269,14 +308,12 @@ export default function DivergenciasReportDialog({
 
       // Update contas_pagar if linked to OC
       if (recebimento?.ordem_compra_id) {
-        // Remove forecast entry (previsto)
         await supabase
           .from('contas_pagar')
           .delete()
           .eq('ordem_compra_id', recebimento.ordem_compra_id)
           .eq('status', 'previsto');
 
-        // Get OC info for new entry
         const { data: oc } = await supabase
           .from('ordens_compra')
           .select('parceiro_id, data_vencimento, prazo_pagamento_dias')
@@ -284,7 +321,6 @@ export default function DivergenciasReportDialog({
           .single();
 
         if (oc) {
-          // Create exact entry based on NF-e value
           const vencimento = oc.data_vencimento || new Date(Date.now() + (oc.prazo_pagamento_dias || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
           await supabase
@@ -337,6 +373,8 @@ export default function DivergenciasReportDialog({
   }
 
   const noDivergencias = divergencias.length === 0;
+  const divergenciasWithinTolerance = divergencias.filter(d => !d.critico);
+  const divergenciasCritical = divergencias.filter(d => d.critico);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -358,6 +396,64 @@ export default function DivergenciasReportDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Tolerance settings toggle */}
+        <div className="flex justify-end">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowToleranceSettings(!showToleranceSettings)}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Tolerâncias
+          </Button>
+        </div>
+
+        {/* Tolerance settings form */}
+        {showToleranceSettings && (
+          <Card className="border-primary/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Configurar Tolerâncias</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tolerância Quantidade (%)</Label>
+                  <Input 
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={toleranceQtd}
+                    onChange={(e) => setToleranceQtd(parseFloat(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Divergências abaixo deste % são aceitas automaticamente
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tolerância Preço (%)</Label>
+                  <Input 
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={tolerancePreco}
+                    onChange={(e) => setTolerancePreco(parseFloat(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Apenas aumento de preço acima deste % é crítico
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button size="sm" onClick={saveToleranceSettings}>
+                  Salvar Tolerâncias
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {noDivergencias ? (
           <Card className="border-green-500/50 bg-green-50/10">
             <CardContent className="pt-6">
@@ -378,6 +474,11 @@ export default function DivergenciasReportDialog({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-yellow-600" />
                 <span className="font-medium">{divergencias.length} divergência(s) encontrada(s)</span>
+                {divergenciasWithinTolerance.length > 0 && (
+                  <Badge variant="outline" className="text-green-600 border-green-500">
+                    {divergenciasWithinTolerance.length} dentro da tolerância
+                  </Badge>
+                )}
               </div>
               <Button variant="outline" size="sm" onClick={aceitarTodas}>
                 <Check className="w-4 h-4 mr-2" />
@@ -385,92 +486,141 @@ export default function DivergenciasReportDialog({
               </Button>
             </div>
 
-            <div className="space-y-3">
-              {divergencias.map((div) => (
-                <Card 
-                  key={div.id} 
-                  className={`${div.critico ? 'border-destructive/50' : 'border-yellow-500/50'} ${div.aceita ? 'opacity-60' : ''}`}
-                >
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          checked={div.aceita}
-                          onCheckedChange={() => toggleAceitarDivergencia(div.id)}
-                        />
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={div.tipo === 'quantidade' ? 'secondary' : 'outline'}>
-                              {div.tipo === 'quantidade' ? 'Quantidade' : 'Preço'}
-                            </Badge>
-                            {div.critico && (
-                              <Badge variant="destructive">
-                                <Lock className="w-3 h-3 mr-1" />
-                                Crítico
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="font-medium">{div.produtoNome}</p>
-                          <p className="text-sm text-muted-foreground">{div.descricao}</p>
-                          
-                          <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
-                            {div.tipo === 'quantidade' ? (
-                              <>
-                                <div>
-                                  <span className="text-muted-foreground">OC: </span>
-                                  <span className="font-medium">{div.valorOc}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">NF-e: </span>
-                                  <span className="font-medium">{div.valorNfe}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Físico: </span>
-                                  <span className="font-medium">{div.valorFisico}</span>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div>
-                                  <span className="text-muted-foreground">OC: </span>
-                                  <span className="font-medium">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(div.valorOc)}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">NF-e: </span>
-                                  <span className={`font-medium ${div.percentualDiferenca > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(div.valorNfe)}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Diferença: </span>
-                                  <span className={`font-medium ${div.percentualDiferenca > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                                    {div.percentualDiferenca > 0 ? '+' : ''}{div.percentualDiferenca.toFixed(1)}%
-                                  </span>
-                                </div>
-                              </>
-                            )}
+            {/* Critical divergences */}
+            {divergenciasCritical.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Divergências Críticas ({divergenciasCritical.length})
+                </h4>
+                <div className="space-y-2">
+                  {divergenciasCritical.map((div) => (
+                    <Card 
+                      key={div.id} 
+                      className={`border-destructive/50 ${div.aceita ? 'opacity-60' : ''}`}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              checked={div.aceita}
+                              onCheckedChange={() => toggleAceitarDivergencia(div.id)}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={
+                                  div.tipo === 'quantidade' ? 'secondary' : 
+                                  div.tipo === 'produto_nao_previsto' ? 'destructive' : 'outline'
+                                }>
+                                  {div.tipo === 'quantidade' ? 'Quantidade' : 
+                                   div.tipo === 'produto_nao_previsto' ? 'Produto Extra' : 'Preço'}
+                                </Badge>
+                                <Badge variant="destructive">
+                                  <Lock className="w-3 h-3 mr-1" />
+                                  Crítico
+                                </Badge>
+                              </div>
+                              <p className="font-medium">{div.produtoNome}</p>
+                              <p className="text-sm text-muted-foreground">{div.descricao}</p>
+                              
+                              <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
+                                {div.tipo === 'quantidade' || div.tipo === 'produto_nao_previsto' ? (
+                                  <>
+                                    <div>
+                                      <span className="text-muted-foreground">OC: </span>
+                                      <span className="font-medium">{div.valorOc || '-'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">NF-e: </span>
+                                      <span className="font-medium">{div.valorNfe || '-'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Físico: </span>
+                                      <span className="font-medium">{div.valorFisico}</span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <span className="text-muted-foreground">OC: </span>
+                                      <span className="font-medium">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(div.valorOc)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">NF-e: </span>
+                                      <span className={`font-medium ${div.percentualDiferenca > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(div.valorNfe)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Diferença: </span>
+                                      <span className={`font-medium ${div.percentualDiferenca > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                        {div.percentualDiferenca > 0 ? '+' : ''}{div.percentualDiferenca.toFixed(1)}%
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Non-critical divergences */}
+            {divergenciasWithinTolerance.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  Dentro da Tolerância ({divergenciasWithinTolerance.length}) - Aceitas automaticamente
+                </h4>
+                <div className="space-y-2">
+                  {divergenciasWithinTolerance.map((div) => (
+                    <Card 
+                      key={div.id} 
+                      className={`border-yellow-500/30 ${div.aceita ? 'opacity-60' : ''}`}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              checked={div.aceita}
+                              onCheckedChange={() => toggleAceitarDivergencia(div.id)}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={div.tipo === 'quantidade' ? 'secondary' : 'outline'}>
+                                  {div.tipo === 'quantidade' ? 'Quantidade' : 'Preço'}
+                                </Badge>
+                                <Badge variant="outline" className="text-green-600 border-green-500">
+                                  Tolerância
+                                </Badge>
+                              </div>
+                              <p className="font-medium">{div.produtoNome}</p>
+                              <p className="text-sm text-muted-foreground">{div.descricao}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {hasDivergenciasNaoAceitas() && (
               <Card className="border-yellow-500/50 bg-yellow-50/10">
                 <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <Shield className="w-5 h-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-yellow-700">Autorização Necessária</p>
-                      <p className="text-sm text-muted-foreground">
-                        Aceitar divergências não marcadas requer autorização de um gerente (usuário admin).
-                      </p>
-                    </div>
+                  <div className="flex items-center gap-2 text-yellow-600">
+                    <Shield className="w-5 h-5" />
+                    <span className="text-sm">
+                      Divergências não aceitas requerem autorização do gerente para finalizar
+                    </span>
                   </div>
                 </CardContent>
               </Card>
