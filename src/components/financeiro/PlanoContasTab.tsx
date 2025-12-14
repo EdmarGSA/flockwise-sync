@@ -270,12 +270,12 @@ const PlanoContasTab = ({ userId }: PlanoContasTabProps) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="conta_pai">Conta Pai (opcional)</Label>
-                <Select value={formData.conta_pai_id} onValueChange={(v) => setFormData({ ...formData, conta_pai_id: v })}>
+                <Select value={formData.conta_pai_id || "none"} onValueChange={(v) => setFormData({ ...formData, conta_pai_id: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a conta pai" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma (Raiz)</SelectItem>
+                    <SelectItem value="none">Nenhuma (Raiz)</SelectItem>
                     {getParentOptions().map(conta => (
                       <SelectItem key={conta.id} value={conta.id}>
                         {conta.codigo} - {conta.nome}
