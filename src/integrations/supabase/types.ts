@@ -1038,6 +1038,8 @@ export type Database = {
           dia_ciclo: number
           id: string
           integrado_id: string
+          lido_em: string | null
+          lido_por: string | null
           lote_id: string
           prioridade:
             | Database["public"]["Enums"]["observacao_prioridade"]
@@ -1052,6 +1054,8 @@ export type Database = {
           dia_ciclo: number
           id?: string
           integrado_id: string
+          lido_em?: string | null
+          lido_por?: string | null
           lote_id: string
           prioridade?:
             | Database["public"]["Enums"]["observacao_prioridade"]
@@ -1066,6 +1070,8 @@ export type Database = {
           dia_ciclo?: number
           id?: string
           integrado_id?: string
+          lido_em?: string | null
+          lido_por?: string | null
           lote_id?: string
           prioridade?:
             | Database["public"]["Enums"]["observacao_prioridade"]
@@ -2142,6 +2148,9 @@ export type Database = {
       }
       tratamentos_lote: {
         Row: {
+          aplicacao_confirmada: boolean | null
+          aplicacao_confirmada_em: string | null
+          aplicacao_confirmada_por: string | null
           carencia_dias: number
           created_at: string
           criado_por: string
@@ -2163,6 +2172,9 @@ export type Database = {
           via_administracao: string
         }
         Insert: {
+          aplicacao_confirmada?: boolean | null
+          aplicacao_confirmada_em?: string | null
+          aplicacao_confirmada_por?: string | null
           carencia_dias?: number
           created_at?: string
           criado_por: string
@@ -2184,6 +2196,9 @@ export type Database = {
           via_administracao?: string
         }
         Update: {
+          aplicacao_confirmada?: boolean | null
+          aplicacao_confirmada_em?: string | null
+          aplicacao_confirmada_por?: string | null
           carencia_dias?: number
           created_at?: string
           criado_por?: string
