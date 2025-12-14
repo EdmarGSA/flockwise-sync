@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -58,6 +58,12 @@ const Configuracoes = () => {
       description: "Cadastro de parceiros comerciais",
       icon: Handshake,
       path: "/configuracoes/parceiros"
+    },
+    {
+      title: "Mortalidade Média",
+      description: "Percentuais de referência por semana",
+      icon: Percent,
+      path: "/configuracoes/mortalidade-media"
     }
   ];
 

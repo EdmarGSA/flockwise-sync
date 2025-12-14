@@ -736,6 +736,48 @@ export type Database = {
           },
         ]
       }
+      mortalidade_media: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string
+          mortalidade_14_dias: number
+          mortalidade_21_dias: number
+          mortalidade_28_dias: number
+          mortalidade_35_dias: number
+          mortalidade_42_dias: number
+          mortalidade_7_dias: number
+          mortalidade_acima_42_dias: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id: string
+          mortalidade_14_dias?: number
+          mortalidade_21_dias?: number
+          mortalidade_28_dias?: number
+          mortalidade_35_dias?: number
+          mortalidade_42_dias?: number
+          mortalidade_7_dias?: number
+          mortalidade_acima_42_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          mortalidade_14_dias?: number
+          mortalidade_21_dias?: number
+          mortalidade_28_dias?: number
+          mortalidade_35_dias?: number
+          mortalidade_42_dias?: number
+          mortalidade_7_dias?: number
+          mortalidade_acima_42_dias?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nucleos: {
         Row: {
           area_id: string | null
