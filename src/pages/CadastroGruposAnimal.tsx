@@ -415,15 +415,15 @@ const CadastroGruposAnimal = () => {
               <div>
                 <Label htmlFor="produto_racao">Ração Vinculada</Label>
                 <Select 
-                  value={faseForm.produto_racao_id} 
-                  onValueChange={(value) => setFaseForm({ ...faseForm, produto_racao_id: value })}
+                  value={faseForm.produto_racao_id || "__none__"} 
+                  onValueChange={(value) => setFaseForm({ ...faseForm, produto_racao_id: value === "__none__" ? "" : value })}
                   disabled={loadingRacoes}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={loadingRacoes ? "Carregando..." : "Selecione uma ração (opcional)"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma ração</SelectItem>
+                    <SelectItem value="__none__">Nenhuma ração</SelectItem>
                     {racoesDisponiveis.map((racao) => (
                       <SelectItem key={racao.id} value={racao.id}>
                         {racao.nome} ({racao.sku})
