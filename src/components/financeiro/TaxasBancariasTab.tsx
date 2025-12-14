@@ -263,12 +263,12 @@ const TaxasBancariasTab = ({ userId }: TaxasBancariasTabProps) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="conta_bancaria">Conta Bancária (opcional)</Label>
-                <Select value={formData.conta_bancaria_id} onValueChange={(v) => setFormData({ ...formData, conta_bancaria_id: v })}>
+                <Select value={formData.conta_bancaria_id || "all"} onValueChange={(v) => setFormData({ ...formData, conta_bancaria_id: v === "all" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas as contas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as contas</SelectItem>
+                    <SelectItem value="all">Todas as contas</SelectItem>
                     {contas.map(conta => (
                       <SelectItem key={conta.id} value={conta.id}>
                         {conta.banco_nome} - {conta.agencia}/{conta.conta}
@@ -279,12 +279,12 @@ const TaxasBancariasTab = ({ userId }: TaxasBancariasTabProps) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="plano_conta">Classificação Contábil (Plano de Contas)</Label>
-                <Select value={formData.plano_conta_id} onValueChange={(v) => setFormData({ ...formData, plano_conta_id: v })}>
+                <Select value={formData.plano_conta_id || "none"} onValueChange={(v) => setFormData({ ...formData, plano_conta_id: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a conta contábil" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem classificação</SelectItem>
+                    <SelectItem value="none">Sem classificação</SelectItem>
                     {planoContas.map(plano => (
                       <SelectItem key={plano.id} value={plano.id}>
                         {plano.codigo} - {plano.nome}
