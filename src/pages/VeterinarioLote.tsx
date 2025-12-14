@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Target, Package, MessageSquare, Bird } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Target, Package, MessageSquare, Bird, Pill } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import ObservacoesTab from '@/components/veterinario/ObservacoesTab';
 import MetasVetTab from '@/components/veterinario/MetasVetTab';
 import ConsumoVetTab from '@/components/veterinario/ConsumoVetTab';
+import TratamentosTab from '@/components/veterinario/TratamentosTab';
 
 interface Lote {
   id: string;
@@ -195,11 +196,16 @@ export default function VeterinarioLote() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="observacoes" className="gap-2">
               <MessageSquare className="w-4 h-4" />
               <span className="hidden sm:inline">Observações</span>
               <span className="sm:hidden">Obs.</span>
+            </TabsTrigger>
+            <TabsTrigger value="tratamentos" className="gap-2">
+              <Pill className="w-4 h-4" />
+              <span className="hidden sm:inline">Tratamentos</span>
+              <span className="sm:hidden">Trat.</span>
             </TabsTrigger>
             <TabsTrigger value="metas" className="gap-2">
               <Target className="w-4 h-4" />
@@ -213,6 +219,13 @@ export default function VeterinarioLote() {
 
           <TabsContent value="observacoes">
             <ObservacoesTab loteId={lote.id} diasLote={dias} />
+          </TabsContent>
+
+          <TabsContent value="tratamentos">
+            <TratamentosTab 
+              loteId={lote.id} 
+              dataAlojamento={lote.data_alojamento}
+            />
           </TabsContent>
 
           <TabsContent value="metas">

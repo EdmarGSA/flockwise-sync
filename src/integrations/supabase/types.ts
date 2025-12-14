@@ -648,6 +648,50 @@ export type Database = {
           },
         ]
       }
+      medicamentos_config: {
+        Row: {
+          carencia_dias: number
+          created_at: string
+          dosagem_padrao: string | null
+          id: string
+          integrado_id: string
+          observacoes: string | null
+          produto_id: string
+          updated_at: string
+          via_administracao: string
+        }
+        Insert: {
+          carencia_dias?: number
+          created_at?: string
+          dosagem_padrao?: string | null
+          id?: string
+          integrado_id: string
+          observacoes?: string | null
+          produto_id: string
+          updated_at?: string
+          via_administracao?: string
+        }
+        Update: {
+          carencia_dias?: number
+          created_at?: string
+          dosagem_padrao?: string | null
+          id?: string
+          integrado_id?: string
+          observacoes?: string | null
+          produto_id?: string
+          updated_at?: string
+          via_administracao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicamentos_config_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       metas_peso: {
         Row: {
           created_at: string
@@ -2095,6 +2139,87 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      tratamentos_lote: {
+        Row: {
+          carencia_dias: number
+          created_at: string
+          criado_por: string
+          custo_total: number | null
+          data_fim: string | null
+          data_inicio: string
+          data_liberacao_abate: string | null
+          dosagem: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          motivo: string | null
+          observacoes: string | null
+          produto_id: string
+          quantidade_utilizada: number
+          status: string
+          unidade_medida: string
+          updated_at: string
+          via_administracao: string
+        }
+        Insert: {
+          carencia_dias?: number
+          created_at?: string
+          criado_por: string
+          custo_total?: number | null
+          data_fim?: string | null
+          data_inicio?: string
+          data_liberacao_abate?: string | null
+          dosagem: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          motivo?: string | null
+          observacoes?: string | null
+          produto_id: string
+          quantidade_utilizada?: number
+          status?: string
+          unidade_medida?: string
+          updated_at?: string
+          via_administracao?: string
+        }
+        Update: {
+          carencia_dias?: number
+          created_at?: string
+          criado_por?: string
+          custo_total?: number | null
+          data_fim?: string | null
+          data_inicio?: string
+          data_liberacao_abate?: string | null
+          dosagem?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          motivo?: string | null
+          observacoes?: string | null
+          produto_id?: string
+          quantidade_utilizada?: number
+          status?: string
+          unidade_medida?: string
+          updated_at?: string
+          via_administracao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tratamentos_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tratamentos_lote_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
