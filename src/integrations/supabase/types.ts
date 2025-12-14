@@ -235,50 +235,95 @@ export type Database = {
       contas_pagar: {
         Row: {
           categoria: string | null
+          centro_custo_id: string | null
+          conta_bancaria_id: string | null
           created_at: string
           data_pagamento: string | null
           data_vencimento: string
+          desconto: number | null
           descricao: string
+          forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null
           id: string
           integrado_id: string
+          juros: number | null
+          multa: number | null
+          numero_documento: string | null
           observacoes: string | null
           ordem_compra_id: string | null
           parceiro_id: string | null
+          plano_conta_id: string | null
           status: Database["public"]["Enums"]["conta_pagar_status"]
           updated_at: string
           valor: number
+          valor_pago: number | null
         }
         Insert: {
           categoria?: string | null
+          centro_custo_id?: string | null
+          conta_bancaria_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento: string
+          desconto?: number | null
           descricao: string
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
           id?: string
           integrado_id: string
+          juros?: number | null
+          multa?: number | null
+          numero_documento?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro_id?: string | null
+          plano_conta_id?: string | null
           status?: Database["public"]["Enums"]["conta_pagar_status"]
           updated_at?: string
           valor: number
+          valor_pago?: number | null
         }
         Update: {
           categoria?: string | null
+          centro_custo_id?: string | null
+          conta_bancaria_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento?: string
+          desconto?: number | null
           descricao?: string
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
           id?: string
           integrado_id?: string
+          juros?: number | null
+          multa?: number | null
+          numero_documento?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro_id?: string | null
+          plano_conta_id?: string | null
           status?: Database["public"]["Enums"]["conta_pagar_status"]
           updated_at?: string
           valor?: number
+          valor_pago?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contas_pagar_centro_custo_id_fkey"
+            columns: ["centro_custo_id"]
+            isOneToOne: false
+            referencedRelation: "centro_custos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_pagar_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contas_pagar_ordem_compra_id_fkey"
             columns: ["ordem_compra_id"]
@@ -291,6 +336,13 @@ export type Database = {
             columns: ["parceiro_id"]
             isOneToOne: false
             referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_pagar_plano_conta_id_fkey"
+            columns: ["plano_conta_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
             referencedColumns: ["id"]
           },
         ]
@@ -2518,6 +2570,13 @@ export type Database = {
         | "preco"
         | "condicao_pagamento"
         | "produto_nao_previsto"
+      forma_pagamento:
+        | "boleto"
+        | "pix"
+        | "transferencia"
+        | "dinheiro"
+        | "cheque"
+        | "cartao"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
@@ -2699,6 +2758,14 @@ export const Constants = {
         "preco",
         "condicao_pagamento",
         "produto_nao_previsto",
+      ],
+      forma_pagamento: [
+        "boleto",
+        "pix",
+        "transferencia",
+        "dinheiro",
+        "cheque",
+        "cartao",
       ],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
