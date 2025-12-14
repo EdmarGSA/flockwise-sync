@@ -457,7 +457,7 @@ export default function MeusLotes() {
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
                                       <Target className="w-4 h-4" />
-                                      Metas de Peso
+                                      Meta
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
