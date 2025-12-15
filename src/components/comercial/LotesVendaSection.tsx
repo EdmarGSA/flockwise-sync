@@ -171,16 +171,10 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
 
   const handleQuantidadeChange = (qtd: number) => {
     setQuantidadeAves(qtd);
-    if (selectedLote?.ultimoPesoMedio && qtd > 0) {
-      setPesoTotal(parseFloat((qtd * selectedLote.ultimoPesoMedio).toFixed(2)));
-    }
   };
 
   const handlePesoChange = (peso: number) => {
     setPesoTotal(peso);
-    if (selectedLote?.ultimoPesoMedio && peso > 0) {
-      setQuantidadeAves(Math.ceil(peso / selectedLote.ultimoPesoMedio));
-    }
   };
 
   const handleAddToOrder = () => {
@@ -193,13 +187,6 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
 
     if (pesoTotal <= 0) {
       toast.error('Informe o peso total');
-      return;
-    }
-
-    const disponivel = calcularDisponivelVenda(selectedLote);
-    
-    if (quantidadeAves > disponivel) {
-      toast.error(`Quantidade máxima disponível: ${disponivel} aves`);
       return;
     }
 
