@@ -76,25 +76,31 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
     setLoading(true);
 
     try {
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: values.full_name,
-          },
+      // Create user via Edge Function (does NOT change current session)
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: values.email,
+          password: values.password,
+          full_name: values.full_name,
         },
       });
 
-      if (authError) {
-        toast.error(translateAuthError(authError.message));
+      if (error) {
+        console.error("Edge function error:", error);
+        toast.error(translateAuthError(error.message || "Erro ao criar usuário"));
         setLoading(false);
         return;
       }
 
-      if (!authData.user) {
+      if (data?.error) {
+        toast.error(data.error);
+        setLoading(false);
+        return;
+      }
+
+      const newUserId = data?.user?.id;
+
+      if (!newUserId) {
         toast.error("Erro ao criar usuário");
         setLoading(false);
         return;
@@ -109,7 +115,7 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
           phone: values.phone || null,
           role: values.role,
         })
-        .eq("id", authData.user.id);
+        .eq("id", newUserId);
 
       if (profileError) {
         console.error("Profile update error:", profileError);
@@ -118,7 +124,7 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
       // Assign roles
       if (values.roles.length > 0) {
         const roleInserts = values.roles.map((role) => ({
-          user_id: authData.user!.id,
+          user_id: newUserId,
           role: role as "admin" | "integrado" | "veterinario" | "tecnico",
         }));
 
