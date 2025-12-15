@@ -17,6 +17,7 @@ import { GalpaoEditForm } from '@/components/lotes/GalpaoEditForm';
 import { AreaForm } from '@/components/campo/AreaForm';
 import { AreaEditForm } from '@/components/campo/AreaEditForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
+import { LotePosturaForm } from '@/components/lotes/postura/LotePosturaForm';
 import { LoteEditForm } from '@/components/lotes/LoteEditForm';
 import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
 import { DesempenhoEditForm } from '@/components/campo/DesempenhoEditForm';
@@ -114,6 +115,7 @@ export default function GestaoCampo() {
   const [filterGrupoNucleos, setFilterGrupoNucleos] = useState<string>('all');
   const [filterGrupoGalpoes, setFilterGrupoGalpoes] = useState<string>('all');
   const [filterGrupoLotes, setFilterGrupoLotes] = useState<string>('all');
+  const [tipoLoteAbertura, setTipoLoteAbertura] = useState<'corte' | 'postura'>('corte');
 
   useEffect(() => {
     if (user) {
@@ -323,7 +325,18 @@ export default function GestaoCampo() {
                   <DialogHeader>
                     <DialogTitle>Abertura de Lote</DialogTitle>
                   </DialogHeader>
-                  <LoteForm onSuccess={handleLoteSuccess} />
+                  <Tabs value={tipoLoteAbertura} onValueChange={(v) => setTipoLoteAbertura(v as 'corte' | 'postura')} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsTrigger value="corte">🐔 Aves Corte</TabsTrigger>
+                      <TabsTrigger value="postura">🥚 Aves Postura</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="corte">
+                      <LoteForm onSuccess={handleLoteSuccess} />
+                    </TabsContent>
+                    <TabsContent value="postura">
+                      <LotePosturaForm onSuccess={handleLoteSuccess} />
+                    </TabsContent>
+                  </Tabs>
                 </DialogContent>
               </Dialog>
             ) : activeTab !== 'desempenho' ? (
