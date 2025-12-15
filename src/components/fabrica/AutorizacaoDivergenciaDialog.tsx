@@ -56,35 +56,27 @@ export default function AutorizacaoDivergenciaDialog({
     setError('');
 
     try {
-      // Try to sign in with admin credentials
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      // Use Edge Function to verify admin credentials WITHOUT changing current session
+      const { data, error: invokeError } = await supabase.functions.invoke('verify-admin-credentials', {
+        body: { email, password }
       });
 
-      if (authError) {
-        setError('Credenciais inválidas');
+      if (invokeError) {
+        console.error('Edge function error:', invokeError);
+        setError('Erro ao verificar credenciais');
         setLoading(false);
         return;
       }
 
-      // Check if user has admin role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', authData.user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (roleError || !roleData) {
-        setError('Usuário não possui permissão de administrador');
+      if (!data?.authorized) {
+        setError(data?.error || 'Credenciais inválidas ou sem permissão de administrador');
         setLoading(false);
         return;
       }
 
-      // Authorization successful
+      // Authorization successful - current user session remains unchanged
       toast.success('Autorização concedida!');
-      onSuccess(authData.user.id, justificativa);
+      onSuccess(data.admin_user_id, justificativa);
     } catch (error) {
       console.error('Erro na autorização:', error);
       setError('Erro ao verificar autorização');
