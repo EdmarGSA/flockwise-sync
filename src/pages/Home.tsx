@@ -14,7 +14,8 @@ import {
   LogOut,
   Settings,
   Package,
-  DollarSign
+  DollarSign,
+  ShoppingCart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -99,6 +100,15 @@ const modules: ModuleCard[] = [
     icon: DollarSign,
     path: '/configuracoes/financeiro',
     color: 'from-teal-500 to-teal-700',
+    available: true,
+  },
+  {
+    id: 'comercial',
+    title: 'Comercial',
+    description: 'Vendas, pedidos e contas a receber',
+    icon: ShoppingCart,
+    path: '/comercial',
+    color: 'from-indigo-500 to-indigo-700',
     available: true,
   },
 ];
