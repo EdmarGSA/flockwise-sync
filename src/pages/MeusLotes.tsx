@@ -654,7 +654,7 @@ export default function MeusLotes() {
                                           <Skull className="w-4 h-4" />
                                           Mortalidade
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleMetasPostura(lote)} className="gap-2">
+                                        <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas-postura`)} className="gap-2">
                                           <Target className="w-4 h-4" />
                                           Metas Postura
                                         </DropdownMenuItem>
