@@ -1,19 +1,25 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, LayoutDashboard, TrendingUp, RefreshCw, FileText, CreditCard, Wallet } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, TrendingUp, RefreshCw, FileText, CreditCard, Wallet, Settings, Landmark, Target, Receipt } from "lucide-react";
 import DashboardFinanceiroCards from "@/components/financeiro/DashboardFinanceiroCards";
 import FluxoCaixaTab from "@/components/financeiro/FluxoCaixaTab";
 import ConciliacaoTab from "@/components/financeiro/ConciliacaoTab";
 import RelatoriosTab from "@/components/financeiro/RelatoriosTab";
 import ContasPagarFinanceiroTab from "@/components/financeiro/ContasPagarFinanceiroTab";
 import ContasReceberFinanceiroTab from "@/components/financeiro/ContasReceberFinanceiroTab";
+import ContasBancariasTab from "@/components/financeiro/ContasBancariasTab";
+import PlanoContasTab from "@/components/financeiro/PlanoContasTab";
+import CentroCustosTab from "@/components/financeiro/CentroCustosTab";
+import TaxasBancariasTab from "@/components/financeiro/TaxasBancariasTab";
 
 const Financeiro = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [configTab, setConfigTab] = useState("contas-bancarias");
 
   if (loading) {
     return (
@@ -48,7 +54,7 @@ const Financeiro = () => {
         </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -78,6 +84,11 @@ const Financeiro = () => {
               <span className="hidden sm:inline">Relatórios</span>
               <span className="sm:hidden">Relat.</span>
             </TabsTrigger>
+            <TabsTrigger value="configuracoes" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Configurações</span>
+              <span className="sm:hidden">Config.</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -102,6 +113,49 @@ const Financeiro = () => {
 
           <TabsContent value="relatorios">
             <RelatoriosTab userId={user.id} />
+          </TabsContent>
+
+          <TabsContent value="configuracoes">
+            <Tabs value={configTab} onValueChange={setConfigTab} className="space-y-4">
+              <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+                <TabsTrigger value="contas-bancarias" className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4" />
+                  <span className="hidden sm:inline">Contas Bancárias</span>
+                  <span className="sm:hidden">Bancos</span>
+                </TabsTrigger>
+                <TabsTrigger value="plano-contas" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Plano de Contas</span>
+                  <span className="sm:hidden">Plano</span>
+                </TabsTrigger>
+                <TabsTrigger value="centro-custos" className="flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  <span className="hidden sm:inline">Centro de Custos</span>
+                  <span className="sm:hidden">Custos</span>
+                </TabsTrigger>
+                <TabsTrigger value="taxas" className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4" />
+                  <span className="hidden sm:inline">Taxas Bancárias</span>
+                  <span className="sm:hidden">Taxas</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="contas-bancarias">
+                <ContasBancariasTab userId={user.id} />
+              </TabsContent>
+              
+              <TabsContent value="plano-contas">
+                <PlanoContasTab userId={user.id} />
+              </TabsContent>
+              
+              <TabsContent value="centro-custos">
+                <CentroCustosTab userId={user.id} />
+              </TabsContent>
+              
+              <TabsContent value="taxas">
+                <TaxasBancariasTab userId={user.id} />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </main>
