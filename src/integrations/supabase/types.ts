@@ -618,6 +618,51 @@ export type Database = {
         }
         Relationships: []
       }
+      desempenho_postura: {
+        Row: {
+          consumo_diario_g: number
+          created_at: string
+          fase: Database["public"]["Enums"]["fase_postura"]
+          id: string
+          linhagem: Database["public"]["Enums"]["linhagem_postura"]
+          ovos_ave_alojada: number | null
+          peso_g: number
+          peso_ovo_g: number | null
+          producao_percentual: number | null
+          semana: number
+          updated_at: string
+          viabilidade_percentual: number | null
+        }
+        Insert: {
+          consumo_diario_g: number
+          created_at?: string
+          fase: Database["public"]["Enums"]["fase_postura"]
+          id?: string
+          linhagem: Database["public"]["Enums"]["linhagem_postura"]
+          ovos_ave_alojada?: number | null
+          peso_g: number
+          peso_ovo_g?: number | null
+          producao_percentual?: number | null
+          semana: number
+          updated_at?: string
+          viabilidade_percentual?: number | null
+        }
+        Update: {
+          consumo_diario_g?: number
+          created_at?: string
+          fase?: Database["public"]["Enums"]["fase_postura"]
+          id?: string
+          linhagem?: Database["public"]["Enums"]["linhagem_postura"]
+          ovos_ave_alojada?: number | null
+          peso_g?: number
+          peso_ovo_g?: number | null
+          producao_percentual?: number | null
+          semana?: number
+          updated_at?: string
+          viabilidade_percentual?: number | null
+        }
+        Relationships: []
+      }
       divergencias_recebimento: {
         Row: {
           aceita: boolean | null
@@ -773,11 +818,18 @@ export type Database = {
           integrado_id: string
           lote_id: string
           mortalidade_percentual: number
+          ovos_por_ave_alojada: number | null
+          percentual_postura_medio: number | null
           peso_inicial_kg: number
+          peso_medio_descarte_kg: number | null
           peso_medio_real_kg: number
           peso_projetado_kg: number | null
           peso_total_abatido_kg: number
+          semanas_producao: number | null
+          tipo_producao: string | null
+          total_ovos_produzidos: number | null
           updated_at: string
+          valor_venda_aves: number | null
           viabilidade_percentual: number
         }
         Insert: {
@@ -802,11 +854,18 @@ export type Database = {
           integrado_id: string
           lote_id: string
           mortalidade_percentual: number
+          ovos_por_ave_alojada?: number | null
+          percentual_postura_medio?: number | null
           peso_inicial_kg: number
+          peso_medio_descarte_kg?: number | null
           peso_medio_real_kg: number
           peso_projetado_kg?: number | null
           peso_total_abatido_kg: number
+          semanas_producao?: number | null
+          tipo_producao?: string | null
+          total_ovos_produzidos?: number | null
           updated_at?: string
+          valor_venda_aves?: number | null
           viabilidade_percentual: number
         }
         Update: {
@@ -831,11 +890,18 @@ export type Database = {
           integrado_id?: string
           lote_id?: string
           mortalidade_percentual?: number
+          ovos_por_ave_alojada?: number | null
+          percentual_postura_medio?: number | null
           peso_inicial_kg?: number
+          peso_medio_descarte_kg?: number | null
           peso_medio_real_kg?: number
           peso_projetado_kg?: number | null
           peso_total_abatido_kg?: number
+          semanas_producao?: number | null
+          tipo_producao?: string | null
+          total_ovos_produzidos?: number | null
           updated_at?: string
+          valor_venda_aves?: number | null
           viabilidade_percentual?: number
         }
         Relationships: [
@@ -1100,6 +1166,7 @@ export type Database = {
           data_fechamento: string | null
           data_prevista_alojamento: string
           data_prevista_saida: string | null
+          fase_postura_atual: Database["public"]["Enums"]["fase_postura"] | null
           galpao_id: string
           horario_inicio_jejum: string | null
           id: string
@@ -1108,6 +1175,9 @@ export type Database = {
           jejum_confirmado_em: string | null
           jejum_confirmado_por: string | null
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem_postura:
+            | Database["public"]["Enums"]["linhagem_postura"]
+            | null
           nucleo_id: string
           observacoes: string | null
           peso_medio_pintinhos: number | null
@@ -1126,6 +1196,9 @@ export type Database = {
           data_fechamento?: string | null
           data_prevista_alojamento: string
           data_prevista_saida?: string | null
+          fase_postura_atual?:
+            | Database["public"]["Enums"]["fase_postura"]
+            | null
           galpao_id: string
           horario_inicio_jejum?: string | null
           id?: string
@@ -1134,6 +1207,9 @@ export type Database = {
           jejum_confirmado_em?: string | null
           jejum_confirmado_por?: string | null
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem_postura?:
+            | Database["public"]["Enums"]["linhagem_postura"]
+            | null
           nucleo_id: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
@@ -1152,6 +1228,9 @@ export type Database = {
           data_fechamento?: string | null
           data_prevista_alojamento?: string
           data_prevista_saida?: string | null
+          fase_postura_atual?:
+            | Database["public"]["Enums"]["fase_postura"]
+            | null
           galpao_id?: string
           horario_inicio_jejum?: string | null
           id?: string
@@ -1160,6 +1239,9 @@ export type Database = {
           jejum_confirmado_em?: string | null
           jejum_confirmado_por?: string | null
           linhagem?: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem_postura?:
+            | Database["public"]["Enums"]["linhagem_postura"]
+            | null
           nucleo_id?: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
@@ -1282,6 +1364,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "metas_peso_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: true
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metas_postura: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          meta_ovos_incubaveis: number | null
+          meta_persistencia: number | null
+          meta_peso_ovo_g: number | null
+          meta_pico_postura: number | null
+          meta_viabilidade: number | null
+          semana_pico: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          meta_ovos_incubaveis?: number | null
+          meta_persistencia?: number | null
+          meta_peso_ovo_g?: number | null
+          meta_pico_postura?: number | null
+          meta_viabilidade?: number | null
+          semana_pico?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          meta_ovos_incubaveis?: number | null
+          meta_persistencia?: number | null
+          meta_peso_ovo_g?: number | null
+          meta_pico_postura?: number | null
+          meta_viabilidade?: number | null
+          semana_pico?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_postura_lote_id_fkey"
             columns: ["lote_id"]
             isOneToOne: true
             referencedRelation: "lotes"
@@ -2480,6 +2612,89 @@ export type Database = {
           },
         ]
       }
+      producao_ovos: {
+        Row: {
+          aves_vivas: number
+          created_at: string
+          criado_por: string | null
+          data_producao: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          observacoes: string | null
+          ovos_deformados: number | null
+          ovos_extra: number | null
+          ovos_grande: number | null
+          ovos_incubaveis: number | null
+          ovos_jumbo: number | null
+          ovos_medio: number | null
+          ovos_pequenos: number | null
+          ovos_quebrados: number | null
+          ovos_sujos: number | null
+          ovos_totais: number
+          ovos_trincados: number | null
+          percentual_postura: number | null
+          peso_medio_ovo_g: number | null
+          updated_at: string
+        }
+        Insert: {
+          aves_vivas: number
+          created_at?: string
+          criado_por?: string | null
+          data_producao?: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          observacoes?: string | null
+          ovos_deformados?: number | null
+          ovos_extra?: number | null
+          ovos_grande?: number | null
+          ovos_incubaveis?: number | null
+          ovos_jumbo?: number | null
+          ovos_medio?: number | null
+          ovos_pequenos?: number | null
+          ovos_quebrados?: number | null
+          ovos_sujos?: number | null
+          ovos_totais?: number
+          ovos_trincados?: number | null
+          percentual_postura?: number | null
+          peso_medio_ovo_g?: number | null
+          updated_at?: string
+        }
+        Update: {
+          aves_vivas?: number
+          created_at?: string
+          criado_por?: string | null
+          data_producao?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          observacoes?: string | null
+          ovos_deformados?: number | null
+          ovos_extra?: number | null
+          ovos_grande?: number | null
+          ovos_incubaveis?: number | null
+          ovos_jumbo?: number | null
+          ovos_medio?: number | null
+          ovos_pequenos?: number | null
+          ovos_quebrados?: number | null
+          ovos_sujos?: number | null
+          ovos_totais?: number
+          ovos_trincados?: number | null
+          percentual_postura?: number | null
+          peso_medio_ovo_g?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producao_ovos_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produto_formulacao: {
         Row: {
           created_at: string
@@ -3445,6 +3660,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calcular_fase_postura: {
+        Args: { semanas_vida: number }
+        Returns: Database["public"]["Enums"]["fase_postura"]
+      }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
       get_veterinarios: {
         Args: never
@@ -3469,6 +3688,7 @@ export type Database = {
         | "tecnico"
         | "comprador"
         | "conferente"
+      classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
       conta_receber_status:
         | "previsao"
@@ -3486,6 +3706,7 @@ export type Database = {
         | "preco"
         | "condicao_pagamento"
         | "produto_nao_previsto"
+      fase_postura: "cria" | "recria" | "producao"
       forma_pagamento:
         | "boleto"
         | "pix"
@@ -3494,6 +3715,14 @@ export type Database = {
         | "cheque"
         | "cartao"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
+      linhagem_postura:
+        | "lohmann_brown_lite"
+        | "lohmann_lsl_lite"
+        | "hy_line_brown"
+        | "hy_line_w36"
+        | "isa_brown"
+        | "novogen_brown"
+        | "dekalb_white"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
       natureza_conta: "devedora" | "credora"
@@ -3669,6 +3898,7 @@ export const Constants = {
         "comprador",
         "conferente",
       ],
+      classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
       conta_receber_status: [
         "previsao",
@@ -3689,6 +3919,7 @@ export const Constants = {
         "condicao_pagamento",
         "produto_nao_previsto",
       ],
+      fase_postura: ["cria", "recria", "producao"],
       forma_pagamento: [
         "boleto",
         "pix",
@@ -3698,6 +3929,15 @@ export const Constants = {
         "cartao",
       ],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
+      linhagem_postura: [
+        "lohmann_brown_lite",
+        "lohmann_lsl_lite",
+        "hy_line_brown",
+        "hy_line_w36",
+        "isa_brown",
+        "novogen_brown",
+        "dekalb_white",
+      ],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
       natureza_conta: ["devedora", "credora"],
