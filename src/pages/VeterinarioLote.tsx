@@ -11,6 +11,7 @@ import { differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import ObservacoesTab from '@/components/veterinario/ObservacoesTab';
 import MetasVetTab from '@/components/veterinario/MetasVetTab';
+import MetasPosturaVetTab from '@/components/veterinario/MetasPosturaVetTab';
 import ConsumoVetTab from '@/components/veterinario/ConsumoVetTab';
 import TratamentosTab from '@/components/veterinario/TratamentosTab';
 
@@ -19,7 +20,8 @@ interface Lote {
   quantidade_aves: number;
   data_alojamento: string | null;
   data_prevista_alojamento: string;
-  linhagem: string;
+  linhagem: string | null;
+  linhagem_postura: string | null;
   sexo: string;
   status: string;
   peso_medio_pintinhos: number | null;
@@ -52,6 +54,7 @@ export default function VeterinarioLote() {
         data_alojamento,
         data_prevista_alojamento,
         linhagem,
+        linhagem_postura,
         sexo,
         status,
         peso_medio_pintinhos,
@@ -72,13 +75,35 @@ export default function VeterinarioLote() {
     setLoadingData(false);
   };
 
-  const formatLinhagem = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
+  const formatLinhagem = (linhagem: string | null, linhagemPostura: string | null) => {
+    if (linhagemPostura) {
+      const labels: Record<string, string> = {
+        lohmann_brown_lite: 'Lohmann Brown-Lite',
+        lohmann_lsl_lite: 'Lohmann LSL Lite',
+      };
+      return labels[linhagemPostura] || linhagemPostura;
+    }
+    if (linhagem) {
+      const labels: Record<string, string> = {
+        cobb_500: 'Cobb 500',
+        ross_308: 'Ross 308',
+        hubbard: 'Hubbard',
+      };
+      return labels[linhagem] || linhagem;
+    }
+    return 'N/A';
+  };
+
+  const isPostura = lote?.linhagem_postura !== null || lote?.nucleo?.tipo_producao === 'Aves Postura';
+
+  const getIdadeDisplay = () => {
+    if (!lote?.data_alojamento) return null;
+    const dias = differenceInDays(new Date(), new Date(lote.data_alojamento));
+    if (isPostura) {
+      const semanas = Math.floor(dias / 7) + 1;
+      return `${semanas} semanas`;
+    }
+    return `${dias} dias`;
   };
 
   const formatSexo = (sexo: string) => {
@@ -106,6 +131,9 @@ export default function VeterinarioLote() {
     return differenceInDays(new Date(), new Date(lote.data_alojamento));
   };
 
+  const dias = getDiasLote();
+  const idadeDisplay = getIdadeDisplay();
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -122,7 +150,6 @@ export default function VeterinarioLote() {
     return null;
   }
 
-  const dias = getDiasLote();
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,13 +168,13 @@ export default function VeterinarioLote() {
                   {lote.nucleo?.nome} - {lote.galpao?.nome}
                 </span>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>{formatLinhagem(lote.linhagem)}</span>
+                  <span>{formatLinhagem(lote.linhagem, lote.linhagem_postura)}</span>
                   <span>•</span>
                   <span>{formatSexo(lote.sexo)}</span>
-                  {dias !== null && (
+                  {idadeDisplay && (
                     <>
                       <span>•</span>
-                      <Badge variant="outline" className="text-xs">{dias} dias</Badge>
+                      <Badge variant="outline" className="text-xs">{idadeDisplay}</Badge>
                     </>
                   )}
                 </div>
@@ -229,7 +256,11 @@ export default function VeterinarioLote() {
           </TabsContent>
 
           <TabsContent value="metas">
-            <MetasVetTab loteId={lote.id} lote={lote} />
+            {isPostura ? (
+              <MetasPosturaVetTab loteId={lote.id} lote={lote} />
+            ) : (
+              <MetasVetTab loteId={lote.id} lote={lote} />
+            )}
           </TabsContent>
 
           <TabsContent value="consumo">
