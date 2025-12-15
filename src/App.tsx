@@ -28,6 +28,7 @@ import VeterinarioLote from "./pages/VeterinarioLote";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
 import Comercial from "./pages/Comercial";
 import CadastroProdutosAnimais from "./pages/CadastroProdutosAnimais";
+import Financeiro from "./pages/Financeiro";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -193,6 +194,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/produtos-animais" element={
       <ProtectedRoute>
         <CadastroProdutosAnimais />
+      </ProtectedRoute>
+    } />
+    <Route path="/financeiro" element={
+      <ProtectedRoute>
+        <Financeiro />
       </ProtectedRoute>
     } />
     
