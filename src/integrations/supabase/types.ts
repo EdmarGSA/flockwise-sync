@@ -1175,7 +1175,7 @@ export type Database = {
           jejum_confirmado: boolean | null
           jejum_confirmado_em: string | null
           jejum_confirmado_por: string | null
-          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem: Database["public"]["Enums"]["linhagem_aves"] | null
           linhagem_postura:
             | Database["public"]["Enums"]["linhagem_postura"]
             | null
@@ -1208,7 +1208,7 @@ export type Database = {
           jejum_confirmado?: boolean | null
           jejum_confirmado_em?: string | null
           jejum_confirmado_por?: string | null
-          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"] | null
           linhagem_postura?:
             | Database["public"]["Enums"]["linhagem_postura"]
             | null
@@ -1241,7 +1241,7 @@ export type Database = {
           jejum_confirmado?: boolean | null
           jejum_confirmado_em?: string | null
           jejum_confirmado_por?: string | null
-          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"] | null
           linhagem_postura?:
             | Database["public"]["Enums"]["linhagem_postura"]
             | null
