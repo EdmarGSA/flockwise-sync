@@ -2986,7 +2986,8 @@ export type Database = {
           desconto_maximo_percentual: number
           id: string
           preco_unitario: number
-          produto_id: string
+          produto_animal_id: string | null
+          produto_id: string | null
           tabela_preco_id: string
         }
         Insert: {
@@ -2994,7 +2995,8 @@ export type Database = {
           desconto_maximo_percentual?: number
           id?: string
           preco_unitario?: number
-          produto_id: string
+          produto_animal_id?: string | null
+          produto_id?: string | null
           tabela_preco_id: string
         }
         Update: {
@@ -3002,10 +3004,18 @@ export type Database = {
           desconto_maximo_percentual?: number
           id?: string
           preco_unitario?: number
-          produto_id?: string
+          produto_animal_id?: string | null
+          produto_id?: string | null
           tabela_preco_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tabelas_preco_itens_produto_animal_id_fkey"
+            columns: ["produto_animal_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_animais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tabelas_preco_itens_produto_id_fkey"
             columns: ["produto_id"]
