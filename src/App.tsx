@@ -11,6 +11,7 @@ import Home from "./pages/Home";
 import GestaoCampo from "./pages/GestaoCampo";
 import MeusLotes from "./pages/MeusLotes";
 import MetasPesoLote from "./pages/MetasPesoLote";
+import MetasPosturaLote from "./pages/MetasPosturaLote";
 import GestaoConsumo from "./pages/GestaoConsumo";
 import Configuracoes from "./pages/Configuracoes";
 import CadastroOrganizacao from "./pages/CadastroOrganizacao";
@@ -110,6 +111,11 @@ const AppRoutes = () => (
     <Route path="/meus-lotes/:loteId/metas" element={
       <ProtectedRoute>
         <MetasPesoLote />
+      </ProtectedRoute>
+    } />
+    <Route path="/meus-lotes/:loteId/metas-postura" element={
+      <ProtectedRoute>
+        <MetasPosturaLote />
       </ProtectedRoute>
     } />
     <Route path="/gestao-consumo" element={

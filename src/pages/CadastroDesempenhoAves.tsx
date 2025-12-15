@@ -74,6 +74,17 @@ const sexoLabels: Record<SexoAve, string> = {
   misto: 'Misto',
 };
 
+const linhagemPosturaLabels: Record<string, string> = {
+  lohmann_brown_lite: 'Lohmann Brown-Lite',
+  lohmann_lsl_lite: 'Lohmann LSL Lite',
+};
+
+const fasePosturaLabels: Record<string, string> = {
+  cria: 'Cria',
+  recria: 'Recria',
+  producao: 'Produção',
+};
+
 // Load multiplicadores from localStorage
 const loadMultiplicadores = (): Multiplicadores => {
   try {
@@ -91,6 +102,140 @@ const loadMultiplicadores = (): Multiplicadores => {
 const saveMultiplicadores = (mult: Multiplicadores) => {
   localStorage.setItem('metas_peso_multiplicadores', JSON.stringify(mult));
 };
+
+// Postura Reference Tab Component
+interface DesempenhoPostura {
+  id: string;
+  semana: number;
+  linhagem: string;
+  fase: string;
+  peso_g: number;
+  consumo_diario_g: number;
+  producao_percentual: number | null;
+  peso_ovo_g: number | null;
+  ovos_ave_alojada: number | null;
+  viabilidade_percentual: number | null;
+}
+
+function PosturaReferenceTab() {
+  const [dataPostura, setDataPostura] = useState<DesempenhoPostura[]>([]);
+  const [loadingPostura, setLoadingPostura] = useState(true);
+  const [filterLinhagemPostura, setFilterLinhagemPostura] = useState<string>('all');
+  const [filterFase, setFilterFase] = useState<string>('all');
+
+  useEffect(() => {
+    fetchPosturaData();
+  }, []);
+
+  const fetchPosturaData = async () => {
+    setLoadingPostura(true);
+    const { data: posturaData, error } = await supabase
+      .from('desempenho_postura')
+      .select('*')
+      .order('linhagem')
+      .order('semana');
+
+    if (error) {
+      console.error('Erro ao buscar dados de postura:', error);
+      toast.error('Erro ao carregar dados de desempenho de postura');
+    } else {
+      setDataPostura(posturaData as DesempenhoPostura[]);
+    }
+    setLoadingPostura(false);
+  };
+
+  const filteredPosturaData = dataPostura.filter((item) => {
+    if (filterLinhagemPostura !== 'all' && item.linhagem !== filterLinhagemPostura) return false;
+    if (filterFase !== 'all' && item.fase !== filterFase) return false;
+    return true;
+  });
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader>
+        <div>
+          <CardTitle>Dados de Desempenho - Aves de Postura</CardTitle>
+          <CardDescription>Referência de peso, consumo e produção por semana de vida</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4 mb-4">
+          <div className="flex-1 max-w-xs">
+            <Label className="text-xs text-muted-foreground">Linhagem</Label>
+            <Select value={filterLinhagemPostura} onValueChange={(v) => setFilterLinhagemPostura(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {Object.entries(linhagemPosturaLabels).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 max-w-xs">
+            <Label className="text-xs text-muted-foreground">Fase</Label>
+            <Select value={filterFase} onValueChange={(v) => setFilterFase(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {Object.entries(fasePosturaLabels).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {loadingPostura ? (
+          <p className="text-muted-foreground py-8 text-center">Carregando...</p>
+        ) : filteredPosturaData.length === 0 ? (
+          <p className="text-muted-foreground py-8 text-center">Nenhum registro encontrado</p>
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Semana</TableHead>
+                  <TableHead>Linhagem</TableHead>
+                  <TableHead>Fase</TableHead>
+                  <TableHead className="text-right">Peso (g)</TableHead>
+                  <TableHead className="text-right">Consumo (g/dia)</TableHead>
+                  <TableHead className="text-right">% Postura</TableHead>
+                  <TableHead className="text-right">Peso Ovo (g)</TableHead>
+                  <TableHead className="text-right">Ovos/Ave</TableHead>
+                  <TableHead className="text-right">Viabilidade (%)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPosturaData.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.semana}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{linhagemPosturaLabels[item.linhagem] || item.linhagem}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{fasePosturaLabels[item.fase] || item.fase}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{item.peso_g.toFixed(0)}</TableCell>
+                    <TableCell className="text-right">{item.consumo_diario_g.toFixed(1)}</TableCell>
+                    <TableCell className="text-right">{item.producao_percentual?.toFixed(1) ?? '-'}</TableCell>
+                    <TableCell className="text-right">{item.peso_ovo_g?.toFixed(1) ?? '-'}</TableCell>
+                    <TableCell className="text-right">{item.ovos_ave_alojada?.toFixed(1) ?? '-'}</TableCell>
+                    <TableCell className="text-right">{item.viabilidade_percentual?.toFixed(1) ?? '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CadastroDesempenhoAves() {
   const { user, loading } = useAuth();
@@ -277,8 +422,8 @@ export default function CadastroDesempenhoAves() {
               <Target className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Meta de Peso</h1>
-              <p className="text-muted-foreground">Multiplicadores e tabela de desempenho</p>
+              <h1 className="text-3xl font-bold text-foreground">Referência de Desempenho</h1>
+              <p className="text-muted-foreground">Tabelas de referência para aves de corte e postura</p>
             </div>
           </div>
         </div>
@@ -287,11 +432,15 @@ export default function CadastroDesempenhoAves() {
           <TabsList>
             <TabsTrigger value="multiplicadores" className="gap-2">
               <Calculator className="w-4 h-4" />
-              Multiplicadores
+              Multiplicadores (Corte)
             </TabsTrigger>
             <TabsTrigger value="referencia" className="gap-2">
               <Target className="w-4 h-4" />
-              Tabela de Referência
+              Referência Corte
+            </TabsTrigger>
+            <TabsTrigger value="postura" className="gap-2">
+              <Target className="w-4 h-4" />
+              Referência Postura
             </TabsTrigger>
           </TabsList>
 
@@ -528,13 +677,17 @@ export default function CadastroDesempenhoAves() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="postura">
+        <PosturaReferenceTab />
+      </TabsContent>
+    </Tabs>
+  </main>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
