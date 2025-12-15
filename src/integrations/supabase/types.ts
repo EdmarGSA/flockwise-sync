@@ -1162,6 +1162,7 @@ export type Database = {
       lotes: {
         Row: {
           created_at: string
+          custo_aves: number | null
           data_alojamento: string | null
           data_fechamento: string | null
           data_prevista_alojamento: string
@@ -1192,6 +1193,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
           data_prevista_alojamento: string
@@ -1224,6 +1226,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
           data_prevista_alojamento?: string

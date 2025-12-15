@@ -23,13 +23,19 @@ const loteSchema = z.object({
   galpao_id: z.string().uuid('Selecione um galpão'),
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
-  linhagem: z.enum(['cobb_500', 'ross_308', 'hubbard']),
+  linhagem: z.string().min(1, 'Selecione uma linhagem'),
   sexo: z.enum(['macho', 'femea', 'misto']),
   veterinario_id: z.string().optional(),
   observacoes: z.string().optional(),
+  custo_aves: z.string().optional(),
 });
 
 type LoteFormData = z.infer<typeof loteSchema>;
+
+interface LinhagemOption {
+  value: string;
+  label: string;
+}
 
 interface Nucleo {
   id: string;
@@ -61,7 +67,8 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
   const [selectedNucleoId, setSelectedNucleoId] = useState<string>('');
   const [availableSexos, setAvailableSexos] = useState<string[]>([]);
-  const [selectedLinhagem, setSelectedLinhagem] = useState<string>('cobb_500');
+  const [selectedLinhagem, setSelectedLinhagem] = useState<string>('');
+  const [linhagens, setLinhagens] = useState<LinhagemOption[]>([]);
 
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
@@ -69,17 +76,18 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       nucleo_id: '',
       galpao_id: '',
       quantidade_aves: '',
-      linhagem: 'cobb_500',
+      linhagem: '',
       sexo: 'misto',
       veterinario_id: '',
       observacoes: '',
+      custo_aves: '',
     },
   });
 
   useEffect(() => {
     fetchNucleos();
     fetchVeterinarios();
-    fetchSexosByLinhagem('cobb_500');
+    fetchLinhagens();
   }, []);
 
   useEffect(() => {
@@ -96,11 +104,44 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
     }
   }, [selectedLinhagem]);
 
+  const linhagemLabels: Record<string, string> = {
+    cobb_500: 'Cobb 500',
+    ross_308: 'Ross 308',
+    hubbard: 'Hubbard',
+  };
+
+  const fetchLinhagens = async () => {
+    const { data, error } = await supabase
+      .from('desempenho_aves')
+      .select('linhagem');
+    
+    if (error) {
+      console.error('Erro ao buscar linhagens:', error);
+      return;
+    }
+    
+    const uniqueLinhagens = [...new Set(data?.map(d => d.linhagem).filter(Boolean) || [])];
+    const options = uniqueLinhagens.map(l => ({
+      value: l,
+      label: linhagemLabels[l] || l
+    }));
+    setLinhagens(options);
+    
+    // Set default if available
+    if (options.length > 0 && !form.getValues('linhagem')) {
+      form.setValue('linhagem', options[0].value);
+      setSelectedLinhagem(options[0].value);
+      fetchSexosByLinhagem(options[0].value);
+    }
+  };
+
   const fetchSexosByLinhagem = async (linhagem: string) => {
+    if (!linhagem) return;
+    
     const { data, error } = await supabase
       .from('desempenho_aves')
       .select('sexo')
-      .eq('linhagem', linhagem as 'cobb_500' | 'ross_308' | 'hubbard');
+      .eq('linhagem', linhagem as any);
     
     if (error) {
       console.error('Erro ao buscar sexos:', error);
@@ -112,10 +153,25 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   };
 
   const fetchNucleos = async () => {
-    const { data, error } = await supabase
+    // Fetch grupo_animal "Aves Corte" to get its ID
+    const { data: gruposData } = await supabase
+      .from('grupos_animal')
+      .select('id')
+      .ilike('nome', '%corte%')
+      .limit(1);
+    
+    const grupoCorteId = gruposData?.[0]?.id;
+    
+    let query = supabase
       .from('nucleos')
       .select('id, nome')
       .eq('ativo', true);
+    
+    if (grupoCorteId) {
+      query = query.eq('tipo_producao', grupoCorteId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Erro ao buscar núcleos:', error);
@@ -186,12 +242,13 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
         galpao_id: data.galpao_id,
         quantidade_aves: parseInt(data.quantidade_aves),
         data_prevista_alojamento: format(data.data_prevista_alojamento, 'yyyy-MM-dd'),
-        linhagem: data.linhagem,
+        linhagem: data.linhagem as any,
         sexo: data.sexo,
         veterinario_id: data.veterinario_id || null,
         observacoes: data.observacoes || null,
         integrado_id: user.id,
         status: 'previsao',
+        custo_aves: data.custo_aves ? parseFloat(data.custo_aves) : null,
       });
 
       if (error) throw error;
@@ -367,8 +424,9 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                   onValueChange={(value) => {
                     field.onChange(value);
                     setSelectedLinhagem(value);
+                    fetchSexosByLinhagem(value);
                   }} 
-                  defaultValue={field.value}
+                  value={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -376,9 +434,17 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="cobb_500">Cobb 500</SelectItem>
-                    <SelectItem value="ross_308">Ross 308</SelectItem>
-                    <SelectItem value="hubbard">Hubbard</SelectItem>
+                    {linhagens.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        Nenhuma linhagem disponível
+                      </SelectItem>
+                    ) : (
+                      linhagens.map((lin) => (
+                        <SelectItem key={lin.value} value={lin.value}>
+                          {lin.label}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -492,6 +558,27 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                     )}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="custo_aves"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Custo das Aves (R$) - opcional</FormLabel>
+                <FormControl>
+                  <Input type="number" min="0" step="0.01" placeholder="Ex: 15000.00" {...field} />
+                </FormControl>
+                {quantidadeAves > 0 && field.value && parseFloat(field.value) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Custo por ave: R$ {(parseFloat(field.value) / quantidadeAves).toFixed(2)}
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
