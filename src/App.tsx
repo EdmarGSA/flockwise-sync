@@ -21,6 +21,7 @@ import CadastroDesempenhoAves from "./pages/CadastroDesempenhoAves";
 import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
 import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
+import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import FabricaRacao from "./pages/FabricaRacao";
 import Veterinario from "./pages/Veterinario";
 import VeterinarioLote from "./pages/VeterinarioLote";
@@ -156,6 +157,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/silo" element={
       <ProtectedRoute>
         <ConfiguracaoSilo />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/fechamento" element={
+      <ProtectedRoute>
+        <ConfiguracaoFechamento />
       </ProtectedRoute>
     } />
     <Route path="/fabrica-racao" element={
