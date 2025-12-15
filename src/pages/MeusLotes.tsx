@@ -6,15 +6,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
@@ -23,6 +24,8 @@ import { MortalidadeDialog } from '@/components/lotes/MortalidadeDialog';
 import { RacaoLoteDialog } from '@/components/lotes/RacaoLoteDialog';
 import { SiloBadge } from '@/components/lotes/SiloBadge';
 import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog';
+import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
+import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
 
 interface Lote {
   id: string;
@@ -39,6 +42,15 @@ interface Lote {
   nucleo_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
+  // Saída de Lote fields
+  data_prevista_saida: string | null;
+  horario_inicio_jejum: string | null;
+  saida_venda_local: number;
+  saida_venda_externa: number;
+  saida_abate: number;
+  jejum_confirmado: boolean;
+  jejum_confirmado_por: string | null;
+  jejum_confirmado_em: string | null;
 }
 
 interface LoteComPesagem extends Lote {
@@ -48,6 +60,8 @@ interface LoteComPesagem extends Lote {
   quantidadeAlojada?: number | null;
   temSolicitacaoPendente?: boolean;
   pendenciasVet?: number;
+  jejumAtrasado?: boolean;
+  saidaProxima?: boolean;
 }
 
 export default function MeusLotes() {
@@ -60,6 +74,8 @@ export default function MeusLotes() {
   const [mortalidadeOpen, setMortalidadeOpen] = useState(false);
   const [racaoOpen, setRacaoOpen] = useState(false);
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
+  const [jejumDialogOpen, setJejumDialogOpen] = useState(false);
+  const [saidaInfoOpen, setSaidaInfoOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -87,7 +103,15 @@ export default function MeusLotes() {
         nucleo_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome),
-        veterinario_id
+        veterinario_id,
+        data_prevista_saida,
+        horario_inicio_jejum,
+        saida_venda_local,
+        saida_venda_externa,
+        saida_abate,
+        jejum_confirmado,
+        jejum_confirmado_por,
+        jejum_confirmado_em
       `)
       .order('created_at', { ascending: false });
 
@@ -173,6 +197,17 @@ export default function MeusLotes() {
           }
         }
 
+        // Check jejum atrasado and saida proxima
+        const now = new Date();
+        const jejumAtrasado = loteData.horario_inicio_jejum 
+          ? isBefore(parseISO(loteData.horario_inicio_jejum), now) && !loteData.jejum_confirmado
+          : false;
+        
+        const horasParaSaida = loteData.data_prevista_saida 
+          ? differenceInHours(parseISO(loteData.data_prevista_saida), now)
+          : null;
+        const saidaProxima = horasParaSaida !== null && horasParaSaida <= 24 && horasParaSaida >= 0;
+
         return {
           ...loteData,
           ultimaPesagem,
@@ -181,6 +216,8 @@ export default function MeusLotes() {
           quantidadeAlojada,
           temSolicitacaoPendente,
           pendenciasVet,
+          jejumAtrasado,
+          saidaProxima,
         };
       })
     );
@@ -252,6 +289,16 @@ export default function MeusLotes() {
   const handleNotificacoesVet = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setNotificacoesOpen(true);
+  };
+
+  const handleJejum = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setJejumDialogOpen(true);
+  };
+
+  const handleSaidaInfo = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setSaidaInfoOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -523,6 +570,47 @@ export default function MeusLotes() {
                                   diasDesdeAlojamento={lote.diasDesdeAlojamento || 0}
                                   avesVivas={lote.quantidadeAlojada || lote.quantidade_aves}
                                 />
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        size="sm" 
+                                        variant={lote.jejumAtrasado ? 'destructive' : lote.data_prevista_saida ? 'outline' : 'ghost'}
+                                        onClick={() => lote.data_prevista_saida ? handleSaidaInfo(lote) : undefined}
+                                        className="gap-1 relative"
+                                        disabled={!lote.data_prevista_saida}
+                                      >
+                                        <Truck className="w-4 h-4" />
+                                        {(lote.jejumAtrasado || lote.saidaProxima) && (
+                                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                          </span>
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {lote.data_prevista_saida ? (
+                                        <div className="text-xs">
+                                          <p>Saída: {format(parseISO(lote.data_prevista_saida), "dd/MM HH:mm")}</p>
+                                          {lote.horario_inicio_jejum && (
+                                            <p>Jejum: {format(parseISO(lote.horario_inicio_jejum), "dd/MM HH:mm")} {lote.jejum_confirmado ? '✓' : ''}</p>
+                                          )}
+                                        </div>
+                                      ) : 'Sem saída programada'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                {lote.horario_inicio_jejum && !lote.jejum_confirmado && (
+                                  <Button 
+                                    size="sm" 
+                                    variant={lote.jejumAtrasado ? 'destructive' : 'outline'}
+                                    onClick={() => handleJejum(lote)}
+                                    className="gap-1"
+                                  >
+                                    <Clock className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </>
                             )}
                           </div>
@@ -584,6 +672,27 @@ export default function MeusLotes() {
             onOpenChange={setNotificacoesOpen}
             loteId={selectedLote.id}
             onSuccess={fetchLotes}
+          />
+          <ConfirmarJejumDialog
+            open={jejumDialogOpen}
+            onOpenChange={setJejumDialogOpen}
+            loteId={selectedLote.id}
+            horarioInicioJejum={selectedLote.horario_inicio_jejum}
+            dataPrevistaSaida={selectedLote.data_prevista_saida}
+            jejumConfirmado={selectedLote.jejum_confirmado}
+            jejumConfirmadoEm={selectedLote.jejum_confirmado_em}
+            onSuccess={fetchLotes}
+          />
+          <SaidaLoteInfoDialog
+            open={saidaInfoOpen}
+            onOpenChange={setSaidaInfoOpen}
+            dataPrevistaSaida={selectedLote.data_prevista_saida}
+            horarioInicioJejum={selectedLote.horario_inicio_jejum}
+            saidaVendaLocal={selectedLote.saida_venda_local}
+            saidaVendaExterna={selectedLote.saida_venda_externa}
+            saidaAbate={selectedLote.saida_abate}
+            jejumConfirmado={selectedLote.jejum_confirmado}
+            jejumConfirmadoEm={selectedLote.jejum_confirmado_em}
           />
         </>
       )}

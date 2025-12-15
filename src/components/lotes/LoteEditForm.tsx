@@ -16,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { SaidaLoteSection } from './SaidaLoteSection';
 
 const loteSchema = z.object({
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
@@ -48,7 +49,25 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
   
+  // Saída de Lote fields
+  const [dataPrevistaSaida, setDataPrevistaSaida] = useState<string | null>(
+    (lote as any).data_prevista_saida || null
+  );
+  const [horarioInicioJejum, setHorarioInicioJejum] = useState<string | null>(
+    (lote as any).horario_inicio_jejum || null
+  );
+  const [saidaVendaLocal, setSaidaVendaLocal] = useState<number>(
+    (lote as any).saida_venda_local || 0
+  );
+  const [saidaVendaExterna, setSaidaVendaExterna] = useState<number>(
+    (lote as any).saida_venda_externa || 0
+  );
+  const [saidaAbate, setSaidaAbate] = useState<number>(
+    (lote as any).saida_abate || 0
+  );
+  
   const isEditable = lote.status === 'previsao';
+  const isAlojado = lote.status === 'alojado';
 
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
@@ -101,6 +120,38 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     }
   };
 
+  const handleSaveSaida = async () => {
+    const totalSaida = saidaVendaLocal + saidaVendaExterna + saidaAbate;
+    if (totalSaida > lote.quantidade_aves) {
+      toast.error('O total de saídas excede a quantidade de aves do lote');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('lotes')
+        .update({
+          data_prevista_saida: dataPrevistaSaida ? new Date(dataPrevistaSaida).toISOString() : null,
+          horario_inicio_jejum: horarioInicioJejum ? new Date(horarioInicioJejum).toISOString() : null,
+          saida_venda_local: saidaVendaLocal,
+          saida_venda_externa: saidaVendaExterna,
+          saida_abate: saidaAbate,
+        })
+        .eq('id', lote.id);
+
+      if (error) throw error;
+
+      toast.success('Informações de saída salvas com sucesso!');
+      onSuccess?.();
+    } catch (error) {
+      console.error('Erro ao salvar saída:', error);
+      toast.error('Erro ao salvar informações de saída');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (data: LoteFormData) => {
     if (!isEditable) return;
     
@@ -135,265 +186,293 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="quantidade_aves"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Quantidade de Aves</FormLabel>
-                <FormControl>
-                  <Input type="number" min="1" placeholder="Ex: 25000" disabled={!isEditable} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <div className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="quantidade_aves"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantidade de Aves</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="1" placeholder="Ex: 25000" disabled={!isEditable} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="peso_medio_pintinhos"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Peso Médio Pintinhos (g)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.1" min="0" placeholder="Ex: 42.5" disabled={!isEditable} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="previsao">Previsão</SelectItem>
+                      <SelectItem value="saiu_para_entrega">Saiu p/ Entrega</SelectItem>
+                      <SelectItem value="alojado">Alojado</SelectItem>
+                      <SelectItem value="fechado">Fechado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="linhagem"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Linhagem</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a linhagem" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="cobb_500">Cobb 500</SelectItem>
+                      <SelectItem value="ross_308">Ross 308</SelectItem>
+                      <SelectItem value="hubbard">Hubbard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sexo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sexo</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o sexo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="macho">Macho</SelectItem>
+                      <SelectItem value="femea">Fêmea</SelectItem>
+                      <SelectItem value="misto">Misto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="data_prevista_alojamento"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data Prevista</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="data_alojamento"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data Alojamento</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="data_fechamento"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data Fechamento</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <FormField
             control={form.control}
-            name="peso_medio_pintinhos"
+            name="veterinario_id"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Peso Médio Pintinhos (g)</FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.1" min="0" placeholder="Ex: 42.5" disabled={!isEditable} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Status</FormLabel>
+                <FormLabel>Veterinário (opcional)</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
+                      <SelectValue placeholder="Selecione o veterinário" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="previsao">Previsão</SelectItem>
-                    <SelectItem value="saiu_para_entrega">Saiu p/ Entrega</SelectItem>
-                    <SelectItem value="alojado">Alojado</SelectItem>
-                    <SelectItem value="fechado">Fechado</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {veterinarios.map((vet) => (
+                      <SelectItem key={vet.id} value={vet.id}>
+                        {vet.full_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="linhagem"
+            name="observacoes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Linhagem</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a linhagem" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="cobb_500">Cobb 500</SelectItem>
-                    <SelectItem value="ross_308">Ross 308</SelectItem>
-                    <SelectItem value="hubbard">Hubbard</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="sexo"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sexo</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o sexo" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="macho">Macho</SelectItem>
-                    <SelectItem value="femea">Fêmea</SelectItem>
-                    <SelectItem value="misto">Misto</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="data_prevista_alojamento"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Data Prevista</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="data_alojamento"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Data Alojamento</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "-"}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="data_fechamento"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Data Fechamento</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : "-"}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="veterinario_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Veterinário (opcional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                <FormLabel>Observações (opcional)</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o veterinário" />
-                  </SelectTrigger>
+                  <Textarea placeholder="Observações sobre o lote..." className="resize-none" disabled={!isEditable} {...field} />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {veterinarios.map((vet) => (
-                    <SelectItem key={vet.id} value={vet.id}>
-                      {vet.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="observacoes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Observações (opcional)</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Observações sobre o lote..." className="resize-none" disabled={!isEditable} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+              {isEditable ? 'Cancelar' : 'Fechar'}
+            </Button>
+            {isEditable && (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={loading}
+                  onClick={handleAlojar}
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  {loading ? 'Alojando...' : 'Alojar'}
+                </Button>
+                <Button type="submit" className="flex-1" disabled={loading}>
+                  {loading ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </>
+            )}
+          </div>
+        </form>
+      </Form>
 
-        <div className="flex gap-3">
-          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-            {isEditable ? 'Cancelar' : 'Fechar'}
+      {/* Seção de Saída de Lote - apenas para lotes alojados */}
+      {isAlojado && (
+        <div className="space-y-4">
+          <SaidaLoteSection
+            quantidadeAvesLote={lote.quantidade_aves}
+            dataPrevistaSaida={dataPrevistaSaida}
+            horarioInicioJejum={horarioInicioJejum}
+            saidaVendaLocal={saidaVendaLocal}
+            saidaVendaExterna={saidaVendaExterna}
+            saidaAbate={saidaAbate}
+            onDataPrevistaSaidaChange={setDataPrevistaSaida}
+            onHorarioInicioJejumChange={setHorarioInicioJejum}
+            onSaidaVendaLocalChange={setSaidaVendaLocal}
+            onSaidaVendaExternaChange={setSaidaVendaExterna}
+            onSaidaAbateChange={setSaidaAbate}
+          />
+          <Button 
+            onClick={handleSaveSaida} 
+            disabled={loading} 
+            className="w-full"
+          >
+            {loading ? 'Salvando...' : 'Salvar Informações de Saída'}
           </Button>
-          {isEditable && (
-            <>
-              <Button
-                type="button"
-                variant="secondary"
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                disabled={loading}
-                onClick={handleAlojar}
-              >
-                <Home className="w-4 h-4 mr-2" />
-                {loading ? 'Alojando...' : 'Alojar'}
-              </Button>
-              <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </>
-          )}
         </div>
-      </form>
-    </Form>
+      )}
+    </div>
   );
 }
