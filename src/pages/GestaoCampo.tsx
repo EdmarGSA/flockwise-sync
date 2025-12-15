@@ -113,6 +113,7 @@ export default function GestaoCampo() {
   const [editingDesempenho, setEditingDesempenho] = useState<DesempenhoAve | null>(null);
   const [filterGrupoNucleos, setFilterGrupoNucleos] = useState<string>('all');
   const [filterGrupoGalpoes, setFilterGrupoGalpoes] = useState<string>('all');
+  const [filterGrupoLotes, setFilterGrupoLotes] = useState<string>('all');
 
   useEffect(() => {
     if (user) {
@@ -251,6 +252,19 @@ export default function GestaoCampo() {
         return nucleo?.tipo_producao === filterGrupoGalpoes;
       });
 
+  // Get nucleo tipo_producao for each lote to enable filtering
+  const getLoteTipoProducao = (lote: Lote) => {
+    // Find the nucleo_id from galpoes since lote doesn't directly have it
+    const galpao = galpoes.find(g => g.nome === lote.galpao?.nome);
+    if (!galpao) return null;
+    const nucleo = nucleos.find(n => n.id === galpao.nucleo_id);
+    return nucleo?.tipo_producao || null;
+  };
+
+  const filteredLotes = filterGrupoLotes === 'all'
+    ? lotes
+    : lotes.filter(l => getLoteTipoProducao(l) === filterGrupoLotes);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -364,13 +378,31 @@ export default function GestaoCampo() {
             </div>
 
             <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground">Todos os Lotes</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle className="text-foreground">
+                  Lotes Cadastrados ({filteredLotes.length})
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <Select value={filterGrupoLotes} onValueChange={setFilterGrupoLotes}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filtrar por grupo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os grupos</SelectItem>
+                      {gruposAnimal.map((grupo) => (
+                        <SelectItem key={grupo.id} value={grupo.id}>
+                          {grupo.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 {loadingData ? (
                   <p className="text-muted-foreground">Carregando...</p>
-                ) : lotes.length === 0 ? (
+                ) : filteredLotes.length === 0 ? (
                   <div className="text-center py-12">
                     <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
@@ -395,7 +427,7 @@ export default function GestaoCampo() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {lotes.map((lote) => (
+                        {filteredLotes.map((lote) => (
                           <TableRow key={lote.id}>
                             <TableCell>{getStatusBadge(lote.status)}</TableCell>
                             <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
