@@ -758,6 +758,36 @@ export type Database = {
           },
         ]
       }
+      formas_pagamento: {
+        Row: {
+          ativo: boolean | null
+          codigo: string
+          created_at: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       galpoes: {
         Row: {
           altura: number
@@ -2309,6 +2339,53 @@ export type Database = {
             columns: ["conta_pai_id"]
             isOneToOne: false
             referencedRelation: "plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prazos_pagamento: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          dias_parcelas: number[]
+          forma_pagamento_id: string
+          id: string
+          integrado_id: string
+          nome: string
+          padrao: boolean | null
+          quantidade_parcelas: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          dias_parcelas?: number[]
+          forma_pagamento_id: string
+          id?: string
+          integrado_id: string
+          nome: string
+          padrao?: boolean | null
+          quantidade_parcelas?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          dias_parcelas?: number[]
+          forma_pagamento_id?: string
+          id?: string
+          integrado_id?: string
+          nome?: string
+          padrao?: boolean | null
+          quantidade_parcelas?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prazos_pagamento_forma_pagamento_id_fkey"
+            columns: ["forma_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
             referencedColumns: ["id"]
           },
         ]
