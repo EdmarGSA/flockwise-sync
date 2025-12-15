@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const translateAuthError = (message: string): string => {
+  const errorMap: Record<string, string> = {
+    "already registered": "Este email já está cadastrado",
+    "user already registered": "Usuário já cadastrado",
+    "invalid email": "Email inválido",
+    "password should be at least 6 characters": "Senha deve ter no mínimo 6 caracteres",
+    "email rate limit exceeded": "Limite de tentativas excedido. Aguarde alguns minutos",
+    "signup requires a valid password": "É necessário informar uma senha válida",
+    "unable to validate email address": "Não foi possível validar o email",
+    "email not confirmed": "Email não confirmado",
+  };
+  
+  const lowerMessage = message.toLowerCase();
+  for (const [key, value] of Object.entries(errorMap)) {
+    if (lowerMessage.includes(key.toLowerCase())) {
+      return value;
+    }
+  }
+  return "Erro ao cadastrar. Tente novamente.";
+};
 
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -35,6 +57,7 @@ const rolesOptions = [
 
 const MembroForm = ({ onSuccess }: MembroFormProps) => {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,11 +89,7 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
       });
 
       if (authError) {
-        if (authError.message.includes("already registered")) {
-          toast.error("Este email já está cadastrado");
-        } else {
-          toast.error(authError.message);
-        }
+        toast.error(translateAuthError(authError.message));
         setLoading(false);
         return;
       }
@@ -148,7 +167,21 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
               <FormItem>
                 <FormLabel>Senha *</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Mínimo 6 caracteres" {...field} />
+                  <div className="relative">
+                    <Input 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Mínimo 6 caracteres" 
+                      className="pr-10"
+                      {...field} 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
