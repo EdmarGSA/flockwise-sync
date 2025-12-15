@@ -857,14 +857,22 @@ export type Database = {
           data_alojamento: string | null
           data_fechamento: string | null
           data_prevista_alojamento: string
+          data_prevista_saida: string | null
           galpao_id: string
+          horario_inicio_jejum: string | null
           id: string
           integrado_id: string
+          jejum_confirmado: boolean | null
+          jejum_confirmado_em: string | null
+          jejum_confirmado_por: string | null
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id: string
           observacoes: string | null
           peso_medio_pintinhos: number | null
           quantidade_aves: number
+          saida_abate: number | null
+          saida_venda_externa: number | null
+          saida_venda_local: number | null
           sexo: Database["public"]["Enums"]["sexo_ave"]
           status: Database["public"]["Enums"]["lote_status"]
           updated_at: string
@@ -875,14 +883,22 @@ export type Database = {
           data_alojamento?: string | null
           data_fechamento?: string | null
           data_prevista_alojamento: string
+          data_prevista_saida?: string | null
           galpao_id: string
+          horario_inicio_jejum?: string | null
           id?: string
           integrado_id: string
+          jejum_confirmado?: boolean | null
+          jejum_confirmado_em?: string | null
+          jejum_confirmado_por?: string | null
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
           quantidade_aves: number
+          saida_abate?: number | null
+          saida_venda_externa?: number | null
+          saida_venda_local?: number | null
           sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]
           updated_at?: string
@@ -893,14 +909,22 @@ export type Database = {
           data_alojamento?: string | null
           data_fechamento?: string | null
           data_prevista_alojamento?: string
+          data_prevista_saida?: string | null
           galpao_id?: string
+          horario_inicio_jejum?: string | null
           id?: string
           integrado_id?: string
+          jejum_confirmado?: boolean | null
+          jejum_confirmado_em?: string | null
+          jejum_confirmado_por?: string | null
           linhagem?: Database["public"]["Enums"]["linhagem_aves"]
           nucleo_id?: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
           quantidade_aves?: number
+          saida_abate?: number | null
+          saida_venda_externa?: number | null
+          saida_venda_local?: number | null
           sexo?: Database["public"]["Enums"]["sexo_ave"]
           status?: Database["public"]["Enums"]["lote_status"]
           updated_at?: string
