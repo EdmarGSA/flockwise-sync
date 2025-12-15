@@ -248,7 +248,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
         observacoes: data.observacoes || null,
         integrado_id: user.id,
         status: 'previsao',
-        custo_aves: data.custo_aves ? parseFloat(data.custo_aves) : null,
+        custo_aves: data.custo_aves ? parseFloat(data.custo_aves) * parseInt(data.quantidade_aves) : null,
       });
 
       if (error) throw error;
@@ -570,13 +570,13 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
             name="custo_aves"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Custo das Aves (R$) - opcional</FormLabel>
+                <FormLabel>Custo por Ave (R$) - opcional</FormLabel>
                 <FormControl>
-                  <Input type="number" min="0" step="0.01" placeholder="Ex: 15000.00" {...field} />
+                  <Input type="number" min="0" step="0.01" placeholder="Ex: 2.50" {...field} />
                 </FormControl>
                 {quantidadeAves > 0 && field.value && parseFloat(field.value) > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Custo por ave: R$ {(parseFloat(field.value) / quantidadeAves).toFixed(2)}
+                    Custo total: R$ {(parseFloat(field.value) * quantidadeAves).toFixed(2)}
                   </p>
                 )}
                 <FormMessage />
