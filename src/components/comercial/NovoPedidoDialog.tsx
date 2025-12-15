@@ -9,8 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, AlertTriangle, History } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Trash2, AlertTriangle, History, Package, Bird } from 'lucide-react';
 import { toast } from 'sonner';
+import LotesVendaSection from './LotesVendaSection';
 
 interface NovoPedidoDialogProps {
   open: boolean;
@@ -30,6 +32,19 @@ interface PedidoItem {
   valor_total: number;
   margem_calculada: number;
   custo_medio: number;
+  lote_producao_id?: string;
+  is_ave_viva?: boolean;
+  tipo_venda?: 'unidade' | 'peso';
+}
+
+interface LoteVendaItem {
+  lote_id: string;
+  lote_info: string;
+  tipo_venda: 'unidade' | 'peso';
+  quantidade: number;
+  preco_unitario: number;
+  peso_medio: number;
+  valor_total: number;
 }
 
 type FormaPagamento = 'boleto' | 'pix' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'cheque';
@@ -41,6 +56,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   const [tabelaItens, setTabelaItens] = useState<any[]>([]);
   const [historicoCliente, setHistoricoCliente] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('produtos');
 
   const [formData, setFormData] = useState({
     cliente_id: '',
@@ -193,6 +209,32 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     setNovoItem({ produto_id: '', quantidade: 1, preco_unitario: 0 });
   };
 
+  const handleAddLoteItem = (loteItem: LoteVendaItem) => {
+    // Check if lote already exists in items
+    if (itens.some(i => i.lote_producao_id === loteItem.lote_id)) {
+      toast.error('Este lote já foi adicionado ao pedido');
+      return;
+    }
+
+    const newItem: PedidoItem = {
+      produto_id: '', // Will be set as description only
+      produto_nome: `Aves Corte Viva - ${loteItem.lote_info}`,
+      quantidade: loteItem.quantidade,
+      unidade_medida: loteItem.tipo_venda === 'unidade' ? 'UN' : 'KG',
+      preco_tabela: loteItem.preco_unitario,
+      preco_unitario: loteItem.preco_unitario,
+      desconto_percentual: 0,
+      valor_total: loteItem.valor_total,
+      margem_calculada: 0,
+      custo_medio: 0,
+      lote_producao_id: loteItem.lote_id,
+      is_ave_viva: true,
+      tipo_venda: loteItem.tipo_venda
+    };
+
+    setItens([...itens, newItem]);
+  };
+
   const handleRemoveItem = (index: number) => {
     setItens(itens.filter((_, i) => i !== index));
   };
@@ -263,14 +305,15 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       // Create order items
       const pedidoItens = itens.map(item => ({
         pedido_id: pedido.id,
-        produto_id: item.produto_id,
+        produto_id: item.is_ave_viva ? null : item.produto_id,
         quantidade: item.quantidade,
         unidade_medida: item.unidade_medida,
         preco_tabela: item.preco_tabela,
         preco_unitario: item.preco_unitario,
         desconto_percentual: item.desconto_percentual,
         valor_total: item.valor_total,
-        margem_calculada: item.margem_calculada
+        margem_calculada: item.margem_calculada,
+        lote_producao_id: item.lote_producao_id || null
       }));
 
       const { error: itensError } = await supabase
@@ -305,6 +348,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     setItens([]);
     setNovoItem({ produto_id: '', quantidade: 1, preco_unitario: 0 });
     setHistoricoCliente([]);
+    setActiveTab('produtos');
   };
 
   const totais = calcularTotais();
@@ -377,64 +421,91 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
             </Card>
           )}
 
-          {/* Add Item Section */}
-          <Card>
-            <CardContent className="pt-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Produto</Label>
-                  <Select
-                    value={novoItem.produto_id}
-                    onValueChange={(v) => {
-                      const produto = produtos.find(p => p.id === v);
-                      const tabelaItem = tabelaItens.find(ti => ti.produto_id === v);
-                      const preco = tabelaItem?.preco_unitario || produto?.preco_venda || 0;
-                      setNovoItem({ ...novoItem, produto_id: v, preco_unitario: preco });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {produtos.map(produto => (
-                        <SelectItem key={produto.id} value={produto.id}>
-                          {produto.nome} (Est: {produto.estoque_atual} {produto.unidade_medida})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Tabs for Products and Live Birds */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="produtos" className="flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                Produtos
+              </TabsTrigger>
+              <TabsTrigger value="aves" className="flex items-center gap-2">
+                <Bird className="w-4 h-4" />
+                Aves Vivas
+              </TabsTrigger>
+            </TabsList>
 
-                <div className="space-y-2">
-                  <Label>Quantidade</Label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={novoItem.quantidade}
-                    onChange={(e) => setNovoItem({ ...novoItem, quantidade: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
+            <TabsContent value="produtos" className="mt-4">
+              {/* Add Item Section */}
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Produto</Label>
+                      <Select
+                        value={novoItem.produto_id}
+                        onValueChange={(v) => {
+                          const produto = produtos.find(p => p.id === v);
+                          const tabelaItem = tabelaItens.find(ti => ti.produto_id === v);
+                          const preco = tabelaItem?.preco_unitario || produto?.preco_venda || 0;
+                          setNovoItem({ ...novoItem, produto_id: v, preco_unitario: preco });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {produtos.map(produto => (
+                            <SelectItem key={produto.id} value={produto.id}>
+                              {produto.nome} (Est: {produto.estoque_atual} {produto.unidade_medida})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label>Preço Unit.</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={novoItem.preco_unitario}
-                      onChange={(e) => setNovoItem({ ...novoItem, preco_unitario: parseFloat(e.target.value) || 0 })}
-                    />
-                    <Button onClick={handleAddItem}>
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                    <div className="space-y-2">
+                      <Label>Quantidade</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={novoItem.quantidade}
+                        onChange={(e) => setNovoItem({ ...novoItem, quantidade: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Preço Unit.</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={novoItem.preco_unitario}
+                          onChange={(e) => setNovoItem({ ...novoItem, preco_unitario: parseFloat(e.target.value) || 0 })}
+                        />
+                        <Button onClick={handleAddItem}>
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              {/* Items Table */}
-              {itens.length > 0 && (
+            <TabsContent value="aves" className="mt-4">
+              <LotesVendaSection
+                integradoId={integradoId}
+                onAddItem={handleAddLoteItem}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {/* Items Table */}
+          {itens.length > 0 && (
+            <Card>
+              <CardContent className="pt-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -449,34 +520,47 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                   <TableBody>
                     {itens.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell>{item.produto_nome}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {item.is_ave_viva && <Bird className="w-4 h-4 text-primary" />}
+                            {item.produto_nome}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           {item.quantidade} {item.unidade_medida}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.preco_unitario}
-                            onChange={(e) => handleUpdateItemPrice(index, parseFloat(e.target.value) || 0)}
-                            className="w-24 text-right"
-                          />
+                          {item.is_ave_viva ? (
+                            <span>R$ {item.preco_unitario.toFixed(2)}</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.preco_unitario}
+                              onChange={(e) => handleUpdateItemPrice(index, parseFloat(e.target.value) || 0)}
+                              className="w-24 text-right"
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           R$ {item.valor_total.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge variant={item.margem_calculada < margemMinima ? 'destructive' : 'default'}>
-                            {item.custo_medio > 0 ? (
-                              <>
-                                {item.margem_calculada.toFixed(1)}%
-                                {item.margem_calculada < margemMinima && (
-                                  <AlertTriangle className="w-3 h-3 ml-1" />
-                                )}
-                              </>
-                            ) : '-'}
-                          </Badge>
+                          {item.is_ave_viva ? (
+                            <Badge variant="secondary">Ave Viva</Badge>
+                          ) : (
+                            <Badge variant={item.margem_calculada < margemMinima ? 'destructive' : 'default'}>
+                              {item.custo_medio > 0 ? (
+                                <>
+                                  {item.margem_calculada.toFixed(1)}%
+                                  {item.margem_calculada < margemMinima && (
+                                    <AlertTriangle className="w-3 h-3 ml-1" />
+                                  )}
+                                </>
+                              ) : '-'}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -491,9 +575,9 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Payment and Delivery */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
