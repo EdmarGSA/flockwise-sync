@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { NucleoEditForm } from '@/components/lotes/NucleoEditForm';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
@@ -110,6 +111,8 @@ export default function GestaoCampo() {
   const [editingArea, setEditingArea] = useState<AreaRow | null>(null);
   const [editingLote, setEditingLote] = useState<LoteRow | null>(null);
   const [editingDesempenho, setEditingDesempenho] = useState<DesempenhoAve | null>(null);
+  const [filterGrupoNucleos, setFilterGrupoNucleos] = useState<string>('all');
+  const [filterGrupoGalpoes, setFilterGrupoGalpoes] = useState<string>('all');
 
   useEffect(() => {
     if (user) {
@@ -235,6 +238,18 @@ export default function GestaoCampo() {
 
   const lotesAtivos = lotes.filter(l => l.status === 'alojado').length;
   const lotesPendentes = lotes.filter(l => l.status === 'previsao').length;
+
+  // Filtered data based on grupo_animal selection
+  const filteredNucleos = filterGrupoNucleos === 'all' 
+    ? nucleos 
+    : nucleos.filter(n => n.tipo_producao === filterGrupoNucleos);
+  
+  const filteredGalpoes = filterGrupoGalpoes === 'all'
+    ? galpoes
+    : galpoes.filter(g => {
+        const nucleo = nucleos.find(n => n.id === g.nucleo_id);
+        return nucleo?.tipo_producao === filterGrupoGalpoes;
+      });
 
   return (
     <div className="min-h-screen bg-background">
@@ -427,17 +442,34 @@ export default function GestaoCampo() {
           </TabsContent>
 
           <TabsContent value="nucleos" className="space-y-6">
+            {/* Filter by grupo_animal */}
+            <div className="flex items-center gap-3">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filtrar por:</span>
+              <Select value={filterGrupoNucleos} onValueChange={setFilterGrupoNucleos}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Todos os grupos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os grupos</SelectItem>
+                  {gruposAnimal.map((grupo) => (
+                    <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
               {showForm && <NucleoForm onSuccess={handleFormSuccess} />}
               
               <Card className="bg-card border-border">
                 <CardHeader>
-                  <CardTitle className="text-foreground">Núcleos Cadastrados ({nucleos.length})</CardTitle>
+                  <CardTitle className="text-foreground">Núcleos Cadastrados ({filteredNucleos.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loadingData ? (
                     <p className="text-muted-foreground">Carregando...</p>
-                  ) : nucleos.length === 0 ? (
+                  ) : filteredNucleos.length === 0 ? (
                     <div className="text-center py-8">
                       <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                       <p className="text-muted-foreground">Nenhum núcleo cadastrado.</p>
@@ -459,7 +491,7 @@ export default function GestaoCampo() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {nucleos.map((nucleo) => (
+                          {filteredNucleos.map((nucleo) => (
                             <TableRow key={nucleo.id}>
                               <TableCell className="font-medium">{nucleo.nome}</TableCell>
                               <TableCell>{nucleo.cidade}/{nucleo.estado}</TableCell>
@@ -518,17 +550,34 @@ export default function GestaoCampo() {
           </TabsContent>
 
           <TabsContent value="galpoes" className="space-y-6">
+            {/* Filter by grupo_animal */}
+            <div className="flex items-center gap-3">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filtrar por:</span>
+              <Select value={filterGrupoGalpoes} onValueChange={setFilterGrupoGalpoes}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Todos os grupos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os grupos</SelectItem>
+                  {gruposAnimal.map((grupo) => (
+                    <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
               {showForm && <GalpaoForm onSuccess={handleFormSuccess} />}
               
               <Card className="bg-card border-border">
                 <CardHeader>
-                  <CardTitle className="text-foreground">Galpões Cadastrados ({galpoes.length})</CardTitle>
+                  <CardTitle className="text-foreground">Galpões Cadastrados ({filteredGalpoes.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loadingData ? (
                     <p className="text-muted-foreground">Carregando...</p>
-                  ) : galpoes.length === 0 ? (
+                  ) : filteredGalpoes.length === 0 ? (
                     <div className="text-center py-8">
                       <Home className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                       <p className="text-muted-foreground">Nenhum galpão cadastrado.</p>
@@ -556,7 +605,7 @@ export default function GestaoCampo() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {galpoes.map((galpao) => (
+                          {filteredGalpoes.map((galpao) => (
                             <TableRow key={galpao.id}>
                               <TableCell className="font-medium">{galpao.nome}</TableCell>
                               <TableCell>{galpao.nucleo?.nome || '-'}</TableCell>
