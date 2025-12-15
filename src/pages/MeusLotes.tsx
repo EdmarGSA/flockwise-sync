@@ -539,10 +539,6 @@ export default function MeusLotes() {
                                       <Target className="w-4 h-4" />
                                       Meta
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleFechamento(lote)} className="gap-2 text-destructive">
-                                      <Lock className="w-4 h-4" />
-                                      Fechar Lote
-                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                                 <Button 
