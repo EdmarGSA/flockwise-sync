@@ -1284,6 +1284,82 @@ export type Database = {
         }
         Relationships: []
       }
+      movimentacoes_bancarias: {
+        Row: {
+          conciliado: boolean | null
+          conta_bancaria_id: string
+          conta_pagar_id: string | null
+          conta_receber_id: string | null
+          created_at: string
+          data_conciliacao: string | null
+          data_movimento: string
+          descricao: string
+          documento_ref: string | null
+          id: string
+          integrado_id: string
+          origem: string | null
+          tipo: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          conciliado?: boolean | null
+          conta_bancaria_id: string
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_conciliacao?: string | null
+          data_movimento: string
+          descricao: string
+          documento_ref?: string | null
+          id?: string
+          integrado_id: string
+          origem?: string | null
+          tipo: string
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          conciliado?: boolean | null
+          conta_bancaria_id?: string
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_conciliacao?: string | null
+          data_movimento?: string
+          descricao?: string
+          documento_ref?: string | null
+          id?: string
+          integrado_id?: string
+          origem?: string | null
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_bancarias_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_bancarias_conta_pagar_id_fkey"
+            columns: ["conta_pagar_id"]
+            isOneToOne: false
+            referencedRelation: "contas_pagar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_bancarias_conta_receber_id_fkey"
+            columns: ["conta_receber_id"]
+            isOneToOne: false
+            referencedRelation: "contas_receber"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nucleos: {
         Row: {
           area_id: string | null

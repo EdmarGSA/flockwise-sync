@@ -96,9 +96,9 @@ const modules: ModuleCard[] = [
   {
     id: 'financeiro',
     title: 'Financeiro',
-    description: 'Contas a pagar, bancos e plano de contas',
+    description: 'Dashboard, fluxo de caixa e relatórios',
     icon: DollarSign,
-    path: '/configuracoes/financeiro',
+    path: '/financeiro',
     color: 'from-teal-500 to-teal-700',
     available: true,
   },
