@@ -1,4 +1,4 @@
-import { Bird } from "lucide-react";
+import logoGSA from "@/assets/logo-gsa.png";
 
 const Footer = () => {
   return (
@@ -7,11 +7,9 @@ const Footer = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Bird className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src={logoGSA} alt="GSA Tibiri" className="w-10 h-10 rounded-lg" />
             <span className="text-xl font-bold text-foreground">
-              Avi<span className="text-primary">Gestão</span>
+              GSA <span className="text-[#2E7D32]">Tibiri</span>
             </span>
           </div>
 
@@ -30,7 +28,7 @@ const Footer = () => {
 
           {/* Copyright */}
           <p className="text-sm text-muted-foreground">
-            © 2024 AviGestão. Todos os direitos reservados.
+            © 2024 GSA Tibiri. Todos os direitos reservados.
           </p>
         </div>
       </div>

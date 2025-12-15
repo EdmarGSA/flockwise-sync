@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
+import logoGSA from "@/assets/logo-gsa.png";
 
 const HeroSection = () => {
   const stats = [
@@ -21,21 +22,25 @@ const HeroSection = () => {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="text-center max-w-4xl mx-auto">
+          {/* Logo */}
+          <div className="flex justify-center mb-8 animate-fade-up">
+            <img src={logoGSA} alt="GSA Tibiri" className="w-24 h-24 rounded-2xl shadow-glow" />
+          </div>
+
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border/50 mb-8 animate-fade-up">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm text-muted-foreground">Modelo SaaS Multi-Tenant</span>
+            <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
+            <span className="text-sm text-muted-foreground">Gestão na Palma da Mão</span>
           </div>
 
           {/* Main heading */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-            Sistema Integrado de{" "}
-            <span className="text-gradient-primary">Gestão Avícola</span>
+            GSA <span className="text-[#2E7D32]">Tibiri</span>
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: "0.2s" }}>
             O sistema que integra todas as rotinas de criação em um único lugar. 
-            Logística e monitoramento em tempo real para gestão completa de sua operação avícola.
+            Logística e monitoramento em tempo real para gestão completa de sua operação.
           </p>
 
           {/* CTA Buttons */}

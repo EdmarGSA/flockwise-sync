@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Bird, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import logoGSA from "@/assets/logo-gsa.png";
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -142,11 +143,9 @@ const Auth = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-              <Bird className="w-7 h-7 text-primary-foreground" />
-            </div>
+            <img src={logoGSA} alt="GSA Tibiri" className="w-12 h-12 rounded-xl" />
             <span className="text-2xl font-bold text-foreground">
-              Avi<span className="text-primary">Gestão</span>
+              GSA <span className="text-[#2E7D32]">Tibiri</span>
             </span>
           </div>
           <p className="text-muted-foreground">
