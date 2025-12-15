@@ -8,14 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
+import { format, differenceInDays, differenceInHours, parseISO, isBefore, differenceInWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
@@ -27,6 +27,10 @@ import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog'
 import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
 import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
 import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
+import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
+import { PosturaIndicators } from '@/components/lotes/postura/PosturaIndicators';
+import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
+import { MetasPosturaDialog } from '@/components/lotes/postura/MetasPosturaDialog';
 
 interface Lote {
   id: string;
@@ -35,6 +39,7 @@ interface Lote {
   data_alojamento: string | null;
   data_fechamento: string | null;
   linhagem: 'cobb_500' | 'ross_308' | 'hubbard';
+  linhagem_postura: string | null;
   sexo: 'macho' | 'femea' | 'misto';
   status: string;
   veterinario_id: string | null;
@@ -57,12 +62,17 @@ interface Lote {
 interface LoteComPesagem extends Lote {
   ultimaPesagem?: string | null;
   diasDesdeAlojamento?: number;
+  semanasVida?: number;
   precisaPesar?: boolean;
   quantidadeAlojada?: number | null;
   temSolicitacaoPendente?: boolean;
   pendenciasVet?: number;
   jejumAtrasado?: boolean;
   saidaProxima?: boolean;
+  // Postura specific
+  percentualPostura?: number | null;
+  percentualReferencia?: number | null;
+  ovosAveAlojada?: number | null;
 }
 
 export default function MeusLotes() {
@@ -78,6 +88,8 @@ export default function MeusLotes() {
   const [jejumDialogOpen, setJejumDialogOpen] = useState(false);
   const [saidaInfoOpen, setSaidaInfoOpen] = useState(false);
   const [fechamentoOpen, setFechamentoOpen] = useState(false);
+  const [producaoOvosOpen, setProducaoOvosOpen] = useState(false);
+  const [metasPosturaOpen, setMetasPosturaOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -98,6 +110,7 @@ export default function MeusLotes() {
         data_alojamento,
         data_fechamento,
         linhagem,
+        linhagem_postura,
         sexo,
         status,
         integrado_id,
@@ -184,13 +197,62 @@ export default function MeusLotes() {
         
         // Calculate days since alojamento
         let diasDesdeAlojamento = 0;
+        let semanasVida = 0;
         if (loteData.data_alojamento) {
           diasDesdeAlojamento = differenceInDays(new Date(), new Date(loteData.data_alojamento));
+          semanasVida = Math.floor(diasDesdeAlojamento / 7) + 1;
         }
 
-        // Check if needs weighing (every 7 days)
+        // Check if is postura type
+        const isPostura = loteData.nucleo?.tipo_producao?.toLowerCase().includes('postura');
+
+        // Fetch postura-specific data if applicable
+        let percentualPostura: number | null = null;
+        let percentualReferencia: number | null = null;
+        let ovosAveAlojada: number | null = null;
+
+        if (isPostura && loteData.status === 'alojado' && semanasVida >= 19) {
+          // Get total eggs produced
+          const { data: producaoData } = await supabase
+            .from('producao_ovos')
+            .select('quantidade_ovos')
+            .eq('lote_id', loteData.id);
+          
+          const totalOvos = producaoData?.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) || 0;
+          const avesVivas = quantidadeAlojada || loteData.quantidade_aves;
+          
+          // Calculate ovos por ave alojada
+          ovosAveAlojada = avesVivas > 0 ? totalOvos / avesVivas : 0;
+          
+          // Calculate approximate % postura (last 7 days average)
+          const { data: recentProducao } = await supabase
+            .from('producao_ovos')
+            .select('quantidade_ovos')
+            .eq('lote_id', loteData.id)
+            .order('data_producao', { ascending: false })
+            .limit(7);
+          
+          if (recentProducao && recentProducao.length > 0) {
+            const avgDailyOvos = recentProducao.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) / recentProducao.length;
+            percentualPostura = avesVivas > 0 ? (avgDailyOvos / avesVivas) * 100 : 0;
+          }
+          
+          // Get reference % from desempenho_postura
+          if (loteData.linhagem_postura) {
+            const { data: refData } = await supabase
+              .from('desempenho_postura')
+              .select('producao_percentual')
+              .eq('linhagem', loteData.linhagem_postura as any)
+              .eq('semana', semanasVida)
+              .maybeSingle();
+            
+            percentualReferencia = refData?.producao_percentual || null;
+          }
+        }
+
+        // Check if needs weighing (every 7 days) - only for aves corte
         let precisaPesar = false;
-        if (loteData.status === 'alojado' && diasDesdeAlojamento >= 7) {
+        if (!isPostura && loteData.status === 'alojado' && diasDesdeAlojamento >= 7) {
           if (!ultimaPesagem) {
             precisaPesar = true;
           } else {
@@ -214,12 +276,16 @@ export default function MeusLotes() {
           ...loteData,
           ultimaPesagem,
           diasDesdeAlojamento,
+          semanasVida,
           precisaPesar,
           quantidadeAlojada,
           temSolicitacaoPendente,
           pendenciasVet,
           jejumAtrasado,
           saidaProxima,
+          percentualPostura,
+          percentualReferencia,
+          ovosAveAlojada,
         };
       })
     );
@@ -306,6 +372,32 @@ export default function MeusLotes() {
   const handleFechamento = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setFechamentoOpen(true);
+  };
+
+  const handleProducaoOvos = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setProducaoOvosOpen(true);
+  };
+
+  const handleMetasPostura = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setMetasPosturaOpen(true);
+  };
+
+  const isPosturaLote = (lote: LoteComPesagem) => {
+    return lote.nucleo?.tipo_producao?.toLowerCase().includes('postura');
+  };
+
+  const getLinhagemPosturaLabel = (linhagem: string | null) => {
+    if (!linhagem) return '-';
+    const labels: Record<string, string> = {
+      lohmann_brown_lite: 'Lohmann Brown-Lite',
+      hy_line_brown: 'Hy-Line Brown',
+      isa_brown: 'ISA Brown',
+      lohmann_lsl: 'Lohmann LSL',
+      dekalb_white: 'Dekalb White',
+    };
+    return labels[linhagem] || linhagem;
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -443,7 +535,10 @@ export default function MeusLotes() {
                         </>
                       )}
                       <TableHead>Alojamento</TableHead>
-                      <TableHead>Dias</TableHead>
+                      <TableHead>Dias/Semanas</TableHead>
+                      {lotes.some(l => isPosturaLote(l) && l.status === 'alojado') && (
+                        <TableHead>Produção</TableHead>
+                      )}
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -470,7 +565,9 @@ export default function MeusLotes() {
                         {lotes.some(l => l.status !== 'alojado' && l.status !== 'fechado') && (
                           <>
                             <TableCell>
-                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? getLinhagemLabel(lote.linhagem) : '-'}
+                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? (
+                                isPosturaLote(lote) ? getLinhagemPosturaLabel(lote.linhagem_postura) : getLinhagemLabel(lote.linhagem)
+                              ) : '-'}
                             </TableCell>
                             <TableCell>
                               {lote.status !== 'alojado' && lote.status !== 'fechado' ? formatDate(lote.data_prevista_alojamento) : '-'}
@@ -480,11 +577,34 @@ export default function MeusLotes() {
                         <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
                         <TableCell>
                           {lote.status === 'alojado' && lote.diasDesdeAlojamento !== undefined ? (
-                            <Badge variant={lote.precisaPesar ? 'destructive' : 'secondary'}>
-                              {lote.diasDesdeAlojamento} dias
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              {isPosturaLote(lote) ? (
+                                <div className="flex items-center gap-2">
+                                  <FasePosturaBadge semanasVida={lote.semanasVida || 0} />
+                                  <span className="text-xs text-muted-foreground">
+                                    S{lote.semanasVida}
+                                  </span>
+                                </div>
+                              ) : (
+                                <Badge variant={lote.precisaPesar ? 'destructive' : 'secondary'}>
+                                  {lote.diasDesdeAlojamento} dias
+                                </Badge>
+                              )}
+                            </div>
                           ) : '-'}
                         </TableCell>
+                        {lotes.some(l => isPosturaLote(l) && l.status === 'alojado') && (
+                          <TableCell>
+                            {isPosturaLote(lote) && lote.status === 'alojado' ? (
+                              <PosturaIndicators
+                                percentualPostura={lote.percentualPostura || null}
+                                percentualReferencia={lote.percentualReferencia || null}
+                                ovosAveAlojada={lote.ovosAveAlojada || null}
+                                semanasVida={lote.semanasVida || 0}
+                              />
+                            ) : '-'}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex gap-1">
                             {lote.status === 'previsao' && (
@@ -524,21 +644,40 @@ export default function MeusLotes() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
-                                      <Scale className="w-4 h-4" />
-                                      Pesagem
-                                      {lote.precisaPesar && (
-                                        <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
-                                      )}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
-                                      <Skull className="w-4 h-4" />
-                                      Mortalidade
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
-                                      <Target className="w-4 h-4" />
-                                      Meta
-                                    </DropdownMenuItem>
+                                    {isPosturaLote(lote) ? (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleProducaoOvos(lote)} className="gap-2">
+                                          <Egg className="w-4 h-4" />
+                                          Produção Ovos
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
+                                          <Skull className="w-4 h-4" />
+                                          Mortalidade
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleMetasPostura(lote)} className="gap-2">
+                                          <Target className="w-4 h-4" />
+                                          Metas Postura
+                                        </DropdownMenuItem>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
+                                          <Scale className="w-4 h-4" />
+                                          Pesagem
+                                          {lote.precisaPesar && (
+                                            <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
+                                          )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
+                                          <Skull className="w-4 h-4" />
+                                          Mortalidade
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
+                                          <Target className="w-4 h-4" />
+                                          Meta
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                                 <Button 
@@ -711,6 +850,25 @@ export default function MeusLotes() {
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
+            onSuccess={fetchLotes}
+          />
+          <ProducaoOvosDialog
+            open={producaoOvosOpen}
+            onOpenChange={setProducaoOvosOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            linhagem={selectedLote.linhagem_postura || ''}
+            semanasVida={selectedLote.semanasVida || 0}
+            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            onSuccess={fetchLotes}
+          />
+          <MetasPosturaDialog
+            open={metasPosturaOpen}
+            onOpenChange={setMetasPosturaOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            linhagem={selectedLote.linhagem_postura || ''}
+            semanasVida={selectedLote.semanasVida || 0}
             onSuccess={fetchLotes}
           />
         </>
