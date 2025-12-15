@@ -25,6 +25,7 @@ import FabricaRacao from "./pages/FabricaRacao";
 import Veterinario from "./pages/Veterinario";
 import VeterinarioLote from "./pages/VeterinarioLote";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
+import Comercial from "./pages/Comercial";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -175,6 +176,11 @@ const AppRoutes = () => (
     <Route path="/configuracoes/financeiro" element={
       <ProtectedRoute>
         <ConfiguracaoFinanceiro />
+      </ProtectedRoute>
+    } />
+    <Route path="/comercial" element={
+      <ProtectedRoute>
+        <Comercial />
       </ProtectedRoute>
     } />
     
