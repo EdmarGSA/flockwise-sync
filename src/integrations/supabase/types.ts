@@ -137,6 +137,30 @@ export type Database = {
           },
         ]
       }
+      config_fechamento: {
+        Row: {
+          constante_ajuste_ca: number
+          created_at: string
+          id: string
+          integrado_id: string
+          updated_at: string
+        }
+        Insert: {
+          constante_ajuste_ca?: number
+          created_at?: string
+          id?: string
+          integrado_id: string
+          updated_at?: string
+        }
+        Update: {
+          constante_ajuste_ca?: number
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       config_silo: {
         Row: {
           created_at: string
@@ -632,6 +656,104 @@ export type Database = {
             columns: ["produto_racao_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fechamento_lotes: {
+        Row: {
+          aves_abatidas: number
+          aves_alojadas: number
+          aves_condenadas_parcial: number | null
+          aves_condenadas_total: number | null
+          calo_pata_quantidade: number | null
+          consumo_total_racao_kg: number
+          conv_ajustada_prev: number | null
+          conversao_ajustada: number | null
+          conversao_alimentar: number
+          created_at: string
+          data_abate: string
+          data_alojamento: string
+          fechado_por: string | null
+          gpd_kg: number
+          id: string
+          idade_abate: number
+          iee: number | null
+          iep: number
+          integrado_id: string
+          lote_id: string
+          mortalidade_percentual: number
+          peso_inicial_kg: number
+          peso_medio_real_kg: number
+          peso_projetado_kg: number | null
+          peso_total_abatido_kg: number
+          updated_at: string
+          viabilidade_percentual: number
+        }
+        Insert: {
+          aves_abatidas: number
+          aves_alojadas: number
+          aves_condenadas_parcial?: number | null
+          aves_condenadas_total?: number | null
+          calo_pata_quantidade?: number | null
+          consumo_total_racao_kg: number
+          conv_ajustada_prev?: number | null
+          conversao_ajustada?: number | null
+          conversao_alimentar: number
+          created_at?: string
+          data_abate: string
+          data_alojamento: string
+          fechado_por?: string | null
+          gpd_kg: number
+          id?: string
+          idade_abate: number
+          iee?: number | null
+          iep: number
+          integrado_id: string
+          lote_id: string
+          mortalidade_percentual: number
+          peso_inicial_kg: number
+          peso_medio_real_kg: number
+          peso_projetado_kg?: number | null
+          peso_total_abatido_kg: number
+          updated_at?: string
+          viabilidade_percentual: number
+        }
+        Update: {
+          aves_abatidas?: number
+          aves_alojadas?: number
+          aves_condenadas_parcial?: number | null
+          aves_condenadas_total?: number | null
+          calo_pata_quantidade?: number | null
+          consumo_total_racao_kg?: number
+          conv_ajustada_prev?: number | null
+          conversao_ajustada?: number | null
+          conversao_alimentar?: number
+          created_at?: string
+          data_abate?: string
+          data_alojamento?: string
+          fechado_por?: string | null
+          gpd_kg?: number
+          id?: string
+          idade_abate?: number
+          iee?: number | null
+          iep?: number
+          integrado_id?: string
+          lote_id?: string
+          mortalidade_percentual?: number
+          peso_inicial_kg?: number
+          peso_medio_real_kg?: number
+          peso_projetado_kg?: number | null
+          peso_total_abatido_kg?: number
+          updated_at?: string
+          viabilidade_percentual?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamento_lotes_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: true
+            referencedRelation: "lotes"
             referencedColumns: ["id"]
           },
         ]

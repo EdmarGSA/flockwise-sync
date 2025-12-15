@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,7 @@ import { SiloBadge } from '@/components/lotes/SiloBadge';
 import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog';
 import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
 import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
+import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
 
 interface Lote {
   id: string;
@@ -76,6 +77,7 @@ export default function MeusLotes() {
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
   const [jejumDialogOpen, setJejumDialogOpen] = useState(false);
   const [saidaInfoOpen, setSaidaInfoOpen] = useState(false);
+  const [fechamentoOpen, setFechamentoOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
 
   useEffect(() => {
@@ -299,6 +301,11 @@ export default function MeusLotes() {
   const handleSaidaInfo = (lote: LoteComPesagem) => {
     setSelectedLote(lote);
     setSaidaInfoOpen(true);
+  };
+
+  const handleFechamento = (lote: LoteComPesagem) => {
+    setSelectedLote(lote);
+    setFechamentoOpen(true);
   };
 
   const getLinhagemLabel = (linhagem: string) => {
@@ -532,6 +539,10 @@ export default function MeusLotes() {
                                       <Target className="w-4 h-4" />
                                       Meta
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleFechamento(lote)} className="gap-2 text-destructive">
+                                      <Lock className="w-4 h-4" />
+                                      Fechar Lote
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                                 <Button 
@@ -693,6 +704,18 @@ export default function MeusLotes() {
             saidaAbate={selectedLote.saida_abate}
             jejumConfirmado={selectedLote.jejum_confirmado}
             jejumConfirmadoEm={selectedLote.jejum_confirmado_em}
+          />
+          <FechamentoLoteDialog
+            open={fechamentoOpen}
+            onOpenChange={setFechamentoOpen}
+            loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
+            dataAlojamento={selectedLote.data_alojamento || ''}
+            quantidadeAlojada={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            linhagem={selectedLote.linhagem}
+            sexo={selectedLote.sexo}
+            onSuccess={fetchLotes}
           />
         </>
       )}
