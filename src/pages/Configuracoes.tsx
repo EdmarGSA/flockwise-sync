@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -76,6 +76,12 @@ const Configuracoes = () => {
       description: "Constante de ajuste de conversão alimentar",
       icon: Lock,
       path: "/configuracoes/fechamento"
+    },
+    {
+      title: "Produtos Animais",
+      description: "Aves vivas, ovos, suínos e outros",
+      icon: Bird,
+      path: "/configuracoes/produtos-animais"
     }
   ];
 

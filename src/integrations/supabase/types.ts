@@ -1928,8 +1928,10 @@ export type Database = {
           lote_producao_id: string | null
           margem_calculada: number | null
           pedido_id: string
+          peso_total_kg: number | null
           preco_tabela: number | null
           preco_unitario: number
+          produto_animal_id: string | null
           produto_id: string
           quantidade: number
           unidade_medida: string
@@ -1942,8 +1944,10 @@ export type Database = {
           lote_producao_id?: string | null
           margem_calculada?: number | null
           pedido_id: string
+          peso_total_kg?: number | null
           preco_tabela?: number | null
           preco_unitario?: number
+          produto_animal_id?: string | null
           produto_id: string
           quantidade: number
           unidade_medida?: string
@@ -1956,8 +1960,10 @@ export type Database = {
           lote_producao_id?: string | null
           margem_calculada?: number | null
           pedido_id?: string
+          peso_total_kg?: number | null
           preco_tabela?: number | null
           preco_unitario?: number
+          produto_animal_id?: string | null
           produto_id?: string
           quantidade?: number
           unidade_medida?: string
@@ -1969,6 +1975,13 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: false
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_itens_produto_animal_id_fkey"
+            columns: ["produto_animal_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_animais"
             referencedColumns: ["id"]
           },
           {
@@ -2465,6 +2478,65 @@ export type Database = {
             columns: ["grupo_produto_id"]
             isOneToOne: false
             referencedRelation: "grupos_produto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos_animais: {
+        Row: {
+          ativo: boolean
+          cest: string | null
+          created_at: string
+          descricao: string | null
+          grupo_animal_id: string | null
+          id: string
+          integrado_id: string
+          ncm: string | null
+          nome: string
+          peso_medio_referencia: number | null
+          preco_venda_base: number | null
+          sku: string
+          unidade_venda: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cest?: string | null
+          created_at?: string
+          descricao?: string | null
+          grupo_animal_id?: string | null
+          id?: string
+          integrado_id: string
+          ncm?: string | null
+          nome: string
+          peso_medio_referencia?: number | null
+          preco_venda_base?: number | null
+          sku: string
+          unidade_venda?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cest?: string | null
+          created_at?: string
+          descricao?: string | null
+          grupo_animal_id?: string | null
+          id?: string
+          integrado_id?: string
+          ncm?: string | null
+          nome?: string
+          peso_medio_referencia?: number | null
+          preco_venda_base?: number | null
+          sku?: string
+          unidade_venda?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_animais_grupo_animal_id_fkey"
+            columns: ["grupo_animal_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_animal"
             referencedColumns: ["id"]
           },
         ]

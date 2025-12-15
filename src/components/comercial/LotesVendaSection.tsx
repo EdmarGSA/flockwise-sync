@@ -5,9 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bird, Scale, Plus, Calendar, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInDays } from 'date-fns';
+
+interface ProdutoAnimal {
+  id: string;
+  nome: string;
+  unidade_venda: string;
+  preco_venda_base: number;
+  peso_medio_referencia: number | null;
+}
 
 interface LoteDisponivel {
   id: string;
@@ -31,7 +40,10 @@ interface LoteVendaItem {
   quantidade: number;
   preco_unitario: number;
   peso_medio: number;
+  peso_total_kg: number;
   valor_total: number;
+  produto_animal_id?: string;
+  produto_animal_nome?: string;
 }
 
 interface LotesVendaSectionProps {
@@ -41,15 +53,51 @@ interface LotesVendaSectionProps {
 
 export default function LotesVendaSection({ integradoId, onAddItem }: LotesVendaSectionProps) {
   const [lotes, setLotes] = useState<LoteDisponivel[]>([]);
+  const [produtosAnimais, setProdutosAnimais] = useState<ProdutoAnimal[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLote, setSelectedLote] = useState<LoteDisponivel | null>(null);
+  const [selectedProdutoAnimal, setSelectedProdutoAnimal] = useState<string>('');
   const [quantidadeAves, setQuantidadeAves] = useState(0);
   const [pesoTotal, setPesoTotal] = useState(0);
   const [precoPorKg, setPrecoPorKg] = useState(0);
 
   useEffect(() => {
     fetchLotesDisponiveis();
+    fetchProdutosAnimais();
   }, [integradoId]);
+
+  const fetchProdutosAnimais = async () => {
+    try {
+      // Fetch only products for "Aves Corte" group
+      const { data: grupos } = await supabase
+        .from('grupos_animal')
+        .select('id')
+        .eq('integrado_id', integradoId)
+        .ilike('nome', '%aves corte%')
+        .limit(1);
+
+      const grupoId = grupos?.[0]?.id;
+
+      const { data, error } = await supabase
+        .from('produtos_animais')
+        .select('id, nome, unidade_venda, preco_venda_base, peso_medio_referencia')
+        .eq('integrado_id', integradoId)
+        .eq('ativo', true)
+        .eq('grupo_animal_id', grupoId || '')
+        .order('nome');
+
+      if (!error && data) {
+        setProdutosAnimais(data);
+        // Auto-select if only one product
+        if (data.length === 1) {
+          setSelectedProdutoAnimal(data[0].id);
+          setPrecoPorKg(data[0].preco_venda_base || 0);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching produtos animais:', error);
+    }
+  };
 
   const fetchLotesDisponiveis = async () => {
     setLoading(true);
@@ -166,7 +214,17 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
     setSelectedLote(lote);
     setQuantidadeAves(0);
     setPesoTotal(0);
-    setPrecoPorKg(0);
+    // Pre-fill price from selected product
+    const produto = produtosAnimais.find(p => p.id === selectedProdutoAnimal);
+    setPrecoPorKg(produto?.preco_venda_base || 0);
+  };
+
+  const handleProdutoChange = (produtoId: string) => {
+    setSelectedProdutoAnimal(produtoId);
+    const produto = produtosAnimais.find(p => p.id === produtoId);
+    if (produto) {
+      setPrecoPorKg(produto.preco_venda_base || 0);
+    }
   };
 
   const handleQuantidadeChange = (qtd: number) => {
@@ -179,6 +237,11 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
 
   const handleAddToOrder = () => {
     if (!selectedLote) return;
+
+    if (!selectedProdutoAnimal) {
+      toast.error('Selecione o produto animal');
+      return;
+    }
 
     if (quantidadeAves <= 0) {
       toast.error('Informe a quantidade de aves');
@@ -195,6 +258,7 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
       return;
     }
 
+    const produto = produtosAnimais.find(p => p.id === selectedProdutoAnimal);
     const pesoMedio = pesoTotal / quantidadeAves;
     const valorTotal = pesoTotal * precoPorKg;
 
@@ -205,7 +269,10 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
       quantidade: quantidadeAves,
       preco_unitario: precoPorKg,
       peso_medio: pesoMedio,
-      valor_total: valorTotal
+      peso_total_kg: pesoTotal,
+      valor_total: valorTotal,
+      produto_animal_id: selectedProdutoAnimal,
+      produto_animal_nome: produto?.nome || 'Aves Corte Viva'
     };
 
     onAddItem(item);
@@ -213,7 +280,6 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
     setSelectedLote(null);
     setQuantidadeAves(0);
     setPesoTotal(0);
-    setPrecoPorKg(0);
   };
 
   if (loading) {
@@ -308,7 +374,7 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
       {selectedLote && (
         <Card className="border-primary">
           <CardContent className="pt-4 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h4 className="font-medium">
                 Vender de: {selectedLote.galpao.nome} - {selectedLote.nucleo.nome}
               </h4>
@@ -320,6 +386,28 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
                   Disponível: {calcularDisponivelVenda(selectedLote).toLocaleString()} aves
                 </Badge>
               </div>
+            </div>
+
+            {/* Product Selection */}
+            <div className="space-y-2">
+              <Label>Produto Animal *</Label>
+              <Select value={selectedProdutoAnimal} onValueChange={handleProdutoChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {produtosAnimais.map(produto => (
+                    <SelectItem key={produto.id} value={produto.id}>
+                      {produto.nome} - R$ {produto.preco_venda_base.toFixed(2)}/{produto.unidade_venda}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {produtosAnimais.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  Nenhum produto animal cadastrado. Cadastre em Configurações → Produtos Animais.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -373,9 +461,9 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
               </p>
             )}
 
-            <Button onClick={handleAddToOrder} className="w-full">
+            <Button onClick={handleAddToOrder} className="w-full" disabled={!selectedProdutoAnimal}>
               <Plus className="w-4 h-4 mr-2" />
-              Adicionar Aves Corte Viva ao Pedido
+              Adicionar {produtosAnimais.find(p => p.id === selectedProdutoAnimal)?.nome || 'Produto'} ao Pedido
             </Button>
           </CardContent>
         </Card>
