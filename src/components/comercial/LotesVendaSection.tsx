@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Bird, Scale, Plus, Calendar, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInDays } from 'date-fns';
@@ -44,9 +43,9 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
   const [lotes, setLotes] = useState<LoteDisponivel[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLote, setSelectedLote] = useState<LoteDisponivel | null>(null);
-  const [tipoVenda, setTipoVenda] = useState<'unidade' | 'peso'>('unidade');
-  const [quantidade, setQuantidade] = useState(0);
-  const [precoUnitario, setPrecoUnitario] = useState(0);
+  const [quantidadeAves, setQuantidadeAves] = useState(0);
+  const [pesoTotal, setPesoTotal] = useState(0);
+  const [precoPorKg, setPrecoPorKg] = useState(0);
 
   useEffect(() => {
     fetchLotesDisponiveis();
@@ -165,58 +164,59 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
 
   const handleSelectLote = (lote: LoteDisponivel) => {
     setSelectedLote(lote);
-    setQuantidade(0);
-    setPrecoUnitario(0);
-    setTipoVenda('unidade');
+    setQuantidadeAves(0);
+    setPesoTotal(0);
+    setPrecoPorKg(0);
+  };
+
+  const handleQuantidadeChange = (qtd: number) => {
+    setQuantidadeAves(qtd);
+    if (selectedLote?.ultimoPesoMedio && qtd > 0) {
+      setPesoTotal(parseFloat((qtd * selectedLote.ultimoPesoMedio).toFixed(2)));
+    }
+  };
+
+  const handlePesoChange = (peso: number) => {
+    setPesoTotal(peso);
+    if (selectedLote?.ultimoPesoMedio && peso > 0) {
+      setQuantidadeAves(Math.ceil(peso / selectedLote.ultimoPesoMedio));
+    }
   };
 
   const handleAddToOrder = () => {
     if (!selectedLote) return;
 
-    if (quantidade <= 0) {
-      toast.error('Informe uma quantidade válida');
+    if (quantidadeAves <= 0) {
+      toast.error('Informe a quantidade de aves');
+      return;
+    }
+
+    if (pesoTotal <= 0) {
+      toast.error('Informe o peso total');
       return;
     }
 
     const disponivel = calcularDisponivelVenda(selectedLote);
     
-    if (tipoVenda === 'unidade' && quantidade > disponivel) {
+    if (quantidadeAves > disponivel) {
       toast.error(`Quantidade máxima disponível: ${disponivel} aves`);
       return;
     }
 
-    if (tipoVenda === 'peso' && selectedLote.ultimoPesoMedio) {
-      const avesNecessarias = Math.ceil(quantidade / selectedLote.ultimoPesoMedio);
-      if (avesNecessarias > disponivel) {
-        toast.error(`Peso máximo disponível: ${(disponivel * selectedLote.ultimoPesoMedio).toFixed(2)} kg`);
-        return;
-      }
-    }
-
-    if (precoUnitario <= 0) {
-      toast.error('Informe um preço válido');
+    if (precoPorKg <= 0) {
+      toast.error('Informe o preço por kg');
       return;
     }
 
-    const pesoMedio = selectedLote.ultimoPesoMedio || 0;
-    let valorTotal = 0;
-    let qtdFinal = quantidade;
-
-    if (tipoVenda === 'unidade') {
-      // Venda por unidade: preço é por ave
-      valorTotal = quantidade * precoUnitario;
-    } else {
-      // Venda por peso: preço é por kg
-      valorTotal = quantidade * precoUnitario;
-      // Quantidade em kg
-    }
+    const pesoMedio = pesoTotal / quantidadeAves;
+    const valorTotal = pesoTotal * precoPorKg;
 
     const item: LoteVendaItem = {
       lote_id: selectedLote.id,
       lote_info: `${selectedLote.galpao.nome} - ${selectedLote.nucleo.nome}`,
-      tipo_venda: tipoVenda,
-      quantidade: qtdFinal,
-      preco_unitario: precoUnitario,
+      tipo_venda: 'peso',
+      quantidade: quantidadeAves,
+      preco_unitario: precoPorKg,
       peso_medio: pesoMedio,
       valor_total: valorTotal
     };
@@ -224,8 +224,9 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
     onAddItem(item);
     toast.success('Aves adicionadas ao pedido');
     setSelectedLote(null);
-    setQuantidade(0);
-    setPrecoUnitario(0);
+    setQuantidadeAves(0);
+    setPesoTotal(0);
+    setPrecoPorKg(0);
   };
 
   if (loading) {
@@ -324,69 +325,64 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
               <h4 className="font-medium">
                 Vender de: {selectedLote.galpao.nome} - {selectedLote.nucleo.nome}
               </h4>
-              <Badge>
-                Disponível: {calcularDisponivelVenda(selectedLote).toLocaleString()} aves
-              </Badge>
+              <div className="flex gap-2">
+                <Badge variant="outline">
+                  Peso médio: {selectedLote.ultimoPesoMedio ? `${selectedLote.ultimoPesoMedio.toFixed(3)} kg` : 'N/A'}
+                </Badge>
+                <Badge>
+                  Disponível: {calcularDisponivelVenda(selectedLote).toLocaleString()} aves
+                </Badge>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <Label>Tipo de Venda</Label>
-              <RadioGroup 
-                value={tipoVenda} 
-                onValueChange={(v) => setTipoVenda(v as 'unidade' | 'peso')}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="unidade" id="unidade" />
-                  <Label htmlFor="unidade" className="cursor-pointer">Por Unidade (aves)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="peso" id="peso" />
-                  <Label htmlFor="peso" className="cursor-pointer">Por Peso (kg)</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label>
-                  {tipoVenda === 'unidade' ? 'Quantidade (aves)' : 'Peso Total (kg)'}
-                </Label>
+                <Label>Quantidade (aves)</Label>
                 <Input
                   type="number"
                   min="0"
-                  step={tipoVenda === 'unidade' ? '1' : '0.01'}
-                  value={quantidade || ''}
-                  onChange={(e) => setQuantidade(parseFloat(e.target.value) || 0)}
-                  placeholder={tipoVenda === 'unidade' ? 'Qtd aves' : 'Peso em kg'}
+                  step="1"
+                  value={quantidadeAves || ''}
+                  onChange={(e) => handleQuantidadeChange(parseInt(e.target.value) || 0)}
+                  placeholder="Qtd aves"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>
-                  Preço {tipoVenda === 'unidade' ? 'por Ave (R$)' : 'por Kg (R$)'}
-                </Label>
+                <Label>Peso Total (kg)</Label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={precoUnitario || ''}
-                  onChange={(e) => setPrecoUnitario(parseFloat(e.target.value) || 0)}
-                  placeholder={tipoVenda === 'unidade' ? 'R$/ave' : 'R$/kg'}
+                  value={pesoTotal || ''}
+                  onChange={(e) => handlePesoChange(parseFloat(e.target.value) || 0)}
+                  placeholder="Peso em kg"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Preço por Kg (R$)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={precoPorKg || ''}
+                  onChange={(e) => setPrecoPorKg(parseFloat(e.target.value) || 0)}
+                  placeholder="R$/kg"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>Valor Total</Label>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted font-medium flex items-center">
-                  R$ {(quantidade * precoUnitario).toFixed(2)}
+                  R$ {(pesoTotal * precoPorKg).toFixed(2)}
                 </div>
               </div>
             </div>
 
-            {tipoVenda === 'peso' && selectedLote.ultimoPesoMedio && quantidade > 0 && (
+            {quantidadeAves > 0 && pesoTotal > 0 && (
               <p className="text-sm text-muted-foreground">
-                ≈ {Math.ceil(quantidade / selectedLote.ultimoPesoMedio)} aves (baseado no peso médio de {selectedLote.ultimoPesoMedio.toFixed(3)} kg)
+                Peso médio calculado: {(pesoTotal / quantidadeAves).toFixed(3)} kg/ave
               </p>
             )}
 
