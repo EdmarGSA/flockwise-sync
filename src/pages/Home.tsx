@@ -15,7 +15,8 @@ import {
   Settings,
   Package,
   DollarSign,
-  ShoppingCart
+  ShoppingCart,
+  Plane
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -109,6 +110,15 @@ const modules: ModuleCard[] = [
     icon: ShoppingCart,
     path: '/comercial',
     color: 'from-indigo-500 to-indigo-700',
+    available: true,
+  },
+  {
+    id: 'cockpit',
+    title: 'Cockpit Thoth',
+    description: 'Painel de controle integrado',
+    icon: Plane,
+    path: '/cockpit',
+    color: 'from-slate-600 to-slate-800',
     available: true,
   },
 ];
