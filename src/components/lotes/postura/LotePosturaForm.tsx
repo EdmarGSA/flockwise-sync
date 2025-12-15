@@ -23,17 +23,10 @@ const lotePosturaSchema = z.object({
   galpao_id: z.string().uuid('Selecione um galpão'),
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
-  linhagem_postura: z.enum([
-    'lohmann_brown_lite',
-    'lohmann_lsl_lite',
-    'hy_line_brown',
-    'hy_line_w36',
-    'isa_brown',
-    'novogen_brown',
-    'dekalb_white'
-  ]),
+  linhagem_postura: z.string().min(1, 'Selecione uma linhagem'),
   veterinario_id: z.string().optional(),
   observacoes: z.string().optional(),
+  custo_aves: z.string().optional(),
 });
 
 type LotePosturaFormData = z.infer<typeof lotePosturaSchema>;
@@ -61,6 +54,11 @@ interface LotePosturaFormProps {
   onSuccess?: () => void;
 }
 
+interface LinhagemOption {
+  value: string;
+  label: string;
+}
+
 const linhagemLabels: Record<string, string> = {
   lohmann_brown_lite: 'Lohmann Brown-Lite',
   lohmann_lsl_lite: 'Lohmann LSL-Lite',
@@ -78,6 +76,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
   const [selectedNucleoId, setSelectedNucleoId] = useState<string>('');
+  const [linhagens, setLinhagens] = useState<LinhagemOption[]>([]);
 
   const form = useForm<LotePosturaFormData>({
     resolver: zodResolver(lotePosturaSchema),
@@ -85,15 +84,17 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
       nucleo_id: '',
       galpao_id: '',
       quantidade_aves: '',
-      linhagem_postura: 'lohmann_brown_lite',
+      linhagem_postura: '',
       veterinario_id: '',
       observacoes: '',
+      custo_aves: '',
     },
   });
 
   useEffect(() => {
     fetchNucleos();
     fetchVeterinarios();
+    fetchLinhagens();
   }, []);
 
   useEffect(() => {
@@ -103,13 +104,49 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
     }
   }, [selectedNucleoId]);
 
-  const fetchNucleos = async () => {
-    // Only fetch nucleos with tipo_producao = 'Aves Postura'
+  const fetchLinhagens = async () => {
     const { data, error } = await supabase
+      .from('desempenho_postura')
+      .select('linhagem');
+    
+    if (error) {
+      console.error('Erro ao buscar linhagens:', error);
+      return;
+    }
+    
+    const uniqueLinhagens = [...new Set(data?.map(d => d.linhagem).filter(Boolean) || [])];
+    const options = uniqueLinhagens.map(l => ({
+      value: l,
+      label: linhagemLabels[l] || l
+    }));
+    setLinhagens(options);
+    
+    // Set default if available
+    if (options.length > 0 && !form.getValues('linhagem_postura')) {
+      form.setValue('linhagem_postura', options[0].value);
+    }
+  };
+
+  const fetchNucleos = async () => {
+    // Fetch grupo_animal "Aves Postura" to get its ID
+    const { data: gruposData } = await supabase
+      .from('grupos_animal')
+      .select('id')
+      .ilike('nome', '%postura%')
+      .limit(1);
+    
+    const grupoPosturaId = gruposData?.[0]?.id;
+    
+    let query = supabase
       .from('nucleos')
       .select('id, nome, tipo_producao')
-      .eq('ativo', true)
-      .ilike('tipo_producao', '%postura%');
+      .eq('ativo', true);
+    
+    if (grupoPosturaId) {
+      query = query.eq('tipo_producao', grupoPosturaId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Erro ao buscar núcleos:', error);
@@ -185,6 +222,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
         integrado_id: user.id,
         status: 'previsao' as const,
         fase_postura_atual: 'cria' as const, // Começa na fase cria
+        custo_aves: data.custo_aves ? parseFloat(data.custo_aves) : null,
       };
 
       const { error } = await supabase.from('lotes').insert(insertData);
@@ -362,18 +400,24 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Linhagem</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a linhagem" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {Object.entries(linhagemLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
+                    {linhagens.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        Nenhuma linhagem disponível
                       </SelectItem>
-                    ))}
+                    ) : (
+                      linhagens.map((lin) => (
+                        <SelectItem key={lin.value} value={lin.value}>
+                          {lin.label}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -458,6 +502,27 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
                     )}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="custo_aves"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Custo das Aves (R$) - opcional</FormLabel>
+                <FormControl>
+                  <Input type="number" min="0" step="0.01" placeholder="Ex: 15000.00" {...field} />
+                </FormControl>
+                {quantidadeAves > 0 && field.value && parseFloat(field.value) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Custo por ave: R$ {(parseFloat(field.value) / quantidadeAves).toFixed(2)}
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
