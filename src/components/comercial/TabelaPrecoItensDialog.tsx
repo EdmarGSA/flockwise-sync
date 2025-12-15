@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Package, Bird } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TabelaPrecoItensDialogProps {
@@ -16,14 +16,24 @@ interface TabelaPrecoItensDialogProps {
   integradoId: string;
 }
 
+interface ProdutoUnificado {
+  id: string;
+  tipo: 'produto' | 'produto_animal';
+  nome: string;
+  preco_venda: number;
+  custo_medio: number | null;
+  unidade: string;
+}
+
 export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, integradoId }: TabelaPrecoItensDialogProps) {
   const [itens, setItens] = useState<any[]>([]);
-  const [produtos, setProdutos] = useState<any[]>([]);
+  const [produtosUnificados, setProdutosUnificados] = useState<ProdutoUnificado[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [novoItem, setNovoItem] = useState({
-    produto_id: '',
+    selecionado_id: '',
+    selecionado_tipo: '' as 'produto' | 'produto_animal' | '',
     preco_unitario: 0,
     desconto_maximo_percentual: 0
   });
@@ -31,7 +41,7 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
   useEffect(() => {
     if (open) {
       fetchItens();
-      fetchProdutos();
+      fetchProdutosUnificados();
     }
   }, [open, tabela]);
 
@@ -42,7 +52,8 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
         .from('tabelas_preco_itens')
         .select(`
           *,
-          produto:produtos(nome, preco_venda, custo_medio, unidade_medida)
+          produto:produtos(nome, preco_venda, custo_medio, unidade_medida),
+          produto_animal:produtos_animais(nome, preco_venda_base, unidade_venda)
         `)
         .eq('tabela_preco_id', tabela.id)
         .order('created_at');
@@ -57,43 +68,85 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
     }
   };
 
-  const fetchProdutos = async () => {
-    const { data } = await supabase
+  const fetchProdutosUnificados = async () => {
+    // Buscar produtos com status_comercial = 'venda' ou 'ambos'
+    const { data: produtos } = await supabase
       .from('produtos')
       .select('id, nome, preco_venda, custo_medio, unidade_medida')
       .eq('integrado_id', integradoId)
       .eq('ativo', true)
+      .in('status_comercial', ['venda', 'ambos'])
       .order('nome');
-    setProdutos(data || []);
+
+    // Buscar produtos animais
+    const { data: produtosAnimais } = await supabase
+      .from('produtos_animais')
+      .select('id, nome, preco_venda_base, unidade_venda')
+      .eq('integrado_id', integradoId)
+      .eq('ativo', true)
+      .order('nome');
+
+    const unificados: ProdutoUnificado[] = [
+      ...(produtos || []).map(p => ({
+        id: p.id,
+        tipo: 'produto' as const,
+        nome: p.nome,
+        preco_venda: p.preco_venda || 0,
+        custo_medio: p.custo_medio,
+        unidade: p.unidade_medida || 'UN'
+      })),
+      ...(produtosAnimais || []).map(pa => ({
+        id: pa.id,
+        tipo: 'produto_animal' as const,
+        nome: pa.nome,
+        preco_venda: pa.preco_venda_base || 0,
+        custo_medio: null,
+        unidade: pa.unidade_venda || 'KG'
+      }))
+    ];
+
+    setProdutosUnificados(unificados);
   };
 
   const handleAddItem = async () => {
-    if (!novoItem.produto_id || novoItem.preco_unitario <= 0) {
+    if (!novoItem.selecionado_id || !novoItem.selecionado_tipo || novoItem.preco_unitario <= 0) {
       toast.error('Selecione um produto e informe um preço válido');
       return;
     }
 
-    // Check if product already exists
-    if (itens.some(i => i.produto_id === novoItem.produto_id)) {
+    // Check if already exists
+    const jaExiste = itens.some(i => 
+      (novoItem.selecionado_tipo === 'produto' && i.produto_id === novoItem.selecionado_id) ||
+      (novoItem.selecionado_tipo === 'produto_animal' && i.produto_animal_id === novoItem.selecionado_id)
+    );
+
+    if (jaExiste) {
       toast.error('Produto já está na tabela');
       return;
     }
 
     setSaving(true);
     try {
+      const insertData: any = {
+        tabela_preco_id: tabela.id,
+        preco_unitario: novoItem.preco_unitario,
+        desconto_maximo_percentual: novoItem.desconto_maximo_percentual
+      };
+
+      if (novoItem.selecionado_tipo === 'produto') {
+        insertData.produto_id = novoItem.selecionado_id;
+      } else {
+        insertData.produto_animal_id = novoItem.selecionado_id;
+      }
+
       const { error } = await supabase
         .from('tabelas_preco_itens')
-        .insert({
-          tabela_preco_id: tabela.id,
-          produto_id: novoItem.produto_id,
-          preco_unitario: novoItem.preco_unitario,
-          desconto_maximo_percentual: novoItem.desconto_maximo_percentual
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
       toast.success('Produto adicionado à tabela!');
-      setNovoItem({ produto_id: '', preco_unitario: 0, desconto_maximo_percentual: 0 });
+      setNovoItem({ selecionado_id: '', selecionado_tipo: '', preco_unitario: 0, desconto_maximo_percentual: 0 });
       fetchItens();
     } catch (error) {
       console.error('Error adding item:', error);
@@ -137,9 +190,17 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
     }
   };
 
-  const availableProducts = produtos.filter(
-    p => !itens.some(i => i.produto_id === p.id)
-  );
+  // Filtrar produtos disponíveis (não já adicionados)
+  const availableProducts = produtosUnificados.filter(p => {
+    if (p.tipo === 'produto') {
+      return !itens.some(i => i.produto_id === p.id);
+    } else {
+      return !itens.some(i => i.produto_animal_id === p.id);
+    }
+  });
+
+  const produtosDisponiveis = availableProducts.filter(p => p.tipo === 'produto');
+  const produtosAnimaisDisponiveis = availableProducts.filter(p => p.tipo === 'produto_animal');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -154,13 +215,15 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
             <div className="space-y-2 md:col-span-2">
               <Label>Produto</Label>
               <Select
-                value={novoItem.produto_id}
+                value={novoItem.selecionado_id ? `${novoItem.selecionado_tipo}:${novoItem.selecionado_id}` : ''}
                 onValueChange={(v) => {
-                  const produto = produtos.find(p => p.id === v);
+                  const [tipo, id] = v.split(':') as ['produto' | 'produto_animal', string];
+                  const item = produtosUnificados.find(p => p.id === id && p.tipo === tipo);
                   setNovoItem({
                     ...novoItem,
-                    produto_id: v,
-                    preco_unitario: produto?.preco_venda || 0
+                    selecionado_id: id,
+                    selecionado_tipo: tipo,
+                    preco_unitario: item?.preco_venda || 0
                   });
                 }}
               >
@@ -168,11 +231,30 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
                   <SelectValue placeholder="Selecione o produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableProducts.map(produto => (
-                    <SelectItem key={produto.id} value={produto.id}>
-                      {produto.nome}
-                    </SelectItem>
-                  ))}
+                  {produtosDisponiveis.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                        <Package className="w-3 h-3" /> Produtos
+                      </div>
+                      {produtosDisponiveis.map(p => (
+                        <SelectItem key={`produto:${p.id}`} value={`produto:${p.id}`}>
+                          {p.nome} ({p.unidade})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {produtosAnimaisDisponiveis.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2">
+                        <Bird className="w-3 h-3" /> Produtos Animais
+                      </div>
+                      {produtosAnimaisDisponiveis.map(p => (
+                        <SelectItem key={`produto_animal:${p.id}`} value={`produto_animal:${p.id}`}>
+                          {p.nome} ({p.unidade})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -217,7 +299,7 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
               <TableHeader>
                 <TableRow>
                   <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Custo Médio</TableHead>
+                  <TableHead className="text-right">Custo</TableHead>
                   <TableHead className="text-right">Preço Unitário</TableHead>
                   <TableHead className="text-right">Desc. Máx.</TableHead>
                   <TableHead className="text-right">Margem</TableHead>
@@ -226,21 +308,31 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
               </TableHeader>
               <TableBody>
                 {itens.map((item) => {
-                  const custoMedio = item.produto?.custo_medio || 0;
-                  const margem = custoMedio > 0 
+                  const isProduto = !!item.produto_id;
+                  const nome = isProduto ? item.produto?.nome : item.produto_animal?.nome;
+                  const unidade = isProduto ? item.produto?.unidade_medida : item.produto_animal?.unidade_venda;
+                  const custoMedio = isProduto ? (item.produto?.custo_medio || 0) : null;
+                  const margem = custoMedio && custoMedio > 0 
                     ? ((item.preco_unitario - custoMedio) / custoMedio * 100)
-                    : 0;
+                    : null;
 
                   return (
                     <TableRow key={item.id}>
                       <TableCell>
-                        {item.produto?.nome}
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({item.produto?.unidade_medida})
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {isProduto ? (
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <Bird className="w-4 h-4 text-orange-500" />
+                          )}
+                          {nome}
+                          <span className="text-xs text-muted-foreground">
+                            ({unidade})
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        R$ {custoMedio.toFixed(2)}
+                        {custoMedio !== null ? `R$ ${custoMedio.toFixed(2)}` : '--'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
@@ -279,9 +371,13 @@ export default function TabelaPrecoItensDialog({ open, onOpenChange, tabela, int
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={margem < tabela.margem_minima_percentual ? 'text-destructive' : 'text-green-600'}>
-                          {margem.toFixed(1)}%
-                        </span>
+                        {margem !== null ? (
+                          <span className={margem < tabela.margem_minima_percentual ? 'text-destructive' : 'text-green-600'}>
+                            {margem.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">--</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Button
