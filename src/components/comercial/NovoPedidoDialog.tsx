@@ -91,6 +91,10 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   const [selectedFormaId, setSelectedFormaId] = useState("");
   const [selectedPrazoId, setSelectedPrazoId] = useState("");
 
+  // Delinquency management
+  const [clienteInadimplente, setClienteInadimplente] = useState(false);
+  const [contasVencidas, setContasVencidas] = useState<{ id: string; valor: number; data_vencimento: string }[]>([]);
+
   const [formData, setFormData] = useState({
     cliente_id: '',
     tabela_preco_id: '',
@@ -136,6 +140,8 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       setLimiteUtilizado(0);
       setSelectedFormaId("");
       setSelectedPrazoId("");
+      setClienteInadimplente(false);
+      setContasVencidas([]);
     }
   }, [formData.cliente_id]);
 
@@ -225,6 +231,20 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   };
 
   const fetchCreditoCliente = async (clienteId: string) => {
+    // Check for overdue accounts (delinquency)
+    const today = new Date().toISOString().split('T')[0];
+    const { data: vencidas } = await supabase
+      .from('contas_receber')
+      .select('id, valor, data_vencimento')
+      .eq('cliente_id', clienteId)
+      .eq('integrado_id', integradoId)
+      .in('status', ['previsao', 'pendente', 'parcial'])
+      .lt('data_vencimento', today);
+
+    const isInadimplente = vencidas && vencidas.length > 0;
+    setClienteInadimplente(isInadimplente);
+    setContasVencidas(vencidas || []);
+
     // Fetch credit configuration
     const { data: credito } = await supabase
       .from('credito_cliente')
@@ -269,7 +289,19 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     return creditoCliente.limite_credito - limiteUtilizado;
   };
 
+  const isFormaAVista = (forma: FormaPagamentoCustom) => {
+    const codigoLower = forma.codigo.toLowerCase();
+    const nomeLower = forma.nome.toLowerCase();
+    return codigoLower.includes('dinheiro') || codigoLower.includes('pix') ||
+           nomeLower.includes('dinheiro') || nomeLower.includes('pix');
+  };
+
   const getFormasDisponiveis = () => {
+    // If client is delinquent, only allow cash/PIX
+    if (clienteInadimplente) {
+      return formasPagamento.filter(f => isFormaAVista(f));
+    }
+
     if (!creditoCliente || creditoFormas.length === 0) {
       return formasPagamento;
     }
@@ -282,6 +314,14 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     
     const prazosForma = prazosPagamento.filter(p => p.forma_pagamento_id === selectedFormaId);
     
+    // If client is delinquent, only allow immediate payment (0 days)
+    if (clienteInadimplente) {
+      return prazosForma.filter(p => 
+        p.dias_parcelas.length === 0 || 
+        (p.dias_parcelas.length === 1 && p.dias_parcelas[0] === 0)
+      );
+    }
+
     if (!creditoCliente || creditoFormas.length === 0) {
       return prazosForma;
     }
@@ -429,6 +469,15 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       return;
     }
 
+    // Delinquency validation - only allow cash/PIX
+    if (clienteInadimplente && selectedFormaId) {
+      const formaSelected = formasPagamento.find(f => f.id === selectedFormaId);
+      if (formaSelected && !isFormaAVista(formaSelected)) {
+        toast.error('Cliente inadimplente! Somente venda à vista (Dinheiro ou PIX)');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const totais = calcularTotais();
@@ -508,6 +557,8 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     setLimiteUtilizado(0);
     setSelectedFormaId("");
     setSelectedPrazoId("");
+    setClienteInadimplente(false);
+    setContasVencidas([]);
   };
 
   const totais = calcularTotais();
@@ -560,6 +611,30 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
               </Select>
             </div>
           </div>
+
+          {/* Delinquency Alert Card */}
+          {clienteInadimplente && (
+            <Card className="border-2 border-destructive bg-destructive/10">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <span className="font-bold text-destructive">CLIENTE INADIMPLENTE</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Este cliente possui {contasVencidas.length} conta(s) em atraso
+                </p>
+                <p className="text-sm font-medium">
+                  Total em atraso: R$ {contasVencidas.reduce((acc, c) => acc + (c.valor || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <div className="mt-3 pt-3 border-t border-destructive/30">
+                  <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    SOMENTE VENDA À VISTA (Dinheiro ou PIX)
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Credit Info Card */}
           {creditoCliente && (
