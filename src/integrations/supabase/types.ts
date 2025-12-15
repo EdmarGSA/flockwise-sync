@@ -483,6 +483,96 @@ export type Database = {
           },
         ]
       }
+      credito_cliente: {
+        Row: {
+          ativo: boolean | null
+          cliente_id: string
+          created_at: string | null
+          id: string
+          integrado_id: string
+          limite_credito: number
+          observacoes: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cliente_id: string
+          created_at?: string | null
+          id?: string
+          integrado_id: string
+          limite_credito?: number
+          observacoes?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cliente_id?: string
+          created_at?: string | null
+          id?: string
+          integrado_id?: string
+          limite_credito?: number
+          observacoes?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credito_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credito_cliente_formas: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          credito_cliente_id: string
+          forma_pagamento_id: string
+          id: string
+          prazo_pagamento_id: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          credito_cliente_id: string
+          forma_pagamento_id: string
+          id?: string
+          prazo_pagamento_id?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          credito_cliente_id?: string
+          forma_pagamento_id?: string
+          id?: string
+          prazo_pagamento_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credito_cliente_formas_credito_cliente_id_fkey"
+            columns: ["credito_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "credito_cliente"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credito_cliente_formas_forma_pagamento_id_fkey"
+            columns: ["forma_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credito_cliente_formas_prazo_pagamento_id_fkey"
+            columns: ["prazo_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "prazos_pagamento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       desempenho_aves: {
         Row: {
           consumo_acumulado_racao_g: number

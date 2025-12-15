@@ -16,6 +16,7 @@ import PlanoContasTab from "@/components/financeiro/PlanoContasTab";
 import CentroCustosTab from "@/components/financeiro/CentroCustosTab";
 import TaxasBancariasTab from "@/components/financeiro/TaxasBancariasTab";
 import FormasPagamentoTab from "@/components/financeiro/FormasPagamentoTab";
+import CreditoClienteTab from "@/components/financeiro/CreditoClienteTab";
 
 const Financeiro = () => {
   const { user, loading } = useAuth();
@@ -118,7 +119,7 @@ const Financeiro = () => {
 
           <TabsContent value="configuracoes">
             <Tabs value={configTab} onValueChange={setConfigTab} className="space-y-4">
-              <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+              <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
                 <TabsTrigger value="contas-bancarias" className="flex items-center gap-2">
                   <Landmark className="h-4 w-4" />
                   <span className="hidden sm:inline">Contas Bancárias</span>
@@ -144,6 +145,11 @@ const Financeiro = () => {
                   <span className="hidden sm:inline">Formas Pagamento</span>
                   <span className="sm:hidden">Formas</span>
                 </TabsTrigger>
+                <TabsTrigger value="credito-cliente" className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Crédito Cliente</span>
+                  <span className="sm:hidden">Crédito</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="contas-bancarias">
@@ -164,6 +170,10 @@ const Financeiro = () => {
               
               <TabsContent value="formas-pagamento">
                 <FormasPagamentoTab userId={user.id} />
+              </TabsContent>
+
+              <TabsContent value="credito-cliente">
+                <CreditoClienteTab userId={user.id} />
               </TabsContent>
             </Tabs>
           </TabsContent>

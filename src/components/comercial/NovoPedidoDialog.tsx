@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, AlertTriangle, History, Package, Bird } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, History, Package, Bird, CreditCard, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import LotesVendaSection from './LotesVendaSection';
 
@@ -49,6 +49,30 @@ interface LoteVendaItem {
 
 type FormaPagamento = 'boleto' | 'pix' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'cheque';
 
+interface CreditoCliente {
+  id: string;
+  limite_credito: number;
+  ativo: boolean;
+}
+
+interface CreditoForma {
+  forma_pagamento_id: string;
+  prazo_pagamento_id: string | null;
+}
+
+interface FormaPagamentoCustom {
+  id: string;
+  nome: string;
+  codigo: string;
+}
+
+interface PrazoPagamentoCustom {
+  id: string;
+  forma_pagamento_id: string;
+  nome: string;
+  dias_parcelas: number[];
+}
+
 export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSuccess }: NovoPedidoDialogProps) {
   const [clientes, setClientes] = useState<any[]>([]);
   const [tabelasPreco, setTabelasPreco] = useState<any[]>([]);
@@ -57,6 +81,15 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   const [historicoCliente, setHistoricoCliente] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('produtos');
+
+  // Credit management
+  const [creditoCliente, setCreditoCliente] = useState<CreditoCliente | null>(null);
+  const [creditoFormas, setCreditoFormas] = useState<CreditoForma[]>([]);
+  const [limiteUtilizado, setLimiteUtilizado] = useState(0);
+  const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoCustom[]>([]);
+  const [prazosPagamento, setPrazosPagamento] = useState<PrazoPagamentoCustom[]>([]);
+  const [selectedFormaId, setSelectedFormaId] = useState("");
+  const [selectedPrazoId, setSelectedPrazoId] = useState("");
 
   const [formData, setFormData] = useState({
     cliente_id: '',
@@ -83,6 +116,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       fetchClientes();
       fetchTabelasPreco();
       fetchProdutos();
+      fetchFormasPagamento();
     }
   }, [open]);
 
@@ -95,6 +129,13 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   useEffect(() => {
     if (formData.cliente_id) {
       fetchHistoricoCliente(formData.cliente_id);
+      fetchCreditoCliente(formData.cliente_id);
+    } else {
+      setCreditoCliente(null);
+      setCreditoFormas([]);
+      setLimiteUtilizado(0);
+      setSelectedFormaId("");
+      setSelectedPrazoId("");
     }
   }, [formData.cliente_id]);
 
@@ -163,6 +204,104 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       .order('created_at', { ascending: false })
       .limit(10);
     setHistoricoCliente(data || []);
+  };
+
+  const fetchFormasPagamento = async () => {
+    const { data: formas } = await supabase
+      .from('formas_pagamento')
+      .select('*')
+      .eq('integrado_id', integradoId)
+      .eq('ativo', true)
+      .order('nome');
+    setFormasPagamento(formas || []);
+
+    const { data: prazos } = await supabase
+      .from('prazos_pagamento')
+      .select('*')
+      .eq('integrado_id', integradoId)
+      .eq('ativo', true)
+      .order('nome');
+    setPrazosPagamento(prazos || []);
+  };
+
+  const fetchCreditoCliente = async (clienteId: string) => {
+    // Fetch credit configuration
+    const { data: credito } = await supabase
+      .from('credito_cliente')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .eq('ativo', true)
+      .single();
+
+    setCreditoCliente(credito);
+
+    if (credito) {
+      // Fetch allowed forms/terms
+      const { data: formas } = await supabase
+        .from('credito_cliente_formas')
+        .select('forma_pagamento_id, prazo_pagamento_id')
+        .eq('credito_cliente_id', credito.id)
+        .eq('ativo', true);
+      setCreditoFormas(formas || []);
+
+      // Fetch utilized credit
+      const { data: contas } = await supabase
+        .from('contas_receber')
+        .select('valor, valor_recebido')
+        .eq('cliente_id', clienteId)
+        .eq('integrado_id', integradoId)
+        .in('status', ['previsao', 'pendente', 'parcial']);
+
+      const utilizado = (contas || []).reduce((acc, c) => {
+        return acc + ((c.valor || 0) - (c.valor_recebido || 0));
+      }, 0);
+      setLimiteUtilizado(utilizado);
+    } else {
+      setCreditoFormas([]);
+      setLimiteUtilizado(0);
+    }
+    setSelectedFormaId("");
+    setSelectedPrazoId("");
+  };
+
+  const getLimiteDisponivel = () => {
+    if (!creditoCliente) return Infinity;
+    return creditoCliente.limite_credito - limiteUtilizado;
+  };
+
+  const getFormasDisponiveis = () => {
+    if (!creditoCliente || creditoFormas.length === 0) {
+      return formasPagamento;
+    }
+    const formaIds = [...new Set(creditoFormas.map(cf => cf.forma_pagamento_id))];
+    return formasPagamento.filter(f => formaIds.includes(f.id));
+  };
+
+  const getPrazosDisponiveis = () => {
+    if (!selectedFormaId) return [];
+    
+    const prazosForma = prazosPagamento.filter(p => p.forma_pagamento_id === selectedFormaId);
+    
+    if (!creditoCliente || creditoFormas.length === 0) {
+      return prazosForma;
+    }
+
+    const prazoIds = creditoFormas
+      .filter(cf => cf.forma_pagamento_id === selectedFormaId && cf.prazo_pagamento_id)
+      .map(cf => cf.prazo_pagamento_id);
+    
+    if (prazoIds.length === 0) {
+      // If forma is allowed but no specific prazos, allow all prazos for that forma
+      const hasFormaNoSpecificPrazo = creditoFormas.some(
+        cf => cf.forma_pagamento_id === selectedFormaId && !cf.prazo_pagamento_id
+      );
+      if (hasFormaNoSpecificPrazo) {
+        return prazosForma;
+      }
+      return [];
+    }
+
+    return prazosForma.filter(p => prazoIds.includes(p.id));
   };
 
   const handleAddItem = () => {
@@ -275,6 +414,21 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       return;
     }
 
+    // Credit limit validation
+    const totalPedido = calcularTotais().total;
+    const limiteDisponivel = getLimiteDisponivel();
+    
+    if (creditoCliente && totalPedido > limiteDisponivel) {
+      toast.error(`Limite de crédito excedido! Disponível: R$ ${limiteDisponivel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+      return;
+    }
+
+    // Payment method validation
+    if (creditoCliente && creditoFormas.length > 0 && (!selectedFormaId)) {
+      toast.error('Selecione uma forma de pagamento autorizada para este cliente');
+      return;
+    }
+
     setSaving(true);
     try {
       const totais = calcularTotais();
@@ -349,6 +503,11 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     setNovoItem({ produto_id: '', quantidade: 1, preco_unitario: 0 });
     setHistoricoCliente([]);
     setActiveTab('produtos');
+    setCreditoCliente(null);
+    setCreditoFormas([]);
+    setLimiteUtilizado(0);
+    setSelectedFormaId("");
+    setSelectedPrazoId("");
   };
 
   const totais = calcularTotais();
@@ -401,6 +560,53 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
               </Select>
             </div>
           </div>
+
+          {/* Credit Info Card */}
+          {creditoCliente && (
+            <Card className={`border-2 ${getLimiteDisponivel() < 0 ? 'border-destructive bg-destructive/10' : getLimiteDisponivel() < creditoCliente.limite_credito * 0.2 ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : 'border-green-500 bg-green-50/50 dark:bg-green-950/20'}`}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    <span className="font-medium">Crédito do Cliente</span>
+                    {getLimiteDisponivel() < creditoCliente.limite_credito * 0.2 && getLimiteDisponivel() > 0 && (
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
+                        <AlertCircle className="w-3 h-3 mr-1" /> Próximo do limite
+                      </Badge>
+                    )}
+                    {getLimiteDisponivel() < 0 && (
+                      <Badge variant="destructive">
+                        <AlertCircle className="w-3 h-3 mr-1" /> Limite excedido
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4 mt-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Limite</p>
+                    <p className="font-medium">R$ {creditoCliente.limite_credito.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Utilizado</p>
+                    <p className="font-medium">R$ {limiteUtilizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Disponível</p>
+                    <p className={`font-bold ${getLimiteDisponivel() < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                      R$ {getLimiteDisponivel().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {creditoFormas.length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs text-muted-foreground">
+                      ⚠️ Formas permitidas: {getFormasDisponiveis().map(f => f.nome).join(', ')}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Client History */}
           {historicoCliente.length > 0 && (
@@ -584,32 +790,53 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
             <div className="space-y-2">
               <Label>Forma de Pagamento</Label>
               <Select
-                value={formData.forma_pagamento}
-                onValueChange={(v) => setFormData({ ...formData, forma_pagamento: v as FormaPagamento })}
+                value={selectedFormaId}
+                onValueChange={(v) => {
+                  setSelectedFormaId(v);
+                  setSelectedPrazoId("");
+                  const forma = formasPagamento.find(f => f.id === v);
+                  if (forma) {
+                    setFormData({ ...formData, forma_pagamento: forma.codigo as FormaPagamento });
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="transferencia">Transferência</SelectItem>
-                  <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
-                  <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
+                  {getFormasDisponiveis().map(forma => (
+                    <SelectItem key={forma.id} value={forma.id}>
+                      {forma.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Prazo (dias)</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.prazo_pagamento_dias}
-                onChange={(e) => setFormData({ ...formData, prazo_pagamento_dias: parseInt(e.target.value) || 0 })}
-              />
+              <Label>Prazo</Label>
+              <Select
+                value={selectedPrazoId}
+                onValueChange={(v) => {
+                  setSelectedPrazoId(v);
+                  const prazo = prazosPagamento.find(p => p.id === v);
+                  if (prazo && prazo.dias_parcelas.length > 0) {
+                    setFormData({ ...formData, prazo_pagamento_dias: prazo.dias_parcelas[prazo.dias_parcelas.length - 1] });
+                  }
+                }}
+                disabled={!selectedFormaId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedFormaId ? "Selecione" : "Selecione forma primeiro"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {getPrazosDisponiveis().map(prazo => (
+                    <SelectItem key={prazo.id} value={prazo.id}>
+                      {prazo.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
