@@ -48,6 +48,8 @@ interface LoteEditFormProps {
 export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
+  const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   
   // Saída de Lote fields
   const [dataPrevistaSaida, setDataPrevistaSaida] = useState<string | null>(
@@ -68,6 +70,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   
   const isEditable = lote.status === 'previsao';
   const isAlojado = lote.status === 'alojado';
+  const quantidadeAvesReal = lote.quantidade_aves - totalMortalidade;
 
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
@@ -87,7 +90,11 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
   useEffect(() => {
     fetchVeterinarios();
-  }, []);
+    if (isAlojado) {
+      fetchMortalidade();
+      fetchUltimoPeso();
+    }
+  }, [lote.id, isAlojado]);
 
   const fetchVeterinarios = async () => {
     const { data, error } = await supabase.rpc('get_veterinarios');
@@ -96,6 +103,55 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       return;
     }
     setVeterinarios(data || []);
+  };
+
+  const fetchMortalidade = async () => {
+    // Buscar total de mortalidade (mortes + eliminados)
+    const { data, error } = await supabase
+      .from('mortalidade')
+      .select('id, mortalidade_itens(quantidade)')
+      .eq('lote_id', lote.id);
+
+    if (error) {
+      console.error('Erro ao buscar mortalidade:', error);
+      return;
+    }
+
+    let total = 0;
+    data?.forEach((m: any) => {
+      m.mortalidade_itens?.forEach((item: any) => {
+        total += item.quantidade || 0;
+      });
+    });
+    setTotalMortalidade(total);
+  };
+
+  const fetchUltimoPeso = async () => {
+    // Buscar última pesagem e calcular peso médio
+    const { data, error } = await supabase
+      .from('pesagens')
+      .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_g)')
+      .eq('lote_id', lote.id)
+      .order('data_pesagem', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Erro ao buscar pesagens:', error);
+      return;
+    }
+
+    if (data && data.length > 0 && data[0].pesagem_itens) {
+      let totalAves = 0;
+      let totalPeso = 0;
+      data[0].pesagem_itens.forEach((item: any) => {
+        totalAves += item.quantidade_aves || 0;
+        totalPeso += item.peso_liquido_g || 0;
+      });
+      if (totalAves > 0) {
+        // peso_liquido_g está em gramas, convertendo para kg
+        setUltimoPesoMedio(totalPeso / totalAves / 1000);
+      }
+    }
   };
 
   const handleAlojar = async () => {
@@ -122,8 +178,8 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
   const handleSaveSaida = async () => {
     const totalSaida = saidaVendaLocal + saidaVendaExterna + saidaAbate;
-    if (totalSaida > lote.quantidade_aves) {
-      toast.error('O total de saídas excede a quantidade de aves do lote');
+    if (totalSaida > quantidadeAvesReal) {
+      toast.error('O total de saídas excede a quantidade atual de aves do lote');
       return;
     }
 
@@ -453,6 +509,8 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
         <div className="space-y-4">
           <SaidaLoteSection
             quantidadeAvesLote={lote.quantidade_aves}
+            quantidadeAvesReal={quantidadeAvesReal}
+            ultimoPesoMedio={ultimoPesoMedio}
             dataPrevistaSaida={dataPrevistaSaida}
             horarioInicioJejum={horarioInicioJejum}
             saidaVendaLocal={saidaVendaLocal}

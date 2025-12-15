@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Truck, AlertTriangle, Clock } from 'lucide-react';
+import { Truck, AlertTriangle, Clock, Scale, Bird } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface SaidaLoteSectionProps {
   quantidadeAvesLote: number;
+  quantidadeAvesReal: number;
+  ultimoPesoMedio: number | null;
   dataPrevistaSaida: string | null;
   horarioInicioJejum: string | null;
   saidaVendaLocal: number;
@@ -24,6 +26,8 @@ interface SaidaLoteSectionProps {
 
 export function SaidaLoteSection({
   quantidadeAvesLote,
+  quantidadeAvesReal,
+  ultimoPesoMedio,
   dataPrevistaSaida,
   horarioInicioJejum,
   saidaVendaLocal,
@@ -37,7 +41,8 @@ export function SaidaLoteSection({
   disabled = false,
 }: SaidaLoteSectionProps) {
   const totalDestino = saidaVendaLocal + saidaVendaExterna + saidaAbate;
-  const excedeuQuantidade = totalDestino > quantidadeAvesLote;
+  const excedeuQuantidade = totalDestino > quantidadeAvesReal;
+  const mortalidadeTotal = quantidadeAvesLote - quantidadeAvesReal;
 
   const formatDateTimeForInput = (dateStr: string | null): string => {
     if (!dateStr) return '';
@@ -58,6 +63,44 @@ export function SaidaLoteSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Resumo do Lote */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <Bird className="w-5 h-5 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Aves Atuais</p>
+              <p className="text-lg font-bold">{quantidadeAvesReal.toLocaleString('pt-BR')}</p>
+              <p className="text-xs text-muted-foreground">
+                Inicial: {quantidadeAvesLote.toLocaleString('pt-BR')} | Mort/Elim: {mortalidadeTotal.toLocaleString('pt-BR')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <Scale className="w-5 h-5 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Último Peso Médio</p>
+              <p className="text-lg font-bold">
+                {ultimoPesoMedio !== null 
+                  ? `${ultimoPesoMedio.toFixed(3)} kg`
+                  : '-'
+                }
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <Truck className="w-5 h-5 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Peso Total Estimado</p>
+              <p className="text-lg font-bold">
+                {ultimoPesoMedio !== null 
+                  ? `${((quantidadeAvesReal * ultimoPesoMedio) / 1000).toFixed(1)} ton`
+                  : '-'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="data_prevista_saida" className="flex items-center gap-2">
@@ -138,7 +181,7 @@ export function SaidaLoteSection({
         <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
           <span className="text-sm font-medium">Total:</span>
           <span className={`text-lg font-bold ${excedeuQuantidade ? 'text-destructive' : 'text-foreground'}`}>
-            {totalDestino.toLocaleString('pt-BR')} / {quantidadeAvesLote.toLocaleString('pt-BR')} aves
+            {totalDestino.toLocaleString('pt-BR')} / {quantidadeAvesReal.toLocaleString('pt-BR')} aves
           </span>
         </div>
 
@@ -146,7 +189,7 @@ export function SaidaLoteSection({
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              O total de saídas excede a quantidade de aves do lote.
+              O total de saídas excede a quantidade atual de aves do lote.
             </AlertDescription>
           </Alert>
         )}
