@@ -16,7 +16,8 @@ import {
   Package,
   DollarSign,
   ShoppingCart,
-  Plane
+  Plane,
+  Egg
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoGSA from "@/assets/logo-gsa.png";
@@ -84,6 +85,15 @@ const modules: ModuleCard[] = [
     icon: Factory,
     path: '/fabrica-racao',
     color: 'from-amber-500 to-amber-700',
+    available: true,
+  },
+  {
+    id: 'estoque-ovos',
+    title: 'Estoque de Ovos',
+    description: 'Gestão FIFO e rastreabilidade de ovos',
+    icon: Egg,
+    path: '/estoque-ovos',
+    color: 'from-amber-400 to-amber-600',
     available: true,
   },
   {

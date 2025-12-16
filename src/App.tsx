@@ -31,6 +31,8 @@ import Comercial from "./pages/Comercial";
 import CadastroProdutosAnimais from "./pages/CadastroProdutosAnimais";
 import Financeiro from "./pages/Financeiro";
 import CockpitThoth from "./pages/CockpitThoth";
+import CadastroProdutosOvos from "./pages/CadastroProdutosOvos";
+import EstoqueOvos from "./pages/EstoqueOvos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -211,6 +213,16 @@ const AppRoutes = () => (
     <Route path="/cockpit" element={
       <ProtectedRoute>
         <CockpitThoth />
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/produtos-ovos" element={
+      <ProtectedRoute>
+        <CadastroProdutosOvos />
+      </ProtectedRoute>
+    } />
+    <Route path="/estoque-ovos" element={
+      <ProtectedRoute>
+        <EstoqueOvos />
       </ProtectedRoute>
     } />
     
