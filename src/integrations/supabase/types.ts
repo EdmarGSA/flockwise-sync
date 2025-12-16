@@ -738,6 +738,71 @@ export type Database = {
           },
         ]
       }
+      estoque_ovos: {
+        Row: {
+          ativo: boolean
+          classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          created_at: string
+          custo_unitario: number | null
+          data_producao: string
+          data_validade: string
+          id: string
+          integrado_id: string
+          lote_interno: string
+          lote_producao_id: string | null
+          observacoes: string | null
+          quantidade_atual: number
+          quantidade_inicial: number
+          quantidade_reservada: number
+          tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          created_at?: string
+          custo_unitario?: number | null
+          data_producao: string
+          data_validade: string
+          id?: string
+          integrado_id: string
+          lote_interno: string
+          lote_producao_id?: string | null
+          observacoes?: string | null
+          quantidade_atual: number
+          quantidade_inicial: number
+          quantidade_reservada?: number
+          tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          classificacao_peso?: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          created_at?: string
+          custo_unitario?: number | null
+          data_producao?: string
+          data_validade?: string
+          id?: string
+          integrado_id?: string
+          lote_interno?: string
+          lote_producao_id?: string | null
+          observacoes?: string | null
+          quantidade_atual?: number
+          quantidade_inicial?: number
+          quantidade_reservada?: number
+          tipo_ovo?: Database["public"]["Enums"]["tipo_ovo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_ovos_lote_producao_id_fkey"
+            columns: ["lote_producao_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fases_animal: {
         Row: {
           ativo: boolean
@@ -1155,6 +1220,76 @@ export type Database = {
             columns: ["recebimento_id"]
             isOneToOne: false
             referencedRelation: "recebimentos_mercadoria"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kardex_ovos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          documento_ref: string | null
+          estoque_ovo_id: string
+          id: string
+          integrado_id: string
+          observacao: string | null
+          pedido_id: string | null
+          producao_ovos_id: string | null
+          quantidade: number
+          saldo_anterior: number
+          saldo_atual: number
+          tipo_movimento: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          documento_ref?: string | null
+          estoque_ovo_id: string
+          id?: string
+          integrado_id: string
+          observacao?: string | null
+          pedido_id?: string | null
+          producao_ovos_id?: string | null
+          quantidade: number
+          saldo_anterior: number
+          saldo_atual: number
+          tipo_movimento: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          documento_ref?: string | null
+          estoque_ovo_id?: string
+          id?: string
+          integrado_id?: string
+          observacao?: string | null
+          pedido_id?: string | null
+          producao_ovos_id?: string | null
+          quantidade?: number
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo_movimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kardex_ovos_estoque_ovo_id_fkey"
+            columns: ["estoque_ovo_id"]
+            isOneToOne: false
+            referencedRelation: "estoque_ovos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kardex_ovos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kardex_ovos_producao_ovos_id_fkey"
+            columns: ["producao_ovos_id"]
+            isOneToOne: false
+            referencedRelation: "producao_ovos"
             referencedColumns: ["id"]
           },
         ]
@@ -2324,6 +2459,54 @@ export type Database = {
           },
         ]
       }
+      pedido_itens_ovos: {
+        Row: {
+          created_at: string
+          id: string
+          pedido_id: string
+          preco_unitario: number
+          produto_ovo_id: string
+          quantidade: number
+          quantidade_unidades: number
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pedido_id: string
+          preco_unitario: number
+          produto_ovo_id: string
+          quantidade: number
+          quantidade_unidades: number
+          valor_total: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pedido_id?: string
+          preco_unitario?: number
+          produto_ovo_id?: string
+          quantidade?: number
+          quantidade_unidades?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_itens_ovos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_itens_ovos_produto_ovo_id_fkey"
+            columns: ["produto_ovo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_ovos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos: {
         Row: {
           aprovado_por: string | null
@@ -3002,6 +3185,60 @@ export type Database = {
           },
         ]
       }
+      produtos_ovos: {
+        Row: {
+          ativo: boolean
+          classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          codigo: string
+          created_at: string
+          descricao: string | null
+          estoque_minimo: number | null
+          fator_conversao: number
+          id: string
+          integrado_id: string
+          margem_minima: number | null
+          nome: string
+          preco_venda: number | null
+          tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          unidade_venda: Database["public"]["Enums"]["unidade_venda_ovo"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          estoque_minimo?: number | null
+          fator_conversao?: number
+          id?: string
+          integrado_id: string
+          margem_minima?: number | null
+          nome: string
+          preco_venda?: number | null
+          tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          unidade_venda?: Database["public"]["Enums"]["unidade_venda_ovo"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          classificacao_peso?: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          estoque_minimo?: number | null
+          fator_conversao?: number
+          id?: string
+          integrado_id?: string
+          margem_minima?: number | null
+          nome?: string
+          preco_venda?: number | null
+          tipo_ovo?: Database["public"]["Enums"]["tipo_ovo"]
+          unidade_venda?: Database["public"]["Enums"]["unidade_venda_ovo"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -3261,6 +3498,54 @@ export type Database = {
             columns: ["ordem_compra_id"]
             isOneToOne: false
             referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reserva_estoque_ovos: {
+        Row: {
+          created_at: string
+          data_producao: string
+          data_validade: string
+          estoque_ovo_id: string
+          id: string
+          lote_interno: string
+          pedido_item_ovo_id: string
+          quantidade_reservada: number
+        }
+        Insert: {
+          created_at?: string
+          data_producao: string
+          data_validade: string
+          estoque_ovo_id: string
+          id?: string
+          lote_interno: string
+          pedido_item_ovo_id: string
+          quantidade_reservada: number
+        }
+        Update: {
+          created_at?: string
+          data_producao?: string
+          data_validade?: string
+          estoque_ovo_id?: string
+          id?: string
+          lote_interno?: string
+          pedido_item_ovo_id?: string
+          quantidade_reservada?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reserva_estoque_ovos_estoque_ovo_id_fkey"
+            columns: ["estoque_ovo_id"]
+            isOneToOne: false
+            referencedRelation: "estoque_ovos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserva_estoque_ovos_pedido_item_ovo_id_fkey"
+            columns: ["pedido_item_ovo_id"]
+            isOneToOne: false
+            referencedRelation: "pedido_itens_ovos"
             referencedColumns: ["id"]
           },
         ]
@@ -3668,6 +3953,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["fase_postura"]
       }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
+      gerar_lote_interno_ovos: {
+        Args: { p_integrado_id: string }
+        Returns: string
+      }
       get_veterinarios: {
         Args: never
         Returns: {
@@ -3682,6 +3971,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      reservar_estoque_ovos_fifo: {
+        Args: {
+          p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]
+          p_integrado_id: string
+          p_pedido_item_ovo_id: string
+          p_quantidade_unidades: number
+          p_tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+        }
+        Returns: {
+          data_producao: string
+          data_validade: string
+          estoque_id: string
+          lote_interno: string
+          quantidade_reservada: number
+        }[]
+      }
     }
     Enums: {
       app_role:
@@ -3692,6 +3997,7 @@ export type Database = {
         | "comprador"
         | "conferente"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
+      classificacao_peso_ovo: "medio" | "grande" | "extra" | "jumbo"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
       conta_receber_status:
         | "previsao"
@@ -3761,11 +4067,21 @@ export type Database = {
       tipo_centro_custo: "lote" | "nucleo" | "geral" | "projeto"
       tipo_comedouro: "manual" | "automatico"
       tipo_conta_bancaria: "corrente" | "poupanca" | "investimento"
+      tipo_ovo: "branco" | "castanho" | "vermelho" | "caipira"
       tipo_pessoa: "pf" | "pj" | "produtor_rural"
       tipo_plano_conta: "receita" | "custo" | "despesa" | "investimento"
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
       tipo_producao: "corte" | "postura"
       tipo_taxa_bancaria: "fixo" | "percentual"
+      unidade_venda_ovo:
+        | "UN"
+        | "DZ"
+        | "CX_15"
+        | "CX_30"
+        | "BDJ_30"
+        | "BDJ_60"
+        | "BDJ_180"
+        | "BDJ_360"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3902,6 +4218,7 @@ export const Constants = {
         "conferente",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
+      classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
       conta_receber_status: [
         "previsao",
@@ -3979,11 +4296,22 @@ export const Constants = {
       tipo_centro_custo: ["lote", "nucleo", "geral", "projeto"],
       tipo_comedouro: ["manual", "automatico"],
       tipo_conta_bancaria: ["corrente", "poupanca", "investimento"],
+      tipo_ovo: ["branco", "castanho", "vermelho", "caipira"],
       tipo_pessoa: ["pf", "pj", "produtor_rural"],
       tipo_plano_conta: ["receita", "custo", "despesa", "investimento"],
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
       tipo_producao: ["corte", "postura"],
       tipo_taxa_bancaria: ["fixo", "percentual"],
+      unidade_venda_ovo: [
+        "UN",
+        "DZ",
+        "CX_15",
+        "CX_30",
+        "BDJ_30",
+        "BDJ_60",
+        "BDJ_180",
+        "BDJ_360",
+      ],
     },
   },
 } as const

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg } from "lucide-react";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
@@ -76,6 +76,12 @@ const Configuracoes = () => {
       description: "Constante de ajuste de conversão alimentar",
       icon: Lock,
       path: "/configuracoes/fechamento"
+    },
+    {
+      title: "Produtos de Ovos",
+      description: "Catálogo comercial de ovos",
+      icon: Egg,
+      path: "/configuracoes/produtos-ovos"
     },
     {
       title: "Produtos Animais",
