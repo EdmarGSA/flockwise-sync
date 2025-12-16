@@ -385,7 +385,8 @@ export default function MeusLotes() {
   };
 
   const isPosturaLote = (lote: LoteComPesagem) => {
-    return lote.nucleo?.tipo_producao?.toLowerCase().includes('postura');
+    // Lotes de postura usam linhagem_postura, lotes de corte usam linhagem
+    return lote.linhagem_postura !== null && lote.linhagem_postura !== undefined;
   };
 
   const getLinhagemPosturaLabel = (linhagem: string | null) => {
