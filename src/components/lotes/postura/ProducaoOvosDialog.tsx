@@ -8,14 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Egg, AlertTriangle, TrendingDown, TrendingUp, Minus } from 'lucide-react';
-import { format } from 'date-fns';
+import { Egg, AlertTriangle, TrendingDown, TrendingUp, Minus, Package, ArrowRight } from 'lucide-react';
+import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { FasePosturaBadge } from './FasePosturaBadge';
+import type { Database } from '@/integrations/supabase/types';
+
+type TipoOvo = Database['public']['Enums']['tipo_ovo'];
+type ClassificacaoPesoOvo = Database['public']['Enums']['classificacao_peso_ovo'];
 
 const producaoSchema = z.object({
   ovos_totais: z.string().min(1, 'Quantidade obrigatória'),
@@ -46,6 +50,17 @@ interface ProducaoOvosDialogProps {
   onSuccess?: () => void;
 }
 
+// Inferir tipo de ovo a partir da linhagem
+const inferirTipoOvo = (linhagem: string): TipoOvo => {
+  if (linhagem.toLowerCase().includes('brown') || linhagem === 'lohmann_brown_lite') {
+    return 'castanho';
+  }
+  if (linhagem.toLowerCase().includes('lsl') || linhagem === 'lohmann_lsl_lite') {
+    return 'branco';
+  }
+  return 'castanho'; // default
+};
+
 export function ProducaoOvosDialog({
   open,
   onOpenChange,
@@ -57,6 +72,7 @@ export function ProducaoOvosDialog({
   onSuccess,
 }: ProducaoOvosDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [transferirEstoque, setTransferirEstoque] = useState(true);
   const [referencia, setReferencia] = useState<{
     producao_percentual: number | null;
     peso_ovo_g: number | null;
@@ -121,6 +137,79 @@ export function ProducaoOvosDialog({
     setExistingRecord(!!data);
   };
 
+  const transferirParaEstoque = async (producaoId: string, data: ProducaoFormData) => {
+    const tipoOvo = inferirTipoOvo(linhagem);
+    const dataProducao = format(new Date(), 'yyyy-MM-dd');
+    const dataValidade = format(addDays(new Date(), 30), 'yyyy-MM-dd');
+    
+    // Mapear classificações com quantidades
+    const classificacoesBase: { classificacao: ClassificacaoPesoOvo; quantidade: number }[] = [
+      { classificacao: 'medio' as ClassificacaoPesoOvo, quantidade: parseInt(data.ovos_medio || '0') || 0 },
+      { classificacao: 'grande' as ClassificacaoPesoOvo, quantidade: parseInt(data.ovos_grande || '0') || 0 },
+      { classificacao: 'extra' as ClassificacaoPesoOvo, quantidade: parseInt(data.ovos_extra || '0') || 0 },
+      { classificacao: 'jumbo' as ClassificacaoPesoOvo, quantidade: parseInt(data.ovos_jumbo || '0') || 0 },
+    ];
+    
+    const classificacoes = classificacoesBase.filter(c => c.quantidade > 0);
+
+    // Se não houver classificação específica, usar "grande" como padrão
+    if (classificacoes.length === 0) {
+      const ovosTotais = parseInt(data.ovos_totais) || 0;
+      const perdas = (parseInt(data.ovos_trincados || '0') || 0) +
+                    (parseInt(data.ovos_sujos || '0') || 0) +
+                    (parseInt(data.ovos_quebrados || '0') || 0) +
+                    (parseInt(data.ovos_deformados || '0') || 0) +
+                    (parseInt(data.ovos_pequenos || '0') || 0);
+      const ovosDisponiveis = ovosTotais - perdas;
+      
+      if (ovosDisponiveis > 0) {
+        classificacoes.push({ classificacao: 'grande', quantidade: ovosDisponiveis });
+      }
+    }
+
+    // Criar entradas de estoque para cada classificação
+    for (const { classificacao, quantidade } of classificacoes) {
+      // Gerar lote interno
+      const { data: loteInterno } = await supabase
+        .rpc('gerar_lote_interno_ovos', { p_integrado_id: integradoId });
+
+      // Criar entrada no estoque
+      const { data: estoqueData, error: estoqueError } = await supabase
+        .from('estoque_ovos')
+        .insert({
+          integrado_id: integradoId,
+          lote_producao_id: loteId,
+          tipo_ovo: tipoOvo as any,
+          classificacao_peso: classificacao as any,
+          data_producao: dataProducao,
+          data_validade: dataValidade,
+          quantidade_inicial: quantidade,
+          quantidade_atual: quantidade,
+          lote_interno: loteInterno || `OV-${Date.now()}`,
+          observacoes: `Produção do dia ${format(new Date(), 'dd/MM/yyyy')}`,
+        })
+        .select('id')
+        .single();
+
+      if (estoqueError) {
+        console.error('Erro ao criar estoque:', estoqueError);
+        continue;
+      }
+
+      // Registrar no kardex
+      await supabase.from('kardex_ovos').insert({
+        integrado_id: integradoId,
+        estoque_ovo_id: estoqueData.id,
+        producao_ovos_id: producaoId,
+        tipo_movimento: 'entrada_producao',
+        quantidade: quantidade,
+        saldo_anterior: 0,
+        saldo_atual: quantidade,
+        observacao: `Produção registrada - Lote ${loteInterno}`,
+      });
+    }
+  };
+
   const onSubmit = async (data: ProducaoFormData) => {
     if (semanasVida < 19) {
       toast.error('Produção só pode ser registrada a partir da semana 19');
@@ -153,15 +242,24 @@ export function ProducaoOvosDialog({
         observacoes: data.observacoes || null,
       };
 
-      const { error } = await supabase
+      const { data: producaoData, error } = await supabase
         .from('producao_ovos')
         .upsert(insertData, { 
           onConflict: 'lote_id,data_producao',
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
-      toast.success('Produção registrada com sucesso!');
+      // Transferir para estoque se marcado
+      if (transferirEstoque && producaoData) {
+        await transferirParaEstoque(producaoData.id, data);
+        toast.success('Produção registrada e transferida para estoque!');
+      } else {
+        toast.success('Produção registrada com sucesso!');
+      }
+
       form.reset();
       onOpenChange(false);
       onSuccess?.();
@@ -447,12 +545,45 @@ export function ProducaoOvosDialog({
                 )}
               />
 
+              {/* Transferir para Estoque */}
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Package className="w-5 h-5 text-primary" />
+                      <div>
+                        <Label htmlFor="transferir-estoque" className="font-medium">
+                          Transferir para Estoque
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Cria entrada FIFO automática por classificação
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="transferir-estoque"
+                      checked={transferirEstoque}
+                      onCheckedChange={setTransferirEstoque}
+                    />
+                  </div>
+                  {transferirEstoque && (
+                    <div className="mt-3 pt-3 border-t border-primary/20 flex items-center gap-2 text-xs text-muted-foreground">
+                      <ArrowRight className="w-3 h-3" />
+                      <span>
+                        Tipo: <strong className="text-foreground">{inferirTipoOvo(linhagem) === 'castanho' ? 'Castanho' : 'Branco'}</strong>
+                        {' | '}Validade: <strong className="text-foreground">30 dias</strong>
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? 'Salvando...' : 'Salvar'}
+                  {loading ? 'Salvando...' : transferirEstoque ? 'Salvar e Transferir' : 'Salvar'}
                 </Button>
               </div>
             </form>
