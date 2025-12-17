@@ -115,6 +115,7 @@ export function RacaoLoteDialog({
       .select('id')
       .eq('nome', 'Ração')
       .eq('ativo', true)
+      .eq('integrado_id', integradoId)
       .maybeSingle();
 
     if (grupoError || !grupoData) {

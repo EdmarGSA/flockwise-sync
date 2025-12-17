@@ -99,6 +99,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
       .select('id')
       .eq('nome', 'Ração')
       .eq('ativo', true)
+      .eq('integrado_id', lote.integrado_id)
       .maybeSingle();
 
     if (grupoError || !grupoData) {
