@@ -76,6 +76,7 @@ export function NucleoEditForm({ nucleo, onSuccess, onCancel }: NucleoEditFormPr
       .from('grupos_animal')
       .select('id, nome')
       .eq('ativo', true)
+      .eq('integrado_id', nucleo.integrado_id)
       .order('nome');
     
     if (error) {
