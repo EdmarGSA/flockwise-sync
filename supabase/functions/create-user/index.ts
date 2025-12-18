@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, password, full_name } = await req.json()
+    const { email, password, full_name, integrado_id } = await req.json()
 
     if (!email || !password) {
       return new Response(
@@ -66,14 +66,26 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('Creating user with email:', email)
+    // Buscar integrado_id do admin se não foi passado
+    let targetIntegradoId = integrado_id
+    if (!targetIntegradoId) {
+      const { data: adminProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('integrado_id')
+        .eq('id', requestingUser.id)
+        .single()
+      targetIntegradoId = adminProfile?.integrado_id || requestingUser.id
+    }
+
+    console.log('Creating user with email:', email, 'for org:', targetIntegradoId)
 
     // Create user using admin API (does NOT log in the new user)
+    // Passa o integrado_id no metadata para o trigger handle_new_user
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Auto-confirm email
-      user_metadata: { full_name }
+      user_metadata: { full_name, integrado_id: targetIntegradoId }
     })
 
     if (error) {

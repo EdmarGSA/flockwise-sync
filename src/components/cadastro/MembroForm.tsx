@@ -58,6 +58,7 @@ const rolesOptions = [
 const MembroForm = ({ onSuccess }: MembroFormProps) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [adminIntegradoId, setAdminIntegradoId] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -72,16 +73,34 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
     },
   });
 
+  // Buscar integrado_id do admin atual
+  useState(() => {
+    const fetchAdminIntegradoId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('integrado_id')
+          .eq('id', user.id)
+          .single();
+        setAdminIntegradoId(profile?.integrado_id || user.id);
+      }
+    };
+    fetchAdminIntegradoId();
+  });
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
 
     try {
       // Create user via Edge Function (does NOT change current session)
+      // Passa o integrado_id do admin para vincular o novo membro à organização
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: values.email,
           password: values.password,
           full_name: values.full_name,
+          integrado_id: adminIntegradoId,
         },
       });
 
