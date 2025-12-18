@@ -127,15 +127,15 @@ export default function GestaoCampo() {
     setLoadingData(true);
     
     const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes, gruposRes] = await Promise.all([
-      supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude'),
-      supabase.from('galpoes').select('*,nucleo:nucleos(nome)'),
-      supabase.from('areas').select('id, nome, descricao, cor, ativo'),
+      supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude').eq('integrado_id', user!.id),
+      supabase.from('galpoes').select('*,nucleo:nucleos(nome)').eq('nucleo.integrado_id', user!.id),
+      supabase.from('areas').select('id, nome, descricao, cor, ativo').eq('integrado_id', user!.id),
       supabase.from('lotes').select(`
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
         linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
-      `).order('created_at', { ascending: false }),
+      `).eq('integrado_id', user!.id).order('created_at', { ascending: false }),
       supabase.from('desempenho_aves').select('*').order('dia', { ascending: true }),
-      supabase.from('grupos_animal').select('id, nome').eq('ativo', true)
+      supabase.from('grupos_animal').select('id, nome').eq('ativo', true).eq('integrado_id', user!.id)
     ]);
 
     if (nucleosRes.data) setNucleos(nucleosRes.data);

@@ -70,8 +70,17 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
 
   useEffect(() => {
     fetchIntegrados();
-    fetchGruposAnimal();
   }, []);
+
+  // Buscar grupos de animal quando integrado for selecionado
+  const watchIntegradoId = form.watch('integrado_id');
+  useEffect(() => {
+    if (watchIntegradoId) {
+      fetchGruposAnimal(watchIntegradoId);
+    } else {
+      setGruposAnimal([]);
+    }
+  }, [watchIntegradoId]);
 
   const fetchIntegrados = async () => {
     const { data, error } = await supabase
@@ -86,11 +95,12 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
     setIntegrados(data || []);
   };
 
-  const fetchGruposAnimal = async () => {
+  const fetchGruposAnimal = async (integradoId: string) => {
     const { data, error } = await supabase
       .from('grupos_animal')
       .select('id, nome')
       .eq('ativo', true)
+      .eq('integrado_id', integradoId)
       .order('nome');
     
     if (error) {
