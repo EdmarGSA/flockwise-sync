@@ -32,15 +32,28 @@ const CadastroMembros = () => {
   const fetchMembers = async () => {
     setLoadingData(true);
     
-    // Get profiles with their roles
+    // Buscar o integrado_id do usuário atual
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('integrado_id')
+      .eq('id', user?.id)
+      .single();
+
+    const myIntegradoId = myProfile?.integrado_id || user?.id;
+    
+    // Buscar apenas membros da mesma organização
     const { data: profiles } = await supabase
       .from('profiles')
       .select('*')
+      .eq('integrado_id', myIntegradoId)
       .order('created_at', { ascending: false });
     
+    // Buscar roles dos membros da organização
+    const userIds = profiles?.map(p => p.id) || [];
     const { data: roles } = await supabase
       .from('user_roles')
-      .select('*');
+      .select('*')
+      .in('user_id', userIds);
 
     if (profiles) {
       const membersWithRoles = profiles.map(profile => ({
