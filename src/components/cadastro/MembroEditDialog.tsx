@@ -5,8 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import MembroModulosSection from "./MembroModulosSection";
+import { useAuth } from "@/hooks/useAuth";
 
 interface MembroEditDialogProps {
   open: boolean;
@@ -20,15 +23,20 @@ const rolesOptions = [
   { value: "integrado", label: "Integrado" },
   { value: "veterinario", label: "Veterinário" },
   { value: "tecnico", label: "Técnico" },
+  { value: "comprador", label: "Comprador" },
+  { value: "conferente", label: "Conferente" },
 ];
 
 const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditDialogProps) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("integrado");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [moduloChanges, setModuloChanges] = useState<{ modulo_id: string; permitido: boolean }[]>([]);
+  const [integradoId, setIntegradoId] = useState<string>("");
 
   useEffect(() => {
     if (membro) {
@@ -37,8 +45,24 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
       setPhone(membro.phone || "");
       setRole(membro.role || "integrado");
       setSelectedRoles(membro.roles || []);
+      setModuloChanges([]);
     }
   }, [membro]);
+
+  useEffect(() => {
+    const fetchIntegradoId = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("integrado_id")
+        .eq("id", user.id)
+        .single();
+      if (data?.integrado_id) {
+        setIntegradoId(data.integrado_id);
+      }
+    };
+    fetchIntegradoId();
+  }, [user?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +101,7 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
       if (selectedRoles.length > 0) {
         const roleInserts = selectedRoles.map((r) => ({
           user_id: membro.id,
-          role: r as "admin" | "integrado" | "veterinario" | "tecnico",
+          role: r as "admin" | "integrado" | "veterinario" | "tecnico" | "comprador" | "conferente",
         }));
 
         const { error: insertError } = await supabase
@@ -86,6 +110,31 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
 
         if (insertError) {
           console.error("Insert roles error:", insertError);
+        }
+      }
+
+      // Handle module permission changes
+      if (moduloChanges.length > 0) {
+        // Delete existing user_modulos for this user
+        await supabase
+          .from("user_modulos" as any)
+          .delete()
+          .eq("user_id", membro.id);
+
+        // Insert new permissions
+        const moduloInserts = moduloChanges.map((m) => ({
+          user_id: membro.id,
+          modulo_id: m.modulo_id,
+          permitido: m.permitido,
+          integrado_id: integradoId || membro.integrado_id,
+        }));
+
+        const { error: moduloError } = await supabase
+          .from("user_modulos" as any)
+          .insert(moduloInserts);
+
+        if (moduloError) {
+          console.error("Insert modulos error:", moduloError);
         }
       }
 
@@ -110,7 +159,7 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Membro</DialogTitle>
         </DialogHeader>
@@ -178,6 +227,20 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
                 </div>
               ))}
             </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <Label>Módulos Permitidos</Label>
+            {membro && (
+              <MembroModulosSection
+                membroId={membro.id}
+                membroRoles={selectedRoles}
+                integradoId={integradoId || membro.integrado_id}
+                onModulosChange={setModuloChanges}
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

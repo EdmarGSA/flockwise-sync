@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -89,7 +90,7 @@ const AppRoutes = () => (
       </PublicRoute>
     } />
     
-    {/* Protected routes */}
+    {/* Protected routes - Home (no module restriction) */}
     <Route path="/home" element={
       <ProtectedRoute>
         <Home />
@@ -100,129 +101,183 @@ const AppRoutes = () => (
         <Dashboard />
       </ProtectedRoute>
     } />
+
+    {/* Module-protected routes */}
     <Route path="/gestao-campo" element={
       <ProtectedRoute>
-        <GestaoCampo />
+        <ModuleProtectedRoute moduleCode="gestao-campo">
+          <GestaoCampo />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/meus-lotes" element={
       <ProtectedRoute>
-        <MeusLotes />
+        <ModuleProtectedRoute moduleCode="lotes">
+          <MeusLotes />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/meus-lotes/:loteId/metas" element={
       <ProtectedRoute>
-        <MetasPesoLote />
+        <ModuleProtectedRoute moduleCode="lotes">
+          <MetasPesoLote />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/meus-lotes/:loteId/metas-postura" element={
       <ProtectedRoute>
-        <MetasPosturaLote />
+        <ModuleProtectedRoute moduleCode="lotes">
+          <MetasPosturaLote />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/gestao-consumo" element={
       <ProtectedRoute>
-        <GestaoConsumo />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes" element={
-      <ProtectedRoute>
-        <Configuracoes />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/organizacao" element={
-      <ProtectedRoute>
-        <CadastroOrganizacao />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/membros" element={
-      <ProtectedRoute>
-        <CadastroMembros />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/produtos" element={
-      <ProtectedRoute>
-        <CadastroProdutos />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/grupos-animal" element={
-      <ProtectedRoute>
-        <CadastroGruposAnimal />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/desempenho-aves" element={
-      <ProtectedRoute>
-        <CadastroDesempenhoAves />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/parceiros" element={
-      <ProtectedRoute>
-        <CadastroParceiros />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/mortalidade-media" element={
-      <ProtectedRoute>
-        <CadastroMortalidadeMedia />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/silo" element={
-      <ProtectedRoute>
-        <ConfiguracaoSilo />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/fechamento" element={
-      <ProtectedRoute>
-        <ConfiguracaoFechamento />
+        <ModuleProtectedRoute moduleCode="gestao-consumo">
+          <GestaoConsumo />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/fabrica-racao" element={
       <ProtectedRoute>
-        <FabricaRacao />
+        <ModuleProtectedRoute moduleCode="fabrica-racao">
+          <FabricaRacao />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/veterinario" element={
       <ProtectedRoute>
-        <Veterinario />
+        <ModuleProtectedRoute moduleCode="veterinario">
+          <Veterinario />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/veterinario/:loteId" element={
       <ProtectedRoute>
-        <VeterinarioLote />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/financeiro" element={
-      <ProtectedRoute>
-        <ConfiguracaoFinanceiro />
+        <ModuleProtectedRoute moduleCode="veterinario">
+          <VeterinarioLote />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/comercial" element={
       <ProtectedRoute>
-        <Comercial />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/produtos-animais" element={
-      <ProtectedRoute>
-        <CadastroProdutosAnimais />
+        <ModuleProtectedRoute moduleCode="comercial">
+          <Comercial />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/financeiro" element={
       <ProtectedRoute>
-        <Financeiro />
+        <ModuleProtectedRoute moduleCode="financeiro">
+          <Financeiro />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/cockpit" element={
       <ProtectedRoute>
-        <CockpitThoth />
-      </ProtectedRoute>
-    } />
-    <Route path="/configuracoes/produtos-ovos" element={
-      <ProtectedRoute>
-        <CadastroProdutosOvos />
+        <ModuleProtectedRoute moduleCode="cockpit">
+          <CockpitThoth />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     <Route path="/estoque-ovos" element={
       <ProtectedRoute>
-        <EstoqueOvos />
+        <ModuleProtectedRoute moduleCode="estoque-ovos">
+          <EstoqueOvos />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
+    {/* Configuration routes - protected by configuracoes module */}
+    <Route path="/configuracoes" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <Configuracoes />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/organizacao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroOrganizacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/membros" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroMembros />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/produtos" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroProdutos />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/grupos-animal" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroGruposAnimal />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/desempenho-aves" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroDesempenhoAves />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/parceiros" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroParceiros />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/mortalidade-media" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroMortalidadeMedia />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/silo" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoSilo />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/fechamento" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoFechamento />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/financeiro" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoFinanceiro />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/produtos-animais" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroProdutosAnimais />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/produtos-ovos" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroProdutosOvos />
+        </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
     
