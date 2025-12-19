@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import Header from '@/components/Header';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Bird, 
@@ -17,9 +17,11 @@ import {
   DollarSign,
   ShoppingCart,
   Plane,
-  Egg
+  Egg,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import logoGSA from "@/assets/logo-gsa.png";
 
 interface ModuleCard {
@@ -29,7 +31,7 @@ interface ModuleCard {
   icon: React.ComponentType<{ className?: string }>;
   path: string;
   color: string;
-  available: boolean;
+  systemAvailable: boolean;
 }
 
 const modules: ModuleCard[] = [
@@ -40,7 +42,7 @@ const modules: ModuleCard[] = [
     icon: Bird,
     path: '/meus-lotes',
     color: 'from-primary to-primary/70',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'gestao-campo',
@@ -49,7 +51,7 @@ const modules: ModuleCard[] = [
     icon: Map,
     path: '/gestao-campo',
     color: 'from-emerald-500 to-emerald-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'gestao-consumo',
@@ -58,7 +60,7 @@ const modules: ModuleCard[] = [
     icon: Package,
     path: '/gestao-consumo',
     color: 'from-orange-500 to-orange-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'logistica',
@@ -67,7 +69,7 @@ const modules: ModuleCard[] = [
     icon: Truck,
     path: '/logistica',
     color: 'from-blue-500 to-blue-700',
-    available: false,
+    systemAvailable: false,
   },
   {
     id: 'veterinario',
@@ -76,7 +78,7 @@ const modules: ModuleCard[] = [
     icon: Stethoscope,
     path: '/veterinario',
     color: 'from-purple-500 to-purple-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'fabrica-racao',
@@ -85,7 +87,7 @@ const modules: ModuleCard[] = [
     icon: Factory,
     path: '/fabrica-racao',
     color: 'from-amber-500 to-amber-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'estoque-ovos',
@@ -94,7 +96,7 @@ const modules: ModuleCard[] = [
     icon: Egg,
     path: '/estoque-ovos',
     color: 'from-amber-400 to-amber-600',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'apanha',
@@ -103,7 +105,7 @@ const modules: ModuleCard[] = [
     icon: Users,
     path: '/apanha',
     color: 'from-rose-500 to-rose-700',
-    available: false,
+    systemAvailable: false,
   },
   {
     id: 'financeiro',
@@ -112,7 +114,7 @@ const modules: ModuleCard[] = [
     icon: DollarSign,
     path: '/financeiro',
     color: 'from-teal-500 to-teal-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'comercial',
@@ -121,7 +123,7 @@ const modules: ModuleCard[] = [
     icon: ShoppingCart,
     path: '/comercial',
     color: 'from-indigo-500 to-indigo-700',
-    available: true,
+    systemAvailable: true,
   },
   {
     id: 'cockpit',
@@ -130,16 +132,20 @@ const modules: ModuleCard[] = [
     icon: Plane,
     path: '/cockpit',
     color: 'from-slate-600 to-slate-800',
-    available: true,
+    systemAvailable: true,
   },
 ];
 
 export default function Home() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { accessibleModules, loading: modulesLoading } = useModuleAccess();
 
   const handleModuleClick = (module: ModuleCard) => {
-    if (module.available) {
+    if (!module.systemAvailable) return;
+    
+    const hasAccess = accessibleModules.some(m => m.codigo === module.id);
+    if (hasAccess) {
       navigate(module.path);
     }
   };
@@ -147,6 +153,12 @@ export default function Home() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const getModuleStatus = (module: ModuleCard): 'available' | 'no-permission' | 'coming-soon' => {
+    if (!module.systemAvailable) return 'coming-soon';
+    const hasAccess = accessibleModules.some(m => m.codigo === module.id);
+    return hasAccess ? 'available' : 'no-permission';
   };
 
   return (
@@ -190,32 +202,63 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {modules.map((module) => (
-            <Card 
-              key={module.id}
-              className={`bg-card border-border cursor-pointer transition-all duration-300 hover:shadow-card-hover hover:scale-[1.02] ${
-                !module.available ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              onClick={() => handleModuleClick(module)}
-            >
-              <CardHeader className="pb-3">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center mb-3`}>
-                  <module.icon className="w-6 h-6 text-white" />
-                </div>
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  {module.title}
-                  {!module.available && (
-                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
-                      Em breve
-                    </span>
-                  )}
-                </CardTitle>
-                <CardDescription>{module.description}</CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+        {modulesLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <Skeleton className="w-12 h-12 rounded-xl mb-3" />
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-48 mt-2" />
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {modules.map((module) => {
+              const status = getModuleStatus(module);
+              const isClickable = status === 'available';
+              
+              return (
+                <Card 
+                  key={module.id}
+                  className={`bg-card border-border transition-all duration-300 ${
+                    isClickable 
+                      ? 'cursor-pointer hover:shadow-card-hover hover:scale-[1.02]' 
+                      : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  onClick={() => isClickable && handleModuleClick(module)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center mb-3 relative`}>
+                      <module.icon className="w-6 h-6 text-white" />
+                      {status === 'no-permission' && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center">
+                          <Lock className="w-3 h-3 text-destructive-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <CardTitle className="text-foreground flex items-center gap-2">
+                      {module.title}
+                      {status === 'coming-soon' && (
+                        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
+                          Em breve
+                        </span>
+                      )}
+                      {status === 'no-permission' && (
+                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
+                          Sem acesso
+                        </span>
+                      )}
+                    </CardTitle>
+                    <CardDescription>{module.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="mt-12">

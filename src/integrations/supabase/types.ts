@@ -3960,6 +3960,17 @@ export type Database = {
         Args: { p_integrado_id: string }
         Returns: string
       }
+      get_user_accessible_modules: {
+        Args: { _user_id: string }
+        Returns: {
+          codigo: string
+          fonte_permissao: string
+          icone: string
+          nome: string
+          ordem: number
+          rota: string
+        }[]
+      }
       get_veterinarios: {
         Args: never
         Returns: {
