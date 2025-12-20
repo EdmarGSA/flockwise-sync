@@ -1559,6 +1559,45 @@ export type Database = {
           },
         ]
       }
+      modulos: {
+        Row: {
+          ativo: boolean | null
+          codigo: string
+          created_at: string | null
+          descricao: string | null
+          icone: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          rota: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          rota: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          rota?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       mortalidade: {
         Row: {
           created_at: string
@@ -3553,6 +3592,44 @@ export type Database = {
           },
         ]
       }
+      role_modulos: {
+        Row: {
+          created_at: string | null
+          id: string
+          modulo_id: string
+          nivel_acesso: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido: boolean | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          modulo_id: string
+          nivel_acesso?: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido?: boolean | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          modulo_id?: string
+          nivel_acesso?: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido?: boolean | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_modulos_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       separacao_pedidos: {
         Row: {
           created_at: string
@@ -3925,6 +4002,53 @@ export type Database = {
           },
         ]
       }
+      user_modulos: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          integrado_id: string
+          modulo_id: string
+          nivel_acesso: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido: boolean
+          updated_at: string | null
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          integrado_id: string
+          modulo_id: string
+          nivel_acesso?: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          integrado_id?: string
+          modulo_id?: string
+          nivel_acesso?: Database["public"]["Enums"]["nivel_acesso"] | null
+          permitido?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_modulos_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3966,6 +4090,7 @@ export type Database = {
           codigo: string
           fonte_permissao: string
           icone: string
+          nivel_acesso: string
           nome: string
           ordem: number
           rota: string
@@ -4002,6 +4127,14 @@ export type Database = {
         }[]
       }
       same_organization: { Args: { _user_id: string }; Returns: boolean }
+      user_can_access_module: {
+        Args: {
+          _module_code: string
+          _required_level?: Database["public"]["Enums"]["nivel_acesso"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
@@ -4050,6 +4183,7 @@ export type Database = {
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
       natureza_conta: "devedora" | "credora"
+      nivel_acesso: "view" | "edit" | "full"
       observacao_prioridade: "alta" | "media" | "baixa"
       observacao_tipo: "observacao" | "orientacao"
       ordem_compra_status:
@@ -4276,6 +4410,7 @@ export const Constants = {
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
       natureza_conta: ["devedora", "credora"],
+      nivel_acesso: ["view", "edit", "full"],
       observacao_prioridade: ["alta", "media", "baixa"],
       observacao_tipo: ["observacao", "orientacao"],
       ordem_compra_status: [

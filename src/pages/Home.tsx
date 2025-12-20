@@ -161,6 +161,20 @@ export default function Home() {
     return hasAccess ? 'available' : 'no-permission';
   };
 
+  const getModuleLevel = (moduleId: string): string | null => {
+    const module = accessibleModules.find(m => m.codigo === moduleId);
+    return module?.nivel_acesso || null;
+  };
+
+  const getLevelBadge = (level: string) => {
+    const labels: Record<string, { text: string; className: string }> = {
+      view: { text: 'Ver', className: 'bg-blue-500/10 text-blue-500' },
+      edit: { text: 'Editar', className: 'bg-amber-500/10 text-amber-500' },
+      full: { text: 'Total', className: 'bg-emerald-500/10 text-emerald-500' },
+    };
+    return labels[level] || null;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -219,6 +233,8 @@ export default function Home() {
             {modules.map((module) => {
               const status = getModuleStatus(module);
               const isClickable = status === 'available';
+              const level = getModuleLevel(module.id);
+              const levelBadge = level ? getLevelBadge(level) : null;
               
               return (
                 <Card 
@@ -239,7 +255,7 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    <CardTitle className="text-foreground flex items-center gap-2">
+                    <CardTitle className="text-foreground flex items-center gap-2 flex-wrap">
                       {module.title}
                       {status === 'coming-soon' && (
                         <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
@@ -249,6 +265,11 @@ export default function Home() {
                       {status === 'no-permission' && (
                         <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
                           Sem acesso
+                        </span>
+                      )}
+                      {status === 'available' && levelBadge && (
+                        <span className={`text-xs px-2 py-0.5 rounded ${levelBadge.className}`}>
+                          {levelBadge.text}
                         </span>
                       )}
                     </CardTitle>

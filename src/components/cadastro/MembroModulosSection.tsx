@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, Pencil, Shield } from "lucide-react";
+import type { NivelAcesso } from "@/hooks/useModuleAccess";
 
 interface Modulo {
   id: string;
@@ -13,19 +15,34 @@ interface Modulo {
 interface UserModulo {
   modulo_id: string;
   permitido: boolean;
+  nivel_acesso: NivelAcesso;
 }
 
 interface RoleModulo {
   modulo_id: string;
   permitido: boolean;
+  nivel_acesso: NivelAcesso;
+  role: string;
+}
+
+interface ModuloChange {
+  modulo_id: string;
+  permitido: boolean;
+  nivel_acesso: NivelAcesso;
 }
 
 interface MembroModulosSectionProps {
   membroId: string;
   membroRoles: string[];
   integradoId: string;
-  onModulosChange: (modulos: { modulo_id: string; permitido: boolean }[]) => void;
+  onModulosChange: (modulos: ModuloChange[]) => void;
 }
+
+const nivelLabels: Record<NivelAcesso, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  view: { label: 'Ver', icon: Eye },
+  edit: { label: 'Editar', icon: Pencil },
+  full: { label: 'Total', icon: Shield },
+};
 
 const MembroModulosSection = ({ 
   membroId, 
@@ -37,29 +54,26 @@ const MembroModulosSection = ({
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [userModulos, setUserModulos] = useState<UserModulo[]>([]);
   const [roleModulos, setRoleModulos] = useState<RoleModulo[]>([]);
-  const [localChanges, setLocalChanges] = useState<Map<string, boolean | null>>(new Map());
+  const [localChanges, setLocalChanges] = useState<Map<string, { permitido: boolean | null; nivel_acesso: NivelAcesso }>>(new Map());
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch all modules
         const { data: modulosData } = await supabase
           .from('modulos' as any)
           .select('id, codigo, nome')
           .eq('ativo', true)
           .order('ordem');
 
-        // Fetch user's individual module permissions
         const { data: userModulosData } = await supabase
           .from('user_modulos' as any)
-          .select('modulo_id, permitido')
+          .select('modulo_id, permitido, nivel_acesso')
           .eq('user_id', membroId);
 
-        // Fetch role-based permissions for all roles the member has
         const { data: roleModulosData } = await supabase
           .from('role_modulos' as any)
-          .select('modulo_id, permitido, role')
+          .select('modulo_id, permitido, nivel_acesso, role')
           .in('role', membroRoles.length > 0 ? membroRoles : ['integrado']);
 
         setModulos((modulosData as unknown as Modulo[]) || []);
@@ -77,61 +91,77 @@ const MembroModulosSection = ({
     }
   }, [membroId, membroRoles]);
 
-  const getModuleAccess = (moduloId: string): { hasAccess: boolean; source: 'individual' | 'role' | 'none' } => {
-    // Check local changes first
+  const getModuleAccess = (moduloId: string): { 
+    hasAccess: boolean; 
+    source: 'individual' | 'role' | 'none';
+    nivel_acesso: NivelAcesso;
+  } => {
     const localChange = localChanges.get(moduloId);
-    if (localChange !== undefined && localChange !== null) {
-      return { hasAccess: localChange, source: 'individual' };
+    if (localChange !== undefined && localChange.permitido !== null) {
+      return { 
+        hasAccess: localChange.permitido, 
+        source: 'individual',
+        nivel_acesso: localChange.nivel_acesso
+      };
     }
 
-    // Check individual permissions
     const userModulo = userModulos.find(um => um.modulo_id === moduloId);
     if (userModulo !== undefined) {
-      return { hasAccess: userModulo.permitido, source: 'individual' };
+      return { 
+        hasAccess: userModulo.permitido, 
+        source: 'individual',
+        nivel_acesso: userModulo.nivel_acesso || 'view'
+      };
     }
 
-    // Check role permissions
-    const rolePermission = roleModulos.find(rm => rm.modulo_id === moduloId && rm.permitido);
-    if (rolePermission) {
-      return { hasAccess: true, source: 'role' };
+    const rolePermissions = roleModulos.filter(rm => rm.modulo_id === moduloId && rm.permitido);
+    if (rolePermissions.length > 0) {
+      const maxLevel = rolePermissions.reduce((max, rp) => {
+        const order = { view: 1, edit: 2, full: 3 };
+        return order[rp.nivel_acesso] > order[max] ? rp.nivel_acesso : max;
+      }, 'view' as NivelAcesso);
+      
+      return { hasAccess: true, source: 'role', nivel_acesso: maxLevel };
     }
 
-    return { hasAccess: false, source: 'none' };
+    return { hasAccess: false, source: 'none', nivel_acesso: 'view' };
   };
 
-  const handleToggle = (moduloId: string, currentAccess: { hasAccess: boolean; source: string }) => {
+  const handleToggle = (moduloId: string, currentAccess: ReturnType<typeof getModuleAccess>) => {
     const newChanges = new Map(localChanges);
     
-    if (currentAccess.source === 'role') {
-      // If coming from role, we need to add an individual override
-      newChanges.set(moduloId, !currentAccess.hasAccess);
-    } else if (currentAccess.source === 'individual' || localChanges.has(moduloId)) {
-      // Toggle individual permission
-      const currentValue = localChanges.get(moduloId);
-      if (currentValue !== undefined && currentValue !== null) {
-        // If we're toggling back to what the role says, remove the override
-        const roleHasAccess = roleModulos.some(rm => rm.modulo_id === moduloId && rm.permitido);
-        if (!currentValue === roleHasAccess) {
-          newChanges.delete(moduloId);
-        } else {
-          newChanges.set(moduloId, !currentValue);
-        }
-      } else {
-        newChanges.set(moduloId, !currentAccess.hasAccess);
-      }
+    if (currentAccess.hasAccess) {
+      newChanges.set(moduloId, { permitido: false, nivel_acesso: currentAccess.nivel_acesso });
     } else {
-      // No permission exists, add individual access
-      newChanges.set(moduloId, true);
+      newChanges.set(moduloId, { permitido: true, nivel_acesso: 'view' });
     }
 
     setLocalChanges(newChanges);
+    notifyChanges(newChanges);
+  };
 
-    // Notify parent of changes
-    const changes = Array.from(newChanges.entries()).map(([modulo_id, permitido]) => ({
-      modulo_id,
-      permitido: permitido as boolean
-    }));
-    onModulosChange(changes);
+  const handleNivelChange = (moduloId: string, nivel: NivelAcesso) => {
+    const newChanges = new Map(localChanges);
+    const current = localChanges.get(moduloId);
+    
+    newChanges.set(moduloId, { 
+      permitido: current?.permitido ?? true, 
+      nivel_acesso: nivel 
+    });
+
+    setLocalChanges(newChanges);
+    notifyChanges(newChanges);
+  };
+
+  const notifyChanges = (changes: Map<string, { permitido: boolean | null; nivel_acesso: NivelAcesso }>) => {
+    const changesArray = Array.from(changes.entries())
+      .filter(([_, value]) => value.permitido !== null)
+      .map(([modulo_id, value]) => ({
+        modulo_id,
+        permitido: value.permitido as boolean,
+        nivel_acesso: value.nivel_acesso
+      }));
+    onModulosChange(changesArray);
   };
 
   if (loading) {
@@ -146,15 +176,15 @@ const MembroModulosSection = ({
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground mb-2">
-        Marque os módulos que este membro pode acessar. Módulos herdados do papel aparecem com badge "Role".
+        Configure o acesso aos módulos. <strong>Ver</strong>: apenas leitura, <strong>Editar</strong>: criar/editar, <strong>Total</strong>: todas as ações.
       </div>
-      <div className="grid grid-cols-2 gap-2 p-3 bg-muted rounded-lg max-h-48 overflow-y-auto">
+      <div className="space-y-2 p-3 bg-muted rounded-lg max-h-64 overflow-y-auto">
         {modulos.map((modulo) => {
           const access = getModuleAccess(modulo.id);
           const hasLocalChange = localChanges.has(modulo.id);
           
           return (
-            <div key={modulo.id} className="flex items-center gap-2">
+            <div key={modulo.id} className="flex items-center gap-3 py-1.5 border-b border-border/30 last:border-0">
               <Checkbox
                 id={`modulo-${modulo.id}`}
                 checked={access.hasAccess}
@@ -162,20 +192,40 @@ const MembroModulosSection = ({
               />
               <label
                 htmlFor={`modulo-${modulo.id}`}
-                className="text-sm cursor-pointer flex items-center gap-1 flex-wrap"
+                className="text-sm cursor-pointer flex-1 flex items-center gap-2"
               >
                 {modulo.nome}
                 {access.source === 'role' && !hasLocalChange && (
-                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     Role
                   </Badge>
                 )}
                 {hasLocalChange && (
-                  <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     Custom
                   </Badge>
                 )}
               </label>
+              {access.hasAccess && (
+                <Select
+                  value={access.nivel_acesso}
+                  onValueChange={(value) => handleNivelChange(modulo.id, value as NivelAcesso)}
+                >
+                  <SelectTrigger className="w-28 h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(nivelLabels).map(([key, { label, icon: Icon }]) => (
+                      <SelectItem key={key} value={key} className="text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <Icon className="w-3 h-3" />
+                          {label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           );
         })}
