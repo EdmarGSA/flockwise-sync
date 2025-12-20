@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MembroModulosSection from "./MembroModulosSection";
 import { useAuth } from "@/hooks/useAuth";
+import type { NivelAcesso } from "@/hooks/useModuleAccess";
 
 interface MembroEditDialogProps {
   open: boolean;
@@ -35,7 +36,7 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("integrado");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [moduloChanges, setModuloChanges] = useState<{ modulo_id: string; permitido: boolean }[]>([]);
+  const [moduloChanges, setModuloChanges] = useState<{ modulo_id: string; permitido: boolean; nivel_acesso: NivelAcesso }[]>([]);
   const [integradoId, setIntegradoId] = useState<string>("");
 
   useEffect(() => {
@@ -126,6 +127,7 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
           user_id: membro.id,
           modulo_id: m.modulo_id,
           permitido: m.permitido,
+          nivel_acesso: m.nivel_acesso,
           integrado_id: integradoId || membro.integrado_id,
         }));
 

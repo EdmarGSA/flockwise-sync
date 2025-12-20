@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
+export type NivelAcesso = 'view' | 'edit' | 'full';
+
 interface AccessibleModule {
   codigo: string;
   nome: string;
@@ -9,6 +11,7 @@ interface AccessibleModule {
   icone: string;
   ordem: number;
   fonte_permissao: string;
+  nivel_acesso: NivelAcesso;
 }
 
 export const useModuleAccess = () => {
@@ -32,7 +35,11 @@ export const useModuleAccess = () => {
         console.error('Error fetching accessible modules:', error);
         setAccessibleModules([]);
       } else {
-        setAccessibleModules((data as AccessibleModule[]) || []);
+        const modules = (data as any[])?.map(m => ({
+          ...m,
+          nivel_acesso: (m.nivel_acesso || 'view') as NivelAcesso
+        })) || [];
+        setAccessibleModules(modules);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -46,13 +53,14 @@ export const useModuleAccess = () => {
     fetchAccessibleModules();
   }, [fetchAccessibleModules]);
 
-  const canAccess = useCallback(async (moduleCode: string): Promise<boolean> => {
+  const canAccess = useCallback(async (moduleCode: string, requiredLevel: NivelAcesso = 'view'): Promise<boolean> => {
     if (!user?.id) return false;
 
     try {
       const { data, error } = await supabase.rpc('user_can_access_module' as any, {
         _user_id: user.id,
-        _module_code: moduleCode
+        _module_code: moduleCode,
+        _required_level: requiredLevel
       });
 
       if (error) {
@@ -71,11 +79,35 @@ export const useModuleAccess = () => {
     return accessibleModules.some(m => m.codigo === moduleCode);
   }, [accessibleModules]);
 
+  const getAccessLevel = useCallback((moduleCode: string): NivelAcesso | null => {
+    const module = accessibleModules.find(m => m.codigo === moduleCode);
+    return module?.nivel_acesso || null;
+  }, [accessibleModules]);
+
+  const canEdit = useCallback((moduleCode: string): boolean => {
+    const level = getAccessLevel(moduleCode);
+    return level === 'edit' || level === 'full';
+  }, [getAccessLevel]);
+
+  const canDelete = useCallback((moduleCode: string): boolean => {
+    const level = getAccessLevel(moduleCode);
+    return level === 'full';
+  }, [getAccessLevel]);
+
+  const hasFullAccess = useCallback((moduleCode: string): boolean => {
+    const level = getAccessLevel(moduleCode);
+    return level === 'full';
+  }, [getAccessLevel]);
+
   return { 
     accessibleModules, 
     loading, 
     canAccess, 
     canAccessSync,
+    getAccessLevel,
+    canEdit,
+    canDelete,
+    hasFullAccess,
     refetch: fetchAccessibleModules 
   };
 };
