@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import FinalizarOPDialog from './FinalizarOPDialog';
 import OrdemProducaoViewDialog from './OrdemProducaoViewDialog';
+import IniciarProducaoDialog from './IniciarProducaoDialog';
 
 interface OrdemProducao {
   id: string;
@@ -39,6 +40,7 @@ interface OrdemProducao {
   custo_total_real?: number;
   custo_por_kg?: number;
   nutricao_id?: string | null;
+  lote_producao?: string;
   produto?: {
     nome: string;
     unidade_medida: string;
@@ -58,6 +60,7 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
   const [loading, setLoading] = useState(true);
   const [finalizandoOP, setFinalizandoOP] = useState<OrdemProducao | null>(null);
   const [viewingOP, setViewingOP] = useState<OrdemProducao | null>(null);
+  const [iniciandoOP, setIniciandoOP] = useState<OrdemProducao | null>(null);
 
   useEffect(() => {
     fetchOrdens();
@@ -110,25 +113,8 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
     }
   };
 
-  const handleIniciarProducao = async (ordem: OrdemProducao) => {
-    try {
-      const { error } = await supabase
-        .from('ordens_producao')
-        .update({ 
-          status: 'em_producao',
-          data_inicio_producao: new Date().toISOString()
-        })
-        .eq('id', ordem.id);
-
-      if (error) throw error;
-
-      toast.success(`Produção iniciada para OP #${ordem.numero_op}!`);
-      fetchOrdens();
-      onRefresh();
-    } catch (error) {
-      console.error('Erro ao iniciar produção:', error);
-      toast.error('Erro ao iniciar produção');
-    }
+  const handleIniciarProducao = (ordem: OrdemProducao) => {
+    setIniciandoOP(ordem);
   };
 
   const handleCancelar = async (ordem: OrdemProducao) => {
@@ -347,6 +333,18 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
         open={!!viewingOP}
         onOpenChange={(open) => !open && setViewingOP(null)}
         ordem={viewingOP}
+      />
+
+      <IniciarProducaoDialog
+        open={!!iniciandoOP}
+        onOpenChange={(open) => !open && setIniciandoOP(null)}
+        ordem={iniciandoOP}
+        integradoId={integradoId}
+        onSuccess={() => {
+          setIniciandoOP(null);
+          fetchOrdens();
+          onRefresh();
+        }}
       />
     </>
   );

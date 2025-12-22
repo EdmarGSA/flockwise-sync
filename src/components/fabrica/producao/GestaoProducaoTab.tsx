@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Factory, RefreshCw, Loader2 } from 'lucide-react';
+import { Factory, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import DemandaProducaoCard from './DemandaProducaoCard';
 import RacoesCriticasCard from './RacoesCriticasCard';
 import OrdensProducaoTable from './OrdensProducaoTable';
 import GerarOPDialog from './GerarOPDialog';
+import NovaOrdemProducaoDialog from './NovaOrdemProducaoDialog';
 
 interface RacaoCritica {
   id: string;
@@ -33,6 +34,7 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
   const [racoesCriticas, setRacoesCriticas] = useState<RacaoCritica[]>([]);
   const [selectedRacao, setSelectedRacao] = useState<RacaoCritica | null>(null);
   const [showGerarOP, setShowGerarOP] = useState(false);
+  const [showNovaOP, setShowNovaOP] = useState(false);
 
   useEffect(() => {
     if (integradoId) {
@@ -167,7 +169,7 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
 
   return (
     <div className="space-y-6">
-      {/* Header with Refresh */}
+      {/* Header with Refresh and New OP Button */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -178,19 +180,28 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
             Análise de demanda e planejamento de produção de ração
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={fetchDemandaData}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-          ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
-          )}
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchDemandaData}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Atualizar
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={() => setShowNovaOP(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nova OP
+          </Button>
+        </div>
       </div>
 
       {/* Demand Panel */}
@@ -215,7 +226,7 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
         onRefresh={fetchDemandaData}
       />
 
-      {/* Generate OP Dialog */}
+      {/* Generate OP Dialog (from critical) */}
       <GerarOPDialog
         open={showGerarOP}
         onOpenChange={setShowGerarOP}
@@ -223,6 +234,17 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
         integradoId={integradoId}
         onSuccess={() => {
           setShowGerarOP(false);
+          fetchDemandaData();
+        }}
+      />
+
+      {/* Nova OP Dialog (manual) */}
+      <NovaOrdemProducaoDialog
+        open={showNovaOP}
+        onOpenChange={setShowNovaOP}
+        integradoId={integradoId}
+        onSuccess={() => {
+          setShowNovaOP(false);
           fetchDemandaData();
         }}
       />
