@@ -161,6 +161,39 @@ export type Database = {
         }
         Relationships: []
       }
+      config_producao: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string
+          modo_producao_padrao: string | null
+          tempo_mistura_padrao_min: number | null
+          tolerancia_insumo_percentual: number | null
+          tolerancia_producao_percentual: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id: string
+          modo_producao_padrao?: string | null
+          tempo_mistura_padrao_min?: number | null
+          tolerancia_insumo_percentual?: number | null
+          tolerancia_producao_percentual?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          modo_producao_padrao?: string | null
+          tempo_mistura_padrao_min?: number | null
+          tolerancia_insumo_percentual?: number | null
+          tolerancia_producao_percentual?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       config_silo: {
         Row: {
           created_at: string
@@ -737,6 +770,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      equipamentos_producao: {
+        Row: {
+          ativo: boolean | null
+          codigo_clp: string | null
+          created_at: string
+          id: string
+          integrado_id: string
+          ip_comunicacao: string | null
+          nome: string
+          protocolo: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo_clp?: string | null
+          created_at?: string
+          id?: string
+          integrado_id: string
+          ip_comunicacao?: string | null
+          nome: string
+          protocolo?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo_clp?: string | null
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          ip_comunicacao?: string | null
+          nome?: string
+          protocolo?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       estoque_ovos: {
         Row: {
@@ -2161,8 +2233,11 @@ export type Database = {
           data_finalizacao: string | null
           data_inicio_producao: string | null
           data_prevista_producao: string | null
+          equipamento_id: string | null
           id: string
           integrado_id: string
+          lote_producao: string | null
+          modo_execucao: string | null
           numero_op: number
           nutricao_id: string | null
           observacoes: string | null
@@ -2170,6 +2245,9 @@ export type Database = {
           quantidade_planejada: number
           quantidade_produzida: number | null
           status: string
+          tempo_mistura_previsto: number | null
+          tempo_mistura_real: number | null
+          tolerancia_variacao: number | null
           updated_at: string
         }
         Insert: {
@@ -2183,8 +2261,11 @@ export type Database = {
           data_finalizacao?: string | null
           data_inicio_producao?: string | null
           data_prevista_producao?: string | null
+          equipamento_id?: string | null
           id?: string
           integrado_id: string
+          lote_producao?: string | null
+          modo_execucao?: string | null
           numero_op?: number
           nutricao_id?: string | null
           observacoes?: string | null
@@ -2192,6 +2273,9 @@ export type Database = {
           quantidade_planejada: number
           quantidade_produzida?: number | null
           status?: string
+          tempo_mistura_previsto?: number | null
+          tempo_mistura_real?: number | null
+          tolerancia_variacao?: number | null
           updated_at?: string
         }
         Update: {
@@ -2205,8 +2289,11 @@ export type Database = {
           data_finalizacao?: string | null
           data_inicio_producao?: string | null
           data_prevista_producao?: string | null
+          equipamento_id?: string | null
           id?: string
           integrado_id?: string
+          lote_producao?: string | null
+          modo_execucao?: string | null
           numero_op?: number
           nutricao_id?: string | null
           observacoes?: string | null
@@ -2214,9 +2301,19 @@ export type Database = {
           quantidade_planejada?: number
           quantidade_produzida?: number | null
           status?: string
+          tempo_mistura_previsto?: number | null
+          tempo_mistura_real?: number | null
+          tolerancia_variacao?: number | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_producao_equipamento_id_fkey"
+            columns: ["equipamento_id"]
+            isOneToOne: false
+            referencedRelation: "equipamentos_producao"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordens_producao_nutricao_id_fkey"
             columns: ["nutricao_id"]
@@ -2833,6 +2930,60 @@ export type Database = {
             columns: ["forma_pagamento_id"]
             isOneToOne: false
             referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      producao_logs: {
+        Row: {
+          created_at: string
+          dados_adicionais: Json | null
+          equipamento_codigo: string | null
+          id: string
+          insumo_id: string | null
+          ordem_producao_id: string
+          origem: string | null
+          quantidade: number | null
+          timestamp: string
+          tipo_evento: string
+        }
+        Insert: {
+          created_at?: string
+          dados_adicionais?: Json | null
+          equipamento_codigo?: string | null
+          id?: string
+          insumo_id?: string | null
+          ordem_producao_id: string
+          origem?: string | null
+          quantidade?: number | null
+          timestamp?: string
+          tipo_evento: string
+        }
+        Update: {
+          created_at?: string
+          dados_adicionais?: Json | null
+          equipamento_codigo?: string | null
+          id?: string
+          insumo_id?: string | null
+          ordem_producao_id?: string
+          origem?: string | null
+          quantidade?: number | null
+          timestamp?: string
+          tipo_evento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producao_logs_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producao_logs_ordem_producao_id_fkey"
+            columns: ["ordem_producao_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_producao"
             referencedColumns: ["id"]
           },
         ]
