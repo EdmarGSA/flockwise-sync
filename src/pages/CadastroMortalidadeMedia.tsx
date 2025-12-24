@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 
 const CadastroMortalidadeMedia = () => {
   const { user, loading } = useAuth();
+  const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -84,7 +86,7 @@ const CadastroMortalidadeMedia = () => {
         const { error } = await supabase
           .from('mortalidade_media')
           .insert({
-            integrado_id: user.id,
+            integrado_id: integradoId,
             ...values
           });
 

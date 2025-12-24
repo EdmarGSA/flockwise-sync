@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +57,7 @@ const UNIDADES_VENDA = [
 export default function CadastroProdutosOvos() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const [produtos, setProdutos] = useState<ProdutoOvo[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -132,7 +134,7 @@ export default function CadastroProdutosOvos() {
         const { error } = await supabase
           .from('produtos_ovos')
           .insert([{
-            integrado_id: user.id,
+            integrado_id: integradoId,
             codigo: formData.codigo,
             nome: formData.nome,
             descricao: formData.descricao || null,

@@ -2941,6 +2941,7 @@ export type Database = {
           equipamento_codigo: string | null
           id: string
           insumo_id: string | null
+          integrado_id: string | null
           ordem_producao_id: string
           origem: string | null
           quantidade: number | null
@@ -2953,6 +2954,7 @@ export type Database = {
           equipamento_codigo?: string | null
           id?: string
           insumo_id?: string | null
+          integrado_id?: string | null
           ordem_producao_id: string
           origem?: string | null
           quantidade?: number | null
@@ -2965,6 +2967,7 @@ export type Database = {
           equipamento_codigo?: string | null
           id?: string
           insumo_id?: string | null
+          integrado_id?: string | null
           ordem_producao_id?: string
           origem?: string | null
           quantidade?: number | null
@@ -4235,6 +4238,7 @@ export type Database = {
         Args: { p_integrado_id: string }
         Returns: string
       }
+      get_my_integrado_id: { Args: never; Returns: string }
       get_user_accessible_modules: {
         Args: { _user_id: string }
         Returns: {

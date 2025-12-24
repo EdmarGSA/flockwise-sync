@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ interface FaseAnimal {
 
 const CadastroGruposAnimal = () => {
   const { user, loading } = useAuth();
+  const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
   const [grupos, setGrupos] = useState<GrupoAnimal[]>([]);
   const [fases, setFases] = useState<FaseAnimal[]>([]);
@@ -77,10 +79,10 @@ const CadastroGruposAnimal = () => {
 
     if (!existingGrupos || existingGrupos.length === 0) {
       const defaultGrupos = [
-        { nome: "Aves Corte", descricao: "Frangos de corte para abate", integrado_id: user?.id },
-        { nome: "Aves Postura", descricao: "Galinhas poedeiras para produção de ovos", integrado_id: user?.id },
-        { nome: "Suínos", descricao: "Criação de suínos", integrado_id: user?.id },
-        { nome: "Bovinos", descricao: "Criação de bovinos", integrado_id: user?.id },
+        { nome: "Aves Corte", descricao: "Frangos de corte para abate", integrado_id: integradoId },
+        { nome: "Aves Postura", descricao: "Galinhas poedeiras para produção de ovos", integrado_id: integradoId },
+        { nome: "Suínos", descricao: "Criação de suínos", integrado_id: integradoId },
+        { nome: "Bovinos", descricao: "Criação de bovinos", integrado_id: integradoId },
       ];
 
       const { error: insertError } = await supabase
@@ -186,7 +188,7 @@ const CadastroGruposAnimal = () => {
         .insert({ 
           nome: grupoForm.nome, 
           descricao: grupoForm.descricao || null,
-          integrado_id: user?.id 
+          integrado_id: integradoId 
         });
       
       if (error) {
@@ -242,7 +244,7 @@ const CadastroGruposAnimal = () => {
           descricao: faseForm.descricao || null,
           produto_racao_id: racaoId,
           grupo_id: selectedGrupoId,
-          integrado_id: user?.id 
+          integrado_id: integradoId 
         });
       
       if (error) {

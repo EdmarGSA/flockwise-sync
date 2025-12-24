@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Pill, Plus, AlertTriangle, Calendar, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { format, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -77,6 +78,7 @@ interface TratamentosTabProps {
 
 export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAbate }: TratamentosTabProps) {
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const [tratamentos, setTratamentos] = useState<Tratamento[]>([]);
   const [medicamentos, setMedicamentos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +236,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
       .from('tratamentos_lote')
       .insert({
         lote_id: loteId,
-        integrado_id: user.id,
+        integrado_id: integradoId,
         criado_por: user.id,
         produto_id: formData.produto_id,
         dosagem: formData.dosagem,
@@ -271,7 +273,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
       await supabase
         .from('kardex')
         .insert({
-          integrado_id: user.id,
+          integrado_id: integradoId,
           produto_id: formData.produto_id,
           tipo_movimento: 'SAIDA_TRATAMENTO',
           quantidade: formData.quantidade_utilizada,
