@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { MessageSquare, Plus, Clock, User, AlertTriangle, FileText, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -54,6 +55,7 @@ interface ObservacoesPorDia {
 
 export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps) {
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const [observacoes, setObservacoes] = useState<Observacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -135,7 +137,7 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
       .from('observacoes_lote')
       .insert({
         lote_id: loteId,
-        integrado_id: user.id,
+        integrado_id: integradoId,
         criado_por: user.id,
         dia_ciclo: formData.dia_ciclo,
         tipo: formData.tipo,

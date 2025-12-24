@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 
 export interface ConfigSilo {
   id?: string;
@@ -19,23 +20,24 @@ const DEFAULT_CONFIG: ConfigSilo = {
 
 export function useConfigSilo() {
   const { user } = useAuth();
+  const { integradoId, loading: integradoLoading } = useIntegradoId();
   const [config, setConfig] = useState<ConfigSilo>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.id) {
+    if (integradoId && !integradoLoading) {
       fetchConfig();
     }
-  }, [user?.id]);
+  }, [integradoId, integradoLoading]);
 
   const fetchConfig = async () => {
-    if (!user?.id) return;
+    if (!integradoId) return;
     
     try {
       const { data, error } = await supabase
         .from('config_silo')
         .select('*')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
@@ -59,11 +61,11 @@ export function useConfigSilo() {
   };
 
   const saveConfig = async (newConfig: Omit<ConfigSilo, 'id'>) => {
-    if (!user?.id) return false;
+    if (!integradoId) return false;
 
     try {
       const payload = {
-        integrado_id: user.id,
+        integrado_id: integradoId,
         dias_critico: newConfig.diasCritico,
         dias_atencao: newConfig.diasAtencao,
         dias_ok: newConfig.diasOk,
@@ -98,5 +100,5 @@ export function useConfigSilo() {
     }
   };
 
-  return { config, loading, saveConfig, refetch: fetchConfig };
+  return { config, loading: loading || integradoLoading, saveConfig, refetch: fetchConfig };
 }

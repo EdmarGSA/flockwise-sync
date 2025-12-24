@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, AlertCircle, AlertTriangle } from 'lucide-react';
@@ -71,6 +72,7 @@ const linhagemLabels: Record<string, string> = {
 
 export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(false);
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
@@ -219,7 +221,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
         sexo: 'femea' as const, // Postura é sempre fêmea
         veterinario_id: data.veterinario_id || null,
         observacoes: data.observacoes || null,
-        integrado_id: user.id,
+        integrado_id: integradoId,
         status: 'previsao' as const,
         fase_postura_atual: 'cria' as const, // Começa na fase cria
         custo_aves: data.custo_aves ? parseFloat(data.custo_aves) * parseInt(data.quantidade_aves) : null,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useIntegradoId } from './useIntegradoId';
 
 interface ConfigFechamento {
   id: string;
@@ -10,23 +11,24 @@ interface ConfigFechamento {
 
 export function useConfigFechamento() {
   const { user } = useAuth();
+  const { integradoId, loading: integradoLoading } = useIntegradoId();
   const [config, setConfig] = useState<ConfigFechamento | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (integradoId && !integradoLoading) {
       fetchConfig();
     }
-  }, [user]);
+  }, [integradoId, integradoLoading]);
 
   const fetchConfig = async () => {
-    if (!user) return;
+    if (!integradoId) return;
 
     setLoading(true);
     const { data, error } = await supabase
       .from('config_fechamento')
       .select('*')
-      .eq('integrado_id', user.id)
+      .eq('integrado_id', integradoId)
       .maybeSingle();
 
     if (error) {
@@ -38,7 +40,7 @@ export function useConfigFechamento() {
   };
 
   const saveConfig = async (constanteAjusteCA: number): Promise<boolean> => {
-    if (!user) return false;
+    if (!integradoId) return false;
 
     if (config) {
       // Update existing
@@ -56,7 +58,7 @@ export function useConfigFechamento() {
       const { error } = await supabase
         .from('config_fechamento')
         .insert({
-          integrado_id: user.id,
+          integrado_id: integradoId,
           constante_ajuste_ca: constanteAjusteCA
         });
 
@@ -76,7 +78,7 @@ export function useConfigFechamento() {
   return {
     config,
     constanteAjusteCA,
-    loading,
+    loading: loading || integradoLoading,
     saveConfig,
     refetch: fetchConfig
   };
