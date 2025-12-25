@@ -1369,6 +1369,7 @@ export type Database = {
       lotes: {
         Row: {
           created_at: string
+          criador_id: string | null
           custo_aves: number | null
           data_alojamento: string | null
           data_fechamento: string | null
@@ -1400,6 +1401,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          criador_id?: string | null
           custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
@@ -1433,6 +1435,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          criador_id?: string | null
           custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
@@ -4299,6 +4302,7 @@ export type Database = {
         | "tecnico"
         | "comprador"
         | "conferente"
+        | "criador"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo: "medio" | "grande" | "extra" | "jumbo"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
@@ -4520,6 +4524,7 @@ export const Constants = {
         "tecnico",
         "comprador",
         "conferente",
+        "criador",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo"],
