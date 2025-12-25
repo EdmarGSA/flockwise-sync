@@ -27,6 +27,7 @@ const loteSchema = z.object({
   linhagem: z.string().min(1, 'Selecione uma linhagem'),
   sexo: z.enum(['macho', 'femea', 'misto']),
   veterinario_id: z.string().optional(),
+  criador_id: z.string().optional(),
   observacoes: z.string().optional(),
   custo_aves: z.string().optional(),
 });
@@ -56,6 +57,11 @@ interface Veterinario {
   full_name: string;
 }
 
+interface Criador {
+  id: string;
+  full_name: string;
+}
+
 interface LoteFormProps {
   onSuccess?: () => void;
 }
@@ -67,6 +73,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  const [criadores, setCriadores] = useState<Criador[]>([]);
   const [selectedNucleoId, setSelectedNucleoId] = useState<string>('');
   const [availableSexos, setAvailableSexos] = useState<string[]>([]);
   const [selectedLinhagem, setSelectedLinhagem] = useState<string>('');
@@ -81,6 +88,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       linhagem: '',
       sexo: 'misto',
       veterinario_id: '',
+      criador_id: '',
       observacoes: '',
       custo_aves: '',
     },
@@ -90,6 +98,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
     fetchNucleos();
     fetchVeterinarios();
     fetchLinhagens();
+    fetchCriadores();
   }, []);
 
   useEffect(() => {
@@ -224,6 +233,16 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
     setVeterinarios(data || []);
   };
 
+  const fetchCriadores = async () => {
+    const { data, error } = await supabase.rpc('get_criadores' as any);
+    
+    if (error) {
+      console.error('Erro ao buscar criadores:', error);
+      return;
+    }
+    setCriadores((data as Criador[]) || []);
+  };
+
   const onSubmit = async (data: LoteFormData) => {
     if (!user) {
       toast.error('Usuário não autenticado');
@@ -247,6 +266,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
         linhagem: data.linhagem as any,
         sexo: data.sexo,
         veterinario_id: data.veterinario_id || null,
+        criador_id: data.criador_id || null,
         observacoes: data.observacoes || null,
         integrado_id: integradoId,
         status: 'previsao',
@@ -555,6 +575,37 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
                       veterinarios.map((vet) => (
                         <SelectItem key={vet.id} value={vet.id}>
                           {vet.full_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="criador_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Criador (opcional)</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o criador" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {criadores.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        Nenhum criador cadastrado
+                      </SelectItem>
+                    ) : (
+                      criadores.map((criador) => (
+                        <SelectItem key={criador.id} value={criador.id}>
+                          {criador.full_name}
                         </SelectItem>
                       ))
                     )}

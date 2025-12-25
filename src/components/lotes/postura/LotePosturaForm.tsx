@@ -26,6 +26,7 @@ const lotePosturaSchema = z.object({
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
   linhagem_postura: z.string().min(1, 'Selecione uma linhagem'),
   veterinario_id: z.string().optional(),
+  criador_id: z.string().optional(),
   observacoes: z.string().optional(),
   custo_aves: z.string().optional(),
 });
@@ -47,6 +48,11 @@ interface Galpao {
 }
 
 interface Veterinario {
+  id: string;
+  full_name: string;
+}
+
+interface Criador {
   id: string;
   full_name: string;
 }
@@ -77,6 +83,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  const [criadores, setCriadores] = useState<Criador[]>([]);
   const [selectedNucleoId, setSelectedNucleoId] = useState<string>('');
   const [linhagens, setLinhagens] = useState<LinhagemOption[]>([]);
 
@@ -88,6 +95,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
       quantidade_aves: '',
       linhagem_postura: '',
       veterinario_id: '',
+      criador_id: '',
       observacoes: '',
       custo_aves: '',
     },
@@ -97,6 +105,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
     fetchNucleos();
     fetchVeterinarios();
     fetchLinhagens();
+    fetchCriadores();
   }, []);
 
   useEffect(() => {
@@ -198,6 +207,16 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
     setVeterinarios(data || []);
   };
 
+  const fetchCriadores = async () => {
+    const { data, error } = await supabase.rpc('get_criadores' as any);
+    
+    if (error) {
+      console.error('Erro ao buscar criadores:', error);
+      return;
+    }
+    setCriadores((data as Criador[]) || []);
+  };
+
   const onSubmit = async (data: LotePosturaFormData) => {
     if (!user) {
       toast.error('Usuário não autenticado');
@@ -220,6 +239,7 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
         linhagem_postura: data.linhagem_postura,
         sexo: 'femea' as const, // Postura é sempre fêmea
         veterinario_id: data.veterinario_id || null,
+        criador_id: data.criador_id || null,
         observacoes: data.observacoes || null,
         integrado_id: integradoId,
         status: 'previsao' as const,
@@ -499,6 +519,37 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
                       veterinarios.map((vet) => (
                         <SelectItem key={vet.id} value={vet.id}>
                           {vet.full_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="criador_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Criador (opcional)</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o criador" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {criadores.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        Nenhum criador cadastrado
+                      </SelectItem>
+                    ) : (
+                      criadores.map((criador) => (
+                        <SelectItem key={criador.id} value={criador.id}>
+                          {criador.full_name}
                         </SelectItem>
                       ))
                     )}
