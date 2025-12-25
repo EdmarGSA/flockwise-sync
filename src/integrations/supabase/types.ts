@@ -4241,6 +4241,13 @@ export type Database = {
         Args: { p_integrado_id: string }
         Returns: string
       }
+      get_criadores: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_my_integrado_id: { Args: never; Returns: string }
       get_user_accessible_modules: {
         Args: { _user_id: string }

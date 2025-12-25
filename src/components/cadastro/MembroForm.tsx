@@ -53,6 +53,7 @@ const rolesOptions = [
   { value: "tecnico", label: "Técnico" },
   { value: "comprador", label: "Comprador" },
   { value: "conferente", label: "Conferente" },
+  { value: "criador", label: "Criador" },
 ];
 
 const MembroForm = ({ onSuccess }: MembroFormProps) => {
