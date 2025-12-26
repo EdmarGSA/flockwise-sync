@@ -3867,6 +3867,7 @@ export type Database = {
           integrado_id: string
           lote_id: string
           observacoes: string | null
+          observacoes_envio: string | null
           quantidade_devolvida_kg: number | null
           quantidade_recebida_kg: number | null
           quantidade_solicitada_kg: number
@@ -3889,6 +3890,7 @@ export type Database = {
           integrado_id: string
           lote_id: string
           observacoes?: string | null
+          observacoes_envio?: string | null
           quantidade_devolvida_kg?: number | null
           quantidade_recebida_kg?: number | null
           quantidade_solicitada_kg: number
@@ -3911,6 +3913,7 @@ export type Database = {
           integrado_id?: string
           lote_id?: string
           observacoes?: string | null
+          observacoes_envio?: string | null
           quantidade_devolvida_kg?: number | null
           quantidade_recebida_kg?: number | null
           quantidade_solicitada_kg?: number
