@@ -11,6 +11,7 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RacaoGestaoDialog } from '@/components/consumo/RacaoGestaoDialog';
+import { EnviarRacaoDialog } from '@/components/consumo/EnviarRacaoDialog';
 
 interface LoteConsumo {
   id: string;
@@ -48,6 +49,8 @@ export default function GestaoConsumo() {
   const [loadingData, setLoadingData] = useState(true);
   const [racaoDialogOpen, setRacaoDialogOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteConsumo | null>(null);
+  const [enviarDialogOpen, setEnviarDialogOpen] = useState(false);
+  const [selectedSolicitacao, setSelectedSolicitacao] = useState<SolicitacaoRacao | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -238,23 +241,9 @@ export default function GestaoConsumo() {
     }
   };
 
-  const handleConfirmarEnvio = async (solicitacao: SolicitacaoRacao) => {
-    try {
-      const { error } = await supabase
-        .from('solicitacoes_racao')
-        .update({
-          status: 'enviado',
-          data_envio: new Date().toISOString(),
-        })
-        .eq('id', solicitacao.id);
-
-      if (error) throw error;
-      toast.success('Envio confirmado!');
-      fetchSolicitacoes();
-    } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao confirmar envio');
-    }
+  const handleOpenEnviarDialog = (solicitacao: SolicitacaoRacao) => {
+    setSelectedSolicitacao(solicitacao);
+    setEnviarDialogOpen(true);
   };
 
   const handleConfirmarDevolucao = async (solicitacao: SolicitacaoRacao) => {
@@ -512,7 +501,7 @@ export default function GestaoConsumo() {
                                 <Button 
                                   size="sm" 
                                   variant="default"
-                                  onClick={() => handleConfirmarEnvio(solicitacao)}
+                                  onClick={() => handleOpenEnviarDialog(solicitacao)}
                                   className="gap-1"
                                 >
                                   <Truck className="w-4 h-4" />
@@ -550,6 +539,24 @@ export default function GestaoConsumo() {
           open={racaoDialogOpen}
           onOpenChange={setRacaoDialogOpen}
           lote={selectedLote}
+          onSuccess={fetchSolicitacoes}
+        />
+      )}
+
+      {selectedSolicitacao && (
+        <EnviarRacaoDialog
+          open={enviarDialogOpen}
+          onOpenChange={setEnviarDialogOpen}
+          solicitacao={selectedSolicitacao}
+          loteInfo={(() => {
+            const lote = lotes.find(l => l.id === selectedSolicitacao.lote_id);
+            if (!lote) return null;
+            return {
+              nucleo_nome: lote.nucleo?.nome || '-',
+              galpao_nome: lote.galpao?.nome || '-',
+              tipo_producao: lote.nucleo?.tipo_producao || '',
+            };
+          })()}
           onSuccess={fetchSolicitacoes}
         />
       )}
