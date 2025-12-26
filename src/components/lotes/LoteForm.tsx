@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
+import { SolicitarRacaoLoteDialog } from '@/components/consumo/SolicitarRacaoLoteDialog';
 const loteSchema = z.object({
   nucleo_id: z.string().uuid('Selecione um núcleo'),
   galpao_id: z.string().uuid('Selecione um galpão'),
@@ -78,7 +78,15 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const [availableSexos, setAvailableSexos] = useState<string[]>([]);
   const [selectedLinhagem, setSelectedLinhagem] = useState<string>('');
   const [linhagens, setLinhagens] = useState<LinhagemOption[]>([]);
-
+  
+  // State for feed request dialog
+  const [showRacaoDialog, setShowRacaoDialog] = useState(false);
+  const [novoLoteData, setNovoLoteData] = useState<{
+    loteId: string;
+    tipoProducao: string;
+    quantidadeAves: number;
+    dataPrevistaAlojamento: Date;
+  } | null>(null);
   const form = useForm<LoteFormData>({
     resolver: zodResolver(loteSchema),
     defaultValues: {
@@ -258,7 +266,15 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('lotes').insert({
+      // Get tipo_producao from nucleo
+      const selectedNucleo = nucleos.find(n => n.id === data.nucleo_id);
+      const { data: nucleoData } = await supabase
+        .from('nucleos')
+        .select('tipo_producao')
+        .eq('id', data.nucleo_id)
+        .single();
+
+      const { data: insertedLote, error } = await supabase.from('lotes').insert({
         nucleo_id: data.nucleo_id,
         galpao_id: data.galpao_id,
         quantidade_aves: parseInt(data.quantidade_aves),
@@ -271,19 +287,38 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
         integrado_id: integradoId,
         status: 'previsao',
         custo_aves: data.custo_aves ? parseFloat(data.custo_aves) * parseInt(data.quantidade_aves) : null,
-      });
+      }).select('id').single();
 
       if (error) throw error;
 
       toast.success('Lote aberto com sucesso!');
-      form.reset();
-      onSuccess?.();
+      
+      // Store data for feed request dialog
+      if (insertedLote && integradoId) {
+        setNovoLoteData({
+          loteId: insertedLote.id,
+          tipoProducao: nucleoData?.tipo_producao || '',
+          quantidadeAves: parseInt(data.quantidade_aves),
+          dataPrevistaAlojamento: data.data_prevista_alojamento,
+        });
+        setShowRacaoDialog(true);
+      } else {
+        form.reset();
+        onSuccess?.();
+      }
     } catch (error) {
       console.error('Erro ao abrir lote:', error);
       toast.error('Erro ao abrir lote');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRacaoDialogClose = () => {
+    setShowRacaoDialog(false);
+    setNovoLoteData(null);
+    form.reset();
+    onSuccess?.();
   };
 
   const availableGalpoes = galpoes.filter(g => !g.has_active_lote);
@@ -670,6 +705,21 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
           </p>
         )}
       </form>
+      
+      {/* Dialog para solicitar ração ao criar lote */}
+      {novoLoteData && integradoId && (
+        <SolicitarRacaoLoteDialog
+          open={showRacaoDialog}
+          onOpenChange={setShowRacaoDialog}
+          loteId={novoLoteData.loteId}
+          integradoId={integradoId}
+          tipoProducao={novoLoteData.tipoProducao}
+          quantidadeAves={novoLoteData.quantidadeAves}
+          dataPrevistaAlojamento={novoLoteData.dataPrevistaAlojamento}
+          onSuccess={handleRacaoDialogClose}
+          onSkip={handleRacaoDialogClose}
+        />
+      )}
     </Form>
   );
 }
