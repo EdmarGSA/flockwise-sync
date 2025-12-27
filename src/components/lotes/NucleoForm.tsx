@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { MapPin, Search } from 'lucide-react';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 
 const nucleoSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
@@ -44,6 +45,7 @@ interface NucleoFormProps {
 }
 
 export function NucleoForm({ onSuccess }: NucleoFormProps) {
+  const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(false);
   const [searchingCep, setSearchingCep] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
@@ -171,6 +173,11 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
   };
 
   const onSubmit = async (data: NucleoFormData) => {
+    if (!integradoId) {
+      toast.error('Erro: usuário não autenticado');
+      return;
+    }
+    
     setLoading(true);
     try {
       const { error } = await supabase.from('nucleos').insert({
@@ -186,7 +193,7 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
         latitude: location?.lat || null,
         longitude: location?.lng || null,
         tipo_producao: data.tipo_producao,
-        integrado_id: data.integrado_id,
+        integrado_id: integradoId,
       });
 
       if (error) throw error;
