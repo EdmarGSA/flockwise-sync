@@ -368,31 +368,6 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="tipo_producao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Produção</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o grupo de animal" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {gruposAnimal.map((grupo) => (
-                          <SelectItem key={grupo.id} value={grupo.id}>
-                            {grupo.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="integrado_id"
                 render={({ field }) => (
                   <FormItem>
@@ -407,6 +382,35 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
                         {integrados.map((integrado) => (
                           <SelectItem key={integrado.id} value={integrado.id}>
                             {integrado.full_name || integrado.company_name || 'Sem nome'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tipo_producao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Produção</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={!watchIntegradoId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={watchIntegradoId ? "Selecione o tipo de produção" : "Selecione o integrado primeiro"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {gruposAnimal.map((grupo) => (
+                          <SelectItem key={grupo.id} value={grupo.nome}>
+                            {grupo.nome}
                           </SelectItem>
                         ))}
                       </SelectContent>
