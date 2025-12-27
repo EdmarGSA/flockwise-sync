@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Truck, SkipForward } from 'lucide-react';
-import { format, subDays, setHours, setMinutes } from 'date-fns';
+import { format, subDays, setHours, setMinutes, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -52,14 +52,19 @@ export function SolicitarRacaoLoteDialog({
   // Calculate suggested quantity (approx 50g per bird for initial days)
   const suggestedQuantity = Math.ceil((quantidadeAves * 50) / 1000); // Convert to kg
 
+  // Ensure dataPrevistaAlojamento is a valid Date
+  const validDataAlojamento = dataPrevistaAlojamento instanceof Date && isValid(dataPrevistaAlojamento) 
+    ? dataPrevistaAlojamento 
+    : new Date();
+
   useEffect(() => {
     if (open) {
       fetchProdutosRacao();
       // Suggest delivery 1 day before housing
-      setDataEntrega(subDays(dataPrevistaAlojamento, 1));
+      setDataEntrega(subDays(validDataAlojamento, 1));
       setQuantidade(suggestedQuantity.toString());
     }
-  }, [open, tipoProducao, dataPrevistaAlojamento, suggestedQuantity]);
+  }, [open, tipoProducao, validDataAlojamento, suggestedQuantity]);
 
   const fetchProdutosRacao = async () => {
     try {
@@ -187,7 +192,7 @@ export function SolicitarRacaoLoteDialog({
 
         <div className="space-y-4 py-4">
           <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
-            <p><strong>Alojamento previsto:</strong> {format(dataPrevistaAlojamento, "dd/MM/yyyy", { locale: ptBR })}</p>
+            <p><strong>Alojamento previsto:</strong> {format(validDataAlojamento, "dd/MM/yyyy", { locale: ptBR })}</p>
             <p><strong>Quantidade de aves:</strong> {quantidadeAves.toLocaleString('pt-BR')}</p>
           </div>
 
