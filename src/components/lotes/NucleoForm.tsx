@@ -72,15 +72,11 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
     fetchIntegrados();
   }, []);
 
-  // Buscar grupos de animal quando integrado for selecionado
+  // Buscar grupos de animal na inicialização
   const watchIntegradoId = form.watch('integrado_id');
   useEffect(() => {
-    if (watchIntegradoId) {
-      fetchGruposAnimal(watchIntegradoId);
-    } else {
-      setGruposAnimal([]);
-    }
-  }, [watchIntegradoId]);
+    fetchGruposAnimal();
+  }, []);
 
   const fetchIntegrados = async () => {
     const { data, error } = await supabase
@@ -95,19 +91,27 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
     setIntegrados(data || []);
   };
 
-  const fetchGruposAnimal = async (integradoId: string) => {
+  const fetchGruposAnimal = async () => {
     const { data, error } = await supabase
       .from('grupos_animal')
       .select('id, nome')
       .eq('ativo', true)
-      .eq('integrado_id', integradoId)
       .order('nome');
     
     if (error) {
       console.error('Erro ao buscar grupos de animais:', error);
       return;
     }
-    setGruposAnimal(data || []);
+    
+    // Remover duplicatas pelo nome
+    const gruposUnicos = data?.reduce((acc, grupo) => {
+      if (!acc.find(g => g.nome === grupo.nome)) {
+        acc.push(grupo);
+      }
+      return acc;
+    }, [] as typeof data) || [];
+    
+    setGruposAnimal(gruposUnicos);
   };
 
   const searchCep = async () => {
@@ -400,11 +404,10 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
                     <Select 
                       onValueChange={field.onChange} 
                       value={field.value}
-                      disabled={!watchIntegradoId}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={watchIntegradoId ? "Selecione o tipo de produção" : "Selecione o integrado primeiro"} />
+                          <SelectValue placeholder="Selecione o tipo de produção" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
