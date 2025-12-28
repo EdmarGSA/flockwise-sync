@@ -72,11 +72,12 @@ export function NucleoEditForm({ nucleo, onSuccess, onCancel }: NucleoEditFormPr
   }, []);
 
   const fetchGruposAnimal = async () => {
+    // A RLS já filtra pelo integrado_id do usuário via get_my_integrado_id()
+    // Não precisamos filtrar manualmente
     const { data, error } = await supabase
       .from('grupos_animal')
       .select('id, nome')
       .eq('ativo', true)
-      .eq('integrado_id', nucleo.integrado_id)
       .order('nome');
     
     if (error) {
