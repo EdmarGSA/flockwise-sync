@@ -66,6 +66,7 @@ interface LoteComPesagem extends Lote {
   precisaPesar?: boolean;
   quantidadeAlojada?: number | null;
   temSolicitacaoPendente?: boolean;
+  temSolicitacaoEnviada?: boolean;
   pendenciasVet?: number;
   jejumAtrasado?: boolean;
   saidaProxima?: boolean;
@@ -160,11 +161,9 @@ export default function MeusLotes() {
         // Check for pending feed requests (solicitado, confirmado, or enviado status)
         const { data: solicitacaoData } = await supabase
           .from('solicitacoes_racao')
-          .select('id')
+          .select('id, status')
           .eq('lote_id', loteData.id)
-          .in('status', ['solicitado', 'confirmado', 'enviado'])
-          .limit(1)
-          .maybeSingle();
+          .in('status', ['solicitado', 'confirmado', 'enviado']);
 
         // Count pending vet notifications (unread orientacoes + unconfirmed tratamentos)
         const { count: orientacoesCount } = await supabase
@@ -184,7 +183,8 @@ export default function MeusLotes() {
         const pendenciasVet = (orientacoesCount || 0) + (tratamentosCount || 0);
 
         const ultimaPesagem = pesagemData?.data_pesagem || null;
-        const temSolicitacaoPendente = !!solicitacaoData;
+        const temSolicitacaoPendente = solicitacaoData && solicitacaoData.length > 0;
+        const temSolicitacaoEnviada = solicitacaoData?.some(s => s.status === 'enviado') || false;
         
         // Calculate quantidade alojada
         let quantidadeAlojada: number | null = null;
@@ -280,6 +280,7 @@ export default function MeusLotes() {
           precisaPesar,
           quantidadeAlojada,
           temSolicitacaoPendente,
+          temSolicitacaoEnviada,
           pendenciasVet,
           jejumAtrasado,
           saidaProxima,
@@ -609,26 +610,60 @@ export default function MeusLotes() {
                         <TableCell>
                           <div className="flex gap-1">
                             {lote.status === 'previsao' && (
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleAlojar(lote)}
-                                className="gap-1"
-                              >
-                                <Truck className="w-4 h-4" />
-                                Alojar
-                              </Button>
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleAlojar(lote)}
+                                  className="gap-1"
+                                >
+                                  <Truck className="w-4 h-4" />
+                                  Alojar
+                                </Button>
+                                {lote.temSolicitacaoEnviada && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleRacao(lote)}
+                                    className="gap-1 relative"
+                                  >
+                                    <Package className="w-4 h-4" />
+                                    Ração
+                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-foreground opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-foreground"></span>
+                                    </span>
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {lote.status === 'saiu_para_entrega' && (
-                              <Button 
-                                size="sm" 
-                                variant="default"
-                                onClick={() => handleAdm(lote)}
-                                className="gap-1"
-                              >
-                                <ClipboardCheck className="w-4 h-4" />
-                                Adm.
-                              </Button>
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="default"
+                                  onClick={() => handleAdm(lote)}
+                                  className="gap-1"
+                                >
+                                  <ClipboardCheck className="w-4 h-4" />
+                                  Adm.
+                                </Button>
+                                {lote.temSolicitacaoEnviada && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleRacao(lote)}
+                                    className="gap-1 relative"
+                                  >
+                                    <Package className="w-4 h-4" />
+                                    Ração
+                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-foreground opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-foreground"></span>
+                                    </span>
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {lote.status === 'alojado' && (
                               <>
