@@ -104,10 +104,27 @@ const KardexForm = ({ integradoId, produtoId, produtos, onSuccess }: KardexFormP
       return;
     }
 
-    // Update product stock
+    // Update product stock and custo_medio for entrada movements
+    const updateData: { estoque_atual: number; custo_medio?: number } = { 
+      estoque_atual: saldoAtual 
+    };
+    
+    // Calcular custo médio ponderado para entradas
+    if (values.tipo_movimento === 'entrada' && values.custo_unitario && values.custo_unitario > 0) {
+      const custoMedioAtual = produto?.custo_medio || 0;
+      
+      if (saldoAnterior > 0 && custoMedioAtual > 0) {
+        // Custo médio ponderado: (estoque * custo_atual + entrada * custo_entrada) / (estoque + entrada)
+        updateData.custo_medio = ((saldoAnterior * custoMedioAtual) + (quantidadeFinal * values.custo_unitario)) / saldoAtual;
+      } else {
+        // Primeira entrada ou custo anterior zerado
+        updateData.custo_medio = values.custo_unitario;
+      }
+    }
+    
     const { error: produtoError } = await supabase
       .from('produtos')
-      .update({ estoque_atual: saldoAtual })
+      .update(updateData)
       .eq('id', produtoId);
 
     setLoading(false);
