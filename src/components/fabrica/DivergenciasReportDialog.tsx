@@ -269,7 +269,7 @@ export default function DivergenciasReportDialog({
         if (quantidadeEstoque > 0) {
           const { data: produto, error: prodError } = await supabase
             .from('produtos')
-            .select('estoque_atual, requer_quarentena')
+            .select('estoque_atual, custo_medio, requer_quarentena')
             .eq('id', item.produto_id)
             .single();
 
@@ -278,6 +278,21 @@ export default function DivergenciasReportDialog({
           const saldoAnterior = produto?.estoque_atual || 0;
           const saldoAtual = saldoAnterior + quantidadeEstoque;
           const requerQuarentena = produto?.requer_quarentena ?? true;
+          
+          // Calcular custo médio ponderado
+          const custoUnitario = item.preco_nfe || item.preco_oc || 0;
+          const custoMedioAtual = produto?.custo_medio || 0;
+          let novoCustoMedio = custoMedioAtual;
+          
+          if (custoUnitario > 0) {
+            if (saldoAnterior > 0 && custoMedioAtual > 0) {
+              // Custo médio ponderado: (estoque * custo_atual + entrada * custo_entrada) / (estoque + entrada)
+              novoCustoMedio = ((saldoAnterior * custoMedioAtual) + (quantidadeEstoque * custoUnitario)) / saldoAtual;
+            } else {
+              // Primeira entrada ou custo anterior zerado
+              novoCustoMedio = custoUnitario;
+            }
+          }
 
           const { error: kardexError } = await supabase
             .from('kardex')
@@ -288,7 +303,7 @@ export default function DivergenciasReportDialog({
               quantidade: quantidadeEstoque,
               saldo_anterior: saldoAnterior,
               saldo_atual: saldoAtual,
-              custo_unitario: item.preco_nfe || item.preco_oc,
+              custo_unitario: custoUnitario,
               documento_ref: `NF-e ${recebimento?.numero_nfe || 'S/N'}`,
               observacao: `Recebimento - ${item.quantidade_fisica} ${item.unidade_compra || item.produtos.unidade_medida} (${quantidadeEstoque} ${item.produtos.unidade_medida}) - Lote: ${item.lote_fornecedor || 'N/A'}`,
               lote_fornecedor: item.lote_fornecedor || null,
@@ -300,7 +315,10 @@ export default function DivergenciasReportDialog({
 
           const { error: stockError } = await supabase
             .from('produtos')
-            .update({ estoque_atual: saldoAtual })
+            .update({ 
+              estoque_atual: saldoAtual,
+              custo_medio: novoCustoMedio 
+            })
             .eq('id', item.produto_id);
 
           if (stockError) throw stockError;
