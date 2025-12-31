@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -16,10 +18,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface MortalidadeDialogProps {
   open: boolean;
@@ -54,6 +59,7 @@ export function MortalidadeDialog({
   onSuccess,
 }: MortalidadeDialogProps) {
   const [items, setItems] = useState<MortalidadeItem[]>([]);
+  const [dataRegistro, setDataRegistro] = useState<Date>(new Date());
   const [motivo, setMotivo] = useState<MotivoMortalidade>('natural');
   const [submotivo, setSubmotivo] = useState<SubmotivoEliminacao>('problema_locomotor');
   const [quantidade, setQuantidade] = useState('');
@@ -115,6 +121,7 @@ export function MortalidadeDialog({
         .insert({
           lote_id: loteId,
           integrado_id: integradoId,
+          data_registro: format(dataRegistro, 'yyyy-MM-dd'),
         })
         .select('id')
         .single();
@@ -150,6 +157,7 @@ export function MortalidadeDialog({
 
   const handleClose = () => {
     setItems([]);
+    setDataRegistro(new Date());
     setQuantidade('');
     setPesoKg('');
     setMotivo('natural');
@@ -168,6 +176,36 @@ export function MortalidadeDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Date Picker */}
+          <div className="space-y-2">
+            <Label>Data do Registro</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dataRegistro && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dataRegistro ? format(dataRegistro, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dataRegistro}
+                  onSelect={(date) => date && setDataRegistro(date)}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                  className="pointer-events-auto"
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {/* Input Form */}
           <Card className="border-border">
             <CardContent className="pt-4 space-y-4">

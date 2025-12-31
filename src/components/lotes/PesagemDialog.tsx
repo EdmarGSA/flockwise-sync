@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface PesagemItem {
   id: string;
@@ -92,6 +97,7 @@ export function PesagemDialog({
   const [itens, setItens] = useState<PesagemItem[]>([]);
   const [metas, setMetas] = useState<MetasPeso | null>(null);
   const [pesoReferencia, setPesoReferencia] = useState<number | null>(null);
+  const [dataPesagem, setDataPesagem] = useState<Date>(new Date());
   
   // Form inputs
   const [quantidadeAves, setQuantidadeAves] = useState('');
@@ -128,6 +134,7 @@ export function PesagemDialog({
   useEffect(() => {
     if (open) {
       setItens([]);
+      setDataPesagem(new Date());
       setQuantidadeAves('');
       setPesoBruto('');
       // Não limpa a tara - mantém o valor anterior
@@ -224,7 +231,7 @@ export function PesagemDialog({
         .insert({
           lote_id: loteId,
           integrado_id: integradoId,
-          data_pesagem: new Date().toISOString().split('T')[0],
+          data_pesagem: format(dataPesagem, 'yyyy-MM-dd'),
         })
         .select()
         .single();
@@ -290,6 +297,36 @@ export function PesagemDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Date Picker */}
+          <div className="space-y-2">
+            <Label>Data da Pesagem</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dataPesagem && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dataPesagem ? format(dataPesagem, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dataPesagem}
+                  onSelect={(date) => date && setDataPesagem(date)}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                  className="pointer-events-auto"
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {/* Metas Card */}
           {metas && (
             <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20">
