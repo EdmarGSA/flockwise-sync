@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Target, TrendingUp, Scale, Skull, AlertTriangle, CheckCircle } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -51,6 +52,7 @@ interface MetasVetTabProps {
 
 export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const [metas, setMetas] = useState<MetasPeso | null>(null);
   const [pesagens, setPesagens] = useState<PesagemData[]>([]);
   const [desempenhoReferencia, setDesempenhoReferencia] = useState<DesempenhoReferencia[]>([]);
@@ -59,8 +61,10 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
-  }, [loteId]);
+    if (integradoId) {
+      fetchData();
+    }
+  }, [loteId, integradoId]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -138,11 +142,11 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
     }
 
     // Fetch mortalidade
-    if (lote.data_alojamento && qtdAlojada > 0 && user) {
+    if (lote.data_alojamento && qtdAlojada > 0 && integradoId) {
       const { data: mortalidadeMediaData } = await supabase
         .from('mortalidade_media')
         .select('*')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .maybeSingle();
 
       const { data: mortalidadeData } = await supabase

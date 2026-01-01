@@ -109,6 +109,7 @@ const loadMultiplicadores = (): Multiplicadores => {
 
 export default function MetasPesoLote() {
   const { user, loading } = useAuth();
+  const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
   const { loteId } = useParams<{ loteId: string }>();
   const [lote, setLote] = useState<Lote | null>(null);
@@ -127,10 +128,10 @@ export default function MetasPesoLote() {
   const [alertasMortalidade, setAlertasMortalidade] = useState<MortalidadePorSemana[]>([]);
 
   useEffect(() => {
-    if (user && loteId) {
+    if (user && loteId && integradoId) {
       fetchData();
     }
-  }, [user, loteId]);
+  }, [user, loteId, integradoId]);
 
   const fetchData = async () => {
     setLoadingData(true);
@@ -263,7 +264,7 @@ export default function MetasPesoLote() {
     const { data: mortalidadeMediaData } = await supabase
       .from('mortalidade_media')
       .select('*')
-      .eq('integrado_id', user!.id)
+      .eq('integrado_id', integradoId!)
       .maybeSingle();
 
     if (mortalidadeMediaData) {
@@ -384,7 +385,7 @@ export default function MetasPesoLote() {
           .from('metas_peso')
           .insert({
             lote_id: loteId,
-            integrado_id: user.id,
+            integrado_id: integradoId!,
             peso_inicial_kg: editingMetas.peso_inicial_kg,
             meta_7_dias_kg: editingMetas.meta_7_dias_kg,
             meta_14_dias_kg: editingMetas.meta_14_dias_kg,
