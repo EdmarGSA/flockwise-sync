@@ -12,6 +12,7 @@ import Home from "./pages/Home";
 import GestaoCampo from "./pages/GestaoCampo";
 import MeusLotes from "./pages/MeusLotes";
 import MetasPesoLote from "./pages/MetasPesoLote";
+import LoteDetalhe from "./pages/LoteDetalhe";
 import MetasPosturaLote from "./pages/MetasPosturaLote";
 import GestaoConsumo from "./pages/GestaoConsumo";
 import Configuracoes from "./pages/Configuracoes";
@@ -114,6 +115,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="lotes">
           <MeusLotes />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/meus-lotes/:loteId" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="lotes">
+          <LoteDetalhe />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
