@@ -449,362 +449,100 @@ export default function MeusLotes() {
       <main className="container mx-auto px-4 py-8 pt-24">
         {/* Weighing Alert */}
         {lotesPrecisandoPesar > 0 && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="flex items-center gap-2">
               <Scale className="w-4 h-4" />
-              <strong>{lotesPrecisandoPesar} lote(s)</strong> precisam de pesagem (intervalo de 7 dias).
+              <strong>{lotesPrecisandoPesar} lote(s)</strong> precisam de pesagem.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Alojados</p>
-                  <p className="text-2xl font-bold text-primary">{lotesAtivos}</p>
-                </div>
-                <Bird className="w-8 h-8 text-primary/50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Previstos</p>
-                  <p className="text-2xl font-bold text-amber-500">{lotesPendentes}</p>
-                </div>
-                <Calendar className="w-8 h-8 text-amber-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Em Trânsito</p>
-                  <p className="text-2xl font-bold text-destructive">{lotesEmTransito}</p>
-                </div>
-                <Truck className="w-8 h-8 text-destructive/50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Fechados</p>
-                  <p className="text-2xl font-bold text-muted-foreground">{lotesFechados}</p>
-                </div>
-                <Users className="w-8 h-8 text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Filter Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4">
+          {[
+            { status: 'todos', label: 'Todos', count: lotes.length },
+            { status: 'alojado', label: 'Alojados', count: lotesAtivos },
+            { status: 'previsao', label: 'Previstos', count: lotesPendentes },
+            { status: 'saiu_para_entrega', label: 'Trânsito', count: lotesEmTransito },
+            { status: 'fechado', label: 'Fechados', count: lotesFechados },
+          ].map((tab) => (
+            <Badge
+              key={tab.status}
+              variant={tab.count > 0 ? 'default' : 'secondary'}
+              className="cursor-pointer whitespace-nowrap px-3 py-1.5"
+            >
+              {tab.label} ({tab.count})
+            </Badge>
+          ))}
         </div>
 
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Todos os Lotes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingData ? (
-              <p className="text-muted-foreground">Carregando...</p>
-            ) : lotes.length === 0 ? (
-              <div className="text-center py-12">
-                <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
-                <Button onClick={() => navigate('/gestao-campo')} className="gap-2">
-                  Ir para Gestão de Campo
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Núcleo</TableHead>
-                      <TableHead>Galpão</TableHead>
-                      <TableHead>Qtd. Aves</TableHead>
-                      {lotes.some(l => l.status !== 'alojado' && l.status !== 'fechado') && (
-                        <>
-                          <TableHead>Linhagem</TableHead>
-                          <TableHead>Previsão</TableHead>
-                        </>
+        {/* Lotes Grid */}
+        {loadingData ? (
+          <p className="text-muted-foreground text-center py-8">Carregando...</p>
+        ) : lotes.length === 0 ? (
+          <div className="text-center py-12">
+            <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
+            <Button onClick={() => navigate('/gestao-campo')} className="gap-2">
+              Ir para Gestão de Campo
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {lotes.map((lote) => (
+              <Card 
+                key={lote.id}
+                className={`cursor-pointer transition-all hover:shadow-md active:scale-[0.98] ${lote.precisaPesar ? 'border-destructive/50 bg-destructive/5' : ''}`}
+                onClick={() => navigate(`/meus-lotes/${lote.id}`)}
+              >
+                <CardContent className="p-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    {getStatusBadge(lote.status)}
+                    <div className="flex items-center gap-1">
+                      {lote.precisaPesar && (
+                        <div className="w-6 h-6 rounded-full bg-destructive/20 flex items-center justify-center">
+                          <Scale className="w-3 h-3 text-destructive" />
+                        </div>
                       )}
-                      <TableHead>Alojamento</TableHead>
-                      <TableHead>Dias/Semanas</TableHead>
-                      {lotes.some(l => isPosturaLote(l) && l.status === 'alojado') && (
-                        <TableHead>Produção</TableHead>
+                      {lote.temSolicitacaoPendente && (
+                        <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <Package className="w-3 h-3 text-amber-600" />
+                        </div>
                       )}
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lotes.map((lote) => (
-                      <TableRow key={lote.id} className={lote.precisaPesar ? 'bg-destructive/10' : ''}>
-                        <TableCell>{getStatusBadge(lote.status)}</TableCell>
-                        <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
-                        <TableCell>{lote.galpao?.nome || '-'}</TableCell>
-                        <TableCell>
-                          {lote.status === 'alojado' || lote.status === 'fechado' ? (
-                            <div className="flex flex-col">
-                              <span>{(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
-                              {lote.quantidadeAlojada !== null && lote.quantidadeAlojada !== lote.quantidade_aves && (
-                                <span className="text-xs text-muted-foreground">
-                                  de {lote.quantidade_aves.toLocaleString('pt-BR')}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            lote.quantidade_aves.toLocaleString('pt-BR')
-                          )}
-                        </TableCell>
-                        {lotes.some(l => l.status !== 'alojado' && l.status !== 'fechado') && (
-                          <>
-                            <TableCell>
-                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? (
-                                isPosturaLote(lote) ? getLinhagemPosturaLabel(lote.linhagem_postura) : getLinhagemLabel(lote.linhagem)
-                              ) : '-'}
-                            </TableCell>
-                            <TableCell>
-                              {lote.status !== 'alojado' && lote.status !== 'fechado' ? formatDate(lote.data_prevista_alojamento) : '-'}
-                            </TableCell>
-                          </>
-                        )}
-                        <TableCell>{formatDate(lote.data_alojamento)}</TableCell>
-                        <TableCell>
-                          {lote.status === 'alojado' && lote.diasDesdeAlojamento !== undefined ? (
-                            <div className="flex items-center gap-1">
-                              {isPosturaLote(lote) ? (
-                                <div className="flex items-center gap-2">
-                                  <FasePosturaBadge semanasVida={lote.semanasVida || 0} />
-                                  <span className="text-xs text-muted-foreground">
-                                    S{lote.semanasVida}
-                                  </span>
-                                </div>
-                              ) : (
-                                <Badge variant={lote.precisaPesar ? 'destructive' : 'secondary'}>
-                                  {lote.diasDesdeAlojamento} dias
-                                </Badge>
-                              )}
-                            </div>
-                          ) : '-'}
-                        </TableCell>
-                        {lotes.some(l => isPosturaLote(l) && l.status === 'alojado') && (
-                          <TableCell>
-                            {isPosturaLote(lote) && lote.status === 'alojado' ? (
-                              <PosturaIndicators
-                                percentualPostura={lote.percentualPostura || null}
-                                percentualReferencia={lote.percentualReferencia || null}
-                                ovosAveAlojada={lote.ovosAveAlojada || null}
-                                semanasVida={lote.semanasVida || 0}
-                              />
-                            ) : '-'}
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {lote.status === 'previsao' && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleAlojar(lote)}
-                                  className="gap-1"
-                                >
-                                  <Truck className="w-4 h-4" />
-                                  Alojar
-                                </Button>
-                                {lote.temSolicitacaoEnviada && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive"
-                                    onClick={() => handleRacao(lote)}
-                                    className="gap-1 relative"
-                                  >
-                                    <Package className="w-4 h-4" />
-                                    Ração
-                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-foreground opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-foreground"></span>
-                                    </span>
-                                  </Button>
-                                )}
-                              </>
-                            )}
-                            {lote.status === 'saiu_para_entrega' && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant="default"
-                                  onClick={() => handleAdm(lote)}
-                                  className="gap-1"
-                                >
-                                  <ClipboardCheck className="w-4 h-4" />
-                                  Adm.
-                                </Button>
-                                {lote.temSolicitacaoEnviada && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive"
-                                    onClick={() => handleRacao(lote)}
-                                    className="gap-1 relative"
-                                  >
-                                    <Package className="w-4 h-4" />
-                                    Ração
-                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-foreground opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-foreground"></span>
-                                    </span>
-                                  </Button>
-                                )}
-                              </>
-                            )}
-                            {lote.status === 'alojado' && (
-                              <>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button 
-                                      size="sm" 
-                                      variant={lote.precisaPesar ? 'destructive' : 'default'}
-                                      className="gap-1"
-                                    >
-                                      <ClipboardCheck className="w-4 h-4" />
-                                      Adm.
-                                      <ChevronDown className="w-3 h-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {isPosturaLote(lote) ? (
-                                      <>
-                                        <DropdownMenuItem onClick={() => handleProducaoOvos(lote)} className="gap-2">
-                                          <Egg className="w-4 h-4" />
-                                          Produção Ovos
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
-                                          <Skull className="w-4 h-4" />
-                                          Mortalidade
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas-postura`)} className="gap-2">
-                                          <Target className="w-4 h-4" />
-                                          Metas Postura
-                                        </DropdownMenuItem>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <DropdownMenuItem onClick={() => handlePesagem(lote)} className="gap-2">
-                                          <Scale className="w-4 h-4" />
-                                          Pesagem
-                                          {lote.precisaPesar && (
-                                            <Badge variant="destructive" className="ml-2 text-xs">!</Badge>
-                                          )}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleMortalidade(lote)} className="gap-2">
-                                          <Skull className="w-4 h-4" />
-                                          Mortalidade
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)} className="gap-2">
-                                          <Target className="w-4 h-4" />
-                                          Meta
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                                <Button 
-                                  size="sm" 
-                                  variant={lote.temSolicitacaoPendente ? 'destructive' : 'outline'}
-                                  onClick={() => handleRacao(lote)}
-                                  className="gap-1 relative"
-                                >
-                                  <Package className="w-4 h-4" />
-                                  Ração
-                                  {lote.temSolicitacaoPendente && (
-                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
-                                    </span>
-                                  )}
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant={lote.pendenciasVet && lote.pendenciasVet > 0 ? 'destructive' : 'outline'}
-                                  onClick={() => handleNotificacoesVet(lote)}
-                                  className="gap-1 relative"
-                                >
-                                  <Stethoscope className="w-4 h-4" />
-                                  {lote.pendenciasVet && lote.pendenciasVet > 0 && (
-                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
-                                    </span>
-                                  )}
-                                </Button>
-                                <SiloBadge
-                                  loteId={lote.id}
-                                  linhagem={lote.linhagem}
-                                  sexo={lote.sexo}
-                                  diasDesdeAlojamento={lote.diasDesdeAlojamento || 0}
-                                  avesVivas={lote.quantidadeAlojada || lote.quantidade_aves}
-                                />
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button 
-                                        size="sm" 
-                                        variant={lote.jejumAtrasado ? 'destructive' : lote.data_prevista_saida ? 'outline' : 'ghost'}
-                                        onClick={() => lote.data_prevista_saida ? handleSaidaInfo(lote) : undefined}
-                                        className="gap-1 relative"
-                                        disabled={!lote.data_prevista_saida}
-                                      >
-                                        <Truck className="w-4 h-4" />
-                                        {(lote.jejumAtrasado || lote.saidaProxima) && (
-                                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                                          </span>
-                                        )}
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {lote.data_prevista_saida ? (
-                                        <div className="text-xs">
-                                          <p>Saída: {format(parseISO(lote.data_prevista_saida), "dd/MM HH:mm")}</p>
-                                          {lote.horario_inicio_jejum && (
-                                            <p>Jejum: {format(parseISO(lote.horario_inicio_jejum), "dd/MM HH:mm")} {lote.jejum_confirmado ? '✓' : ''}</p>
-                                          )}
-                                        </div>
-                                      ) : 'Sem saída programada'}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                {lote.horario_inicio_jejum && !lote.jejum_confirmado && (
-                                  <Button 
-                                    size="sm" 
-                                    variant={lote.jejumAtrasado ? 'destructive' : 'outline'}
-                                    onClick={() => handleJejum(lote)}
-                                    className="gap-1"
-                                  >
-                                    <Clock className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      {lote.pendenciasVet && lote.pendenciasVet > 0 && (
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Stethoscope className="w-3 h-3 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <h3 className="font-semibold text-foreground mb-3 truncate">
+                    {lote.nucleo?.nome} / {lote.galpao?.nome}
+                  </h3>
+
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Bird className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">{(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
+                    </div>
+                    {lote.status === 'alojado' && (
+                      <div className="flex justify-end">
+                        <Badge variant="secondary" className="text-xs">
+                          {lote.diasDesdeAlojamento}d (S{lote.semanasVida})
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </main>
 
       {selectedLote && (
