@@ -77,6 +77,7 @@ interface MortalidadePorSemana {
   mortalidade_real: number;
   mortalidade_referencia: number | null;
   acima_limite: boolean;
+  quantidade_mortes: number;
 }
 
 interface RecebimentoLote {
@@ -323,6 +324,7 @@ export default function MetasPesoLote() {
             mortalidade_real: mortalidadeReal,
             mortalidade_referencia: refValue,
             acima_limite: refValue !== null && mortalidadeReal > refValue,
+            quantidade_mortes: mortesAcumuladas,
           };
         });
 
@@ -875,6 +877,7 @@ export default function MetasPesoLote() {
                         .filter(m => m.dia <= diasDesdeAlojamento)
                         .slice(-1)[0];
                       const totalMortalidadeReal = ultimaSemanaComDados?.mortalidade_real || 0;
+                      const totalQuantidadeMortes = ultimaSemanaComDados?.quantidade_mortes || 0;
                       
                       // Mortalidade máxima de referência = valor acumulado do dia 42 (ou acima de 42)
                       const totalReferenciaMaxima = mortalidadeMedia 
@@ -900,6 +903,9 @@ export default function MetasPesoLote() {
                               <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Mortalidade Real Total</p>
                                 <p className={`text-2xl font-bold ${!dentroDoLimite ? 'text-destructive' : ''}`}>
+                                  {totalQuantidadeMortes.toLocaleString('pt-BR')} <span className="text-base font-normal text-muted-foreground">aves</span>
+                                </p>
+                                <p className={`text-sm ${!dentroDoLimite ? 'text-destructive' : 'text-muted-foreground'}`}>
                                   {totalMortalidadeReal.toFixed(2)}%
                                 </p>
                               </div>
@@ -949,12 +955,15 @@ export default function MetasPesoLote() {
                             m.acima_limite ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'
                           }`}
                         >
-                          <p className="text-xs text-muted-foreground">Dia {m.dia}</p>
+                          <p className="text-xs text-muted-foreground font-medium">Dia {m.dia}</p>
                           <p className={`text-lg font-bold ${m.acima_limite ? 'text-destructive' : ''}`}>
+                            {m.quantidade_mortes.toLocaleString('pt-BR')}
+                          </p>
+                          <p className={`text-sm ${m.acima_limite ? 'text-destructive' : 'text-muted-foreground'}`}>
                             {m.mortalidade_real.toFixed(2)}%
                           </p>
                           {m.mortalidade_referencia !== null && (
-                            <div className="flex items-center justify-center gap-1 mt-1">
+                            <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-border/50">
                               {m.acima_limite ? (
                                 <AlertTriangle className="w-3 h-3 text-destructive" />
                               ) : (
