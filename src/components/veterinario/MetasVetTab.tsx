@@ -130,13 +130,23 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
         .order('data_pesagem', { ascending: true });
 
       if (pesagensData) {
-        const processed = pesagensData.map((p: any) => {
-          const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-          const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+        // Agrupar pesagens parciais do mesmo dia
+        const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+          const data = p.data_pesagem;
+          if (!acc[data]) acc[data] = [];
+          acc[data].push(...p.pesagem_itens);
+          return acc;
+        }, {});
+
+        // Calcular média ponderada consolidada por dia
+        const processed = Object.entries(pesagensPorData).map(([data, itens]) => {
+          const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
+          const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-          const dia = differenceInDays(new Date(p.data_pesagem), new Date(lote.data_alojamento!));
+          const dia = differenceInDays(new Date(data), new Date(lote.data_alojamento!));
           return { dia, peso_real_kg: pesoMedio };
-        });
+        }).sort((a, b) => a.dia - b.dia);
+        
         setPesagens(processed);
       }
     }

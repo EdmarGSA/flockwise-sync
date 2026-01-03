@@ -247,18 +247,28 @@ export default function MetasPesoLote() {
       .order('data_pesagem', { ascending: true });
 
     if (pesagensData && loteData.data_alojamento) {
-      const pesagensProcessed: PesagemData[] = pesagensData.map((p: any) => {
-        const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-        const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+      // Agrupar todas as pesagens parciais do mesmo dia
+      const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+        const data = p.data_pesagem;
+        if (!acc[data]) acc[data] = [];
+        acc[data].push(...p.pesagem_itens);
+        return acc;
+      }, {});
+
+      // Calcular média ponderada consolidada por dia
+      const pesagensProcessed: PesagemData[] = Object.entries(pesagensPorData).map(([data, itens]) => {
+        const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
+        const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-        const dia = differenceInDays(new Date(p.data_pesagem), new Date(loteData.data_alojamento));
+        const dia = differenceInDays(new Date(data), new Date(loteData.data_alojamento));
         
         return {
           dia,
           peso_real_kg: pesoMedio,
-          data_pesagem: p.data_pesagem,
+          data_pesagem: data,
         };
-      });
+      }).sort((a, b) => a.dia - b.dia);
+      
       setPesagens(pesagensProcessed);
     }
 
