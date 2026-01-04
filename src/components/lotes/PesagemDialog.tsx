@@ -34,6 +34,16 @@ interface MetasPeso {
   gpd_kg: number;
 }
 
+interface PesagemHistorico {
+  periodo: string;
+  label: string;
+  diasMin: number;
+  diasMax: number;
+  pesoReal: number | null;
+  meta: number | null;
+  percentual: number | null;
+}
+
 interface PesagemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +51,7 @@ interface PesagemDialogProps {
   integradoId: string;
   pesoInicialPintinhos?: number | null;
   diasDesdeAlojamento?: number;
+  dataAlojamento?: string | null;
   linhagem?: 'cobb_500' | 'ross_308' | 'hubbard';
   sexo?: 'macho' | 'femea' | 'misto';
   onSuccess?: () => void;
@@ -89,6 +100,7 @@ export function PesagemDialog({
   integradoId,
   pesoInicialPintinhos,
   diasDesdeAlojamento = 0,
+  dataAlojamento,
   linhagem,
   sexo,
   onSuccess 
@@ -98,6 +110,7 @@ export function PesagemDialog({
   const [metas, setMetas] = useState<MetasPeso | null>(null);
   const [pesoReferencia, setPesoReferencia] = useState<number | null>(null);
   const [dataPesagem, setDataPesagem] = useState<Date>(new Date());
+  const [historicoPesagens, setHistoricoPesagens] = useState<PesagemHistorico[]>([]);
   
   // Form inputs
   const [quantidadeAves, setQuantidadeAves] = useState('');
@@ -130,6 +143,89 @@ export function PesagemDialog({
     
     fetchPesoReferencia();
   }, [open, linhagem, sexo, diasDesdeAlojamento]);
+
+  // Fetch pesagem history
+  useEffect(() => {
+    const fetchHistoricoPesagens = async () => {
+      if (!open || !loteId || !dataAlojamento) {
+        setHistoricoPesagens([]);
+        return;
+      }
+
+      const { data: pesagens } = await supabase
+        .from('pesagens')
+        .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
+        .eq('lote_id', loteId);
+
+      if (!pesagens || pesagens.length === 0) {
+        setHistoricoPesagens([]);
+        return;
+      }
+
+      const alojamento = new Date(dataAlojamento);
+      
+      // Group by period
+      const periodos = [
+        { label: 'Inicial', diasMin: 0, diasMax: 6 },
+        { label: '7 dias', diasMin: 7, diasMax: 13 },
+        { label: '14 dias', diasMin: 14, diasMax: 20 },
+        { label: '21 dias', diasMin: 21, diasMax: 27 },
+        { label: '28 dias', diasMin: 28, diasMax: 34 },
+        { label: '35 dias', diasMin: 35, diasMax: 41 },
+        { label: '42 dias', diasMin: 42, diasMax: 999 },
+      ];
+
+      const pesoInicialKg = pesoInicialPintinhos ? pesoInicialPintinhos / 1000 : 0.040;
+      const metasCalc = calcularMetas(pesoInicialKg);
+
+      const historico: PesagemHistorico[] = periodos.map((periodo, idx) => {
+        let pesoLiquidoTotal = 0;
+        let quantidadeTotal = 0;
+
+        pesagens.forEach(pesagem => {
+          const dataPes = new Date(pesagem.data_pesagem);
+          const dias = Math.floor((dataPes.getTime() - alojamento.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (dias >= periodo.diasMin && dias <= periodo.diasMax) {
+            pesagem.pesagem_itens?.forEach((item: any) => {
+              const liquido = (item.peso_bruto_g || 0) - (item.peso_tara_g || 0);
+              pesoLiquidoTotal += liquido;
+              quantidadeTotal += item.quantidade_aves || 0;
+            });
+          }
+        });
+
+        const pesoReal = quantidadeTotal > 0 ? pesoLiquidoTotal / quantidadeTotal : null;
+        
+        let meta: number | null = null;
+        if (idx === 0) meta = metasCalc.peso_inicial_kg;
+        else if (idx === 1) meta = metasCalc.meta_7_dias_kg;
+        else if (idx === 2) meta = metasCalc.meta_14_dias_kg;
+        else if (idx === 3) meta = metasCalc.meta_21_dias_kg;
+        else if (idx === 4) meta = metasCalc.meta_28_dias_kg;
+        else if (idx === 5) meta = metasCalc.meta_35_dias_kg;
+        else if (idx === 6) meta = metasCalc.meta_42_dias_kg;
+
+        const percentual = pesoReal !== null && meta !== null && meta > 0 
+          ? (pesoReal / meta) * 100 
+          : null;
+
+        return {
+          periodo: periodo.label,
+          label: periodo.label,
+          diasMin: periodo.diasMin,
+          diasMax: periodo.diasMax,
+          pesoReal,
+          meta,
+          percentual,
+        };
+      });
+
+      setHistoricoPesagens(historico);
+    };
+
+    fetchHistoricoPesagens();
+  }, [open, loteId, dataAlojamento, pesoInicialPintinhos]);
 
   useEffect(() => {
     if (open) {
@@ -327,7 +423,7 @@ export function PesagemDialog({
             </Popover>
           </div>
 
-          {/* Metas Card */}
+          {/* Metas Card with Real Values */}
           {metas && (
             <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20">
               <CardContent className="pt-4 pb-4">
@@ -336,34 +432,30 @@ export function PesagemDialog({
                   <span className="font-semibold text-amber-700">Metas de Peso</span>
                 </div>
                 <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center text-xs">
-                  <div className={`p-2 rounded ${diasDesdeAlojamento < 7 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">Inicial</p>
-                    <p className="font-bold">{metas.peso_inicial_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 7 && diasDesdeAlojamento < 14 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">7 dias</p>
-                    <p className="font-bold">{metas.meta_7_dias_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 14 && diasDesdeAlojamento < 21 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">14 dias</p>
-                    <p className="font-bold">{metas.meta_14_dias_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 21 && diasDesdeAlojamento < 28 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">21 dias</p>
-                    <p className="font-bold">{metas.meta_21_dias_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 28 && diasDesdeAlojamento < 35 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">28 dias</p>
-                    <p className="font-bold">{metas.meta_28_dias_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 35 && diasDesdeAlojamento < 42 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">35 dias</p>
-                    <p className="font-bold">{metas.meta_35_dias_kg.toFixed(3)}</p>
-                  </div>
-                  <div className={`p-2 rounded ${diasDesdeAlojamento >= 42 ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                    <p className="text-muted-foreground">42 dias</p>
-                    <p className="font-bold">{metas.meta_42_dias_kg.toFixed(3)}</p>
-                  </div>
+                  {historicoPesagens.map((hist, idx) => {
+                    const isActive = diasDesdeAlojamento >= hist.diasMin && diasDesdeAlojamento <= hist.diasMax;
+                    return (
+                      <div key={hist.label} className={`p-2 rounded ${isActive ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
+                        <p className="text-muted-foreground">{hist.label}</p>
+                        <p className="font-bold text-amber-600">{hist.meta?.toFixed(3) || '0.000'}</p>
+                        {hist.pesoReal !== null ? (
+                          <>
+                            <p className={`font-bold ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
+                              {hist.pesoReal.toFixed(3)}
+                            </p>
+                            <p className={`text-[10px] ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
+                              {hist.percentual?.toFixed(0)}%
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-muted-foreground/50">--</p>
+                            <p className="text-muted-foreground/50 text-[10px]">--</p>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div className="p-2 rounded bg-primary/10">
                     <p className="text-muted-foreground">GPD</p>
                     <p className="font-bold text-primary">{metas.gpd_kg.toFixed(3)}</p>
