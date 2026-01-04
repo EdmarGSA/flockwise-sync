@@ -542,6 +542,8 @@ export default function LoteDetalhe() {
         onOpenChange={setMortalidadeOpen}
         loteId={lote.id}
         integradoId={lote.integrado_id}
+        dataAlojamento={lote.data_alojamento}
+        quantidadeAves={avesVivas}
         onSuccess={fetchLote}
       />
       <RacaoLoteDialog
