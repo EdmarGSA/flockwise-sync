@@ -562,6 +562,7 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
+            dataAlojamento={selectedLote.data_alojamento}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
             onSuccess={fetchLotes}

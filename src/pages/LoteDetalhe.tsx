@@ -533,6 +533,7 @@ export default function LoteDetalhe() {
         integradoId={lote.integrado_id}
         pesoInicialPintinhos={lote.peso_medio_pintinhos}
         diasDesdeAlojamento={diasDesdeAlojamento}
+        dataAlojamento={lote.data_alojamento}
         linhagem={lote.linhagem}
         sexo={lote.sexo}
         onSuccess={fetchLote}
