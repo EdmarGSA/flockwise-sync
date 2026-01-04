@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Dialog,
@@ -22,7 +22,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +31,8 @@ interface MortalidadeDialogProps {
   onOpenChange: (open: boolean) => void;
   loteId: string;
   integradoId: string;
+  dataAlojamento: string | null;
+  quantidadeAves: number;
   onSuccess: () => void;
 }
 
@@ -45,6 +47,13 @@ interface MortalidadeItem {
   pesoKg: string;
 }
 
+interface MortalidadeSemana {
+  semana: number;
+  label: string;
+  quantidade: number;
+  percentual: number;
+}
+
 const SUBMOTIVO_LABELS: Record<SubmotivoEliminacao, string> = {
   problema_locomotor: 'Problema Locomotor',
   debilitado: 'Debilitado',
@@ -56,6 +65,8 @@ export function MortalidadeDialog({
   onOpenChange,
   loteId,
   integradoId,
+  dataAlojamento,
+  quantidadeAves,
   onSuccess,
 }: MortalidadeDialogProps) {
   const [items, setItems] = useState<MortalidadeItem[]>([]);
@@ -65,6 +76,73 @@ export function MortalidadeDialog({
   const [quantidade, setQuantidade] = useState('');
   const [pesoKg, setPesoKg] = useState('');
   const [saving, setSaving] = useState(false);
+  const [historicoMortalidade, setHistoricoMortalidade] = useState<MortalidadeSemana[]>([]);
+  const [totalMortalidade, setTotalMortalidade] = useState(0);
+
+  // Calcular dias desde alojamento
+  const diasDesdeAlojamento = dataAlojamento 
+    ? differenceInDays(new Date(), new Date(dataAlojamento)) 
+    : 0;
+
+  // Buscar histórico de mortalidade
+  useEffect(() => {
+    if (open && loteId && dataAlojamento) {
+      fetchHistoricoMortalidade();
+    }
+  }, [open, loteId, dataAlojamento]);
+
+  const fetchHistoricoMortalidade = async () => {
+    const { data, error } = await supabase
+      .from('mortalidade')
+      .select(`
+        data_registro,
+        mortalidade_itens(quantidade)
+      `)
+      .eq('lote_id', loteId);
+
+    if (error) {
+      console.error('Erro ao buscar histórico:', error);
+      return;
+    }
+
+    // Agrupar por semana
+    const semanas: Record<number, number> = {};
+    let total = 0;
+
+    data?.forEach((mortalidade: any) => {
+      const diasDoRegistro = differenceInDays(
+        new Date(mortalidade.data_registro),
+        new Date(dataAlojamento!)
+      );
+      
+      // Determinar a semana (7, 14, 21, 28, 35, 42+)
+      let semana: number;
+      if (diasDoRegistro <= 7) semana = 7;
+      else if (diasDoRegistro <= 14) semana = 14;
+      else if (diasDoRegistro <= 21) semana = 21;
+      else if (diasDoRegistro <= 28) semana = 28;
+      else if (diasDoRegistro <= 35) semana = 35;
+      else semana = 42;
+
+      const qtdTotal = mortalidade.mortalidade_itens?.reduce(
+        (acc: number, item: any) => acc + (item.quantidade || 0), 0
+      ) || 0;
+
+      semanas[semana] = (semanas[semana] || 0) + qtdTotal;
+      total += qtdTotal;
+    });
+
+    // Criar array de semanas para exibição
+    const semanasArray: MortalidadeSemana[] = [7, 14, 21, 28, 35, 42].map(dias => ({
+      semana: dias,
+      label: dias === 42 ? '42+' : `${dias}d`,
+      quantidade: semanas[dias] || 0,
+      percentual: quantidadeAves > 0 ? ((semanas[dias] || 0) / quantidadeAves) * 100 : 0,
+    }));
+
+    setHistoricoMortalidade(semanasArray);
+    setTotalMortalidade(total);
+  };
 
   const handleAddItem = () => {
     const qtd = parseInt(quantidade);
@@ -176,6 +254,45 @@ export function MortalidadeDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Painel Informativo - Histórico de Mortalidade */}
+          {dataAlojamento && diasDesdeAlojamento > 0 && (
+            <Card className="border-amber-500/50 bg-amber-950/20">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-medium">Histórico de Mortalidade</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                  {historicoMortalidade.map((semana) => {
+                    const isActive = diasDesdeAlojamento >= (semana.semana === 42 ? 36 : semana.semana - 6);
+                    return (
+                      <div 
+                        key={semana.semana} 
+                        className={cn(
+                          "p-2 rounded",
+                          isActive ? "bg-muted" : "bg-muted/30 opacity-50"
+                        )}
+                      >
+                        <span className="text-muted-foreground block">{semana.label}</span>
+                        <span className="font-bold block text-sm">{semana.quantidade || '--'}</span>
+                        <span className="text-muted-foreground">
+                          {semana.quantidade > 0 ? `${semana.percentual.toFixed(2)}%` : '--'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <div className="p-2 rounded bg-destructive/20 border border-destructive/30">
+                    <span className="text-destructive block font-medium">Total</span>
+                    <span className="font-bold block text-sm text-destructive">{totalMortalidade}</span>
+                    <span className="text-destructive/80">
+                      {quantidadeAves > 0 ? `${((totalMortalidade / quantidadeAves) * 100).toFixed(2)}%` : '--'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Date Picker */}
           <div className="space-y-2">
             <Label>Data do Registro</Label>
