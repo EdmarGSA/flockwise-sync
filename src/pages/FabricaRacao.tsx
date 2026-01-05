@@ -12,7 +12,9 @@ import {
   FileText, 
   RefreshCw,
   Package,
-  Cog
+  Cog,
+  TrendingUp,
+  Calendar
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,7 +49,9 @@ export default function FabricaRacao() {
   const [stats, setStats] = useState({
     alertasCriticos: 0,
     alertasAtencao: 0,
-    ocsPendentes: 0
+    ocsPendentes: 0,
+    estoqueRacao: 0,
+    previsaoConsumo3d: 0
   });
 
   useEffect(() => {
@@ -70,9 +74,55 @@ export default function FabricaRacao() {
 
       if (ocsError) throw ocsError;
 
+      // Fetch feed products (grupo "Ração") for stock and consumption
+      const { data: grupoRacao } = await supabase
+        .from('grupos_produto')
+        .select('id')
+        .eq('integrado_id', user.id)
+        .eq('nome', 'Ração')
+        .maybeSingle();
+
+      let estoqueRacao = 0;
+      let previsaoConsumo3d = 0;
+      const grupoId = grupoRacao?.id;
+
+      if (grupoId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: racoesData } = await (supabase as any)
+          .from('produtos')
+          .select('id, estoque_atual')
+          .eq('integrado_id', user.id)
+          .eq('grupo_id', grupoId)
+          .eq('ativo', true) as { data: { id: string; estoque_atual: number }[] | null };
+
+        estoqueRacao = (racoesData || []).reduce((sum, p) => sum + (p.estoque_atual || 0), 0);
+
+        // Get consumption from last 15 days for feed products
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+
+        const racaoIds = (racoesData || []).map(p => p.id);
+        if (racaoIds.length > 0) {
+          const { data: kardexRacao } = await supabase
+            .from('kardex')
+            .select('quantidade, tipo_movimento')
+            .eq('integrado_id', user.id)
+            .in('produto_id', racaoIds)
+            .gte('created_at', fifteenDaysAgo.toISOString());
+
+          const consumoTotal = (kardexRacao || [])
+            .filter(k => k.tipo_movimento === 'saida' || k.tipo_movimento === 'ajuste_saida')
+            .reduce((sum, k) => sum + Number(k.quantidade), 0);
+          const consumoDiario = consumoTotal / 15;
+          previsaoConsumo3d = consumoDiario * 3;
+        }
+      }
+
       setStats(prev => ({
         ...prev,
-        ocsPendentes: ocs?.length || 0
+        ocsPendentes: ocs?.length || 0,
+        estoqueRacao,
+        previsaoConsumo3d
       }));
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -208,7 +258,33 @@ export default function FabricaRacao() {
 
           <TabsContent value="dashboard">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <Card className="bg-card border-green-500/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Estoque Ração</p>
+                      <p className="text-2xl font-bold text-green-500">
+                        {stats.estoqueRacao.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                      </p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-green-500/50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-purple-500/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Previsão Consumo (3d)</p>
+                      <p className="text-2xl font-bold text-purple-500">
+                        {stats.previsaoConsumo3d.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                      </p>
+                    </div>
+                    <Calendar className="w-8 h-8 text-purple-500/50" />
+                  </div>
+                </CardContent>
+              </Card>
               <Card className="bg-card border-destructive/50">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
