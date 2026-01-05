@@ -170,7 +170,7 @@ export function PesagemDialog({
         { label: '42 dias', diasMin: 42, diasMax: 999 },
       ];
 
-      const pesoInicialKg = pesoInicialPintinhos ? pesoInicialPintinhos / 1000 : 0.040;
+      const pesoInicialKg = pesoInicialPintinhos || 0.040;
       const metasCalc = calcularMetas(pesoInicialKg);
 
       const historico: PesagemHistorico[] = periodos.map((periodo, idx) => {
@@ -232,10 +232,9 @@ export function PesagemDialog({
       setPesoBruto('');
       // Não limpa a tara - mantém o valor anterior
       
-      // Calculate metas if initial weight available (convert g to kg)
+      // Calculate metas if initial weight available (já está em kg)
       if (pesoInicialPintinhos && pesoInicialPintinhos > 0) {
-        const pesoInicialKg = pesoInicialPintinhos / 1000;
-        const metasCalculadas = calcularMetas(pesoInicialKg);
+        const metasCalculadas = calcularMetas(pesoInicialPintinhos);
         setMetas(metasCalculadas);
       } else {
         setMetas(null);
