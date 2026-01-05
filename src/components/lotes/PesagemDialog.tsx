@@ -152,12 +152,17 @@ export function PesagemDialog({
         return;
       }
 
+      // Validate date before proceeding
+      const alojamento = new Date(dataAlojamento);
+      if (isNaN(alojamento.getTime())) {
+        setHistoricoPesagens([]);
+        return;
+      }
+
       const { data: pesagens } = await supabase
         .from('pesagens')
         .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
         .eq('lote_id', loteId);
-
-      const alojamento = new Date(dataAlojamento);
       
       // Group by period
       const periodos = [

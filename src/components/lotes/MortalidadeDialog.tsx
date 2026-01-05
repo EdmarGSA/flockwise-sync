@@ -79,15 +79,21 @@ export function MortalidadeDialog({
   const [historicoMortalidade, setHistoricoMortalidade] = useState<MortalidadeSemana[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState(0);
 
-  // Calcular dias desde alojamento
-  const diasDesdeAlojamento = dataAlojamento 
-    ? differenceInDays(new Date(), new Date(dataAlojamento)) 
-    : 0;
+  // Calcular dias desde alojamento - validate date first
+  const diasDesdeAlojamento = (() => {
+    if (!dataAlojamento) return 0;
+    const date = new Date(dataAlojamento);
+    if (isNaN(date.getTime())) return 0;
+    return differenceInDays(new Date(), date);
+  })();
 
   // Buscar histórico de mortalidade
   useEffect(() => {
     if (open && loteId && dataAlojamento) {
-      fetchHistoricoMortalidade();
+      const date = new Date(dataAlojamento);
+      if (!isNaN(date.getTime())) {
+        fetchHistoricoMortalidade();
+      }
     }
   }, [open, loteId, dataAlojamento]);
 
