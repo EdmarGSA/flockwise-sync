@@ -10,7 +10,6 @@ import {
   AlertTriangle, 
   ShoppingCart, 
   FileText, 
-  DollarSign,
   RefreshCw,
   Package,
   Cog
@@ -20,7 +19,7 @@ import { toast } from 'sonner';
 import AlertaEstoqueCard from '@/components/fabrica/AlertaEstoqueCard';
 import ProdutosCriticosDialog from '@/components/fabrica/ProdutosCriticosDialog';
 import OrdensCompraTable from '@/components/fabrica/OrdensCompraTable';
-import ContasPagarTable from '@/components/fabrica/ContasPagarTable';
+
 import RecebimentosTable from '@/components/fabrica/RecebimentosTable';
 import GestaoProducaoTab from '@/components/fabrica/producao/GestaoProducaoTab';
 
@@ -48,8 +47,7 @@ export default function FabricaRacao() {
   const [stats, setStats] = useState({
     alertasCriticos: 0,
     alertasAtencao: 0,
-    ocsPendentes: 0,
-    contasVencer: 0
+    ocsPendentes: 0
   });
 
   useEffect(() => {
@@ -72,24 +70,9 @@ export default function FabricaRacao() {
 
       if (ocsError) throw ocsError;
 
-      // Count accounts payable due in next 7 days
-      const today = new Date();
-      const nextWeek = new Date(today);
-      nextWeek.setDate(today.getDate() + 7);
-
-      const { data: contas, error: contasError } = await supabase
-        .from('contas_pagar')
-        .select('id')
-        .eq('integrado_id', user.id)
-        .eq('status', 'pendente')
-        .lte('data_vencimento', nextWeek.toISOString().split('T')[0]);
-
-      if (contasError) throw contasError;
-
       setStats(prev => ({
         ...prev,
-        ocsPendentes: ocs?.length || 0,
-        contasVencer: contas?.length || 0
+        ocsPendentes: ocs?.length || 0
       }));
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -200,7 +183,7 @@ export default function FabricaRacao() {
 
       <main className="container mx-auto px-4 py-8 pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               Dashboard
@@ -221,15 +204,11 @@ export default function FabricaRacao() {
               <Package className="w-4 h-4" />
               Recebimento
             </TabsTrigger>
-            <TabsTrigger value="financeiro" className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
-              Contas Pagar
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <Card className="bg-card border-destructive/50">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -260,17 +239,6 @@ export default function FabricaRacao() {
                       <p className="text-2xl font-bold text-primary">{stats.ocsPendentes}</p>
                     </div>
                     <FileText className="w-8 h-8 text-primary/50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-orange-500/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-muted-foreground text-sm">Contas a Vencer (7d)</p>
-                      <p className="text-2xl font-bold text-orange-500">{stats.contasVencer}</p>
-                    </div>
-                    <DollarSign className="w-8 h-8 text-orange-500/50" />
                   </div>
                 </CardContent>
               </Card>
@@ -353,12 +321,6 @@ export default function FabricaRacao() {
             />
           </TabsContent>
 
-          <TabsContent value="financeiro">
-            <ContasPagarTable 
-              integradoId={user?.id || ''} 
-              onRefresh={fetchStats}
-            />
-          </TabsContent>
         </Tabs>
       </main>
 
