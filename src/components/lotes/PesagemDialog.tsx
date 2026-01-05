@@ -157,11 +157,6 @@ export function PesagemDialog({
         .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
         .eq('lote_id', loteId);
 
-      if (!pesagens || pesagens.length === 0) {
-        setHistoricoPesagens([]);
-        return;
-      }
-
       const alojamento = new Date(dataAlojamento);
       
       // Group by period
@@ -182,18 +177,20 @@ export function PesagemDialog({
         let pesoLiquidoTotal = 0;
         let quantidadeTotal = 0;
 
-        pesagens.forEach(pesagem => {
-          const dataPes = new Date(pesagem.data_pesagem);
-          const dias = Math.floor((dataPes.getTime() - alojamento.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (dias >= periodo.diasMin && dias <= periodo.diasMax) {
-            pesagem.pesagem_itens?.forEach((item: any) => {
-              const liquido = (item.peso_bruto_g || 0) - (item.peso_tara_g || 0);
-              pesoLiquidoTotal += liquido;
-              quantidadeTotal += item.quantidade_aves || 0;
-            });
-          }
-        });
+        if (pesagens && pesagens.length > 0) {
+          pesagens.forEach(pesagem => {
+            const dataPes = new Date(pesagem.data_pesagem);
+            const dias = Math.floor((dataPes.getTime() - alojamento.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (dias >= periodo.diasMin && dias <= periodo.diasMax) {
+              pesagem.pesagem_itens?.forEach((item: any) => {
+                const liquido = (item.peso_bruto_g || 0) - (item.peso_tara_g || 0);
+                pesoLiquidoTotal += liquido;
+                quantidadeTotal += item.quantidade_aves || 0;
+              });
+            }
+          });
+        }
 
         const pesoReal = quantidadeTotal > 0 ? pesoLiquidoTotal / quantidadeTotal : null;
         
