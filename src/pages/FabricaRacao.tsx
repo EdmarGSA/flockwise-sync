@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,6 +44,7 @@ interface ProdutoCritico {
 
 export default function FabricaRacao() {
   const { user } = useAuth();
+  const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [produtosCriticos, setProdutosCriticos] = useState<ProdutoCritico[]>([]);
@@ -64,21 +66,21 @@ export default function FabricaRacao() {
   const [racoesDetalhadas, setRacoesDetalhadas] = useState<RacaoDetalhe[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       fetchProdutosCriticos();
       fetchStats();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const fetchStats = async () => {
-    if (!user) return;
+    if (!integradoId) return;
 
     try {
       // Count pending purchase orders
       const { data: ocs, error: ocsError } = await supabase
         .from('ordens_compra')
         .select('id')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .in('status', ['pendente', 'aprovada']);
 
       if (ocsError) throw ocsError;
@@ -87,7 +89,7 @@ export default function FabricaRacao() {
       const { data: grupoRacao } = await supabase
         .from('grupos_produto')
         .select('id')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .eq('nome', 'Ração')
         .maybeSingle();
 
@@ -101,7 +103,7 @@ export default function FabricaRacao() {
         const { data: racoesData } = await (supabase as any)
           .from('produtos')
           .select('id, nome, sku, estoque_atual, unidade_medida')
-          .eq('integrado_id', user.id)
+          .eq('integrado_id', integradoId)
           .eq('grupo_id', grupoId)
           .eq('ativo', true) as { data: { id: string; nome: string; sku: string; estoque_atual: number; unidade_medida: string }[] | null };
 
@@ -116,7 +118,7 @@ export default function FabricaRacao() {
           const { data: kardexRacao } = await supabase
             .from('kardex')
             .select('produto_id, quantidade, tipo_movimento')
-            .eq('integrado_id', user.id)
+            .eq('integrado_id', integradoId)
             .in('produto_id', racaoIds)
             .gte('created_at', fifteenDaysAgo.toISOString());
 
@@ -171,7 +173,7 @@ export default function FabricaRacao() {
   };
 
   const fetchProdutosCriticos = async () => {
-    if (!user) return;
+    if (!integradoId) return;
     setLoading(true);
 
     try {
@@ -179,7 +181,7 @@ export default function FabricaRacao() {
       const { data: produtos, error: produtosError } = await supabase
         .from('produtos')
         .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, unidade_compra, fator_conversao, categorias!inner(tipo_origem)')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .eq('ativo', true)
         .eq('categorias.tipo_origem', 'terceiros');
 
@@ -192,7 +194,7 @@ export default function FabricaRacao() {
       const { data: kardexData, error: kardexError } = await supabase
         .from('kardex')
         .select('produto_id, quantidade, tipo_movimento, created_at')
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .gte('created_at', fifteenDaysAgo.toISOString())
         .in('tipo_movimento', ['saida', 'ajuste_saida']);
 
@@ -413,7 +415,7 @@ export default function FabricaRacao() {
           </TabsContent>
 
           <TabsContent value="producao">
-            <GestaoProducaoTab integradoId={user?.id || ''} />
+            <GestaoProducaoTab integradoId={integradoId || ''} />
           </TabsContent>
 
           <TabsContent value="compras">
@@ -441,14 +443,14 @@ export default function FabricaRacao() {
 
           <TabsContent value="ordens">
             <OrdensCompraTable 
-              integradoId={user?.id || ''} 
+              integradoId={integradoId || ''} 
               onRefresh={() => { fetchStats(); fetchProdutosCriticos(); }}
             />
           </TabsContent>
 
           <TabsContent value="recebimento">
             <RecebimentosTable 
-              integradoId={user?.id || ''} 
+              integradoId={integradoId || ''} 
               onRefresh={() => { fetchStats(); fetchProdutosCriticos(); }}
             />
           </TabsContent>
@@ -460,7 +462,7 @@ export default function FabricaRacao() {
         open={showProdutosCriticos}
         onOpenChange={setShowProdutosCriticos}
         produtos={produtosCriticos}
-        integradoId={user?.id || ''}
+        integradoId={integradoId || ''}
         onSuccess={() => {
           fetchProdutosCriticos();
           fetchStats();
