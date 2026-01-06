@@ -21,9 +21,11 @@ import { toast } from 'sonner';
 import AlertaEstoqueCard from '@/components/fabrica/AlertaEstoqueCard';
 import ProdutosCriticosDialog from '@/components/fabrica/ProdutosCriticosDialog';
 import OrdensCompraTable from '@/components/fabrica/OrdensCompraTable';
-
 import RecebimentosTable from '@/components/fabrica/RecebimentosTable';
 import GestaoProducaoTab from '@/components/fabrica/producao/GestaoProducaoTab';
+import EstoqueRacaoDialog, { RacaoDetalhe } from '@/components/fabrica/EstoqueRacaoDialog';
+import PrevisaoConsumoDialog from '@/components/fabrica/PrevisaoConsumoDialog';
+import AlertasDetalheDialog from '@/components/fabrica/AlertasDetalheDialog';
 
 interface ProdutoCritico {
   id: string;
@@ -53,6 +55,13 @@ export default function FabricaRacao() {
     estoqueRacao: 0,
     previsaoConsumo3d: 0
   });
+
+  // States for analytical dialogs
+  const [showEstoqueRacao, setShowEstoqueRacao] = useState(false);
+  const [showPrevisaoConsumo, setShowPrevisaoConsumo] = useState(false);
+  const [showAlertasCriticos, setShowAlertasCriticos] = useState(false);
+  const [showAlertasAtencao, setShowAlertasAtencao] = useState(false);
+  const [racoesDetalhadas, setRacoesDetalhadas] = useState<RacaoDetalhe[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -85,15 +94,16 @@ export default function FabricaRacao() {
       let estoqueRacao = 0;
       let previsaoConsumo3d = 0;
       const grupoId = grupoRacao?.id;
+      const racoesDetalhadasTemp: RacaoDetalhe[] = [];
 
       if (grupoId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: racoesData } = await (supabase as any)
           .from('produtos')
-          .select('id, estoque_atual')
+          .select('id, nome, sku, estoque_atual, unidade_medida')
           .eq('integrado_id', user.id)
           .eq('grupo_id', grupoId)
-          .eq('ativo', true) as { data: { id: string; estoque_atual: number }[] | null };
+          .eq('ativo', true) as { data: { id: string; nome: string; sku: string; estoque_atual: number; unidade_medida: string }[] | null };
 
         estoqueRacao = (racoesData || []).reduce((sum, p) => sum + (p.estoque_atual || 0), 0);
 
@@ -105,19 +115,50 @@ export default function FabricaRacao() {
         if (racaoIds.length > 0) {
           const { data: kardexRacao } = await supabase
             .from('kardex')
-            .select('quantidade, tipo_movimento')
+            .select('produto_id, quantidade, tipo_movimento')
             .eq('integrado_id', user.id)
             .in('produto_id', racaoIds)
             .gte('created_at', fifteenDaysAgo.toISOString());
 
-          const consumoTotal = (kardexRacao || [])
+          // Calculate consumption per product
+          const consumoPorProduto: Record<string, number> = {};
+          (kardexRacao || [])
             .filter(k => k.tipo_movimento === 'saida' || k.tipo_movimento === 'ajuste_saida')
-            .reduce((sum, k) => sum + Number(k.quantidade), 0);
-          const consumoDiario = consumoTotal / 15;
+            .forEach(k => {
+              if (!consumoPorProduto[k.produto_id]) {
+                consumoPorProduto[k.produto_id] = 0;
+              }
+              consumoPorProduto[k.produto_id] += Number(k.quantidade);
+            });
+
+          // Build detailed feed data
+          (racoesData || []).forEach(racao => {
+            const consumoTotal = consumoPorProduto[racao.id] || 0;
+            const consumoMedioDiario = consumoTotal / 15;
+            const diasRestantes = consumoMedioDiario > 0
+              ? Math.floor(racao.estoque_atual / consumoMedioDiario)
+              : 999;
+            const percentualTotal = estoqueRacao > 0 ? (racao.estoque_atual / estoqueRacao) * 100 : 0;
+
+            racoesDetalhadasTemp.push({
+              id: racao.id,
+              nome: racao.nome,
+              sku: racao.sku,
+              estoque_atual: racao.estoque_atual,
+              unidade_medida: racao.unidade_medida,
+              consumo_medio_diario: consumoMedioDiario,
+              dias_restantes: diasRestantes,
+              percentual_total: percentualTotal,
+            });
+          });
+
+          const consumoTotalGeral = Object.values(consumoPorProduto).reduce((a, b) => a + b, 0);
+          const consumoDiario = consumoTotalGeral / 15;
           previsaoConsumo3d = consumoDiario * 3;
         }
       }
 
+      setRacoesDetalhadas(racoesDetalhadasTemp);
       setStats(prev => ({
         ...prev,
         ocsPendentes: ocs?.length || 0,
@@ -257,9 +298,12 @@ export default function FabricaRacao() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            {/* Stats Cards */}
+            {/* Stats Cards - Clickable */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <Card className="bg-card border-green-500/50">
+              <Card 
+                className="bg-card border-green-500/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-green-500"
+                onClick={() => setShowEstoqueRacao(true)}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -272,7 +316,10 @@ export default function FabricaRacao() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-purple-500/50">
+              <Card 
+                className="bg-card border-purple-500/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-purple-500"
+                onClick={() => setShowPrevisaoConsumo(true)}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -285,7 +332,10 @@ export default function FabricaRacao() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-destructive/50">
+              <Card 
+                className="bg-card border-destructive/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-destructive"
+                onClick={() => setShowAlertasCriticos(true)}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -296,7 +346,10 @@ export default function FabricaRacao() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-yellow-500/50">
+              <Card 
+                className="bg-card border-yellow-500/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-yellow-500"
+                onClick={() => setShowAlertasAtencao(true)}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -307,7 +360,10 @@ export default function FabricaRacao() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-primary/50">
+              <Card 
+                className="bg-card border-primary/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-primary"
+                onClick={() => setActiveTab('ordens')}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -410,6 +466,35 @@ export default function FabricaRacao() {
           fetchStats();
           setActiveTab('ordens');
         }}
+      />
+
+      {/* Analytical Dialogs */}
+      <EstoqueRacaoDialog
+        open={showEstoqueRacao}
+        onOpenChange={setShowEstoqueRacao}
+        racoes={racoesDetalhadas}
+        totalEstoque={stats.estoqueRacao}
+      />
+
+      <PrevisaoConsumoDialog
+        open={showPrevisaoConsumo}
+        onOpenChange={setShowPrevisaoConsumo}
+        racoes={racoesDetalhadas}
+        totalPrevisao={stats.previsaoConsumo3d}
+      />
+
+      <AlertasDetalheDialog
+        open={showAlertasCriticos}
+        onOpenChange={setShowAlertasCriticos}
+        produtos={produtosCriticos}
+        tipo="critico"
+      />
+
+      <AlertasDetalheDialog
+        open={showAlertasAtencao}
+        onOpenChange={setShowAlertasAtencao}
+        produtos={produtosCriticos}
+        tipo="atencao"
       />
     </div>
   );
