@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import Header from '@/components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,9 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Plus, Pencil, Save, Calculator } from 'lucide-react';
+import { ArrowLeft, Target, Plus, Pencil, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { Constants } from '@/integrations/supabase/types';
+import { MultiplicadoresMetaDialog } from '@/components/cadastro/MultiplicadoresMetaDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type Linhagem = 'cobb_500' | 'ross_308' | 'hubbard';
 type SexoAve = 'macho' | 'femea' | 'misto';
@@ -44,7 +47,10 @@ interface FormData {
   conversao_alimentar_acumulada: number;
 }
 
-interface Multiplicadores {
+interface MultiplicadorDB {
+  id: string;
+  linhagem: string;
+  sexo: string;
   mult_7_dias: number;
   mult_14_dias: number;
   mult_21_dias: number;
@@ -53,22 +59,13 @@ interface Multiplicadores {
   mult_42_dias: number;
 }
 
-const DEFAULT_MULTIPLICADORES: Multiplicadores = {
-  mult_7_dias: 4.5,
-  mult_14_dias: 2.6,
-  mult_21_dias: 1.9,
-  mult_28_dias: 1.6,
-  mult_35_dias: 1.4,
-  mult_42_dias: 1.3,
-};
-
-const linhagemLabels: Record<Linhagem, string> = {
+const linhagemLabels: Record<string, string> = {
   cobb_500: 'Cobb 500',
   ross_308: 'Ross 308',
   hubbard: 'Hubbard',
 };
 
-const sexoLabels: Record<SexoAve, string> = {
+const sexoLabels: Record<string, string> = {
   macho: 'Macho',
   femea: 'Fêmea',
   misto: 'Misto',
@@ -83,24 +80,6 @@ const fasePosturaLabels: Record<string, string> = {
   cria: 'Cria',
   recria: 'Recria',
   producao: 'Produção',
-};
-
-// Load multiplicadores from localStorage
-const loadMultiplicadores = (): Multiplicadores => {
-  try {
-    const saved = localStorage.getItem('metas_peso_multiplicadores');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Erro ao carregar multiplicadores:', e);
-  }
-  return DEFAULT_MULTIPLICADORES;
-};
-
-// Save multiplicadores to localStorage
-const saveMultiplicadores = (mult: Multiplicadores) => {
-  localStorage.setItem('metas_peso_multiplicadores', JSON.stringify(mult));
 };
 
 // Postura Reference Tab Component
@@ -239,6 +218,7 @@ function PosturaReferenceTab() {
 
 export default function CadastroDesempenhoAves() {
   const { user, loading } = useAuth();
+  const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
   const [data, setData] = useState<DesempenhoAve[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -247,8 +227,13 @@ export default function CadastroDesempenhoAves() {
   const [editingItem, setEditingItem] = useState<DesempenhoAve | null>(null);
   const [filterLinhagem, setFilterLinhagem] = useState<Linhagem | 'all'>('all');
   const [filterSexo, setFilterSexo] = useState<SexoAve | 'all'>('all');
-  const [multiplicadores, setMultiplicadores] = useState<Multiplicadores>(loadMultiplicadores());
-  const [pesoInicial, setPesoInicial] = useState<number>(0.045);
+  
+  // Multiplicadores from DB
+  const [multiplicadores, setMultiplicadores] = useState<MultiplicadorDB[]>([]);
+  const [loadingMult, setLoadingMult] = useState(true);
+  const [multDialogOpen, setMultDialogOpen] = useState(false);
+  const [editingMult, setEditingMult] = useState<MultiplicadorDB | null>(null);
+  const [deleteMultId, setDeleteMultId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<FormData>({
     dia: 0,
@@ -262,35 +247,53 @@ export default function CadastroDesempenhoAves() {
     conversao_alimentar_acumulada: 0,
   });
 
-  // Calculate weight targets based on multiplicadores
-  const calcularMetas = (pesoInicialKg: number) => {
-    const meta7 = pesoInicialKg * multiplicadores.mult_7_dias;
-    const meta14 = meta7 * multiplicadores.mult_14_dias;
-    const meta21 = meta14 * multiplicadores.mult_21_dias;
-    const meta28 = meta21 * multiplicadores.mult_28_dias;
-    const meta35 = meta28 * multiplicadores.mult_35_dias;
-    const meta42 = meta35 * multiplicadores.mult_42_dias;
-    const gpd = (meta42 - pesoInicialKg) / 42;
-    
-    return { meta7, meta14, meta21, meta28, meta35, meta42, gpd };
-  };
-
-  const handleSaveMultiplicadores = () => {
-    saveMultiplicadores(multiplicadores);
-    toast.success('Multiplicadores salvos com sucesso!');
-  };
-
-  const handleResetMultiplicadores = () => {
-    setMultiplicadores(DEFAULT_MULTIPLICADORES);
-    saveMultiplicadores(DEFAULT_MULTIPLICADORES);
-    toast.success('Multiplicadores restaurados para valores padrão');
-  };
-
   useEffect(() => {
     if (user) {
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (integradoId) {
+      fetchMultiplicadores();
+    }
+  }, [integradoId]);
+
+  const fetchMultiplicadores = async () => {
+    if (!integradoId) return;
+    setLoadingMult(true);
+    const { data: multData, error } = await supabase
+      .from('multiplicadores_meta_peso')
+      .select('*')
+      .eq('integrado_id', integradoId)
+      .order('linhagem')
+      .order('sexo');
+
+    if (error) {
+      console.error('Erro ao buscar multiplicadores:', error);
+    } else {
+      setMultiplicadores(multData as MultiplicadorDB[]);
+    }
+    setLoadingMult(false);
+  };
+
+  const handleDeleteMult = async () => {
+    if (!deleteMultId) return;
+    try {
+      const { error } = await supabase
+        .from('multiplicadores_meta_peso')
+        .delete()
+        .eq('id', deleteMultId);
+      if (error) throw error;
+      toast.success('Multiplicadores excluídos com sucesso!');
+      fetchMultiplicadores();
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      toast.error('Erro ao excluir multiplicadores');
+    } finally {
+      setDeleteMultId(null);
+    }
+  };
 
   const fetchData = async () => {
     setLoadingData(true);
@@ -445,150 +448,92 @@ export default function CadastroDesempenhoAves() {
           </TabsList>
 
           <TabsContent value="multiplicadores">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>Multiplicadores de Meta</CardTitle>
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Multiplicadores de Meta de Peso</CardTitle>
                   <CardDescription>
-                    Configure os multiplicadores usados no cálculo automático das metas de peso
+                    Configure multiplicadores por linhagem e sexo para cálculo automático das metas
                   </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>7 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_7_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_7_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Peso inicial × este valor</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>14 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_14_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_14_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Meta 7 dias × este valor</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>21 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_21_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_21_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Meta 14 dias × este valor</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>28 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_28_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_28_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Meta 21 dias × este valor</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>35 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_35_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_35_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Meta 28 dias × este valor</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>42 dias (×)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={multiplicadores.mult_42_dias}
-                        onChange={(e) => setMultiplicadores({ ...multiplicadores, mult_42_dias: parseFloat(e.target.value) || 0 })}
-                      />
-                      <p className="text-xs text-muted-foreground">Meta 35 dias × este valor</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-4">
-                    <Button onClick={handleSaveMultiplicadores} className="gap-2">
-                      <Save className="w-4 h-4" />
-                      Salvar Multiplicadores
-                    </Button>
-                    <Button variant="outline" onClick={handleResetMultiplicadores}>
-                      Restaurar Padrão
+                </div>
+                <Button onClick={() => { setEditingMult(null); setMultDialogOpen(true); }} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Nova Tabela
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {loadingMult ? (
+                  <p className="text-muted-foreground py-8 text-center">Carregando...</p>
+                ) : multiplicadores.length === 0 ? (
+                  <div className="text-center py-12 space-y-4">
+                    <p className="text-muted-foreground">Nenhuma tabela de multiplicadores cadastrada</p>
+                    <Button variant="outline" onClick={() => { setEditingMult(null); setMultDialogOpen(true); }}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Cadastrar multiplicadores
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>Simulação de Metas</CardTitle>
-                  <CardDescription>
-                    Visualize as metas calculadas com os multiplicadores atuais
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Peso Inicial (kg)</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      value={pesoInicial}
-                      onChange={(e) => setPesoInicial(parseFloat(e.target.value) || 0)}
-                      placeholder="0,045"
-                    />
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {multiplicadores.map((mult) => (
+                      <Card key={mult.id} className="bg-muted/30">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{linhagemLabels[mult.linhagem] || mult.linhagem}</Badge>
+                              <Badge variant="secondary">{sexoLabels[mult.sexo] || mult.sexo}</Badge>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => { setEditingMult(mult); setMultDialogOpen(true); }}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => setDeleteMultId(mult.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="text-center">
+                              <span className="text-muted-foreground">7d</span>
+                              <p className="font-mono font-medium">{mult.mult_7_dias}×</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-muted-foreground">14d</span>
+                              <p className="font-mono font-medium">{mult.mult_14_dias}×</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-muted-foreground">21d</span>
+                              <p className="font-mono font-medium">{mult.mult_21_dias}×</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-muted-foreground">28d</span>
+                              <p className="font-mono font-medium">{mult.mult_28_dias}×</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-muted-foreground">35d</span>
+                              <p className="font-mono font-medium">{mult.mult_35_dias}×</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-muted-foreground">42d</span>
+                              <p className="font-mono font-medium">{mult.mult_42_dias}×</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                  
-                  {pesoInicial > 0 && (
-                    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                      {(() => {
-                        const metas = calcularMetas(pesoInicial);
-                        return (
-                          <>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">7 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta7.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">14 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta14.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">21 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta21.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">28 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta28.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">35 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta35.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-border/50">
-                              <span className="text-muted-foreground">42 dias:</span>
-                              <span className="font-mono font-medium">{metas.meta42.toFixed(3)} kg</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 bg-primary/10 rounded px-2">
-                              <span className="font-medium">GPD:</span>
-                              <span className="font-mono font-bold text-primary">{metas.gpd.toFixed(4)} kg/dia</span>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="referencia">
@@ -794,6 +739,31 @@ export default function CadastroDesempenhoAves() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para multiplicadores */}
+      <MultiplicadoresMetaDialog
+        open={multDialogOpen}
+        onOpenChange={setMultDialogOpen}
+        integradoId={integradoId || ''}
+        onSuccess={fetchMultiplicadores}
+        editData={editingMult}
+      />
+
+      {/* Confirmação de exclusão */}
+      <AlertDialog open={!!deleteMultId} onOpenChange={() => setDeleteMultId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir multiplicadores?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Os multiplicadores serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMult}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
