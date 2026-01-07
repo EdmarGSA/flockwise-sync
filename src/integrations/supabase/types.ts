@@ -1864,6 +1864,51 @@ export type Database = {
           },
         ]
       }
+      multiplicadores_meta_peso: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          mult_14_dias: number
+          mult_21_dias: number
+          mult_28_dias: number
+          mult_35_dias: number
+          mult_42_dias: number
+          mult_7_dias: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
+          mult_14_dias?: number
+          mult_21_dias?: number
+          mult_28_dias?: number
+          mult_35_dias?: number
+          mult_42_dias?: number
+          mult_7_dias?: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
+          mult_14_dias?: number
+          mult_21_dias?: number
+          mult_28_dias?: number
+          mult_35_dias?: number
+          mult_42_dias?: number
+          mult_7_dias?: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nucleos: {
         Row: {
           area_id: string | null
