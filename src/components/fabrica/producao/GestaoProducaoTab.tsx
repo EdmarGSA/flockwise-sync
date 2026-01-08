@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Factory, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,10 @@ import RacoesCriticasCard from './RacoesCriticasCard';
 import OrdensProducaoTable from './OrdensProducaoTable';
 import GerarOPDialog from './GerarOPDialog';
 import NovaOrdemProducaoDialog from './NovaOrdemProducaoDialog';
+import SolicitacoesAbertoDialog from './SolicitacoesAbertoDialog';
+import PrevisaoConsumoLotesDialog from './PrevisaoConsumoLotesDialog';
+import EstoqueProducaoDialog from './EstoqueProducaoDialog';
+import CoberturaDemandasDialog from './CoberturaDemandasDialog';
 
 interface RacaoCritica {
   id: string;
@@ -35,6 +38,10 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
   const [selectedRacao, setSelectedRacao] = useState<RacaoCritica | null>(null);
   const [showGerarOP, setShowGerarOP] = useState(false);
   const [showNovaOP, setShowNovaOP] = useState(false);
+  const [showSolicitacoes, setShowSolicitacoes] = useState(false);
+  const [showPrevisao, setShowPrevisao] = useState(false);
+  const [showEstoque, setShowEstoque] = useState(false);
+  const [showCobertura, setShowCobertura] = useState(false);
 
   useEffect(() => {
     if (integradoId) {
@@ -211,6 +218,10 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
         estoqueDisponivel={estoqueDisponivel}
         demandaTotal={demandaTotal}
         loading={loading}
+        onClickSolicitado={() => setShowSolicitacoes(true)}
+        onClickPrevisao={() => setShowPrevisao(true)}
+        onClickEstoque={() => setShowEstoque(true)}
+        onClickDemanda={() => setShowCobertura(true)}
       />
 
       {/* Critical Feeds */}
@@ -246,6 +257,49 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
         onSuccess={() => {
           setShowNovaOP(false);
           fetchDemandaData();
+        }}
+      />
+
+      {/* Analytical Dialogs */}
+      <SolicitacoesAbertoDialog
+        open={showSolicitacoes}
+        onOpenChange={setShowSolicitacoes}
+        integradoId={integradoId}
+        totalSolicitado={totalSolicitado}
+      />
+
+      <PrevisaoConsumoLotesDialog
+        open={showPrevisao}
+        onOpenChange={setShowPrevisao}
+        integradoId={integradoId}
+        previsaoTotal={previsaoConsumo3d}
+      />
+
+      <EstoqueProducaoDialog
+        open={showEstoque}
+        onOpenChange={setShowEstoque}
+        integradoId={integradoId}
+        estoqueTotal={estoqueDisponivel}
+      />
+
+      <CoberturaDemandasDialog
+        open={showCobertura}
+        onOpenChange={setShowCobertura}
+        integradoId={integradoId}
+        demandaTotal={demandaTotal}
+        estoqueTotal={estoqueDisponivel}
+        onGerarOP={(racaoId, racaoNome, quantidade) => {
+          setSelectedRacao({
+            id: racaoId,
+            nome: racaoNome,
+            demandaTotal: 0,
+            estoqueAtual: 0,
+            deficit: -quantidade,
+            sugestaoProducao: quantidade,
+            unidade_medida: 'kg'
+          });
+          setShowCobertura(false);
+          setShowGerarOP(true);
         }}
       />
     </div>
