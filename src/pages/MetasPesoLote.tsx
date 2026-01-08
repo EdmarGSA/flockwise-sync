@@ -96,18 +96,6 @@ const DEFAULT_MULTIPLICADORES: Multiplicadores = {
   mult_42_dias: 1.3,
 };
 
-const loadMultiplicadores = (): Multiplicadores => {
-  try {
-    const saved = localStorage.getItem('metas_peso_multiplicadores');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Erro ao carregar multiplicadores:', e);
-  }
-  return DEFAULT_MULTIPLICADORES;
-};
-
 export default function MetasPesoLote() {
   const { user, loading } = useAuth();
   const { integradoId } = useIntegradoId();
@@ -120,7 +108,7 @@ export default function MetasPesoLote() {
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingMetas, setEditingMetas] = useState<MetasPeso | null>(null);
-  const [multiplicadores] = useState<Multiplicadores>(loadMultiplicadores());
+  const [multiplicadores, setMultiplicadores] = useState<Multiplicadores>(DEFAULT_MULTIPLICADORES);
   
   // Mortalidade states
   const [mortalidadeMedia, setMortalidadeMedia] = useState<MortalidadeMedia | null>(null);
@@ -161,6 +149,21 @@ export default function MetasPesoLote() {
     }
 
     setLote(loteData as Lote);
+
+    // Buscar multiplicadores específicos da linhagem/sexo do lote
+    if (loteData.linhagem && loteData.sexo && integradoId) {
+      const { data: mult } = await supabase
+        .from('multiplicadores_meta_peso')
+        .select('mult_7_dias, mult_14_dias, mult_21_dias, mult_28_dias, mult_35_dias, mult_42_dias')
+        .eq('integrado_id', integradoId)
+        .eq('linhagem', loteData.linhagem)
+        .eq('sexo', loteData.sexo)
+        .maybeSingle();
+      
+      if (mult) {
+        setMultiplicadores(mult);
+      }
+    }
 
     // Fetch recebimento_lotes para obter quantidade alojada
     const { data: recebimentoData } = await supabase

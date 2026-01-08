@@ -291,6 +291,41 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
 
       if (error) throw error;
 
+      // Buscar multiplicadores para a linhagem e sexo selecionados
+      const { data: multiplicadores } = await supabase
+        .from('multiplicadores_meta_peso')
+        .select('*')
+        .eq('integrado_id', integradoId)
+        .eq('linhagem', data.linhagem as 'cobb_500' | 'ross_308' | 'hubbard')
+        .eq('sexo', data.sexo as 'macho' | 'femea' | 'misto')
+        .maybeSingle();
+
+      // Se existirem multiplicadores cadastrados, criar metas automaticamente
+      if (multiplicadores && insertedLote) {
+        // Usar peso médio padrão de pintinhos se não informado (40g = 0.040kg)
+        const pesoInicialKg = 0.040;
+        const meta7 = pesoInicialKg * multiplicadores.mult_7_dias;
+        const meta14 = meta7 * multiplicadores.mult_14_dias;
+        const meta21 = meta14 * multiplicadores.mult_21_dias;
+        const meta28 = meta21 * multiplicadores.mult_28_dias;
+        const meta35 = meta28 * multiplicadores.mult_35_dias;
+        const meta42 = meta35 * multiplicadores.mult_42_dias;
+        const gpd = (meta42 - pesoInicialKg) / 42;
+
+        await supabase.from('metas_peso').insert({
+          lote_id: insertedLote.id,
+          integrado_id: integradoId,
+          peso_inicial_kg: pesoInicialKg,
+          meta_7_dias_kg: meta7,
+          meta_14_dias_kg: meta14,
+          meta_21_dias_kg: meta21,
+          meta_28_dias_kg: meta28,
+          meta_35_dias_kg: meta35,
+          meta_42_dias_kg: meta42,
+          gpd_kg: gpd,
+        });
+      }
+
       toast.success('Lote aberto com sucesso!');
       
       // Store data for feed request dialog
