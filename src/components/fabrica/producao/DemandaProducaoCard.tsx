@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { TrendingUp, Package, AlertTriangle, Calendar } from 'lucide-react';
 
 interface DemandaProducaoCardProps {
@@ -7,6 +7,10 @@ interface DemandaProducaoCardProps {
   estoqueDisponivel: number;
   demandaTotal: number;
   loading?: boolean;
+  onClickSolicitado?: () => void;
+  onClickPrevisao?: () => void;
+  onClickEstoque?: () => void;
+  onClickDemanda?: () => void;
 }
 
 export default function DemandaProducaoCard({
@@ -14,7 +18,11 @@ export default function DemandaProducaoCard({
   previsaoConsumo3d,
   estoqueDisponivel,
   demandaTotal,
-  loading = false
+  loading = false,
+  onClickSolicitado,
+  onClickPrevisao,
+  onClickEstoque,
+  onClickDemanda
 }: DemandaProducaoCardProps) {
   const saldo = estoqueDisponivel - demandaTotal;
   const isCritico = saldo < 0;
@@ -35,7 +43,10 @@ export default function DemandaProducaoCard({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card className="bg-card border-blue-500/50">
+      <Card 
+        className="bg-card border-blue-500/50 cursor-pointer transition-all hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/10"
+        onClick={onClickSolicitado}
+      >
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -50,7 +61,10 @@ export default function DemandaProducaoCard({
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-purple-500/50">
+      <Card 
+        className="bg-card border-purple-500/50 cursor-pointer transition-all hover:border-purple-500 hover:shadow-md hover:shadow-purple-500/10"
+        onClick={onClickPrevisao}
+      >
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -65,7 +79,10 @@ export default function DemandaProducaoCard({
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-green-500/50">
+      <Card 
+        className="bg-card border-green-500/50 cursor-pointer transition-all hover:border-green-500 hover:shadow-md hover:shadow-green-500/10"
+        onClick={onClickEstoque}
+      >
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -80,7 +97,10 @@ export default function DemandaProducaoCard({
         </CardContent>
       </Card>
 
-      <Card className={`bg-card ${isCritico ? 'border-destructive/50' : 'border-amber-500/50'}`}>
+      <Card 
+        className={`bg-card cursor-pointer transition-all hover:shadow-md ${isCritico ? 'border-destructive/50 hover:border-destructive hover:shadow-destructive/10' : 'border-amber-500/50 hover:border-amber-500 hover:shadow-amber-500/10'}`}
+        onClick={onClickDemanda}
+      >
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
