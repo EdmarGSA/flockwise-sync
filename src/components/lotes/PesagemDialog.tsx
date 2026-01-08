@@ -57,14 +57,32 @@ interface PesagemDialogProps {
   onSuccess?: () => void;
 }
 
-// Calculate weight targets based on initial weight
-function calcularMetas(pesoInicialKg: number): MetasPeso {
-  const meta7 = pesoInicialKg * 4.5;
-  const meta14 = meta7 * 2.6;
-  const meta21 = meta14 * 1.9;
-  const meta28 = meta21 * 1.6;
-  const meta35 = meta28 * 1.4;
-  const meta42 = meta35 * 1.3;
+interface Multiplicadores {
+  mult_7_dias: number;
+  mult_14_dias: number;
+  mult_21_dias: number;
+  mult_28_dias: number;
+  mult_35_dias: number;
+  mult_42_dias: number;
+}
+
+const DEFAULT_MULTIPLICADORES: Multiplicadores = {
+  mult_7_dias: 4.5,
+  mult_14_dias: 2.6,
+  mult_21_dias: 1.9,
+  mult_28_dias: 1.6,
+  mult_35_dias: 1.4,
+  mult_42_dias: 1.3,
+};
+
+// Calculate weight targets based on initial weight and multipliers
+function calcularMetasComMultiplicadores(pesoInicialKg: number, mult: Multiplicadores): MetasPeso {
+  const meta7 = pesoInicialKg * mult.mult_7_dias;
+  const meta14 = meta7 * mult.mult_14_dias;
+  const meta21 = meta14 * mult.mult_21_dias;
+  const meta28 = meta21 * mult.mult_28_dias;
+  const meta35 = meta28 * mult.mult_35_dias;
+  const meta42 = meta35 * mult.mult_42_dias;
   const gpd = (meta42 - pesoInicialKg) / 42;
 
   return {
@@ -176,7 +194,7 @@ export function PesagemDialog({
       ];
 
       const pesoInicialKg = pesoInicialPintinhos || 0.040;
-      const metasCalc = calcularMetas(pesoInicialKg);
+      const metasCalc = calcularMetasComMultiplicadores(pesoInicialKg, DEFAULT_MULTIPLICADORES);
 
       const historico: PesagemHistorico[] = periodos.map((periodo, idx) => {
         let pesoLiquidoTotal = 0;
@@ -230,7 +248,9 @@ export function PesagemDialog({
   }, [open, loteId, dataAlojamento, pesoInicialPintinhos]);
 
   useEffect(() => {
-    if (open) {
+    const fetchMultiplicadoresAndCalculateMetas = async () => {
+      if (!open) return;
+      
       setItens([]);
       setDataPesagem(new Date());
       setQuantidadeAves('');
@@ -239,13 +259,32 @@ export function PesagemDialog({
       
       // Calculate metas if initial weight available (já está em kg)
       if (pesoInicialPintinhos && pesoInicialPintinhos > 0) {
-        const metasCalculadas = calcularMetas(pesoInicialPintinhos);
+        // Buscar multiplicadores específicos da linhagem/sexo
+        let multiplicadores = DEFAULT_MULTIPLICADORES;
+        
+        if (linhagem && sexo && integradoId) {
+          const { data: mult } = await supabase
+            .from('multiplicadores_meta_peso')
+            .select('mult_7_dias, mult_14_dias, mult_21_dias, mult_28_dias, mult_35_dias, mult_42_dias')
+            .eq('integrado_id', integradoId)
+            .eq('linhagem', linhagem)
+            .eq('sexo', sexo)
+            .maybeSingle();
+          
+          if (mult) {
+            multiplicadores = mult;
+          }
+        }
+        
+        const metasCalculadas = calcularMetasComMultiplicadores(pesoInicialPintinhos, multiplicadores);
         setMetas(metasCalculadas);
       } else {
         setMetas(null);
       }
-    }
-  }, [open, pesoInicialPintinhos]);
+    };
+
+    fetchMultiplicadoresAndCalculateMetas();
+  }, [open, pesoInicialPintinhos, linhagem, sexo, integradoId]);
 
   const handleAddItem = () => {
     const quantidade = parseInt(quantidadeAves) || 0;
