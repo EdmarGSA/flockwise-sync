@@ -47,6 +47,139 @@ export type Database = {
         }
         Relationships: []
       }
+      autopsias: {
+        Row: {
+          assinado_em: string | null
+          assinatura_url: string | null
+          audio_url: string | null
+          causa_morte: string | null
+          created_at: string | null
+          criado_por: string
+          data_autopsia: string
+          diagnostico_presuntivo: string | null
+          id: string
+          idade_dias: number | null
+          integrado_id: string
+          local_id: string | null
+          lote_id: string
+          quantidade_aves: number
+          recomendacoes: string | null
+          sistema_cardiovascular: string | null
+          sistema_digestivo: string | null
+          sistema_locomotor: string | null
+          sistema_nervoso: string | null
+          sistema_reprodutor: string | null
+          sistema_respiratorio: string | null
+          sistema_tegumentar: string | null
+          status: string | null
+          sync_status: string | null
+          transcricao_voz: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assinado_em?: string | null
+          assinatura_url?: string | null
+          audio_url?: string | null
+          causa_morte?: string | null
+          created_at?: string | null
+          criado_por: string
+          data_autopsia?: string
+          diagnostico_presuntivo?: string | null
+          id?: string
+          idade_dias?: number | null
+          integrado_id: string
+          local_id?: string | null
+          lote_id: string
+          quantidade_aves?: number
+          recomendacoes?: string | null
+          sistema_cardiovascular?: string | null
+          sistema_digestivo?: string | null
+          sistema_locomotor?: string | null
+          sistema_nervoso?: string | null
+          sistema_reprodutor?: string | null
+          sistema_respiratorio?: string | null
+          sistema_tegumentar?: string | null
+          status?: string | null
+          sync_status?: string | null
+          transcricao_voz?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assinado_em?: string | null
+          assinatura_url?: string | null
+          audio_url?: string | null
+          causa_morte?: string | null
+          created_at?: string | null
+          criado_por?: string
+          data_autopsia?: string
+          diagnostico_presuntivo?: string | null
+          id?: string
+          idade_dias?: number | null
+          integrado_id?: string
+          local_id?: string | null
+          lote_id?: string
+          quantidade_aves?: number
+          recomendacoes?: string | null
+          sistema_cardiovascular?: string | null
+          sistema_digestivo?: string | null
+          sistema_locomotor?: string | null
+          sistema_nervoso?: string | null
+          sistema_reprodutor?: string | null
+          sistema_respiratorio?: string | null
+          sistema_tegumentar?: string | null
+          status?: string | null
+          sync_status?: string | null
+          transcricao_voz?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopsias_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopsias_midias: {
+        Row: {
+          autopsia_id: string | null
+          created_at: string | null
+          descricao: string | null
+          id: string
+          sistema_afetado: string | null
+          tipo: string
+          url: string
+        }
+        Insert: {
+          autopsia_id?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          sistema_afetado?: string | null
+          tipo: string
+          url: string
+        }
+        Update: {
+          autopsia_id?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          sistema_afetado?: string | null
+          tipo?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopsias_midias_autopsia_id_fkey"
+            columns: ["autopsia_id"]
+            isOneToOne: false
+            referencedRelation: "autopsias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias: {
         Row: {
           ativo: boolean
