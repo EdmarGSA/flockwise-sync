@@ -45,14 +45,11 @@ export default function DigitalSignature({
     setUploading(true);
 
     try {
-      // Get signature as data URL
       const dataUrl = signatureRef.current.toDataURL('image/png');
       
-      // Convert to blob
       const response = await fetch(dataUrl);
       const blob = await response.blob();
 
-      // Upload to storage
       const fileName = `assinatura-${Date.now()}.png`;
       const filePath = `assinaturas/${fileName}`;
 
@@ -86,11 +83,11 @@ export default function DigitalSignature({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="bg-white rounded-lg p-2">
+          <div className="bg-white rounded-lg p-3">
             <img 
               src={existingUrl} 
               alt="Assinatura" 
-              className="max-h-20 mx-auto"
+              className="max-h-24 mx-auto"
             />
           </div>
         </CardContent>
@@ -103,23 +100,29 @@ export default function DigitalSignature({
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Assinatura Digital</CardTitle>
         <CardDescription className="text-xs">
-          Assine no espaço abaixo para confirmar a autenticidade
+          Assine no espaço abaixo para confirmar
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         <div 
           className={cn(
-            "bg-white rounded-lg border-2 border-dashed transition-colors",
-            isSigning ? "border-primary" : "border-gray-200"
+            "bg-white rounded-xl border-2 border-dashed transition-colors overflow-hidden",
+            isSigning ? "border-primary" : "border-gray-300"
           )}
         >
           <SignatureCanvas
             ref={signatureRef}
             canvasProps={{
-              className: 'w-full h-32 rounded-lg',
-              style: { touchAction: 'none' },
+              className: 'w-full rounded-xl',
+              style: { 
+                touchAction: 'none',
+                height: '200px',
+                width: '100%',
+              },
             }}
             penColor="black"
+            minWidth={2}
+            maxWidth={4}
             backgroundColor="white"
             onBegin={() => setIsSigning(true)}
             onEnd={handleEnd}
@@ -127,35 +130,33 @@ export default function DigitalSignature({
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={handleClear}
             disabled={disabled || uploading}
-            className="gap-2"
+            className="h-12 gap-2 text-base"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-5 h-5" />
             Limpar
           </Button>
 
           <Button
             type="button"
-            size="sm"
             onClick={handleConfirm}
             disabled={disabled || uploading || !hasContent}
-            className="gap-2 flex-1"
+            className="h-12 gap-2 text-base"
           >
             {uploading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 Salvando...
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" />
-                Confirmar Assinatura
+                <Check className="w-5 h-5" />
+                Confirmar
               </>
             )}
           </Button>
