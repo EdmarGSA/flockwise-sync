@@ -64,7 +64,6 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
   const [saving, setSaving] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
 
-  // Form state
   const [formData, setFormData] = useState({
     dia_ciclo: diasLote || 0,
     tipo: 'observacao' as 'observacao' | 'orientacao',
@@ -99,7 +98,6 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
       return;
     }
 
-    // Fetch user names
     const userIds = [...new Set((data || []).map(o => o.criado_por))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -115,7 +113,6 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
 
     setObservacoes(observacoesWithNames as Observacao[]);
 
-    // Auto-expand current day
     if (diasLote !== null) {
       setExpandedDays(new Set([diasLote]));
     }
@@ -208,10 +205,9 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
     if (tipo === 'orientacao') {
       return <Badge variant="secondary" className="gap-1"><FileText className="w-3 h-3" />Orientação</Badge>;
     }
-    return <Badge variant="outline" className="gap-1"><MessageSquare className="w-3 h-3" />Observação</Badge>;
+    return <Badge variant="outline" className="gap-1"><MessageSquare className="w-3 h-3" />Obs.</Badge>;
   };
 
-  // Group by day
   const observacoesPorDia: ObservacoesPorDia[] = [];
   const diasSet = new Set<number>();
   observacoes.forEach(obs => diasSet.add(obs.dia_ciclo));
@@ -225,41 +221,39 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
 
   return (
     <>
-      <Card className="bg-card border-border">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              Observações e Orientações
-            </CardTitle>
-            <CardDescription>
-              Registre eventos de manejo e diretrizes veterinárias por dia do ciclo
-            </CardDescription>
+      <Card className="bg-card border-border relative">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+                <span className="truncate">Observações</span>
+              </CardTitle>
+              <CardDescription className="text-xs mt-1">
+                Registros de manejo e orientações
+              </CardDescription>
+            </div>
           </div>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nova
-          </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-20">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
               Carregando observações...
             </div>
           ) : observacoesPorDia.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">Nenhuma observação registrada</p>
-              <p className="text-sm mt-1">Clique em "Nova" para registrar a primeira observação</p>
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="text-base font-medium">Nenhuma observação</p>
+              <p className="text-sm mt-1">Toque no + para registrar</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {observacoesPorDia.map((grupo) => {
                 const hasAlta = grupo.observacoes.some(o => o.prioridade === 'alta');
                 const isExpanded = expandedDays.has(grupo.dia);
 
                 return (
-                  <div key={grupo.dia} className="border border-border rounded-lg overflow-hidden">
+                  <div key={grupo.dia} className="border border-border rounded-xl overflow-hidden">
                     <button
                       onClick={() => toggleDay(grupo.dia)}
                       className={`w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors ${
@@ -267,16 +261,16 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <Badge variant={grupo.dia === diasLote ? 'default' : 'outline'} className="text-sm">
+                        <Badge variant={grupo.dia === diasLote ? 'default' : 'outline'} className="text-sm py-1 px-3">
                           Dia {grupo.dia}
                         </Badge>
-                        <span className="text-muted-foreground">
-                          {grupo.observacoes.length} registro{grupo.observacoes.length !== 1 ? 's' : ''}
+                        <span className="text-sm text-muted-foreground">
+                          {grupo.observacoes.length} {grupo.observacoes.length === 1 ? 'registro' : 'registros'}
                         </span>
                         {hasAlta && (
-                          <span className="relative flex h-2 w-2">
+                          <span className="relative flex h-2.5 w-2.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive"></span>
                           </span>
                         )}
                       </div>
@@ -291,34 +285,34 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
                       <div className="border-t border-border divide-y divide-border">
                         {grupo.observacoes.map((obs) => (
                           <div key={obs.id} className="p-4 hover:bg-muted/30">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-2 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {getTipoBadge(obs.tipo)}
                                   {getPrioridadeBadge(obs.prioridade)}
                                 </div>
-                                <p className="text-foreground whitespace-pre-wrap">{obs.descricao}</p>
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <p className="text-foreground whitespace-pre-wrap text-sm">{obs.descricao}</p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                   <span className="flex items-center gap-1">
                                     <User className="w-3 h-3" />
                                     {obs.criador?.full_name || 'Usuário'}
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
-                                    {format(new Date(obs.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                    {format(new Date(obs.created_at), "dd/MM HH:mm", { locale: ptBR })}
                                   </span>
                                 </div>
                               </div>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-muted-foreground hover:text-destructive"
+                                className="text-muted-foreground hover:text-destructive shrink-0 w-10 h-10"
                                 onClick={() => {
                                   setSelectedObservacao(obs);
                                   setDeleteDialogOpen(true);
                                 }}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-5 h-5" />
                               </Button>
                             </div>
                           </div>
@@ -331,20 +325,29 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
             </div>
           )}
         </CardContent>
+
+        {/* FAB - Floating Action Button */}
+        <Button
+          onClick={() => setDialogOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50"
+          size="icon"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
       </Card>
 
       {/* New Observation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg mx-4">
           <DialogHeader>
             <DialogTitle>Nova Observação</DialogTitle>
             <DialogDescription>
-              Registre um evento de manejo ou diretriz veterinária
+              Registre um evento de manejo ou diretriz
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Dia do Ciclo</Label>
                 <Input
@@ -352,6 +355,7 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
                   min={0}
                   value={formData.dia_ciclo}
                   onChange={(e) => setFormData(prev => ({ ...prev, dia_ciclo: parseInt(e.target.value) || 0 }))}
+                  className="h-12 text-base"
                 />
               </div>
               <div className="space-y-2">
@@ -360,12 +364,12 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
                   value={formData.tipo}
                   onValueChange={(v) => setFormData(prev => ({ ...prev, tipo: v as 'observacao' | 'orientacao' }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 text-base">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="observacao">Observação</SelectItem>
-                    <SelectItem value="orientacao">Orientação (Diretriz)</SelectItem>
+                    <SelectItem value="orientacao">Orientação</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -377,7 +381,7 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
                 value={formData.prioridade}
                 onValueChange={(v) => setFormData(prev => ({ ...prev, prioridade: v as 'alta' | 'media' | 'baixa' }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -397,21 +401,22 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
               <Label>Descrição</Label>
               <Textarea
                 placeholder={formData.tipo === 'orientacao' 
-                  ? "Ex: Aumentar ventilação em 10% devido ao calor excessivo..."
-                  : "Ex: Cama úmida na área próxima aos bebedouros..."
+                  ? "Ex: Aumentar ventilação em 10%..."
+                  : "Ex: Cama úmida próxima aos bebedouros..."
                 }
                 value={formData.descricao}
                 onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
                 rows={4}
+                className="text-base resize-none"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-12">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="h-12">
               {saving ? 'Salvando...' : 'Registrar'}
             </Button>
           </DialogFooter>
@@ -420,16 +425,16 @@ export default function ObservacoesTab({ loteId, diasLote }: ObservacoesTabProps
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="mx-4">
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir observação?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A observação será removida permanentemente.
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel className="h-12">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12">
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>

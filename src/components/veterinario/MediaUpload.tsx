@@ -2,9 +2,8 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Upload, X, Image, Video, Loader2 } from 'lucide-react';
+import { Camera, FolderOpen, X, Image, Video, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -57,7 +56,6 @@ export default function MediaUpload({
       const isVideo = file.type.startsWith('video/');
       const tipo = isVideo ? 'video' : 'foto';
 
-      // Create local preview URL
       const previewUrl = URL.createObjectURL(file);
       
       newItems.push({
@@ -71,7 +69,6 @@ export default function MediaUpload({
 
     onChange([...items, ...newItems]);
     
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -115,7 +112,6 @@ export default function MediaUpload({
     onChange(items.map(i => i.id === id ? { ...i, sistemaAfetado } : i));
   };
 
-  // Function to upload all pending items
   const uploadAllPending = async (): Promise<MediaItem[]> => {
     setUploading(true);
     const uploaded: MediaItem[] = [];
@@ -147,7 +143,8 @@ export default function MediaUpload({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      {/* Large touch-friendly capture buttons */}
+      <div className="grid grid-cols-2 gap-3">
         {/* Hidden file inputs */}
         <input
           ref={fileInputRef}
@@ -171,49 +168,47 @@ export default function MediaUpload({
         <Button
           type="button"
           variant="outline"
-          size="sm"
           onClick={() => cameraInputRef.current?.click()}
           disabled={disabled || uploading}
-          className="gap-2"
+          className="h-20 flex-col gap-2 text-base"
         >
-          <Camera className="w-4 h-4" />
-          Câmera
+          <Camera className="w-8 h-8" />
+          <span>Câmera</span>
         </Button>
 
         <Button
           type="button"
           variant="outline"
-          size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading}
-          className="gap-2"
+          className="h-20 flex-col gap-2 text-base"
         >
-          <Upload className="w-4 h-4" />
-          Galeria
+          <FolderOpen className="w-8 h-8" />
+          <span>Galeria</span>
         </Button>
-
-        {uploading && (
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Enviando...
-          </span>
-        )}
       </div>
 
-      {/* Media Grid */}
+      {uploading && (
+        <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Enviando mídia...</span>
+        </div>
+      )}
+
+      {/* Media Grid - larger thumbnails for mobile */}
       {items.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {items.map((item) => (
             <Card key={item.id} className="relative overflow-hidden">
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
-                className="absolute top-2 right-2 z-10 w-6 h-6"
+                className="absolute top-2 right-2 z-10 w-8 h-8"
                 onClick={() => handleRemove(item.id)}
                 disabled={disabled}
               >
-                <X className="w-3 h-3" />
+                <X className="w-4 h-4" />
               </Button>
 
               <div className="aspect-square relative bg-muted">
@@ -230,27 +225,33 @@ export default function MediaUpload({
                     controls
                   />
                 )}
-                <div className="absolute bottom-2 left-2">
+                <div className="absolute bottom-2 left-2 flex items-center gap-1">
                   {item.tipo === 'foto' ? (
-                    <Image className="w-4 h-4 text-white drop-shadow-lg" />
+                    <div className="bg-black/50 rounded px-2 py-1 flex items-center gap-1">
+                      <Image className="w-3 h-3 text-white" />
+                      <span className="text-[10px] text-white">Foto</span>
+                    </div>
                   ) : (
-                    <Video className="w-4 h-4 text-white drop-shadow-lg" />
+                    <div className="bg-black/50 rounded px-2 py-1 flex items-center gap-1">
+                      <Video className="w-3 h-3 text-white" />
+                      <span className="text-[10px] text-white">Vídeo</span>
+                    </div>
                   )}
                 </div>
                 {item.isNew && (
-                  <div className="absolute top-2 left-2 px-2 py-0.5 bg-yellow-500 text-black text-xs rounded">
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-yellow-500 text-black text-xs rounded font-medium">
                     Pendente
                   </div>
                 )}
               </div>
 
-              <CardContent className="p-2 space-y-2">
+              <CardContent className="p-3 space-y-2">
                 <Select
                   value={item.sistemaAfetado || ''}
                   onValueChange={(value) => handleSistemaChange(item.id, value)}
                   disabled={disabled}
                 >
-                  <SelectTrigger className="h-8 text-xs">
+                  <SelectTrigger className="h-10 text-sm">
                     <SelectValue placeholder="Sistema afetado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -266,7 +267,7 @@ export default function MediaUpload({
                   placeholder="Descrição..."
                   value={item.descricao || ''}
                   onChange={(e) => handleDescricaoChange(item.id, e.target.value)}
-                  className="h-8 text-xs"
+                  className="h-10 text-sm"
                   disabled={disabled}
                 />
               </CardContent>
@@ -276,17 +277,16 @@ export default function MediaUpload({
       )}
 
       {items.length === 0 && (
-        <div className="border-2 border-dashed border-border rounded-lg p-8 text-center text-muted-foreground">
-          <Camera className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">Nenhuma mídia adicionada</p>
-          <p className="text-xs">Toque nos botões acima para capturar</p>
+        <div className="border-2 border-dashed border-border rounded-xl p-8 text-center text-muted-foreground">
+          <Camera className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-medium">Nenhuma mídia adicionada</p>
+          <p className="text-xs mt-1">Toque nos botões acima para capturar</p>
         </div>
       )}
     </div>
   );
 }
 
-// Export function to upload all pending
 export async function uploadPendingMedia(
   items: MediaItem[], 
   autopsiaId: string

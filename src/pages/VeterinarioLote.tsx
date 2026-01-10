@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Target, Package, MessageSquare, Bird, Pill, Scissors } from 'lucide-react';
+import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import ObservacoesTab from '@/components/veterinario/ObservacoesTab';
@@ -15,6 +16,7 @@ import MetasPosturaVetTab from '@/components/veterinario/MetasPosturaVetTab';
 import ConsumoVetTab from '@/components/veterinario/ConsumoVetTab';
 import TratamentosTab from '@/components/veterinario/TratamentosTab';
 import AutopsiasTab from '@/components/veterinario/AutopsiasTab';
+import ConnectionStatus from '@/components/veterinario/ConnectionStatus';
 
 interface Lote {
   id: string;
@@ -102,16 +104,16 @@ export default function VeterinarioLote() {
     const dias = differenceInDays(new Date(), new Date(lote.data_alojamento));
     if (isPostura) {
       const semanas = Math.floor(dias / 7) + 1;
-      return `${semanas} semanas`;
+      return `${semanas} sem`;
     }
-    return `${dias} dias`;
+    return `${dias}d`;
   };
 
   const formatSexo = (sexo: string) => {
     const labels: Record<string, string> = {
-      macho: 'Macho',
-      femea: 'Fêmea',
-      misto: 'Misto',
+      macho: 'M',
+      femea: 'F',
+      misto: 'Mix',
     };
     return labels[sexo] || sexo;
   };
@@ -119,12 +121,12 @@ export default function VeterinarioLote() {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'secondary' },
+      saiu_para_entrega: { label: 'Saiu', variant: 'secondary' },
       alojado: { label: 'Alojado', variant: 'default' },
       fechado: { label: 'Fechado', variant: 'destructive' },
     };
     const config = statusConfig[status] || { label: status, variant: 'outline' as const };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
   };
 
   const getDiasLote = () => {
@@ -151,121 +153,148 @@ export default function VeterinarioLote() {
     return null;
   }
 
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/veterinario')}>
+    <div className="min-h-screen bg-background pb-6">
+      {/* Compact Mobile Header */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/veterinario')} className="shrink-0 -ml-2">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-glow">
-                <Stethoscope className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <span className="text-xl font-bold text-foreground">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-foreground truncate">
                   {lote.nucleo?.nome} - {lote.galpao?.nome}
-                </span>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>{formatLinhagem(lote.linhagem, lote.linhagem_postura)}</span>
-                  <span>•</span>
-                  <span>{formatSexo(lote.sexo)}</span>
-                  {idadeDisplay && (
-                    <>
-                      <span>•</span>
-                      <Badge variant="outline" className="text-xs">{idadeDisplay}</Badge>
-                    </>
-                  )}
-                </div>
+                </h1>
+                {getStatusBadge(lote.status)}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <span>{formatLinhagem(lote.linhagem, lote.linhagem_postura)}</span>
+                <span>•</span>
+                <span>{formatSexo(lote.sexo)}</span>
+                {idadeDisplay && (
+                  <>
+                    <span>•</span>
+                    <span className="font-medium text-foreground">{idadeDisplay}</span>
+                  </>
+                )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {getStatusBadge(lote.status)}
           </div>
         </div>
+        {/* Offline status bar */}
+        <ConnectionStatus className="px-4 pb-2" />
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-24">
-        {/* Lote Info Card */}
-        <Card className="bg-card border-border mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3">
-                <Bird className="w-8 h-8 text-primary/50" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Aves</p>
-                  <p className="font-bold">{lote.quantidade_aves.toLocaleString('pt-BR')}</p>
-                </div>
+      <main className="px-4 pt-4 space-y-4">
+        {/* Info Cards 2x2 Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <Card className="bg-card border-border">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Bird className="w-6 h-6 text-primary/60 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-lg font-bold truncate">{lote.quantidade_aves.toLocaleString('pt-BR')}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Aves</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Peso Inicial</p>
-                <p className="font-bold">
-                  {lote.peso_medio_pintinhos ? `${lote.peso_medio_pintinhos.toFixed(3)} kg` : 'N/A'}
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Scale className="w-6 h-6 text-emerald-500/60 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-lg font-bold truncate">
+                  {lote.peso_medio_pintinhos ? `${lote.peso_medio_pintinhos.toFixed(3)}` : '-'}
                 </p>
+                <p className="text-[10px] text-muted-foreground uppercase">Peso Ini. (kg)</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Alojamento</p>
-                <p className="font-bold">
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-amber-500/60 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-lg font-bold truncate">
                   {lote.data_alojamento 
-                    ? new Date(lote.data_alojamento).toLocaleDateString('pt-BR')
-                    : 'Não alojado'}
+                    ? new Date(lote.data_alojamento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                    : '-'}
                 </p>
+                <p className="text-[10px] text-muted-foreground uppercase">Alojamento</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Idade</p>
-                <p className="font-bold">{dias !== null ? `${dias} dias` : '-'}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-purple-500">{dias ?? '-'}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="min-w-0">
+                <p className="text-lg font-bold truncate">{dias !== null ? `${dias}` : '-'}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Dias</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Tabs */}
+        {/* Tabs with Horizontal Scroll */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="observacoes" className="gap-2">
-              <MessageSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">Observações</span>
-              <span className="sm:hidden">Obs.</span>
-            </TabsTrigger>
-            <TabsTrigger value="tratamentos" className="gap-2">
-              <Pill className="w-4 h-4" />
-              <span className="hidden sm:inline">Tratamentos</span>
-              <span className="sm:hidden">Trat.</span>
-            </TabsTrigger>
-            <TabsTrigger value="autopsias" className="gap-2">
-              <Scissors className="w-4 h-4" />
-              <span className="hidden sm:inline">Autópsias</span>
-              <span className="sm:hidden">Nec.</span>
-            </TabsTrigger>
-            <TabsTrigger value="metas" className="gap-2">
-              <Target className="w-4 h-4" />
-              Metas
-            </TabsTrigger>
-            <TabsTrigger value="consumo" className="gap-2">
-              <Package className="w-4 h-4" />
-              Consumo
-            </TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full whitespace-nowrap">
+            <TabsList className="inline-flex w-max bg-muted/50 p-1 h-auto">
+              <TabsTrigger 
+                value="observacoes" 
+                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Observações</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tratamentos" 
+                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
+              >
+                <Pill className="w-4 h-4" />
+                <span>Tratamentos</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="autopsias" 
+                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
+              >
+                <Scissors className="w-4 h-4" />
+                <span>Autópsias</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="metas" 
+                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
+              >
+                <Target className="w-4 h-4" />
+                <span>Metas</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="consumo" 
+                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
+              >
+                <Package className="w-4 h-4" />
+                <span>Consumo</span>
+              </TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
 
-          <TabsContent value="observacoes">
+          <TabsContent value="observacoes" className="mt-4">
             <ObservacoesTab loteId={lote.id} diasLote={dias} />
           </TabsContent>
 
-          <TabsContent value="tratamentos">
+          <TabsContent value="tratamentos" className="mt-4">
             <TratamentosTab 
               loteId={lote.id} 
               dataAlojamento={lote.data_alojamento}
             />
           </TabsContent>
 
-          <TabsContent value="autopsias">
+          <TabsContent value="autopsias" className="mt-4">
             <AutopsiasTab loteId={lote.id} diasLote={dias} />
           </TabsContent>
 
-          <TabsContent value="metas">
+          <TabsContent value="metas" className="mt-4">
             {isPostura ? (
               <MetasPosturaVetTab loteId={lote.id} lote={lote} />
             ) : (
@@ -273,7 +302,7 @@ export default function VeterinarioLote() {
             )}
           </TabsContent>
 
-          <TabsContent value="consumo">
+          <TabsContent value="consumo" className="mt-4">
             <ConsumoVetTab loteId={lote.id} />
           </TabsContent>
         </Tabs>

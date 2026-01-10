@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, MapPin, Calendar, AlertTriangle, Eye, MessageSquare } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Lote {
@@ -42,7 +40,6 @@ export default function Veterinario() {
   const fetchLotes = async () => {
     setLoadingData(true);
 
-    // Fetch lotes with status alojado ou previsao
     const { data: lotesData, error } = await supabase
       .from('lotes')
       .select(`
@@ -66,7 +63,6 @@ export default function Veterinario() {
       return;
     }
 
-    // Fetch observações count for each lote
     const lotesWithCounts = await Promise.all(
       (lotesData || []).map(async (lote) => {
         const { count: obsCount } = await supabase
@@ -74,7 +70,6 @@ export default function Veterinario() {
           .select('*', { count: 'exact', head: true })
           .eq('lote_id', lote.id);
 
-        // Count observações with alta prioridade
         const { count: alertCount } = await supabase
           .from('observacoes_lote')
           .select('*', { count: 'exact', head: true })
@@ -114,12 +109,12 @@ export default function Veterinario() {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'secondary' },
+      saiu_para_entrega: { label: 'Saiu', variant: 'secondary' },
       alojado: { label: 'Alojado', variant: 'default' },
       fechado: { label: 'Fechado', variant: 'destructive' },
     };
     const config = statusConfig[status] || { label: status, variant: 'outline' as const };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
   };
 
   const getDiasLote = (dataAlojamento: string | null) => {
@@ -153,172 +148,142 @@ export default function Veterinario() {
   const totalAlertas = lotes.reduce((acc, l) => acc + (l.alertas_count || 0), 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-glow">
-                <Stethoscope className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <span className="text-xl font-bold text-foreground">Módulo Veterinário</span>
-                <p className="text-sm text-muted-foreground">Acompanhamento técnico de lotes</p>
-              </div>
+    <div className="min-h-screen bg-background pb-6">
+      {/* Mobile-optimized Header */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="shrink-0 -ml-2">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shrink-0">
+              <Stethoscope className="w-5 h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground truncate">Veterinário</h1>
+              <p className="text-xs text-muted-foreground">Acompanhamento técnico</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-24">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <main className="px-4 pt-4 space-y-4">
+        {/* Compact Stats Row */}
+        <div className="grid grid-cols-3 gap-2">
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Lotes Ativos</p>
-                  <p className="text-2xl font-bold text-foreground">{lotesAlojados}</p>
-                </div>
-                <Bird className="w-8 h-8 text-primary/50" />
-              </div>
+            <CardContent className="p-3 text-center">
+              <Bird className="w-5 h-5 text-primary/60 mx-auto mb-1" />
+              <p className="text-xl font-bold">{lotesAlojados}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Ativos</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Total de Lotes</p>
-                  <p className="text-2xl font-bold text-foreground">{totalLotes}</p>
-                </div>
-                <MapPin className="w-8 h-8 text-emerald-500/50" />
-              </div>
+            <CardContent className="p-3 text-center">
+              <Calendar className="w-5 h-5 text-emerald-500/60 mx-auto mb-1" />
+              <p className="text-xl font-bold">{totalLotes}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Alertas Ativos</p>
-                  <p className="text-2xl font-bold text-foreground">{totalAlertas}</p>
-                </div>
-                <AlertTriangle className={`w-8 h-8 ${totalAlertas > 0 ? 'text-destructive' : 'text-muted-foreground/50'}`} />
-              </div>
+            <CardContent className="p-3 text-center">
+              <AlertTriangle className={`w-5 h-5 mx-auto mb-1 ${totalAlertas > 0 ? 'text-destructive' : 'text-muted-foreground/40'}`} />
+              <p className="text-xl font-bold">{totalAlertas}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Alertas</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Search and Lotes List */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bird className="w-5 h-5 text-primary" />
-              Lotes para Acompanhamento
-            </CardTitle>
-            <CardDescription>
-              Clique em um lote para visualizar metas, consumo e registrar observações
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por núcleo, galpão ou linhagem..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar lote..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-12 text-base"
+          />
+        </div>
 
-            {loadingData ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Carregando lotes...
-              </div>
-            ) : filteredLotes.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}
-              </div>
-            ) : (
-              <div className="rounded-md border border-border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Núcleo / Galpão</TableHead>
-                      <TableHead>Linhagem</TableHead>
-                      <TableHead className="text-center">Idade</TableHead>
-                      <TableHead className="text-center">Aves</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Obs.</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLotes.map((lote) => {
-                      const dias = getDiasLote(lote.data_alojamento);
-                      return (
-                        <TableRow key={lote.id} className="hover:bg-muted/30">
-                          <TableCell>
-                            <div>
-                              <span className="font-medium">{lote.nucleo?.nome || 'N/A'}</span>
-                              <span className="text-muted-foreground"> / {lote.galpao?.nome || 'N/A'}</span>
+        {/* Lotes Cards List */}
+        {loadingData ? (
+          <div className="text-center py-12 text-muted-foreground">
+            Carregando lotes...
+          </div>
+        ) : filteredLotes.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Bird className="w-12 h-12 mx-auto mb-4 opacity-30" />
+            <p>{searchTerm ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredLotes.map((lote) => {
+              const dias = getDiasLote(lote.data_alojamento);
+              const hasAlerts = (lote.alertas_count || 0) > 0;
+              
+              return (
+                <Card 
+                  key={lote.id} 
+                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts ? 'border-l-4 border-l-destructive' : ''}`}
+                  onClick={() => navigate(`/veterinario/${lote.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Location */}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-foreground truncate">
+                            {lote.nucleo?.nome || 'N/A'} - {lote.galpao?.nome || 'N/A'}
+                          </span>
+                          {hasAlerts && (
+                            <span className="relative flex h-2 w-2 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Details Line */}
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+                          <span>{formatLinhagem(lote.linhagem)}</span>
+                          <span>•</span>
+                          <span>{formatSexo(lote.sexo)}</span>
+                          {dias !== null && (
+                            <>
+                              <span>•</span>
+                              <span className="font-medium text-foreground">{dias}d</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* Bottom Row */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Bird className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span>{lote.quantidade_aves.toLocaleString('pt-BR')}</span>
+                          </div>
+                          {getStatusBadge(lote.status)}
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>{lote.observacoes_count || 0}</span>
+                          </div>
+                          {hasAlerts && (
+                            <div className="flex items-center gap-1 text-sm text-destructive">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>{lote.alertas_count}</span>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span>{formatLinhagem(lote.linhagem)}</span>
-                              <span className="text-xs text-muted-foreground">{formatSexo(lote.sexo)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {dias !== null ? (
-                              <Badge variant="outline">{dias} dias</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {lote.quantidade_aves.toLocaleString('pt-BR')}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {getStatusBadge(lote.status)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                              <span>{lote.observacoes_count || 0}</span>
-                              {(lote.alertas_count || 0) > 0 && (
-                                <span className="relative flex h-2 w-2 ml-1">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/veterinario/${lote.id}`)}
-                              className="gap-2"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Ver
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Arrow */}
+                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );
