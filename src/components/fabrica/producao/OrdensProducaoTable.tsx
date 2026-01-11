@@ -61,10 +61,19 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
   const [finalizandoOP, setFinalizandoOP] = useState<OrdemProducao | null>(null);
   const [viewingOP, setViewingOP] = useState<OrdemProducao | null>(null);
   const [iniciandoOP, setIniciandoOP] = useState<OrdemProducao | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchOrdens();
-  }, [integradoId]);
+  }, [integradoId, refreshKey]);
+
+  // Expose refresh function to parent via onRefresh callback triggering refreshKey
+  useEffect(() => {
+    // Listen for external refresh triggers
+    const handleRefresh = () => setRefreshKey(prev => prev + 1);
+    window.addEventListener('refresh-ordens-producao', handleRefresh);
+    return () => window.removeEventListener('refresh-ordens-producao', handleRefresh);
+  }, []);
 
   const fetchOrdens = async () => {
     if (!integradoId) return;
@@ -79,6 +88,7 @@ export default function OrdensProducaoTable({ integradoId, onRefresh }: OrdensPr
           nutricao:nutricoes(nome)
         `)
         .eq('integrado_id', integradoId)
+        .not('status', 'in', '("finalizada","cancelada")')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
