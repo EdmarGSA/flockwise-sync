@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, FileText, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, ChevronRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { planoContasAgroTemplate, PlanoContasTemplate } from "@/lib/templates/planoContasAgro";
 
 interface PlanoContas {
   id: string;
@@ -42,6 +43,7 @@ const naturezaOptions = [
 const PlanoContasTab = ({ userId }: PlanoContasTabProps) => {
   const [contas, setContas] = useState<PlanoContas[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<PlanoContas | null>(null);
   const [formData, setFormData] = useState<{
@@ -192,6 +194,79 @@ const PlanoContasTab = ({ userId }: PlanoContasTabProps) => {
     return contas.filter(c => c.id !== editingConta?.id && c.nivel < 3);
   };
 
+  const carregarPlanoPadrao = async () => {
+    if (contas.length > 0) {
+      if (!confirm('Já existem contas cadastradas. Deseja adicionar o plano padrão agropecuário? (As contas existentes serão mantidas)')) {
+        return;
+      }
+    }
+    
+    setLoadingTemplate(true);
+    
+    try {
+      // Mapa para armazenar o ID gerado para cada código
+      const codigoParaId: Record<string, string> = {};
+      
+      // Agrupar por nível para inserir na ordem correta
+      const porNivel = planoContasAgroTemplate.reduce((acc, conta) => {
+        if (!acc[conta.nivel]) acc[conta.nivel] = [];
+        acc[conta.nivel].push(conta);
+        return acc;
+      }, {} as Record<number, PlanoContasTemplate[]>);
+      
+      // Inserir por nível (1, 2, 3, 4...)
+      const niveis = Object.keys(porNivel).map(Number).sort((a, b) => a - b);
+      
+      for (const nivel of niveis) {
+        const contasNivel = porNivel[nivel];
+        
+        for (const template of contasNivel) {
+          // Verificar se já existe uma conta com este código
+          const jaExiste = contas.some(c => c.codigo === template.codigo);
+          if (jaExiste) continue;
+          
+          // Buscar o ID da conta pai
+          let contaPaiId: string | null = null;
+          if (template.codigoPai && codigoParaId[template.codigoPai]) {
+            contaPaiId = codigoParaId[template.codigoPai];
+          }
+          
+          const { data, error } = await supabase
+            .from('plano_contas')
+            .insert({
+              integrado_id: userId,
+              codigo: template.codigo,
+              nome: template.nome,
+              tipo: template.tipo,
+              natureza: template.natureza,
+              descricao: template.descricao || null,
+              nivel: template.nivel,
+              conta_pai_id: contaPaiId,
+            })
+            .select('id')
+            .single();
+          
+          if (error) {
+            console.error('Erro ao inserir conta:', template.codigo, error);
+            continue;
+          }
+          
+          if (data) {
+            codigoParaId[template.codigo] = data.id;
+          }
+        }
+      }
+      
+      toast.success('Plano de contas agropecuário carregado com sucesso!');
+      fetchContas();
+    } catch (error) {
+      console.error('Erro ao carregar plano padrão:', error);
+      toast.error('Erro ao carregar plano padrão');
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
   }
@@ -303,8 +378,25 @@ const PlanoContasTab = ({ userId }: PlanoContasTabProps) => {
       </CardHeader>
       <CardContent>
         {contas.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhuma conta cadastrada. Comece criando as contas principais (Receitas, Custos, Despesas).
+          <div className="text-center py-8 space-y-4">
+            <p className="text-muted-foreground">Nenhuma conta cadastrada.</p>
+            <Button 
+              onClick={carregarPlanoPadrao} 
+              disabled={loadingTemplate}
+              variant="outline"
+              size="lg"
+              className="gap-2"
+            >
+              {loadingTemplate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Carregar Plano Padrão Agropecuário
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Inclui estrutura completa para Ativo, Passivo, Receitas, Custos e Despesas
+            </p>
           </div>
         ) : (
           <Table>

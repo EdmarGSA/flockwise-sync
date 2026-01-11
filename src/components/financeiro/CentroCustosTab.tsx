@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Target } from "lucide-react";
+import { Plus, Pencil, Trash2, Target, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { centroCustosAgroTemplate } from "@/lib/templates/centroCustosAgro";
 
 interface CentroCusto {
   id: string;
@@ -52,6 +53,7 @@ const CentroCustosTab = ({ userId }: CentroCustosTabProps) => {
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCentro, setEditingCentro] = useState<CentroCusto | null>(null);
   const [formData, setFormData] = useState<{
@@ -204,6 +206,47 @@ const CentroCustosTab = ({ userId }: CentroCustosTabProps) => {
     return nucleo?.nome || 'Núcleo não encontrado';
   };
 
+  const carregarCentrosPadrao = async () => {
+    if (centros.length > 0) {
+      if (!confirm('Já existem centros de custos cadastrados. Deseja adicionar os centros padrão agropecuário? (Os centros existentes serão mantidos)')) {
+        return;
+      }
+    }
+    
+    setLoadingTemplate(true);
+    
+    try {
+      for (const template of centroCustosAgroTemplate) {
+        // Verificar se já existe um centro com este código
+        const jaExiste = centros.some(c => c.codigo === template.codigo);
+        if (jaExiste) continue;
+        
+        const { error } = await supabase
+          .from('centro_custos')
+          .insert({
+            integrado_id: userId,
+            codigo: template.codigo,
+            nome: template.nome,
+            tipo: template.tipo,
+            descricao: template.descricao || null,
+          });
+        
+        if (error) {
+          console.error('Erro ao inserir centro:', template.codigo, error);
+          continue;
+        }
+      }
+      
+      toast.success('Centros de custos padrão carregados com sucesso!');
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao carregar centros padrão:', error);
+      toast.error('Erro ao carregar centros padrão');
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
   }
@@ -318,8 +361,25 @@ const CentroCustosTab = ({ userId }: CentroCustosTabProps) => {
       </CardHeader>
       <CardContent>
         {centros.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhum centro de custo cadastrado
+          <div className="text-center py-8 space-y-4">
+            <p className="text-muted-foreground">Nenhum centro de custo cadastrado.</p>
+            <Button 
+              onClick={carregarCentrosPadrao} 
+              disabled={loadingTemplate}
+              variant="outline"
+              size="lg"
+              className="gap-2"
+            >
+              {loadingTemplate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Carregar Centros de Custos Padrão
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Inclui: Administração, Fábrica de Ração, Produção Própria, Integração e Logística
+            </p>
           </div>
         ) : (
           <Table>
