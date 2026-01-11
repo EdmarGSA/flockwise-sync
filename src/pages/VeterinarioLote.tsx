@@ -4,19 +4,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
-import ObservacoesTab from '@/components/veterinario/ObservacoesTab';
-import MetasVetTab from '@/components/veterinario/MetasVetTab';
-import MetasPosturaVetTab from '@/components/veterinario/MetasPosturaVetTab';
-import ConsumoVetTab from '@/components/veterinario/ConsumoVetTab';
-import TratamentosTab from '@/components/veterinario/TratamentosTab';
-import AutopsiasTab from '@/components/veterinario/AutopsiasTab';
 import ConnectionStatus from '@/components/veterinario/ConnectionStatus';
+import ObservacoesDialog from '@/components/veterinario/ObservacoesDialog';
+import TratamentosDialog from '@/components/veterinario/TratamentosDialog';
+import AutopsiasDialog from '@/components/veterinario/AutopsiasDialog';
+import MetasDialog from '@/components/veterinario/MetasDialog';
+import ConsumoDialog from '@/components/veterinario/ConsumoDialog';
 
 interface Lote {
   id: string;
@@ -32,17 +29,31 @@ interface Lote {
   galpao: { nome: string } | null;
 }
 
+interface Counts {
+  observacoes: number;
+  tratamentos: number;
+  autopsias: number;
+}
+
 export default function VeterinarioLote() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { loteId } = useParams<{ loteId: string }>();
   const [lote, setLote] = useState<Lote | null>(null);
   const [loadingData, setLoadingData] = useState(true);
-  const [activeTab, setActiveTab] = useState('observacoes');
+  const [counts, setCounts] = useState<Counts>({ observacoes: 0, tratamentos: 0, autopsias: 0 });
+
+  // Dialog states
+  const [observacoesOpen, setObservacoesOpen] = useState(false);
+  const [tratamentosOpen, setTratamentosOpen] = useState(false);
+  const [autopsiasOpen, setAutopsiasOpen] = useState(false);
+  const [metasOpen, setMetasOpen] = useState(false);
+  const [consumoOpen, setConsumoOpen] = useState(false);
 
   useEffect(() => {
     if (user && loteId) {
       fetchLote();
+      fetchCounts();
     }
   }, [user, loteId]);
 
@@ -76,6 +87,22 @@ export default function VeterinarioLote() {
 
     setLote(data as Lote);
     setLoadingData(false);
+  };
+
+  const fetchCounts = async () => {
+    if (!loteId) return;
+
+    const [obsRes, tratRes, autRes] = await Promise.all([
+      supabase.from('observacoes_lote').select('*', { count: 'exact', head: true }).eq('lote_id', loteId),
+      supabase.from('tratamentos_lote').select('*', { count: 'exact', head: true }).eq('lote_id', loteId).eq('status', 'ativo'),
+      supabase.from('autopsias').select('*', { count: 'exact', head: true }).eq('lote_id', loteId),
+    ]);
+
+    setCounts({
+      observacoes: obsRes.count || 0,
+      tratamentos: tratRes.count || 0,
+      autopsias: autRes.count || 0,
+    });
   };
 
   const formatLinhagem = (linhagem: string | null, linhagemPostura: string | null) => {
@@ -236,77 +263,105 @@ export default function VeterinarioLote() {
           </Card>
         </div>
 
-        {/* Tabs with Horizontal Scroll */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <ScrollArea className="w-full whitespace-nowrap">
-            <TabsList className="inline-flex w-max bg-muted/50 p-1 h-auto">
-              <TabsTrigger 
-                value="observacoes" 
-                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Observações</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="tratamentos" 
-                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
-              >
-                <Pill className="w-4 h-4" />
-                <span>Tratamentos</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="autopsias" 
-                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
-              >
-                <Scissors className="w-4 h-4" />
-                <span>Autópsias</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="metas" 
-                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
-              >
-                <Target className="w-4 h-4" />
-                <span>Metas</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="consumo" 
-                className="gap-2 px-4 py-2.5 data-[state=active]:bg-background"
-              >
-                <Package className="w-4 h-4" />
-                <span>Consumo</span>
-              </TabsTrigger>
-            </TabsList>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-
-          <TabsContent value="observacoes" className="mt-4">
-            <ObservacoesTab loteId={lote.id} diasLote={dias} />
-          </TabsContent>
-
-          <TabsContent value="tratamentos" className="mt-4">
-            <TratamentosTab 
-              loteId={lote.id} 
-              dataAlojamento={lote.data_alojamento}
-            />
-          </TabsContent>
-
-          <TabsContent value="autopsias" className="mt-4">
-            <AutopsiasTab loteId={lote.id} diasLote={dias} />
-          </TabsContent>
-
-          <TabsContent value="metas" className="mt-4">
-            {isPostura ? (
-              <MetasPosturaVetTab loteId={lote.id} lote={lote} />
-            ) : (
-              <MetasVetTab loteId={lote.id} lote={lote} />
+        {/* Action Buttons Grid 2x2 - Same as Meus Lotes */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setObservacoesOpen(true)}
+            className="h-20 flex-col gap-1 relative bg-card hover:bg-accent/50"
+          >
+            <MessageSquare className="w-6 h-6 text-blue-500" />
+            <span className="text-sm font-medium">Observações</span>
+            {counts.observacoes > 0 && (
+              <Badge className="absolute top-2 right-2 h-5 min-w-5 px-1.5 text-xs">
+                {counts.observacoes}
+              </Badge>
             )}
-          </TabsContent>
+          </Button>
 
-          <TabsContent value="consumo" className="mt-4">
-            <ConsumoVetTab loteId={lote.id} />
-          </TabsContent>
-        </Tabs>
+          <Button
+            variant="outline"
+            onClick={() => setTratamentosOpen(true)}
+            className="h-20 flex-col gap-1 relative bg-card hover:bg-accent/50"
+          >
+            <Pill className="w-6 h-6 text-green-500" />
+            <span className="text-sm font-medium">Tratamentos</span>
+            {counts.tratamentos > 0 && (
+              <Badge variant="destructive" className="absolute top-2 right-2 h-5 min-w-5 px-1.5 text-xs">
+                {counts.tratamentos}
+              </Badge>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => setAutopsiasOpen(true)}
+            className="h-20 flex-col gap-1 relative bg-card hover:bg-accent/50"
+          >
+            <Scissors className="w-6 h-6 text-red-500" />
+            <span className="text-sm font-medium">Autópsias</span>
+            {counts.autopsias > 0 && (
+              <Badge variant="secondary" className="absolute top-2 right-2 h-5 min-w-5 px-1.5 text-xs">
+                {counts.autopsias}
+              </Badge>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => setMetasOpen(true)}
+            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50"
+          >
+            <Target className="w-6 h-6 text-amber-500" />
+            <span className="text-sm font-medium">Metas</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => setConsumoOpen(true)}
+            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50 col-span-2"
+          >
+            <Package className="w-6 h-6 text-purple-500" />
+            <span className="text-sm font-medium">Consumo</span>
+          </Button>
+        </div>
       </main>
+
+      {/* Dialogs */}
+      <ObservacoesDialog 
+        open={observacoesOpen} 
+        onOpenChange={setObservacoesOpen}
+        loteId={lote.id}
+        diasLote={dias}
+      />
+
+      <TratamentosDialog
+        open={tratamentosOpen}
+        onOpenChange={setTratamentosOpen}
+        loteId={lote.id}
+        dataAlojamento={lote.data_alojamento}
+      />
+
+      <AutopsiasDialog
+        open={autopsiasOpen}
+        onOpenChange={setAutopsiasOpen}
+        loteId={lote.id}
+        diasLote={dias}
+      />
+
+      <MetasDialog
+        open={metasOpen}
+        onOpenChange={setMetasOpen}
+        loteId={lote.id}
+        lote={lote}
+        isPostura={isPostura}
+      />
+
+      <ConsumoDialog
+        open={consumoOpen}
+        onOpenChange={setConsumoOpen}
+        loteId={lote.id}
+      />
     </div>
   );
 }

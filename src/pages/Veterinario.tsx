@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
@@ -24,12 +25,15 @@ interface Lote {
   alertas_count?: number;
 }
 
+type StatusFilter = 'todos' | 'alojado' | 'previsao' | 'saiu_para_entrega' | 'fechado';
+
 export default function Veterinario() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
 
   useEffect(() => {
     if (user) {
@@ -53,7 +57,6 @@ export default function Veterinario() {
         nucleo:nucleos(nome),
         galpao:galpoes(nome)
       `)
-      .in('status', ['alojado', 'previsao', 'saiu_para_entrega'])
       .order('data_alojamento', { ascending: false, nullsFirst: false });
 
     if (error) {
@@ -122,7 +125,21 @@ export default function Veterinario() {
     return calcularIdadeLote(dataAlojamento);
   };
 
+  // Status counts
+  const statusCounts = {
+    todos: lotes.length,
+    alojado: lotes.filter(l => l.status === 'alojado').length,
+    previsao: lotes.filter(l => l.status === 'previsao').length,
+    saiu_para_entrega: lotes.filter(l => l.status === 'saiu_para_entrega').length,
+    fechado: lotes.filter(l => l.status === 'fechado').length,
+  };
+
   const filteredLotes = lotes.filter((lote) => {
+    // Status filter
+    if (statusFilter !== 'todos' && lote.status !== statusFilter) {
+      return false;
+    }
+    // Search filter
     const searchLower = searchTerm.toLowerCase();
     return (
       lote.nucleo?.nome?.toLowerCase().includes(searchLower) ||
@@ -143,9 +160,15 @@ export default function Veterinario() {
     return <Navigate to="/auth" replace />;
   }
 
-  const totalLotes = lotes.length;
-  const lotesAlojados = lotes.filter(l => l.status === 'alojado').length;
   const totalAlertas = lotes.reduce((acc, l) => acc + (l.alertas_count || 0), 0);
+
+  const filterButtons: { key: StatusFilter; label: string }[] = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'alojado', label: 'Alojados' },
+    { key: 'previsao', label: 'Previstos' },
+    { key: 'saiu_para_entrega', label: 'Em Trânsito' },
+    { key: 'fechado', label: 'Fechados' },
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-6">
@@ -164,34 +187,39 @@ export default function Veterinario() {
               <p className="text-xs text-muted-foreground">Acompanhamento técnico</p>
             </div>
           </div>
+          {totalAlertas > 0 && (
+            <Badge variant="destructive" className="shrink-0">
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              {totalAlertas}
+            </Badge>
+          )}
         </div>
       </header>
 
       <main className="px-4 pt-4 space-y-4">
-        {/* Compact Stats Row */}
-        <div className="grid grid-cols-3 gap-2">
-          <Card className="bg-card border-border">
-            <CardContent className="p-3 text-center">
-              <Bird className="w-5 h-5 text-primary/60 mx-auto mb-1" />
-              <p className="text-xl font-bold">{lotesAlojados}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Ativos</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-3 text-center">
-              <Calendar className="w-5 h-5 text-emerald-500/60 mx-auto mb-1" />
-              <p className="text-xl font-bold">{totalLotes}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-3 text-center">
-              <AlertTriangle className={`w-5 h-5 mx-auto mb-1 ${totalAlertas > 0 ? 'text-destructive' : 'text-muted-foreground/40'}`} />
-              <p className="text-xl font-bold">{totalAlertas}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Alertas</p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Status Filter Pills - Horizontal Scroll */}
+        <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
+          <div className="flex gap-2">
+            {filterButtons.map((btn) => (
+              <Button
+                key={btn.key}
+                variant={statusFilter === btn.key ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter(btn.key)}
+                className="shrink-0 gap-1.5"
+              >
+                {btn.label}
+                <Badge 
+                  variant={statusFilter === btn.key ? 'secondary' : 'outline'} 
+                  className="h-5 min-w-5 px-1.5 text-xs ml-1"
+                >
+                  {statusCounts[btn.key]}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
         {/* Search Input */}
         <div className="relative">
@@ -212,7 +240,7 @@ export default function Veterinario() {
         ) : filteredLotes.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Bird className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p>{searchTerm ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}</p>
+            <p>{searchTerm || statusFilter !== 'todos' ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}</p>
           </div>
         ) : (
           <div className="space-y-2">
