@@ -6,12 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
-import { Pill, Plus, AlertTriangle, Calendar, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Pill, Plus, AlertTriangle, Calendar, Clock, CheckCircle, Trash2 } from 'lucide-react';
 import { format, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -349,7 +348,12 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
 
   const getStatusBadge = (tratamento: Tratamento) => {
     if (tratamento.status === 'finalizado') {
-      return <Badge variant="outline" className="gap-1"><CheckCircle className="w-3 h-3" />Finalizado</Badge>;
+      return (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <CheckCircle className="w-3 h-3" />
+          Finalizado
+        </Badge>
+      );
     }
     
     // Check if carência is active
@@ -357,11 +361,21 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
       const hoje = new Date();
       const dataLib = new Date(tratamento.data_liberacao_abate);
       if (hoje < dataLib) {
-        return <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" />Em Carência</Badge>;
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <Clock className="w-3 h-3" />
+            Em Carência
+          </Badge>
+        );
       }
     }
     
-    return <Badge variant="default" className="gap-1"><Pill className="w-3 h-3" />Ativo</Badge>;
+    return (
+      <Badge className="gap-1 bg-emerald-600">
+        <Pill className="w-3 h-3" />
+        Ativo
+      </Badge>
+    );
   };
 
   // Calculate totals
@@ -376,7 +390,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-4 pb-24">
         {/* Alert for treatments blocking slaughter */}
         {tratamentosBloqueando.length > 0 && (
           <Alert variant="destructive">
@@ -394,162 +408,141 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
           </Alert>
         )}
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Summary Cards - Compact for mobile */}
+        <div className="grid grid-cols-3 gap-2">
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Pill className="w-8 h-8 text-purple-500/50" />
-                <div>
-                  <p className="text-muted-foreground text-sm">Tratamentos Ativos</p>
-                  <p className="text-xl font-bold">{tratamentosAtivos}</p>
-                </div>
-              </div>
+            <CardContent className="p-3 text-center">
+              <Pill className="w-5 h-5 text-purple-500/50 mx-auto mb-1" />
+              <p className="text-lg font-bold">{tratamentosAtivos}</p>
+              <p className="text-xs text-muted-foreground">Ativos</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex flex-col">
-                <p className="text-muted-foreground text-sm">Total de Tratamentos</p>
-                <p className="text-xl font-bold">{tratamentos.length}</p>
-              </div>
+            <CardContent className="p-3 text-center">
+              <p className="text-lg font-bold">{tratamentos.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex flex-col">
-                <p className="text-muted-foreground text-sm">Custo Total</p>
-                <p className="text-xl font-bold text-primary">
-                  R$ {custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
+            <CardContent className="p-3 text-center">
+              <p className="text-lg font-bold text-primary">
+                R$ {custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-muted-foreground">Custo</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tratamentos List */}
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Pill className="w-5 h-5 text-purple-500" />
-                Tratamentos e Medicamentos
-              </CardTitle>
-              <CardDescription>
-                Registro de medicamentos aplicados com controle de carência
-              </CardDescription>
-            </div>
-            <Button onClick={() => setDialogOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Carregando tratamentos...
-              </div>
-            ) : tratamentos.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Pill className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">Nenhum tratamento registrado</p>
-                <p className="text-sm mt-1">Clique em "Novo" para registrar um tratamento</p>
-              </div>
-            ) : (
-              <div className="rounded-md border border-border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Medicamento</TableHead>
-                      <TableHead>Período</TableHead>
-                      <TableHead>Dosagem</TableHead>
-                      <TableHead className="text-center">Carência</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Custo</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tratamentos.map((tratamento) => (
-                      <TableRow key={tratamento.id}>
-                        <TableCell>
-                          <div>
-                            <span className="font-medium">{tratamento.produto?.nome}</span>
-                            {tratamento.motivo && (
-                              <p className="text-xs text-muted-foreground">{tratamento.motivo}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {format(new Date(tratamento.data_inicio), 'dd/MM/yyyy', { locale: ptBR })}
-                            {tratamento.data_fim && (
-                              <span className="text-muted-foreground">
-                                {' → '}{format(new Date(tratamento.data_fim), 'dd/MM/yyyy', { locale: ptBR })}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span>{tratamento.dosagem}</span>
-                          <span className="text-xs text-muted-foreground ml-1">
-                            ({tratamento.via_administracao})
+        {/* Tratamentos List as Cards */}
+        {loading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Carregando tratamentos...
+          </div>
+        ) : tratamentos.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <Pill className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg font-medium">Nenhum tratamento registrado</p>
+              <p className="text-sm mt-1">Toque no botão + para registrar</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3">
+            {tratamentos.map((tratamento) => (
+              <Card 
+                key={tratamento.id} 
+                className="bg-card border-border transition-all active:scale-[0.98]"
+              >
+                <CardContent className="p-4">
+                  {/* Header: Status + Custo */}
+                  <div className="flex items-center justify-between mb-3">
+                    {getStatusBadge(tratamento)}
+                    <span className="text-sm font-semibold text-primary">
+                      R$ {tratamento.custo_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {/* Medicamento Name */}
+                  <h3 className="font-semibold text-base mb-1">
+                    {tratamento.produto?.nome || 'Medicamento'}
+                  </h3>
+                  
+                  {/* Dosagem */}
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {tratamento.dosagem} ({tratamento.via_administracao})
+                  </p>
+
+                  {/* Period + Carência */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 pb-3 border-b border-border">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>
+                        {format(new Date(tratamento.data_inicio), 'dd/MM', { locale: ptBR })}
+                        {tratamento.data_fim && (
+                          <> → {format(new Date(tratamento.data_fim), 'dd/MM', { locale: ptBR })}</>
+                        )}
+                      </span>
+                    </div>
+                    {tratamento.carencia_dias > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Carência: {tratamento.carencia_dias}d</span>
+                        {tratamento.data_liberacao_abate && (
+                          <span className="ml-1">
+                            (Lib: {format(new Date(tratamento.data_liberacao_abate), 'dd/MM', { locale: ptBR })})
                           </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {tratamento.carencia_dias > 0 ? (
-                            <div>
-                              <Badge variant="outline">{tratamento.carencia_dias}d</Badge>
-                              {tratamento.data_liberacao_abate && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Lib: {format(new Date(tratamento.data_liberacao_abate), 'dd/MM', { locale: ptBR })}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {getStatusBadge(tratamento)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          R$ {tratamento.custo_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {tratamento.status === 'ativo' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleFinalizarTratamento(tratamento)}
-                                title="Finalizar tratamento"
-                              >
-                                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive"
-                              onClick={() => {
-                                setSelectedTratamento(tratamento);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Motivo if exists */}
+                  {tratamento.motivo && (
+                    <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
+                      {tratamento.motivo}
+                    </p>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    {tratamento.status === 'ativo' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-11 gap-2"
+                        onClick={() => handleFinalizarTratamento(tratamento)}
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        Finalizar
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-11 w-11 p-0 text-muted-foreground hover:text-destructive hover:border-destructive"
+                      onClick={() => {
+                        setSelectedTratamento(tratamento);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* FAB - Floating Action Button */}
+      <Button
+        onClick={() => { resetForm(); setDialogOpen(true); }}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50 p-0"
+        size="icon"
+      >
+        <Plus className="w-6 h-6" />
+      </Button>
 
       {/* New Treatment Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -573,7 +566,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
             <div className="space-y-2">
               <Label>Medicamento / Vacina *</Label>
               <Select value={formData.produto_id} onValueChange={handleProdutoChange}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -595,6 +588,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
               <div className="space-y-2">
                 <Label>Dosagem *</Label>
                 <Input
+                  className="h-12"
                   placeholder="Ex: 1ml/L de água"
                   value={formData.dosagem}
                   onChange={(e) => setFormData(prev => ({ ...prev, dosagem: e.target.value }))}
@@ -606,7 +600,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
                   value={formData.via_administracao}
                   onValueChange={(v) => setFormData(prev => ({ ...prev, via_administracao: v }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -625,7 +619,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
                 <Label>Data Início</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <Button variant="outline" className="w-full h-12 justify-start text-left font-normal">
                       <Calendar className="mr-2 h-4 w-4" />
                       {format(formData.data_inicio, 'dd/MM/yyyy', { locale: ptBR })}
                     </Button>
@@ -644,7 +638,7 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
                 <Label>Data Fim (opcional)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <Button variant="outline" className="w-full h-12 justify-start text-left font-normal">
                       <Calendar className="mr-2 h-4 w-4" />
                       {formData.data_fim 
                         ? format(formData.data_fim, 'dd/MM/yyyy', { locale: ptBR })
@@ -663,10 +657,11 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>Quantidade Utilizada</Label>
+                <Label>Qtd Utilizada</Label>
                 <Input
+                  className="h-12"
                   type="number"
                   min={0}
                   step="0.01"
@@ -677,13 +672,15 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
               <div className="space-y-2">
                 <Label>Unidade</Label>
                 <Input
+                  className="h-12"
                   value={formData.unidade_medida}
                   onChange={(e) => setFormData(prev => ({ ...prev, unidade_medida: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Carência (dias)</Label>
+                <Label>Carência</Label>
                 <Input
+                  className="h-12"
                   type="number"
                   min={0}
                   value={formData.carencia_dias}
@@ -695,7 +692,8 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
             <div className="space-y-2">
               <Label>Motivo do Tratamento</Label>
               <Input
-                placeholder="Ex: Prevenção de Gumboro, Tratamento de Coccidiose..."
+                className="h-12"
+                placeholder="Ex: Prevenção de Gumboro..."
                 value={formData.motivo}
                 onChange={(e) => setFormData(prev => ({ ...prev, motivo: e.target.value }))}
               />
@@ -712,11 +710,11 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 h-12">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="flex-1 h-12">
               {saving ? 'Salvando...' : 'Registrar'}
             </Button>
           </DialogFooter>
@@ -734,8 +732,8 @@ export default function TratamentosTab({ loteId, dataAlojamento, dataPrevistaAba
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel className="h-12">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="h-12 bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
