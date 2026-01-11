@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, ArrowLeft, Bird, Calendar, Truck, CheckCircle, Clock, RefreshCw } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RacaoGestaoDialog } from '@/components/consumo/RacaoGestaoDialog';
@@ -128,10 +129,8 @@ export default function GestaoConsumo() {
           quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
         }
 
-        let diasDesdeAlojamento = 0;
-        if (loteData.data_alojamento) {
-          diasDesdeAlojamento = differenceInDays(new Date(), new Date(loteData.data_alojamento));
-        }
+        // Dia 1 = dia do alojamento
+        const diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
 
         return {
           ...loteData,

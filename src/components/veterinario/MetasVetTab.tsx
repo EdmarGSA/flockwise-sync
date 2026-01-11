@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Target, TrendingUp, Scale, Skull, AlertTriangle, CheckCircle } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Lote {
@@ -138,12 +138,12 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
           return acc;
         }, {});
 
-        // Calcular média ponderada consolidada por dia
+        // Calcular média ponderada consolidada por dia - Dia 1 = dia do alojamento
         const processed = Object.entries(pesagensPorData).map(([data, itens]) => {
           const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
           const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-          const dia = differenceInDays(new Date(data), new Date(lote.data_alojamento!));
+          const dia = calcularIdadeNaData(lote.data_alojamento!, data);
           return { dia, peso_real_kg: pesoMedio };
         }).sort((a, b) => a.dia - b.dia);
         
@@ -171,7 +171,8 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
         const mortalidadeSemanal = semanas.map(dia => {
           let mortesAcumuladas = 0;
           mortalidadeData.forEach((m: any) => {
-            const diasDesdeMort = differenceInDays(new Date(m.data_registro), dataAlojamento);
+            // Dia 1 = dia do alojamento
+            const diasDesdeMort = calcularIdadeNaData(lote.data_alojamento!, m.data_registro);
             if (diasDesdeMort <= dia) {
               mortesAcumuladas += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
             }
@@ -216,7 +217,7 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
   }
 
   const diasLote = lote.data_alojamento 
-    ? differenceInDays(new Date(), new Date(lote.data_alojamento))
+    ? calcularIdadeLote(lote.data_alojamento)
     : 0;
 
   // Chart data for peso

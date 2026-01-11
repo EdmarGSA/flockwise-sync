@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import {
   Dialog,
@@ -79,13 +80,8 @@ export function MortalidadeDialog({
   const [historicoMortalidade, setHistoricoMortalidade] = useState<MortalidadeSemana[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState(0);
 
-  // Calcular dias desde alojamento - validate date first
-  const diasDesdeAlojamento = (() => {
-    if (!dataAlojamento) return 0;
-    const date = new Date(dataAlojamento);
-    if (isNaN(date.getTime())) return 0;
-    return differenceInDays(new Date(), date);
-  })();
+  // Calcular dias desde alojamento - Dia 1 = dia do alojamento
+  const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
 
   // Buscar histórico de mortalidade
   useEffect(() => {
@@ -116,12 +112,10 @@ export function MortalidadeDialog({
     let total = 0;
 
     data?.forEach((mortalidade: any) => {
-      const diasDoRegistro = differenceInDays(
-        new Date(mortalidade.data_registro),
-        new Date(dataAlojamento!)
-      );
+      // Dia 1 = dia do alojamento, então Dia 7 = fim da semana 1
+      const diasDoRegistro = calcularIdadeNaData(dataAlojamento!, mortalidade.data_registro);
       
-      // Determinar a semana (7, 14, 21, 28, 35, 42+)
+      // Determinar a semana (1-7 = semana 7, 8-14 = semana 14, etc.)
       let semana: number;
       if (diasDoRegistro <= 7) semana = 7;
       else if (diasDoRegistro <= 14) semana = 14;

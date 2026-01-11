@@ -15,7 +15,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { format, differenceInDays, differenceInHours, parseISO, isBefore, differenceInWeeks } from 'date-fns';
+import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
@@ -195,12 +196,12 @@ export default function MeusLotes() {
           quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
         }
         
-        // Calculate days since alojamento
+        // Calculate days since alojamento - Dia 1 = dia do alojamento
         let diasDesdeAlojamento = 0;
         let semanasVida = 0;
         if (loteData.data_alojamento) {
-          diasDesdeAlojamento = differenceInDays(new Date(), new Date(loteData.data_alojamento));
-          semanasVida = Math.floor(diasDesdeAlojamento / 7) + 1;
+          diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
+          semanasVida = Math.ceil(diasDesdeAlojamento / 7);
         }
 
         // Check if is postura type

@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, calcularIdadeNaData } from '@/lib/utils';
 
 interface PesagemItem {
   id: string;
@@ -182,15 +182,16 @@ export function PesagemDialog({
         .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
         .eq('lote_id', loteId);
       
-      // Group by period
+      // Group by period - usando +1 para consistência (Dia 1 = dia do alojamento)
+      // Então: Inicial = dias 1-7, 7 dias = dias 8-14, etc.
       const periodos = [
-        { label: 'Inicial', diasMin: 0, diasMax: 6 },
-        { label: '7 dias', diasMin: 7, diasMax: 13 },
-        { label: '14 dias', diasMin: 14, diasMax: 20 },
-        { label: '21 dias', diasMin: 21, diasMax: 27 },
-        { label: '28 dias', diasMin: 28, diasMax: 34 },
-        { label: '35 dias', diasMin: 35, diasMax: 41 },
-        { label: '42 dias', diasMin: 42, diasMax: 999 },
+        { label: 'Inicial', diasMin: 1, diasMax: 7 },
+        { label: '7 dias', diasMin: 8, diasMax: 14 },
+        { label: '14 dias', diasMin: 15, diasMax: 21 },
+        { label: '21 dias', diasMin: 22, diasMax: 28 },
+        { label: '28 dias', diasMin: 29, diasMax: 35 },
+        { label: '35 dias', diasMin: 36, diasMax: 42 },
+        { label: '42 dias', diasMin: 43, diasMax: 999 },
       ];
 
       const pesoInicialKg = pesoInicialPintinhos || 0.040;
@@ -202,9 +203,8 @@ export function PesagemDialog({
 
         if (pesagens && pesagens.length > 0) {
           pesagens.forEach(pesagem => {
-            const dataPes = new Date(pesagem.data_pesagem);
-            const dias = Math.floor((dataPes.getTime() - alojamento.getTime()) / (1000 * 60 * 60 * 24));
-            
+            // Usar +1 para que dia do alojamento = Dia 1
+            const dias = calcularIdadeNaData(dataAlojamento, pesagem.data_pesagem);
             if (dias >= periodo.diasMin && dias <= periodo.diasMax) {
               pesagem.pesagem_itens?.forEach((item: any) => {
                 const liquido = (item.peso_bruto_g || 0) - (item.peso_tara_g || 0);

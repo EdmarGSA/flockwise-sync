@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Save, TrendingUp, Scale, Book, Skull, AlertTriangle, CheckCircle, Settings } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -258,12 +259,12 @@ export default function MetasPesoLote() {
         return acc;
       }, {});
 
-      // Calcular média ponderada consolidada por dia
+      // Calcular média ponderada consolidada por dia - usando +1 para dia do alojamento = Dia 1
       const pesagensProcessed: PesagemData[] = Object.entries(pesagensPorData).map(([data, itens]) => {
         const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
         const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-        const dia = differenceInDays(new Date(data), new Date(loteData.data_alojamento));
+        const dia = calcularIdadeNaData(loteData.data_alojamento, data);
         
         return {
           dia,
@@ -309,10 +310,10 @@ export default function MetasPesoLote() {
         const semanas = [7, 14, 21, 28, 35, 42, 49];
         
         const mortalidadeSemanal: MortalidadePorSemana[] = semanas.map(dia => {
-          // Calcular mortes acumuladas até este dia
+          // Calcular mortes acumuladas até este dia - usando +1 para consistência
           let mortesAcumuladas = 0;
           mortalidadeData.forEach((m: any) => {
-            const diasDesdeMort = differenceInDays(new Date(m.data_registro), dataAlojamento);
+            const diasDesdeMort = calcularIdadeNaData(loteData.data_alojamento, m.data_registro);
             if (diasDesdeMort <= dia) {
               mortesAcumuladas += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
             }
@@ -343,8 +344,8 @@ export default function MetasPesoLote() {
 
         setMortalidadePorSemana(mortalidadeSemanal);
         
-        // Filtrar alertas
-        const diasDesdeAloj = differenceInDays(new Date(), dataAlojamento);
+        // Filtrar alertas - usando +1 para consistência
+        const diasDesdeAloj = calcularIdadeLote(loteData.data_alojamento);
         const alertas = mortalidadeSemanal.filter(m => m.acima_limite && m.dia <= diasDesdeAloj);
         setAlertasMortalidade(alertas);
       }
@@ -487,7 +488,7 @@ export default function MetasPesoLote() {
   }));
 
   const diasDesdeAlojamento = lote?.data_alojamento 
-    ? differenceInDays(new Date(), new Date(lote.data_alojamento))
+    ? calcularIdadeLote(lote.data_alojamento)
     : 0;
 
   return (

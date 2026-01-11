@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Scale, TrendingUp, Egg, Skull, AlertTriangle } from 'lucide-react';
-import { differenceInWeeks, differenceInDays } from 'date-fns';
+import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Lote {
@@ -106,7 +106,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
           const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
           const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-          const semana = Math.floor(differenceInDays(new Date(p.data_pesagem), new Date(lote.data_alojamento!)) / 7) + 1;
+          const semana = Math.ceil(calcularIdadeNaData(lote.data_alojamento!, p.data_pesagem) / 7);
           return { semana, peso_real_g: pesoMedio };
         });
         setPesagens(processed);
@@ -125,7 +125,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
         let ovosAcumulados = 0;
 
         producaoOvosData.forEach((p: any) => {
-          const semana = Math.floor(differenceInDays(new Date(p.data_producao), new Date(lote.data_alojamento!)) / 7) + 1;
+          const semana = Math.ceil(calcularIdadeNaData(lote.data_alojamento!, p.data_producao) / 7);
           if (!producaoPorSemana[semana]) {
             producaoPorSemana[semana] = { ovos: 0, dias: 0 };
           }
@@ -162,7 +162,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
   }
 
   const semanasLote = lote.data_alojamento 
-    ? Math.floor(differenceInDays(new Date(), new Date(lote.data_alojamento)) / 7) + 1
+    ? Math.ceil(calcularIdadeLote(lote.data_alojamento) / 7)
     : 0;
 
   // Get current phase
