@@ -10,7 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useConfigFechamento } from '@/hooks/useConfigFechamento';
 import { toast } from 'sonner';
-import { format, differenceInDays, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Lock, Calculator, AlertTriangle, CheckCircle } from 'lucide-react';
 
@@ -110,7 +111,7 @@ export function FechamentoLoteDialog({
       return null;
     }
 
-    const idadeAbate = differenceInDays(parseISO(dataAbate), parseISO(dataAlojamento));
+    const idadeAbate = calcularIdadeNaData(dataAlojamento, dataAbate);
     const pesoMedioReal = pesoTotalNum / avesAbatidasNum;
     const gpdGramas = idadeAbate > 0 ? ((pesoMedioReal - pesoInicialNum) * 1000) / idadeAbate : 0;
     const gpdKg = gpdGramas / 1000;

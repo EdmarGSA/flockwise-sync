@@ -19,7 +19,8 @@ import {
   Lock,
   Clock
 } from 'lucide-react';
-import { format, differenceInDays, differenceInHours, parseISO, isBefore, differenceInWeeks } from 'date-fns';
+import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
@@ -149,11 +150,11 @@ export default function LoteDetalhe() {
       setQuantidadeAlojada(loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao);
     }
 
-    // Calculate days since alojamento
+    // Calculate days since alojamento - Dia 1 = dia do alojamento
     if (loteData.data_alojamento) {
-      const dias = differenceInDays(new Date(), new Date(loteData.data_alojamento));
+      const dias = calcularIdadeLote(loteData.data_alojamento);
       setDiasDesdeAlojamento(dias);
-      setSemanasVida(Math.floor(dias / 7) + 1);
+      setSemanasVida(Math.ceil(dias / 7));
     }
 
     // Check if needs weighing (every 7 days) - only for aves corte

@@ -4,7 +4,7 @@ import { CompassIndicator } from './CompassIndicator';
 import { GaugeChart } from './GaugeChart';
 import { TachometerGauge } from './TachometerGauge';
 import { Bird, Loader2 } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 
 interface ZootecnicoPanelProps {
   userId: string;
@@ -33,7 +33,7 @@ export const ZootecnicoPanel = ({ userId }: ZootecnicoPanelProps) => {
       for (const lote of lotes) {
         if (!lote.data_alojamento) continue;
 
-        const diasVida = differenceInDays(new Date(), new Date(lote.data_alojamento));
+        const diasVida = calcularIdadeLote(lote.data_alojamento);
         if (diasVida <= 0) continue;
 
         // Get last weighing - using metas_peso for reference instead

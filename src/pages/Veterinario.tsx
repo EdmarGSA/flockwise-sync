@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface Lote {
@@ -119,7 +119,7 @@ export default function Veterinario() {
 
   const getDiasLote = (dataAlojamento: string | null) => {
     if (!dataAlojamento) return null;
-    return differenceInDays(new Date(), new Date(dataAlojamento));
+    return calcularIdadeLote(dataAlojamento);
   };
 
   const filteredLotes = lotes.filter((lote) => {

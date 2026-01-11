@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Save, TrendingUp, Scale, Egg, AlertTriangle, RefreshCw, Activity } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -187,8 +188,9 @@ export default function MetasPosturaLote() {
         const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
         const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
-        const dias = differenceInDays(new Date(p.data_pesagem), new Date(loteData.data_alojamento!));
-        const semana = Math.floor(dias / 7) + 1;
+        // Usar +1 para que dia do alojamento = Dia 1, semana 1 = dias 1-7
+        const dias = calcularIdadeNaData(loteData.data_alojamento!, p.data_pesagem);
+        const semana = Math.ceil(dias / 7);
         
         return {
           semana,
@@ -209,8 +211,8 @@ export default function MetasPosturaLote() {
       const weeklyData: Record<number, { total: number; count: number; ovos: number }> = {};
       
       producaoOvosData.forEach((p: any) => {
-        const dias = differenceInDays(new Date(p.data_producao), new Date(loteData.data_alojamento!));
-        const semana = Math.floor(dias / 7) + 1;
+        const dias = calcularIdadeNaData(loteData.data_alojamento!, p.data_producao);
+        const semana = Math.ceil(dias / 7);
         
         if (!weeklyData[semana]) {
           weeklyData[semana] = { total: 0, count: 0, ovos: 0 };
@@ -303,7 +305,7 @@ export default function MetasPosturaLote() {
   }
 
   const semanasDesdeAlojamento = lote?.data_alojamento
-    ? Math.floor(differenceInDays(new Date(), new Date(lote.data_alojamento)) / 7) + 1
+    ? Math.ceil(calcularIdadeLote(lote.data_alojamento) / 7)
     : 0;
 
   // Chart data for peso (cria/recria)

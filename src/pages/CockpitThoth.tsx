@@ -9,7 +9,7 @@ import { ProducaoEstoquePanel } from '@/components/cockpit/ProducaoEstoquePanel'
 import { FinanceiroPanel } from '@/components/cockpit/FinanceiroPanel';
 import { ZootecnicoPanel } from '@/components/cockpit/ZootecnicoPanel';
 import { Loader2 } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 
 const CockpitThoth = () => {
   const navigate = useNavigate();
@@ -147,7 +147,7 @@ const CockpitThoth = () => {
         // Simplified GPD calculation
         for (const lote of lotes) {
           if (lote.data_alojamento) {
-            const diasVida = differenceInDays(new Date(), new Date(lote.data_alojamento));
+            const diasVida = calcularIdadeLote(lote.data_alojamento);
             if (diasVida > 0) {
               const { data: metas } = await supabase
                 .from('metas_peso')

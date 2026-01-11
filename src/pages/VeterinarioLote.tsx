@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 import ObservacoesTab from '@/components/veterinario/ObservacoesTab';
 import MetasVetTab from '@/components/veterinario/MetasVetTab';
@@ -101,9 +101,9 @@ export default function VeterinarioLote() {
 
   const getIdadeDisplay = () => {
     if (!lote?.data_alojamento) return null;
-    const dias = differenceInDays(new Date(), new Date(lote.data_alojamento));
+    const dias = calcularIdadeLote(lote.data_alojamento);
     if (isPostura) {
-      const semanas = Math.floor(dias / 7) + 1;
+      const semanas = Math.ceil(dias / 7);
       return `${semanas} sem`;
     }
     return `${dias}d`;
@@ -131,7 +131,7 @@ export default function VeterinarioLote() {
 
   const getDiasLote = () => {
     if (!lote?.data_alojamento) return null;
-    return differenceInDays(new Date(), new Date(lote.data_alojamento));
+    return calcularIdadeLote(lote.data_alojamento);
   };
 
   const dias = getDiasLote();
