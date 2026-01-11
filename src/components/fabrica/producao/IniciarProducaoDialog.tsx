@@ -187,14 +187,10 @@ export default function IniciarProducaoDialog({
         return i;
       });
 
-      // If proportionality is active, adjust produced quantity
-      if (proporcionalidadeAtiva && ordem) {
-        const proporcoes = updated.map(i => 
-          i.quantidade_necessaria > 0 ? i.quantidade_ajustada / i.quantidade_necessaria : 1
-        );
-        const proporcaoMedia = proporcoes.reduce((a, b) => a + b, 0) / proporcoes.length;
-        const novaQtdProduzida = Math.round(ordem.quantidade_planejada * proporcaoMedia);
-        setQuantidadeProduzida(novaQtdProduzida);
+      // If proportionality is active, produced quantity = sum of ingredients
+      if (proporcionalidadeAtiva) {
+        const totalInsumos = updated.reduce((sum, i) => sum + i.quantidade_ajustada, 0);
+        setQuantidadeProduzida(Math.round(totalInsumos));
       }
 
       return updated;
