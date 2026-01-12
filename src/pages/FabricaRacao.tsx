@@ -99,13 +99,12 @@ export default function FabricaRacao() {
       const racoesDetalhadasTemp: RacaoDetalhe[] = [];
 
       if (grupoId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: racoesData } = await (supabase as any)
+        const { data: racoesData } = await supabase
           .from('produtos')
           .select('id, nome, sku, estoque_atual, unidade_medida')
           .eq('integrado_id', integradoId)
-          .eq('grupo_id', grupoId)
-          .eq('ativo', true) as { data: { id: string; nome: string; sku: string; estoque_atual: number; unidade_medida: string }[] | null };
+          .eq('grupo_produto_id', grupoId)
+          .eq('ativo', true);
 
         estoqueRacao = (racoesData || []).reduce((sum, p) => sum + (p.estoque_atual || 0), 0);
 
