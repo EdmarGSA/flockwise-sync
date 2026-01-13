@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plane, RefreshCw } from 'lucide-react';
 import { WarningLights, createWarningLights } from '@/components/cockpit/WarningLights';
@@ -13,26 +15,15 @@ import { calcularIdadeLote } from '@/lib/utils';
 
 const CockpitThoth = () => {
   const navigate = useNavigate();
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
-      setUserId(user.id);
-    };
-    checkAuth();
-  }, [navigate]);
 
   // Fetch all data for warning lights
   const { data: warningData, isLoading: loadingWarnings, refetch } = useQuery({
-    queryKey: ['cockpit-warnings', userId, refreshKey],
+    queryKey: ['cockpit-warnings', integradoId, refreshKey],
     queryFn: async () => {
-      if (!userId) return null;
+      if (!integradoId) return null;
 
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
@@ -44,7 +35,7 @@ const CockpitThoth = () => {
       const { data: produtos } = await supabase
         .from('produtos')
         .select('id, estoque_atual')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .gt('estoque_atual', 0);
 
       const giroEstoque = produtos && produtos.length > 0 ? 52 : 60; // Placeholder
@@ -56,7 +47,7 @@ const CockpitThoth = () => {
       const { data: ordens } = await supabase
         .from('ordens_producao')
         .select('status')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .gte('created_at', thirtyDaysAgo.toISOString());
 
       const finalizadas = ordens?.filter(o => o.status === 'finalizada').length || 0;
@@ -67,7 +58,7 @@ const CockpitThoth = () => {
       const { data: kardexItems } = await supabase
         .from('kardex')
         .select('status_quarentena')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .not('status_quarentena', 'is', null);
 
       const liberados = kardexItems?.filter(k => k.status_quarentena === 'liberado').length || 0;
@@ -79,7 +70,7 @@ const CockpitThoth = () => {
       const { data: receber } = await supabase
         .from('contas_receber')
         .select('valor')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .in('status', ['previsao', 'pendente'])
         .gte('data_vencimento', todayStr)
         .lte('data_vencimento', futureStr);
@@ -87,7 +78,7 @@ const CockpitThoth = () => {
       const { data: pagar } = await supabase
         .from('contas_pagar')
         .select('valor')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .in('status', ['previsto', 'pendente'])
         .gte('data_vencimento', todayStr)
         .lte('data_vencimento', futureStr);
@@ -100,7 +91,7 @@ const CockpitThoth = () => {
       const { data: creditos } = await supabase
         .from('credito_cliente')
         .select('limite_credito, cliente_id')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .eq('ativo', true);
 
       let creditoUtilizado = 0;
@@ -109,7 +100,7 @@ const CockpitThoth = () => {
         const { data: pendentes } = await supabase
           .from('contas_receber')
           .select('cliente_id, valor')
-          .eq('integrado_id', userId)
+          .eq('integrado_id', integradoId)
           .in('status', ['previsao', 'pendente', 'parcial']);
 
         let totalUtilizado = 0;
@@ -127,7 +118,7 @@ const CockpitThoth = () => {
       const { data: todasCR } = await supabase
         .from('contas_receber')
         .select('id, data_vencimento')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .in('status', ['previsao', 'pendente', 'parcial']);
 
       const atrasadas = todasCR?.filter(c => c.data_vencimento < todayStr).length || 0;
@@ -139,7 +130,7 @@ const CockpitThoth = () => {
       const { data: lotes } = await supabase
         .from('lotes')
         .select('id, linhagem, sexo, data_alojamento')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .eq('status', 'alojado');
 
       let gpd = 100;
@@ -176,7 +167,7 @@ const CockpitThoth = () => {
       const { data: lotesAtivos } = await supabase
         .from('lotes')
         .select('id, quantidade_aves')
-        .eq('integrado_id', userId)
+        .eq('integrado_id', integradoId)
         .eq('status', 'alojado');
 
       let mortalidade = 0;
@@ -213,7 +204,7 @@ const CockpitThoth = () => {
         mortalidade
       };
     },
-    enabled: !!userId,
+    enabled: !!integradoId,
     refetchInterval: 30000 // Refresh every 30 seconds
   });
 
@@ -222,7 +213,7 @@ const CockpitThoth = () => {
     refetch();
   };
 
-  if (!userId) {
+  if (!user || loadingIntegrado || !integradoId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -271,13 +262,13 @@ const CockpitThoth = () => {
         {/* Main Panels Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Production & Stock Panel */}
-          <ProducaoEstoquePanel userId={userId} />
+          <ProducaoEstoquePanel userId={integradoId} />
 
           {/* Financial Panel */}
-          <FinanceiroPanel userId={userId} />
+          <FinanceiroPanel userId={integradoId} />
 
           {/* Zootechnical Panel */}
-          <ZootecnicoPanel userId={userId} />
+          <ZootecnicoPanel userId={integradoId} />
         </div>
       </main>
     </div>
