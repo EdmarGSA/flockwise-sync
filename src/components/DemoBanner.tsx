@@ -1,13 +1,56 @@
 import { Button } from '@/components/ui/button';
-import { useDemo } from '@/contexts/DemoContext';
 import { Eye, LogIn, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const DemoBanner = () => {
-  const { isDemo, exitDemoMode } = useDemo();
   const navigate = useNavigate();
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+
+  useEffect(() => {
+    const checkDemoStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_demo')
+          .eq('id', session.user.id)
+          .single();
+        
+        setIsDemo(profile?.is_demo ?? false);
+      } else {
+        setIsDemo(false);
+      }
+    };
+
+    checkDemoStatus();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_demo')
+            .eq('id', session.user.id)
+            .single();
+          
+          setIsDemo(profile?.is_demo ?? false);
+        }, 0);
+      } else {
+        setIsDemo(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleExitDemo = async () => {
+    await supabase.auth.signOut();
+    setIsDemo(false);
+    navigate('/auth');
+  };
 
   if (!isDemo) return null;
 
@@ -39,17 +82,14 @@ const DemoBanner = () => {
         
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => {
-              exitDemoMode();
-              navigate('/auth');
-            }}
+            onClick={handleExitDemo}
             variant="secondary"
             size="sm"
             className="bg-white text-orange-600 hover:bg-orange-50 font-semibold shadow-sm"
           >
             <LogIn className="h-4 w-4 mr-1" />
-            <span className="hidden xs:inline">Criar minha conta</span>
-            <span className="xs:hidden">Criar conta</span>
+            <span className="hidden sm:inline">Criar minha conta</span>
+            <span className="sm:hidden">Criar conta</span>
           </Button>
           
           <Button
