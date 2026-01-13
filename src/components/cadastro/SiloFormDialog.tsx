@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Calculator, Warehouse } from 'lucide-react';
+import { Calculator, Warehouse, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Silo {
@@ -33,6 +33,15 @@ interface Galpao {
   };
 }
 
+interface SiloModelo {
+  id: string;
+  diametro_m: number;
+  numero_aneis: number;
+  numero_pernas: number;
+  volume_m3: number;
+  capacidade_ton: number;
+}
+
 interface SiloFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,6 +53,8 @@ interface SiloFormDialogProps {
 const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: SiloFormDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
+  const [modelos, setModelos] = useState<SiloModelo[]>([]);
+  const [selectedModeloId, setSelectedModeloId] = useState<string>('');
   
   // Form state
   const [nome, setNome] = useState('');
@@ -53,14 +64,14 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
   const [numeroPernas, setNumeroPernas] = useState('4');
   const [numeroAneis, setNumeroAneis] = useState('3');
   const [capacidadeVolumeM3, setCapacidadeVolumeM3] = useState('');
-  const [fatorToneladaM3, setFatorToneladaM3] = useState('0.650');
+  const [fatorToneladaM3, setFatorToneladaM3] = useState('0.640');
   const [ativo, setAtivo] = useState(true);
 
   // Calculated values
   const calculatedValues = useMemo(() => {
     const volume = parseFloat(capacidadeVolumeM3) || 0;
     const fator = parseFloat(fatorToneladaM3) || 0;
-    const aneis = parseInt(numeroAneis) || 1;
+    const aneis = parseFloat(numeroAneis) || 1;
     
     const capacidadeToneladas = volume * fator;
     const volumePorAnel = volume / aneis;
@@ -76,6 +87,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
   useEffect(() => {
     if (open) {
       fetchGalpoes();
+      fetchModelos();
       if (silo) {
         // Editing mode
         setNome(silo.nome);
@@ -87,6 +99,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
         setCapacidadeVolumeM3(silo.capacidade_volume_m3.toString());
         setFatorToneladaM3(silo.fator_tonelada_m3.toString());
         setAtivo(silo.ativo);
+        setSelectedModeloId('');
       } else {
         // Creating mode - reset form
         resetForm();
@@ -115,6 +128,38 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
     }
   };
 
+  const fetchModelos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('silos_modelo')
+        .select('*')
+        .order('diametro_m')
+        .order('numero_aneis');
+
+      if (error) throw error;
+      setModelos(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar modelos de silos:', error);
+    }
+  };
+
+  const handleModeloSelect = (modeloId: string) => {
+    setSelectedModeloId(modeloId);
+    
+    if (modeloId === 'none') return;
+    
+    const modelo = modelos.find(m => m.id === modeloId);
+    if (modelo) {
+      setDiametroM(modelo.diametro_m.toString());
+      setNumeroPernas(modelo.numero_pernas.toString());
+      setNumeroAneis(modelo.numero_aneis.toString());
+      setCapacidadeVolumeM3(modelo.volume_m3.toString());
+      // Calculate fator from capacidade_ton / volume_m3
+      const fator = modelo.capacidade_ton / modelo.volume_m3;
+      setFatorToneladaM3(fator.toFixed(3));
+    }
+  };
+
   const resetForm = () => {
     setNome('');
     setMarca('');
@@ -123,8 +168,9 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
     setNumeroPernas('4');
     setNumeroAneis('3');
     setCapacidadeVolumeM3('');
-    setFatorToneladaM3('0.650');
+    setFatorToneladaM3('0.640');
     setAtivo(true);
+    setSelectedModeloId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,6 +246,38 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Seletor de Modelo */}
+          {!silo && modelos.length > 0 && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    Selecionar Modelo (Preenchimento Automático)
+                  </Label>
+                  <Select value={selectedModeloId || "none"} onValueChange={handleModeloSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um modelo para auto-preencher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Personalizado (preencher manualmente)</SelectItem>
+                      {modelos.map((modelo) => (
+                        <SelectItem key={modelo.id} value={modelo.id}>
+                          Ø {modelo.diametro_m}m - {modelo.numero_aneis} {modelo.numero_aneis === 1 ? 'anel' : 'anéis'} - {modelo.volume_m3} m³ ({modelo.capacidade_ton} ton)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Dados baseados na tabela do fabricante. Você pode ajustar os valores após selecionar.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Separator />
+
           {/* Identificação */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

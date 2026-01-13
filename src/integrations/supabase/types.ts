@@ -4095,6 +4095,36 @@ export type Database = {
           },
         ]
       }
+      silos_modelo: {
+        Row: {
+          capacidade_ton: number
+          created_at: string
+          diametro_m: number
+          id: string
+          numero_aneis: number
+          numero_pernas: number
+          volume_m3: number
+        }
+        Insert: {
+          capacidade_ton: number
+          created_at?: string
+          diametro_m: number
+          id?: string
+          numero_aneis: number
+          numero_pernas: number
+          volume_m3: number
+        }
+        Update: {
+          capacidade_ton?: number
+          created_at?: string
+          diametro_m?: number
+          id?: string
+          numero_aneis?: number
+          numero_pernas?: number
+          volume_m3?: number
+        }
+        Relationships: []
+      }
       solicitacoes_racao: {
         Row: {
           confirmado_por: string | null
