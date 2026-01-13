@@ -16,6 +16,7 @@ import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import PesagemDetalheDialog from '@/components/veterinario/PesagemDetalheDialog';
 
 interface Lote {
   id: string;
@@ -44,6 +45,13 @@ interface PesagemData {
   dia: number;
   peso_real_kg: number;
   data_pesagem: string;
+  numSessoes: number;
+}
+
+interface PesagemSelecionada {
+  dataPesagem: string;
+  dia: number;
+  pesoReferencia?: number;
 }
 
 interface DesempenhoReferencia {
@@ -116,6 +124,9 @@ export default function MetasPesoLote() {
   const [mortalidadePorSemana, setMortalidadePorSemana] = useState<MortalidadePorSemana[]>([]);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState<number>(0);
   const [alertasMortalidade, setAlertasMortalidade] = useState<MortalidadePorSemana[]>([]);
+  
+  // State para PesagemDetalheDialog
+  const [pesagemSelecionada, setPesagemSelecionada] = useState<PesagemSelecionada | null>(null);
 
   useEffect(() => {
     if (user && loteId && integradoId) {
@@ -251,16 +262,19 @@ export default function MetasPesoLote() {
       .order('data_pesagem', { ascending: true });
 
     if (pesagensData && loteData.data_alojamento) {
-      // Agrupar todas as pesagens parciais do mesmo dia
-      const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+      // Agrupar todas as pesagens parciais do mesmo dia e contar sessões
+      const pesagensPorData = pesagensData.reduce((acc: Record<string, { itens: any[], sessoes: Set<string> }>, p: any) => {
         const data = p.data_pesagem;
-        if (!acc[data]) acc[data] = [];
-        acc[data].push(...p.pesagem_itens);
+        if (!acc[data]) acc[data] = { itens: [], sessoes: new Set() };
+        acc[data].itens.push(...p.pesagem_itens);
+        // Contar sessões únicas pelo created_at (assumindo formato timestamp)
+        const sessaoId = p.created_at || p.id || data;
+        acc[data].sessoes.add(sessaoId);
         return acc;
       }, {});
 
       // Calcular média ponderada consolidada por dia - usando +1 para dia do alojamento = Dia 1
-      const pesagensProcessed: PesagemData[] = Object.entries(pesagensPorData).map(([data, itens]) => {
+      const pesagensProcessed: PesagemData[] = Object.entries(pesagensPorData).map(([data, { itens, sessoes }]) => {
         const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
         const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
@@ -270,6 +284,7 @@ export default function MetasPesoLote() {
           dia,
           peso_real_kg: pesoMedio,
           data_pesagem: data,
+          numSessoes: sessoes.size,
         };
       }).sort((a, b) => a.dia - b.dia);
       
@@ -1082,9 +1097,20 @@ export default function MetasPesoLote() {
                         );
                         const metaValue = editingMetas ? (editingMetas as any)[`meta_${metaDia}_dias_kg`] || editingMetas.peso_inicial_kg : 0;
                         const diff = metaValue > 0 ? ((p.peso_real_kg - metaValue) / metaValue) * 100 : 0;
+                        const refData = desempenhoReferencia.find(d => d.dia === p.dia);
                         
                         return (
-                          <div key={index} className="p-4 rounded-lg bg-muted/50 text-center">
+                          <div 
+                            key={index} 
+                            className="p-4 rounded-lg bg-muted/50 text-center cursor-pointer hover:bg-muted transition-colors"
+                            onClick={() => {
+                              setPesagemSelecionada({
+                                dataPesagem: p.data_pesagem,
+                                dia: p.dia,
+                                pesoReferencia: refData ? refData.peso_g / 1000 : undefined
+                              });
+                            }}
+                          >
                             <p className="text-xs text-muted-foreground">Dia {p.dia}</p>
                             <p className="text-lg font-bold">{p.peso_real_kg.toFixed(3)} kg</p>
                             <Badge 
@@ -1096,6 +1122,11 @@ export default function MetasPesoLote() {
                             <p className="text-xs text-muted-foreground mt-1">
                               {format(new Date(p.data_pesagem), 'dd/MM', { locale: ptBR })}
                             </p>
+                            {p.numSessoes > 1 && (
+                              <Badge variant="outline" className="text-xs mt-1">
+                                {p.numSessoes} sessões
+                              </Badge>
+                            )}
                           </div>
                         );
                       })}
@@ -1107,6 +1138,18 @@ export default function MetasPesoLote() {
           </div>
         )}
       </main>
+
+      {/* Dialog de detalhes da pesagem */}
+      {pesagemSelecionada && (
+        <PesagemDetalheDialog
+          open={!!pesagemSelecionada}
+          onOpenChange={(open) => !open && setPesagemSelecionada(null)}
+          dataPesagem={pesagemSelecionada.dataPesagem}
+          loteId={loteId!}
+          dia={pesagemSelecionada.dia}
+          pesoReferencia={pesagemSelecionada.pesoReferencia}
+        />
+      )}
     </div>
   );
 }
