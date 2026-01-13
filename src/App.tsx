@@ -26,6 +26,7 @@ import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
 import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
+import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
 import Veterinario from "./pages/Veterinario";
 import VeterinarioLote from "./pages/VeterinarioLote";
@@ -251,6 +252,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <CadastroMortalidadeMedia />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/silos" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroSilos />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
