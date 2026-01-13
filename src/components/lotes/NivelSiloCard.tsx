@@ -5,7 +5,8 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfigSilo } from '@/hooks/useConfigSilo';
-import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle, Truck, Sparkles } from 'lucide-react';
+import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle, Truck, Sparkles, History } from 'lucide-react';
+import { differenceInHours, differenceInMinutes, differenceInDays } from 'date-fns';
 
 interface NivelSiloCardProps {
   loteId: string;
@@ -14,6 +15,8 @@ interface NivelSiloCardProps {
   diasDesdeAlojamento: number;
   avesVivas: number;
   onSugerirQuantidade?: (quantidade: number) => void;
+  galpaoId?: string;
+  refreshKey?: number;
 }
 
 interface DesempenhoAve {
@@ -22,23 +25,32 @@ interface DesempenhoAve {
   consumo_diario_racao_g: number;
 }
 
+interface HistoricoNivel {
+  nivel_estimado_kg: number;
+  created_at: string;
+}
+
 export function NivelSiloCard({ 
   loteId, 
   linhagem, 
   sexo, 
   diasDesdeAlojamento, 
   avesVivas,
-  onSugerirQuantidade
+  onSugerirQuantidade,
+  galpaoId,
+  refreshKey
 }: NivelSiloCardProps) {
   const { config } = useConfigSilo();
   const [totalRecebido, setTotalRecebido] = useState(0);
   const [consumoEstimado, setConsumoEstimado] = useState(0);
   const [consumoDiarioEstimado, setConsumoDiarioEstimado] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [historicoNivel, setHistoricoNivel] = useState<HistoricoNivel | null>(null);
+  const [consumoDesdeHistorico, setConsumoDesdeHistorico] = useState(0);
 
   useEffect(() => {
     fetchData();
-  }, [loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas]);
+  }, [loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId, refreshKey]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -81,6 +93,36 @@ export function NivelSiloCard({
         const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
         setConsumoDiarioEstimado(consumoDiarioKg);
       }
+
+      // Fetch last historico_nivel_silo if galpaoId is available
+      if (galpaoId) {
+        const { data: historico } = await supabase
+          .from('historico_nivel_silo')
+          .select('nivel_estimado_kg, created_at')
+          .eq('galpao_id', galpaoId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (historico) {
+          setHistoricoNivel(historico);
+          
+          // Calculate consumption since historico was recorded
+          const historicoDate = new Date(historico.created_at);
+          const now = new Date();
+          const horasDecorridas = differenceInHours(now, historicoDate);
+          const diasDecorridos = horasDecorridas / 24;
+          
+          // Get consumption per day and calculate since historico
+          if (desempenho) {
+            const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
+            setConsumoDesdeHistorico(consumoDiarioKg * diasDecorridos);
+          }
+        } else {
+          setHistoricoNivel(null);
+          setConsumoDesdeHistorico(0);
+        }
+      }
     } catch (error) {
       console.error('Erro ao calcular nível do silo:', error);
     } finally {
@@ -88,7 +130,24 @@ export function NivelSiloCard({
     }
   };
 
-  const nivelSilo = totalRecebido - consumoEstimado;
+  const formatTempoDesdeAtualizacao = (createdAt: string) => {
+    const historicoDate = new Date(createdAt);
+    const now = new Date();
+    const minutos = differenceInMinutes(now, historicoDate);
+    const horas = differenceInHours(now, historicoDate);
+    const dias = differenceInDays(now, historicoDate);
+    
+    if (minutos < 60) return `${minutos} min`;
+    if (horas < 24) return `${horas}h`;
+    return `${dias} dia${dias > 1 ? 's' : ''}`;
+  };
+
+  // Calculate nivelSilo: prefer historico if available, otherwise use calculation
+  const nivelSiloCalculado = totalRecebido - consumoEstimado;
+  const nivelSilo = historicoNivel 
+    ? Math.max(0, historicoNivel.nivel_estimado_kg - consumoDesdeHistorico)
+    : nivelSiloCalculado;
+  
   const diasRestantes = consumoDiarioEstimado > 0 ? Math.floor(nivelSilo / consumoDiarioEstimado) : 0;
   const percentualConsumido = totalRecebido > 0 ? Math.min((consumoEstimado / totalRecebido) * 100, 100) : 0;
   
@@ -164,6 +223,14 @@ export function NivelSiloCard({
             <Badge variant={status.badgeVariant}>{status.label}</Badge>
           </div>
         </div>
+
+        {/* Indicator for last update */}
+        {historicoNivel && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1">
+            <History className="w-3 h-3" />
+            <span>Atualizado há {formatTempoDesdeAtualizacao(historicoNivel.created_at)}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
