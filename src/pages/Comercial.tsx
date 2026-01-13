@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, ShoppingCart, DollarSign, Tag, FileText } from 'lucide-react';
@@ -11,9 +12,18 @@ import ContasReceberTable from '@/components/comercial/ContasReceberTable';
 export default function Comercial() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [activeTab, setActiveTab] = useState('pedidos');
 
-  if (!user) return null;
+  if (!user || loadingIntegrado) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!integradoId) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,15 +62,15 @@ export default function Comercial() {
           </TabsList>
 
           <TabsContent value="pedidos">
-            <PedidosTable integradoId={user.id} />
+            <PedidosTable integradoId={integradoId} />
           </TabsContent>
 
           <TabsContent value="tabelas-preco">
-            <TabelasPrecosTab integradoId={user.id} />
+            <TabelasPrecosTab integradoId={integradoId} />
           </TabsContent>
 
           <TabsContent value="contas-receber">
-            <ContasReceberTable integradoId={user.id} />
+            <ContasReceberTable integradoId={integradoId} />
           </TabsContent>
         </Tabs>
       </main>

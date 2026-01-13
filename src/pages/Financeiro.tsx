@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,10 +21,11 @@ import CreditoClienteTab from "@/components/financeiro/CreditoClienteTab";
 
 const Financeiro = () => {
   const { user, loading } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [configTab, setConfigTab] = useState("contas-bancarias");
 
-  if (loading) {
+  if (loading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -31,7 +33,7 @@ const Financeiro = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !integradoId) {
     navigate('/auth');
     return null;
   }
@@ -90,27 +92,27 @@ const Financeiro = () => {
           </div>
 
           <TabsContent value="dashboard">
-            <DashboardFinanceiroCards userId={user.id} />
+            <DashboardFinanceiroCards userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="contas-pagar">
-            <ContasPagarFinanceiroTab userId={user.id} />
+            <ContasPagarFinanceiroTab userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="contas-receber">
-            <ContasReceberFinanceiroTab userId={user.id} />
+            <ContasReceberFinanceiroTab userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="fluxo-caixa">
-            <FluxoCaixaTab userId={user.id} />
+            <FluxoCaixaTab userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="conciliacao">
-            <ConciliacaoTab userId={user.id} />
+            <ConciliacaoTab userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="relatorios">
-            <RelatoriosTab userId={user.id} />
+            <RelatoriosTab userId={integradoId} />
           </TabsContent>
 
           <TabsContent value="configuracoes">
@@ -145,27 +147,27 @@ const Financeiro = () => {
               </div>
 
               <TabsContent value="contas-bancarias">
-                <ContasBancariasTab userId={user.id} />
+                <ContasBancariasTab userId={integradoId} />
               </TabsContent>
               
               <TabsContent value="plano-contas">
-                <PlanoContasTab userId={user.id} />
+                <PlanoContasTab userId={integradoId} />
               </TabsContent>
               
               <TabsContent value="centro-custos">
-                <CentroCustosTab userId={user.id} />
+                <CentroCustosTab userId={integradoId} />
               </TabsContent>
               
               <TabsContent value="taxas">
-                <TaxasBancariasTab userId={user.id} />
+                <TaxasBancariasTab userId={integradoId} />
               </TabsContent>
               
               <TabsContent value="formas-pagamento">
-                <FormasPagamentoTab userId={user.id} />
+                <FormasPagamentoTab userId={integradoId} />
               </TabsContent>
 
               <TabsContent value="credito-cliente">
-                <CreditoClienteTab userId={user.id} />
+                <CreditoClienteTab userId={integradoId} />
               </TabsContent>
             </Tabs>
           </TabsContent>
