@@ -563,6 +563,8 @@ export default function MeusLotes() {
             onOpenChange={setPesagemOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
+            galpaoId={selectedLote.galpao_id}
+            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
             dataAlojamento={selectedLote.data_alojamento}
