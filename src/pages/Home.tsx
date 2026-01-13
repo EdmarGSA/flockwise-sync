@@ -9,8 +9,6 @@ import {
   Factory, 
   Users, 
   Map, 
-  BarChart3,
-  AlertTriangle,
   LogOut,
   Settings,
   Package,
@@ -281,59 +279,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Quick Stats */}
-        <div className="mt-12">
-          <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Resumo Rápido
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Lotes Ativos</p>
-                    <p className="text-2xl font-bold text-foreground">0</p>
-                  </div>
-                  <Bird className="w-8 h-8 text-primary/50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Núcleos</p>
-                    <p className="text-2xl font-bold text-foreground">0</p>
-                  </div>
-                  <Map className="w-8 h-8 text-emerald-500/50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Galpões</p>
-                    <p className="text-2xl font-bold text-foreground">0</p>
-                  </div>
-                  <Factory className="w-8 h-8 text-amber-500/50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Alertas</p>
-                    <p className="text-2xl font-bold text-foreground">0</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-rose-500/50" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
       </main>
     </div>
   );
