@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,9 +11,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn, calcularIdadeNaData } from '@/lib/utils';
+import { NivelSiloUpdateForm } from './NivelSiloUpdateForm';
+import { PesagemAnaliseCard } from './PesagemAnaliseCard';
 
 interface PesagemItem {
   id: string;
@@ -49,6 +51,8 @@ interface PesagemDialogProps {
   onOpenChange: (open: boolean) => void;
   loteId: string;
   integradoId: string;
+  galpaoId: string;
+  avesVivas: number;
   pesoInicialPintinhos?: number | null;
   diasDesdeAlojamento?: number;
   dataAlojamento?: string | null;
@@ -64,6 +68,18 @@ interface Multiplicadores {
   mult_28_dias: number;
   mult_35_dias: number;
   mult_42_dias: number;
+}
+
+interface SiloInfo {
+  numero_aneis: number;
+  capacidade_toneladas: number;
+}
+
+interface DesempenhoAves {
+  dia: number;
+  peso_g: number;
+  consumo_acumulado_racao_g: number;
+  conversao_alimentar_acumulada: number;
 }
 
 const DEFAULT_MULTIPLICADORES: Multiplicadores = {
@@ -116,6 +132,8 @@ export function PesagemDialog({
   onOpenChange, 
   loteId, 
   integradoId,
+  galpaoId,
+  avesVivas,
   pesoInicialPintinhos,
   diasDesdeAlojamento = 0,
   dataAlojamento,
@@ -130,10 +148,112 @@ export function PesagemDialog({
   const [dataPesagem, setDataPesagem] = useState<Date>(new Date());
   const [historicoPesagens, setHistoricoPesagens] = useState<PesagemHistorico[]>([]);
   
+  // Silo state
+  const [siloInfo, setSiloInfo] = useState<SiloInfo | null>(null);
+  const [savedSiloLevel, setSavedSiloLevel] = useState<number | null>(null);
+  const [loadingSilo, setLoadingSilo] = useState(true);
+  
+  // CA Analysis state
+  const [desempenhoData, setDesempenhoData] = useState<DesempenhoAves[]>([]);
+  const [consumoEstimado, setConsumoEstimado] = useState<number>(0);
+  
   // Form inputs
   const [quantidadeAves, setQuantidadeAves] = useState('');
   const [pesoBruto, setPesoBruto] = useState('');
   const [pesoTara, setPesoTara] = useState('');
+
+  // Fetch silo info for the galpao
+  useEffect(() => {
+    const fetchSiloInfo = async () => {
+      if (!open || !galpaoId) {
+        setSiloInfo(null);
+        setLoadingSilo(false);
+        return;
+      }
+
+      setLoadingSilo(true);
+
+      // Get galpao with silo_id
+      const { data: galpao } = await supabase
+        .from('galpoes')
+        .select('silo_id')
+        .eq('id', galpaoId)
+        .maybeSingle();
+
+      if (!galpao?.silo_id) {
+        setSiloInfo(null);
+        setLoadingSilo(false);
+        return;
+      }
+
+      // Get silo info
+      const { data: silo } = await supabase
+        .from('silos')
+        .select('numero_aneis, capacidade_toneladas')
+        .eq('id', galpao.silo_id)
+        .maybeSingle();
+
+      if (silo) {
+        setSiloInfo({
+          numero_aneis: silo.numero_aneis || 3,
+          capacidade_toneladas: silo.capacidade_toneladas || 10,
+        });
+      }
+
+      setLoadingSilo(false);
+    };
+
+    fetchSiloInfo();
+  }, [open, galpaoId]);
+
+  // Fetch desempenho data for CA calculation
+  useEffect(() => {
+    const fetchDesempenhoData = async () => {
+      if (!open || !linhagem || !sexo) {
+        setDesempenhoData([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('desempenho_aves')
+        .select('dia, peso_g, consumo_acumulado_racao_g, conversao_alimentar_acumulada')
+        .eq('linhagem', linhagem)
+        .eq('sexo', sexo)
+        .order('dia', { ascending: true });
+
+      if (data) {
+        setDesempenhoData(data);
+      }
+    };
+
+    fetchDesempenhoData();
+  }, [open, linhagem, sexo]);
+
+  // Calculate estimated consumption
+  useEffect(() => {
+    const calculateConsumo = async () => {
+      if (!open || !linhagem || !sexo || diasDesdeAlojamento <= 0 || !avesVivas) {
+        setConsumoEstimado(0);
+        return;
+      }
+
+      const { data: consumoData } = await supabase
+        .from('desempenho_aves')
+        .select('consumo_acumulado_racao_g')
+        .eq('linhagem', linhagem)
+        .eq('sexo', sexo)
+        .eq('dia', diasDesdeAlojamento)
+        .maybeSingle();
+
+      if (consumoData) {
+        // consumo_acumulado_racao_g is per bird, convert to kg for whole lot
+        const consumoTotal = (consumoData.consumo_acumulado_racao_g * avesVivas) / 1000;
+        setConsumoEstimado(consumoTotal);
+      }
+    };
+
+    calculateConsumo();
+  }, [open, linhagem, sexo, diasDesdeAlojamento, avesVivas]);
 
   // Fetch reference weight from desempenho_aves
   useEffect(() => {
@@ -255,6 +375,7 @@ export function PesagemDialog({
       setDataPesagem(new Date());
       setQuantidadeAves('');
       setPesoBruto('');
+      setSavedSiloLevel(null);
       // Não limpa a tara - mantém o valor anterior
       
       // Calculate metas if initial weight available (já está em kg)
@@ -348,6 +469,41 @@ export function PesagemDialog({
   const totalPesoTara = itens.reduce((acc, item) => acc + item.peso_tara_kg, 0);
   const totalPesoLiquido = itens.reduce((acc, item) => acc + item.peso_liquido_kg, 0);
   const pesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves : 0;
+
+  // Calculate CA analysis
+  const pesoTotalLote = pesoMedio * avesVivas;
+  const conversaoAlimentar = pesoTotalLote > 0 ? consumoEstimado / pesoTotalLote : 0;
+
+  // Find closest reference day for the measured weight
+  const analiseCA = useMemo(() => {
+    if (pesoMedio <= 0 || desempenhoData.length === 0) {
+      return {
+        conversaoEsperada: null,
+        diaReferencia: null,
+        pesoReferenciaAtual: pesoReferencia,
+      };
+    }
+
+    const pesoMedioGramas = pesoMedio * 1000;
+    
+    // Find the day with closest weight to measured weight
+    let closestDay = desempenhoData[0];
+    let minDiff = Math.abs(desempenhoData[0].peso_g - pesoMedioGramas);
+    
+    for (const d of desempenhoData) {
+      const diff = Math.abs(d.peso_g - pesoMedioGramas);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestDay = d;
+      }
+    }
+
+    return {
+      conversaoEsperada: closestDay.conversao_alimentar_acumulada,
+      diaReferencia: closestDay.dia,
+      pesoReferenciaAtual: pesoReferencia,
+    };
+  }, [pesoMedio, desempenhoData, pesoReferencia]);
   
   // Get current target
   const metaAtual = getMetaAtual(metas, diasDesdeAlojamento);
@@ -399,7 +555,7 @@ export function PesagemDialog({
           }, { onConflict: 'lote_id' });
       }
 
-      toast.success(`Pesagem salva! Peso médio: ${pesoMedio.toFixed(3)} kg`);
+      toast.success(`Pesagem salva! Peso médio: ${pesoMedio.toFixed(3)} kg | CA: ${conversaoAlimentar.toFixed(2)}`);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -417,6 +573,9 @@ export function PesagemDialog({
   const previewLiquido = previewBruto - previewTara;
   const previewMedio = previewQuantidade > 0 ? previewLiquido / previewQuantidade : 0;
 
+  const siloLevelSaved = savedSiloLevel !== null;
+  const showSiloStep = siloInfo !== null && !loadingSilo;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -433,254 +592,302 @@ export function PesagemDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Date Picker */}
-          <div className="space-y-2">
-            <Label>Data da Pesagem</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dataPesagem && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataPesagem ? format(dataPesagem, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dataPesagem}
-                  onSelect={(date) => date && setDataPesagem(date)}
-                  disabled={(date) => date > new Date()}
-                  initialFocus
-                  className="pointer-events-auto"
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          {/* Step 1: Silo Level Update */}
+          {showSiloStep && (
+            <NivelSiloUpdateForm
+              galpaoId={galpaoId}
+              loteId={loteId}
+              integradoId={integradoId}
+              siloInfo={siloInfo}
+              diasDesdeAlojamento={diasDesdeAlojamento}
+              avesVivas={avesVivas}
+              linhagem={linhagem}
+              sexo={sexo}
+              onLevelSaved={(nivel) => setSavedSiloLevel(nivel)}
+              savedLevel={savedSiloLevel}
+            />
+          )}
 
-          {/* Metas Card with Real Values */}
-          {metas && (
-            <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20">
+          {/* Show message if silo step is required but not completed */}
+          {showSiloStep && !siloLevelSaved && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="w-4 h-4 text-amber-600" />
-                  <span className="font-semibold text-amber-700">Metas de Peso</span>
+                <div className="flex items-center gap-2 text-amber-600">
+                  <Package className="w-4 h-4" />
+                  <span className="text-sm">Grave o nível do silo antes de registrar as pesagens</span>
                 </div>
-                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center text-xs">
-                  {historicoPesagens.map((hist, idx) => {
-                    const isActive = diasDesdeAlojamento >= hist.diasMin && diasDesdeAlojamento <= hist.diasMax;
-                    return (
-                      <div key={hist.label} className={`p-2 rounded ${isActive ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
-                        <p className="text-muted-foreground">{hist.label}</p>
-                        <p className="font-bold text-amber-600">{hist.meta?.toFixed(3) || '0.000'}</p>
-                        {hist.pesoReal !== null ? (
-                          <>
-                            <p className={`font-bold ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
-                              {hist.pesoReal.toFixed(3)}
-                            </p>
-                            <p className={`text-[10px] ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
-                              {hist.percentual?.toFixed(0)}%
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-muted-foreground/50">--</p>
-                            <p className="text-muted-foreground/50 text-[10px]">--</p>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <div className="p-2 rounded bg-primary/10">
-                    <p className="text-muted-foreground">GPD</p>
-                    <p className="font-bold text-primary">{metas.gpd_kg.toFixed(3)}</p>
-                  </div>
-                </div>
-                {metaAtual && (
-                  <div className="mt-3 text-sm text-center">
-                    <span className="text-muted-foreground">Meta atual ({metaAtual.label}):</span>
-                    <span className="font-bold text-amber-600 ml-2">{metaAtual.valor.toFixed(3)} kg</span>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Tara Configuration */}
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="tara" className="font-medium">Peso Tara (kg)</Label>
-                </div>
-                <Input
-                  id="tara"
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  value={pesoTara}
-                  onChange={(e) => setPesoTara(e.target.value)}
-                  placeholder="Ex: 0.500"
-                  className="w-32"
-                />
-                {parseFloat(pesoTara) > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    Tara fixa: {parseFloat(pesoTara).toFixed(3)} kg
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Input Form */}
-          <Card className="bg-secondary/30">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quantidade">Qtd. Aves</Label>
-                  <Input
-                    id="quantidade"
-                    type="number"
-                    min="1"
-                    value={quantidadeAves}
-                    onChange={(e) => setQuantidadeAves(e.target.value)}
-                    placeholder="Ex: 10"
+          {/* Step 2: Weighing Form (only enabled after silo level is saved) */}
+          <div className={cn(
+            "space-y-6 transition-opacity",
+            showSiloStep && !siloLevelSaved && "opacity-50 pointer-events-none"
+          )}>
+            {/* Date Picker */}
+            <div className="space-y-2">
+              <Label>Data da Pesagem</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dataPesagem && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dataPesagem ? format(dataPesagem, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dataPesagem}
+                    onSelect={(date) => date && setDataPesagem(date)}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                    className="pointer-events-auto"
+                    locale={ptBR}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bruto">Peso Bruto (kg)</Label>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Metas Card with Real Values */}
+            {metas && (
+              <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-amber-600" />
+                    <span className="font-semibold text-amber-700">Metas de Peso</span>
+                  </div>
+                  <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center text-xs">
+                    {historicoPesagens.map((hist, idx) => {
+                      const isActive = diasDesdeAlojamento >= hist.diasMin && diasDesdeAlojamento <= hist.diasMax;
+                      return (
+                        <div key={hist.label} className={`p-2 rounded ${isActive ? 'bg-amber-500/20 ring-2 ring-amber-500' : 'bg-background/50'}`}>
+                          <p className="text-muted-foreground">{hist.label}</p>
+                          <p className="font-bold text-amber-600">{hist.meta?.toFixed(3) || '0.000'}</p>
+                          {hist.pesoReal !== null ? (
+                            <>
+                              <p className={`font-bold ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
+                                {hist.pesoReal.toFixed(3)}
+                              </p>
+                              <p className={`text-[10px] ${hist.percentual && hist.percentual >= 100 ? 'text-green-500' : 'text-orange-500'}`}>
+                                {hist.percentual?.toFixed(0)}%
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-muted-foreground/50">--</p>
+                              <p className="text-muted-foreground/50 text-[10px]">--</p>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="p-2 rounded bg-primary/10">
+                      <p className="text-muted-foreground">GPD</p>
+                      <p className="font-bold text-primary">{metas.gpd_kg.toFixed(3)}</p>
+                    </div>
+                  </div>
+                  {metaAtual && (
+                    <div className="mt-3 text-sm text-center">
+                      <span className="text-muted-foreground">Meta atual ({metaAtual.label}):</span>
+                      <span className="font-bold text-amber-600 ml-2">{metaAtual.valor.toFixed(3)} kg</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tara Configuration */}
+            <Card className="bg-muted/30 border-dashed">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="tara" className="font-medium">Peso Tara (kg)</Label>
+                  </div>
                   <Input
-                    id="bruto"
+                    id="tara"
                     type="number"
                     min="0"
                     step="0.001"
-                    value={pesoBruto}
-                    onChange={(e) => setPesoBruto(e.target.value)}
-                    placeholder="Ex: 5.250"
+                    value={pesoTara}
+                    onChange={(e) => setPesoTara(e.target.value)}
+                    placeholder="Ex: 0.500"
+                    className="w-32"
                   />
+                  {parseFloat(pesoTara) > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      Tara fixa: {parseFloat(pesoTara).toFixed(3)} kg
+                    </Badge>
+                  )}
                 </div>
-                <div className="flex items-end">
-                  <Button onClick={handleAddItem} className="w-full gap-2">
-                    <Plus className="w-4 h-4" />
-                    Adicionar
-                  </Button>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Preview calculation */}
-              {previewQuantidade > 0 && previewBruto > 0 && (
-                <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calculator className="w-4 h-4 text-primary" />
-                    <span className="text-muted-foreground">Prévia:</span>
-                    <span className="font-medium">
-                      Líquido: {previewLiquido.toFixed(3)} kg
-                    </span>
-                    <span className="text-muted-foreground">|</span>
-                    <span className="font-medium text-primary">
-                      Médio/ave: {previewMedio.toFixed(3)} kg
-                    </span>
+            {/* Input Form */}
+            <Card className="bg-secondary/30">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quantidade">Qtd. Aves</Label>
+                    <Input
+                      id="quantidade"
+                      type="number"
+                      min="1"
+                      value={quantidadeAves}
+                      onChange={(e) => setQuantidadeAves(e.target.value)}
+                      placeholder="Ex: 10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bruto">Peso Bruto (kg)</Label>
+                    <Input
+                      id="bruto"
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={pesoBruto}
+                      onChange={(e) => setPesoBruto(e.target.value)}
+                      placeholder="Ex: 5.250"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={handleAddItem} className="w-full gap-2">
+                      <Plus className="w-4 h-4" />
+                      Adicionar
+                    </Button>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Items Table */}
-          {itens.length > 0 && (
-            <Card>
-              <CardContent className="pt-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Qtd. Aves</TableHead>
-                      <TableHead>Peso Bruto</TableHead>
-                      <TableHead>Tara</TableHead>
-                      <TableHead>Líquido</TableHead>
-                      <TableHead>Médio/Ave</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {itens.map((item, index) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell>{item.quantidade_aves}</TableCell>
-                        <TableCell>{item.peso_bruto_kg.toFixed(3)} kg</TableCell>
-                        <TableCell>{item.peso_tara_kg.toFixed(3)} kg</TableCell>
-                        <TableCell className="font-medium">{item.peso_liquido_kg.toFixed(3)} kg</TableCell>
-                        <TableCell className="text-primary font-medium">
-                          {(item.peso_liquido_kg / item.quantidade_aves).toFixed(3)} kg
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
+                {/* Preview calculation */}
+                {previewQuantidade > 0 && previewBruto > 0 && (
+                  <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calculator className="w-4 h-4 text-primary" />
+                      <span className="text-muted-foreground">Prévia:</span>
+                      <span className="font-medium">
+                        Líquido: {previewLiquido.toFixed(3)} kg
+                      </span>
+                      <span className="text-muted-foreground">|</span>
+                      <span className="font-medium text-primary">
+                        Médio/ave: {previewMedio.toFixed(3)} kg
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Items Table */}
+            {itens.length > 0 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Qtd. Aves</TableHead>
+                        <TableHead>Peso Bruto</TableHead>
+                        <TableHead>Tara</TableHead>
+                        <TableHead>Líquido</TableHead>
+                        <TableHead>Médio/Ave</TableHead>
+                        <TableHead className="w-12"></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+                    </TableHeader>
+                    <TableBody>
+                      {itens.map((item, index) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell>{item.quantidade_aves}</TableCell>
+                          <TableCell>{item.peso_bruto_kg.toFixed(3)} kg</TableCell>
+                          <TableCell>{item.peso_tara_kg.toFixed(3)} kg</TableCell>
+                          <TableCell className="font-medium">{item.peso_liquido_kg.toFixed(3)} kg</TableCell>
+                          <TableCell className="text-primary font-medium">
+                            {(item.peso_liquido_kg / item.quantidade_aves).toFixed(3)} kg
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Totals Card */}
-          {itens.length > 0 && (
-            <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Total Aves</p>
-                    <p className="text-xl font-bold">{totalAves.toLocaleString('pt-BR')}</p>
+            {/* Totals Card */}
+            {itens.length > 0 && (
+              <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                    <div>
+                      <p className="text-muted-foreground text-sm">Total Aves</p>
+                      <p className="text-xl font-bold">{totalAves.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm">Peso Bruto</p>
+                      <p className="text-xl font-bold">{totalPesoBruto.toFixed(3)} kg</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm">Total Tara</p>
+                      <p className="text-xl font-bold">{totalPesoTara.toFixed(3)} kg</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-sm">Peso Líquido</p>
+                      <p className="text-xl font-bold">{totalPesoLiquido.toFixed(3)} kg</p>
+                    </div>
+                    <div className="bg-primary/20 rounded-lg p-2">
+                      <p className="text-muted-foreground text-sm">Peso Médio</p>
+                      <p className="text-2xl font-bold text-primary">{pesoMedio.toFixed(3)} kg</p>
+                      {metaAtual && (
+                        <p className={`text-xs mt-1 ${pesoMedio >= metaAtual.valor ? 'text-green-600' : 'text-destructive'}`}>
+                          {pesoMedio >= metaAtual.valor ? '✓ Acima da meta' : '✗ Abaixo da meta'}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm">Peso Bruto</p>
-                    <p className="text-xl font-bold">{totalPesoBruto.toFixed(3)} kg</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm">Total Tara</p>
-                    <p className="text-xl font-bold">{totalPesoTara.toFixed(3)} kg</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-sm">Peso Líquido</p>
-                    <p className="text-xl font-bold">{totalPesoLiquido.toFixed(3)} kg</p>
-                  </div>
-                  <div className="bg-primary/20 rounded-lg p-2">
-                    <p className="text-muted-foreground text-sm">Peso Médio</p>
-                    <p className="text-2xl font-bold text-primary">{pesoMedio.toFixed(3)} kg</p>
-                    {metaAtual && (
-                      <p className={`text-xs mt-1 ${pesoMedio >= metaAtual.valor ? 'text-green-600' : 'text-destructive'}`}>
-                        {pesoMedio >= metaAtual.valor ? '✓ Acima da meta' : '✗ Abaixo da meta'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={loading || itens.length === 0} className="gap-2">
-              <Save className="w-4 h-4" />
-              {loading ? 'Salvando...' : 'Salvar Pesagem'}
-            </Button>
+            {/* Step 3: CA Analysis Card */}
+            {itens.length > 0 && consumoEstimado > 0 && (
+              <PesagemAnaliseCard
+                pesoMedio={pesoMedio}
+                avesVivas={avesVivas}
+                consumoTotal={consumoEstimado}
+                conversaoAlimentar={conversaoAlimentar}
+                conversaoEsperada={analiseCA.conversaoEsperada}
+                diaAtual={diasDesdeAlojamento}
+                diaReferencia={analiseCA.diaReferencia}
+                pesoReferencia={analiseCA.pesoReferenciaAtual}
+              />
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={loading || itens.length === 0} className="gap-2">
+                <Save className="w-4 h-4" />
+                {loading ? 'Salvando...' : 'Salvar Pesagem'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

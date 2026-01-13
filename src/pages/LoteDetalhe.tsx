@@ -534,6 +534,8 @@ export default function LoteDetalhe() {
         onOpenChange={setPesagemOpen}
         loteId={lote.id}
         integradoId={lote.integrado_id}
+        galpaoId={lote.galpao_id}
+        avesVivas={avesVivas}
         pesoInicialPintinhos={lote.peso_medio_pintinhos}
         diasDesdeAlojamento={diasDesdeAlojamento}
         dataAlojamento={lote.data_alojamento}
