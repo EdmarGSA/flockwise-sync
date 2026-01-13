@@ -113,9 +113,41 @@ export function NivelSiloUpdateForm({
         return;
       }
 
+      // If no history exists, calculate expected level from total received - total consumed
       if (!historico) {
-        setNivelEsperado(null);
         setLastHistorico(null);
+        
+        // Calculate expected level for first recording
+        if (diasDesdeAlojamento !== undefined && avesVivas && linhagem && sexo) {
+          // Get all feed received for this lot
+          const { data: racaoRecebida } = await supabase
+            .from('solicitacoes_racao')
+            .select('quantidade_recebida_kg')
+            .eq('lote_id', loteId)
+            .eq('status', 'recebido');
+
+          const totalRecebido = racaoRecebida?.reduce((sum, r) => sum + (r.quantidade_recebida_kg || 0), 0) || 0;
+
+          // Get consumption data from day 1 to current day
+          const { data: consumoData } = await supabase
+            .from('desempenho_aves')
+            .select('dia, consumo_diario_racao_g')
+            .eq('linhagem', linhagem)
+            .eq('sexo', sexo)
+            .gte('dia', 1)
+            .lte('dia', diasDesdeAlojamento);
+
+          if (consumoData && consumoData.length > 0) {
+            const consumoTotalGramas = consumoData.reduce((sum, d) => sum + d.consumo_diario_racao_g, 0);
+            const consumoEstimado = (consumoTotalGramas * avesVivas) / 1000; // Convert to kg
+            const expected = totalRecebido - consumoEstimado;
+            setNivelEsperado(Math.max(0, expected));
+          } else {
+            setNivelEsperado(null);
+          }
+        } else {
+          setNivelEsperado(null);
+        }
         return;
       }
 
@@ -341,13 +373,19 @@ export function NivelSiloUpdateForm({
         )}
 
         {/* Divergence alert */}
-        {divergenciaPercentual !== null && Math.abs(divergenciaPercentual) > 20 && (
-          <Alert variant="destructive">
+        {divergenciaPercentual !== null && Math.abs(divergenciaPercentual) > 20 && nivelEsperado !== null && (
+          <Alert variant={divergenciaPercentual > 0 ? "default" : "destructive"} className={divergenciaPercentual > 0 ? "border-blue-500 bg-blue-50 text-blue-800" : ""}>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
+              <span className="font-medium">
+                Informado: {nivelEstimadoKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg | 
+                Esperado: {nivelEsperado.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg | 
+                Diferença: {divergenciaPercentual > 0 ? '+' : ''}{divergenciaPercentual.toFixed(0)}%
+              </span>
+              <br />
               {divergenciaPercentual > 0 
-                ? 'O nível informado está significativamente acima do esperado. Verifique se houve recebimento não registrado.'
-                : 'O nível informado está significativamente abaixo do esperado. Verifique se há perdas, vazamentos ou consumo não contabilizado.'}
+                ? 'O nível informado está acima do esperado. Verifique se houve recebimento não registrado no sistema.'
+                : 'O nível informado está abaixo do esperado. Verifique se há perdas, vazamentos ou consumo não contabilizado.'}
             </AlertDescription>
           </Alert>
         )}
