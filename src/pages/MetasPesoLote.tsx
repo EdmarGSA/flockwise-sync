@@ -457,27 +457,37 @@ export default function MetasPesoLote() {
         const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         // peso_liquido_g já está em kg (nomenclatura incorreta no banco)
         const pesoMedioKg = totalAves > 0 ? totalPeso / totalAves : 0;
-        const diaAtual = calcularIdadeNaData(loteData.data_alojamento, ultimaData);
+        const diaDaPesagem = calcularIdadeNaData(loteData.data_alojamento, ultimaData);
 
-        // Calcular mortalidade total até a última pesagem
-        const { data: mortalidadeData } = await supabase
+        // Buscar mortalidade com data_registro para calcular aves vivas por data
+        const { data: mortalidadeDataCA } = await supabase
           .from('mortalidade')
           .select(`
+            data_registro,
             mortalidade_itens (quantidade)
           `)
           .eq('lote_id', loteId);
 
-        let totalMortes = 0;
-        if (mortalidadeData) {
-          mortalidadeData.forEach((m: any) => {
-            totalMortes += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
-          });
-        }
+        // Função para calcular aves vivas até uma data específica
+        const calcularAvesVivasAteData = (dataLimite: string): number => {
+          let mortesAteData = 0;
+          if (mortalidadeDataCA) {
+            mortalidadeDataCA.forEach((m: any) => {
+              if (m.data_registro <= dataLimite) {
+                mortesAteData += m.mortalidade_itens.reduce(
+                  (acc: number, item: any) => acc + item.quantidade, 0
+                );
+              }
+            });
+          }
+          return qtdAlojada - mortesAteData;
+        };
 
-        const avesVivas = qtdAlojada - totalMortes;
+        // Aves vivas NA DATA da última pesagem (não mortalidade total atual)
+        const avesVivasNaPesagem = calcularAvesVivasAteData(ultimaData);
 
         // Buscar consumo acumulado da tabela de referência para o dia da pesagem
-        const refDiaPesagem = desempenhoData.find((d: any) => d.dia === diaAtual);
+        const refDiaPesagem = desempenhoData.find((d: any) => d.dia === diaDaPesagem);
         const consumoAcumuladoG = refDiaPesagem ? refDiaPesagem.consumo_acumulado_racao_g : 0;
         
         // Se não encontrar no dia exato, interpolar ou usar o mais próximo
@@ -485,19 +495,19 @@ export default function MetasPesoLote() {
         if (!refDiaPesagem) {
           const diasDisponiveis = desempenhoData.map((d: any) => d.dia);
           const diaMaisProximo = diasDisponiveis.reduce((prev: number, curr: number) =>
-            Math.abs(curr - diaAtual) < Math.abs(prev - diaAtual) ? curr : prev
+            Math.abs(curr - diaDaPesagem) < Math.abs(prev - diaDaPesagem) ? curr : prev
           );
           const refMaisProximo = desempenhoData.find((d: any) => d.dia === diaMaisProximo);
           if (refMaisProximo) {
             const consumoDiarioEstimado = refMaisProximo.consumo_diario_racao_g || 150;
             consumoFinal = refMaisProximo.consumo_acumulado_racao_g + 
-              (diaAtual - diaMaisProximo) * consumoDiarioEstimado;
+              (diaDaPesagem - diaMaisProximo) * consumoDiarioEstimado;
           }
         }
 
-        // Consumo estimado do lote em kg
-        const consumoEstimadoKg = (consumoFinal * avesVivas) / 1000;
-        const pesoTotalLoteKg = pesoMedioKg * avesVivas;
+        // Consumo estimado do lote em kg - usando aves vivas na data da pesagem
+        const consumoEstimadoKg = (consumoFinal * avesVivasNaPesagem) / 1000;
+        const pesoTotalLoteKg = pesoMedioKg * avesVivasNaPesagem;
         const conversaoReal = pesoTotalLoteKg > 0 ? consumoEstimadoKg / pesoTotalLoteKg : 0;
 
         // Encontrar o dia de referência cujo peso mais se aproxima do peso medido
@@ -506,8 +516,8 @@ export default function MetasPesoLote() {
         let pesoReferencia: number | null = null;
 
         if (desempenhoData.length > 0) {
-          // Peso de referência do dia da pesagem (não do dia atual)
-          const refPesoPesagem = desempenhoData.find((d: any) => d.dia === diaAtual);
+          // Peso de referência do dia da pesagem
+          const refPesoPesagem = desempenhoData.find((d: any) => d.dia === diaDaPesagem);
           pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_g / 1000 : null;
 
           // Encontrar dia cujo peso_g mais se aproxima do peso medido
@@ -526,17 +536,17 @@ export default function MetasPesoLote() {
 
         setConversaoData({
           pesoMedio: pesoMedioKg,
-          avesVivas,
+          avesVivas: avesVivasNaPesagem,
           consumoEstimado: consumoEstimadoKg,
           conversaoReal,
           conversaoEsperada,
           diaReferencia,
           pesoReferencia,
-          diaPesagem: diaAtual,
+          diaPesagem: diaDaPesagem,
           dataPesagem: ultimaData,
         });
 
-        // Calcular histórico de CA para todas as pesagens
+        // Calcular histórico de CA para todas as pesagens - usando aves vivas por data
         const historicoCACalculado: HistoricoCAItem[] = [];
         
         for (const dataPes of datasPesagens) {
@@ -546,6 +556,9 @@ export default function MetasPesoLote() {
           // peso_liquido_g já está em kg
           const pesoMedioDiaKg = totalAvesDia > 0 ? totalPesoDia / totalAvesDia : 0;
           const diaPes = calcularIdadeNaData(loteData.data_alojamento, dataPes);
+          
+          // Calcular aves vivas ATÉ esta data específica de pesagem
+          const avesVivasDia = calcularAvesVivasAteData(dataPes);
           
           // Buscar consumo para este dia
           const refDia = desempenhoData.find((d: any) => d.dia === diaPes);
@@ -563,8 +576,22 @@ export default function MetasPesoLote() {
             }
           }
           
-          const consumoKg = (consumoDia * avesVivas) / 1000;
-          const pesoTotalKg = pesoMedioDiaKg * avesVivas;
+          // Tratar dias 0-6 onde consumo é zero na referência
+          if (consumoDia === 0 && diaPes <= 6) {
+            historicoCACalculado.push({
+              dia: diaPes,
+              dataPesagem: dataPes,
+              pesoMedio: pesoMedioDiaKg,
+              conversaoReal: 0,
+              conversaoEsperada: null,
+              diferencaCA: null,
+            });
+            continue;
+          }
+          
+          // Usar aves vivas DA DATA da pesagem (não total atual)
+          const consumoKg = (consumoDia * avesVivasDia) / 1000;
+          const pesoTotalKg = pesoMedioDiaKg * avesVivasDia;
           const caReal = pesoTotalKg > 0 ? consumoKg / pesoTotalKg : 0;
           
           // Encontrar CA esperada para o peso medido
