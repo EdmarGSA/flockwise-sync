@@ -4036,6 +4036,65 @@ export type Database = {
           },
         ]
       }
+      silos: {
+        Row: {
+          ativo: boolean
+          capacidade_toneladas: number | null
+          capacidade_volume_m3: number
+          created_at: string
+          diametro_m: number
+          fator_tonelada_m3: number
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          marca: string | null
+          nome: string
+          numero_aneis: number
+          numero_pernas: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          capacidade_toneladas?: number | null
+          capacidade_volume_m3: number
+          created_at?: string
+          diametro_m: number
+          fator_tonelada_m3?: number
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          marca?: string | null
+          nome: string
+          numero_aneis?: number
+          numero_pernas?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          capacidade_toneladas?: number | null
+          capacidade_volume_m3?: number
+          created_at?: string
+          diametro_m?: number
+          fator_tonelada_m3?: number
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          marca?: string | null
+          nome?: string
+          numero_aneis?: number
+          numero_pernas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "silos_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitacoes_racao: {
         Row: {
           confirmado_por: string | null
