@@ -3,16 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Truck, SkipForward } from 'lucide-react';
-import { format, subDays, setHours, setMinutes, isValid } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CalendarIcon, Truck, SkipForward, Package, Save, CheckCircle } from 'lucide-react';
+import { format, subDays, setHours, setMinutes, isValid, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { NivelSiloSelector } from '@/components/lotes/NivelSiloSelector';
+import { useAuth } from '@/hooks/useAuth';
+import { useMemo } from 'react';
 
 interface Produto {
   id: string;
@@ -50,6 +53,7 @@ export function SolicitarRacaoLoteDialog({
   onSuccess,
   onSkip,
 }: SolicitarRacaoLoteDialogProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [selectedProdutoId, setSelectedProdutoId] = useState<string>('');
@@ -61,6 +65,8 @@ export function SolicitarRacaoLoteDialog({
   const [siloInfo, setSiloInfo] = useState<SiloInfo | null>(null);
   const [nivelFunil, setNivelFunil] = useState(0);
   const [nivelAneis, setNivelAneis] = useState(0);
+  const [nivelSalvo, setNivelSalvo] = useState<number | null>(null);
+  const [salvandoNivel, setSalvandoNivel] = useState(false);
 
   // Calculate suggested quantity (approx 50g per bird for initial days)
   const suggestedQuantity = Math.ceil((quantidadeAves * 50) / 1000); // Convert to kg
@@ -69,6 +75,34 @@ export function SolicitarRacaoLoteDialog({
   const validDataAlojamento = dataPrevistaAlojamento instanceof Date && isValid(dataPrevistaAlojamento) 
     ? dataPrevistaAlojamento 
     : new Date();
+
+  // Generate ring options
+  const opcoesAneis = useMemo(() => {
+    if (!siloInfo) return [];
+    const opcoes: { value: number; label: string }[] = [];
+    for (let i = 0; i <= siloInfo.numero_aneis; i += 0.5) {
+      const label = i === 0 ? 'Vazio (0)' : 
+                    i === 0.5 ? '½ anel' :
+                    i % 1 === 0 ? `${i} ${i === 1 ? 'anel' : 'anéis'}` : 
+                    `${Math.floor(i)} ½ anéis`;
+      opcoes.push({ value: i, label });
+    }
+    return opcoes;
+  }, [siloInfo?.numero_aneis]);
+
+  // Calculate estimated level in kg
+  const nivelEstimadoKg = useMemo(() => {
+    if (!siloInfo) return 0;
+    const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
+    const capacidadeFunil = capacidadeKg * 0.15;
+    const capacidadeAneis = capacidadeKg * 0.85;
+    
+    const volumeFunil = nivelFunil * capacidadeFunil;
+    const volumeAneis = siloInfo.numero_aneis > 0 
+      ? (nivelAneis / siloInfo.numero_aneis) * capacidadeAneis 
+      : 0;
+    return volumeFunil + volumeAneis;
+  }, [nivelFunil, nivelAneis, siloInfo]);
 
   useEffect(() => {
     if (open) {
@@ -80,6 +114,7 @@ export function SolicitarRacaoLoteDialog({
       // Reset silo levels
       setNivelFunil(0);
       setNivelAneis(0);
+      setNivelSalvo(null);
     }
   }, [open, tipoProducao, validDataAlojamento, suggestedQuantity, galpaoId]);
 
@@ -181,18 +216,34 @@ export function SolicitarRacaoLoteDialog({
     }
   };
 
-  // Calculate estimated level in kg based on silo selector
-  const calcularNivelEstimadoKg = () => {
-    if (!siloInfo) return null;
-    const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
-    const capacidadeFunil = capacidadeKg * 0.15;
-    const capacidadeAneis = capacidadeKg * 0.85;
-    
-    const volumeFunil = nivelFunil * capacidadeFunil;
-    const volumeAneis = siloInfo.numero_aneis > 0 
-      ? (nivelAneis / siloInfo.numero_aneis) * capacidadeAneis 
-      : 0;
-    return volumeFunil + volumeAneis;
+  const handleSaveNivel = async () => {
+    if (salvandoNivel) return;
+    setSalvandoNivel(true);
+
+    try {
+      const { error } = await supabase
+        .from('historico_nivel_silo')
+        .insert({
+          galpao_id: galpaoId,
+          lote_id: loteId,
+          integrado_id: integradoId,
+          nivel_funil: nivelFunil,
+          nivel_aneis: nivelAneis,
+          nivel_estimado_kg: nivelEstimadoKg,
+          registrado_por: user?.id,
+          observacoes: 'Nível inicial ao abrir lote',
+        });
+
+      if (error) throw error;
+
+      setNivelSalvo(nivelEstimadoKg);
+      toast.success('Nível do silo gravado!');
+    } catch (error) {
+      console.error('Erro ao gravar nível:', error);
+      toast.error('Erro ao gravar nível do silo');
+    } finally {
+      setSalvandoNivel(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -209,6 +260,18 @@ export function SolicitarRacaoLoteDialog({
       return;
     }
 
+    // Capacity validation
+    if (siloInfo && nivelSalvo !== null) {
+      const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
+      const nivelAposRecebimento = nivelSalvo + parseFloat(quantidade);
+      
+      if (nivelAposRecebimento > capacidadeKg) {
+        const excesso = nivelAposRecebimento - capacidadeKg;
+        toast.error(`Quantidade excede capacidade do silo em ${excesso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       // Get product name for tipo_racao field
@@ -217,9 +280,6 @@ export function SolicitarRacaoLoteDialog({
       // Combine date and time
       const [hours, minutes] = horaEntrega.split(':').map(Number);
       const dataHoraPrevista = setMinutes(setHours(dataEntrega, hours), minutes);
-
-      // Calculate estimated silo level
-      const nivelEstimadoKg = calcularNivelEstimadoKg();
 
       const { error } = await supabase.from('solicitacoes_racao').insert({
         lote_id: loteId,
@@ -231,7 +291,7 @@ export function SolicitarRacaoLoteDialog({
         observacoes: 'Solicitação criada ao abrir lote',
         nivel_funil: siloInfo ? nivelFunil : null,
         nivel_aneis: siloInfo ? nivelAneis : null,
-        nivel_estimado_kg: nivelEstimadoKg,
+        nivel_estimado_kg: nivelSalvo,
       });
 
       if (error) throw error;
@@ -252,9 +312,13 @@ export function SolicitarRacaoLoteDialog({
     onSkip?.();
   };
 
+  const capacidadeKg = siloInfo ? siloInfo.capacidade_toneladas * 1000 : 0;
+  const percentualPreenchido = capacidadeKg > 0 ? (nivelEstimadoKg / capacidadeKg) * 100 : 0;
+  const canRequestFeed = !siloInfo || nivelSalvo !== null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-primary" />
@@ -271,89 +335,225 @@ export function SolicitarRacaoLoteDialog({
             <p><strong>Quantidade de aves:</strong> {quantidadeAves.toLocaleString('pt-BR')}</p>
           </div>
 
-          {/* Silo level selector - only show if silo is linked */}
+          {/* Step 1: Silo level selector - only show if silo is linked */}
           {siloInfo && (
-            <NivelSiloSelector
-              numeroAneis={siloInfo.numero_aneis}
-              capacidadeToneladas={siloInfo.capacidade_toneladas}
-              nivelFunil={nivelFunil}
-              nivelAneis={nivelAneis}
-              onNivelFunilChange={setNivelFunil}
-              onNivelAneisChange={setNivelAneis}
-            />
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package className="w-4 h-4 text-primary" />
+                  Etapa 1: Nível do Silo
+                  {nivelSalvo !== null && (
+                    <Badge variant="outline" className="ml-auto bg-green-500/10 text-green-600">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Gravado
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Funil</Label>
+                    <Select 
+                      value={nivelFunil.toString()} 
+                      onValueChange={(v) => setNivelFunil(parseFloat(v))}
+                      disabled={nivelSalvo !== null}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Vazio (0)</SelectItem>
+                        <SelectItem value="0.5">Meio (½)</SelectItem>
+                        <SelectItem value="1">Cheio (1)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Anéis preenchidos</Label>
+                    <Select 
+                      value={nivelAneis.toString()} 
+                      onValueChange={(v) => setNivelAneis(parseFloat(v))}
+                      disabled={nivelSalvo !== null}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opcoesAneis.map((opcao) => (
+                          <SelectItem key={opcao.value} value={opcao.value.toString()}>
+                            {opcao.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Visual representation */}
+                <div className="flex items-center gap-4">
+                  <div className="relative w-12 h-16 flex flex-col">
+                    <div className="flex-1 bg-muted rounded-t-sm border border-border overflow-hidden flex flex-col-reverse">
+                      <div 
+                        className="bg-amber-500/70 transition-all duration-300"
+                        style={{ height: `${Math.min(percentualPreenchido, 100)}%` }}
+                      />
+                    </div>
+                    <div 
+                      className="h-3 border-l border-r border-b border-border"
+                      style={{
+                        clipPath: 'polygon(0% 0%, 100% 0%, 70% 100%, 30% 100%)',
+                        background: nivelFunil > 0 
+                          ? `linear-gradient(to bottom, rgb(245 158 11 / 0.7) ${nivelFunil * 100}%, hsl(var(--muted)) ${nivelFunil * 100}%)`
+                          : 'hsl(var(--muted))'
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Estimativa:</p>
+                    <p className="text-lg font-bold text-primary">
+                      {nivelEstimadoKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      (~{percentualPreenchido.toFixed(0)}% do silo)
+                    </p>
+                  </div>
+                </div>
+
+                {nivelSalvo === null && (
+                  <Button 
+                    onClick={handleSaveNivel} 
+                    disabled={salvandoNivel}
+                    className="w-full gap-2"
+                    variant="secondary"
+                    size="sm"
+                  >
+                    <Save className="w-4 h-4" />
+                    {salvandoNivel ? 'Gravando...' : 'Gravar Nível'}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
           )}
 
-          <div className="space-y-2">
-            <Label>Tipo de Ração</Label>
-            <Select value={selectedProdutoId} onValueChange={setSelectedProdutoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a ração" />
-              </SelectTrigger>
-              <SelectContent>
-                {produtos.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    Nenhuma ração cadastrada
-                  </SelectItem>
-                ) : (
-                  produtos.map((produto) => (
-                    <SelectItem key={produto.id} value={produto.id}>
-                      {produto.sku} - {produto.nome}
-                    </SelectItem>
-                  ))
+          {/* Step 2: Feed request form */}
+          <div className={cn(
+            "space-y-4 transition-opacity",
+            siloInfo && !canRequestFeed && "opacity-50 pointer-events-none"
+          )}>
+            {siloInfo && (
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium text-sm">Etapa 2: Solicitar Ração</h4>
+                {!canRequestFeed && (
+                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                    Grave o nível primeiro
+                  </Badge>
                 )}
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
+            )}
 
-          <div className="space-y-2">
-            <Label>Quantidade (kg)</Label>
-            <Input
-              type="number"
-              min="1"
-              value={quantidade}
-              onChange={(e) => setQuantidade(e.target.value)}
-              placeholder="Quantidade em kg"
-            />
-            <p className="text-xs text-muted-foreground">
-              Sugestão: {suggestedQuantity.toLocaleString('pt-BR')} kg (50g/ave)
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Data de Entrega</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataEntrega && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataEntrega ? format(dataEntrega, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataEntrega}
-                    onSelect={setDataEntrega}
-                    locale={ptBR}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label>Tipo de Ração</Label>
+              <Select value={selectedProdutoId} onValueChange={setSelectedProdutoId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a ração" />
+                </SelectTrigger>
+                <SelectContent>
+                  {produtos.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      Nenhuma ração cadastrada
+                    </SelectItem>
+                  ) : (
+                    produtos.map((produto) => (
+                      <SelectItem key={produto.id} value={produto.id}>
+                        {produto.sku} - {produto.nome}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Hora</Label>
+              <Label>Quantidade (kg)</Label>
               <Input
-                type="time"
-                value={horaEntrega}
-                onChange={(e) => setHoraEntrega(e.target.value)}
+                type="number"
+                min="1"
+                value={quantidade}
+                onChange={(e) => setQuantidade(e.target.value)}
+                placeholder="Quantidade em kg"
               />
+              <p className="text-xs text-muted-foreground">
+                Sugestão: {suggestedQuantity.toLocaleString('pt-BR')} kg (50g/ave)
+              </p>
+            </div>
+
+            {/* Capacity check */}
+            {siloInfo && nivelSalvo !== null && quantidade && parseFloat(quantidade) > 0 && (
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Nível atual:</span>
+                  <span>{nivelSalvo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Após recebimento:</span>
+                  <span className={cn(
+                    "font-medium",
+                    (nivelSalvo + parseFloat(quantidade)) > capacidadeKg ? "text-red-600" : "text-green-600"
+                  )}>
+                    {(nivelSalvo + parseFloat(quantidade)).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Capacidade:</span>
+                  <span>{capacidadeKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+                </div>
+                {(nivelSalvo + parseFloat(quantidade)) > capacidadeKg && (
+                  <p className="text-red-600 text-xs mt-2">
+                    ⚠️ Excede capacidade em {((nivelSalvo + parseFloat(quantidade)) - capacidadeKg).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Data de Entrega</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dataEntrega && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataEntrega ? format(dataEntrega, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataEntrega}
+                      onSelect={setDataEntrega}
+                      locale={ptBR}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Hora</Label>
+                <Input
+                  type="time"
+                  value={horaEntrega}
+                  onChange={(e) => setHoraEntrega(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -372,7 +572,7 @@ export function SolicitarRacaoLoteDialog({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={loading || produtos.length === 0}
+            disabled={loading || produtos.length === 0 || (siloInfo && !canRequestFeed)}
             className="flex-1 sm:flex-none"
           >
             {loading ? 'Enviando...' : 'Solicitar Ração'}
