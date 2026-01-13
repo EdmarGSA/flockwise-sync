@@ -10,9 +10,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, AlertTriangle, History, Package, Bird, CreditCard, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, History, Package, Bird, CreditCard, AlertCircle, Egg } from 'lucide-react';
 import { toast } from 'sonner';
 import LotesVendaSection from './LotesVendaSection';
+import OvosVendaSection, { OvoVendaItem } from './OvosVendaSection';
 
 interface NovoPedidoDialogProps {
   open: boolean;
@@ -35,6 +36,8 @@ interface PedidoItem {
   lote_producao_id?: string;
   is_ave_viva?: boolean;
   tipo_venda?: 'unidade' | 'peso';
+  is_ovo?: boolean;
+  produto_ovo_id?: string;
 }
 
 interface LoteVendaItem {
@@ -107,6 +110,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
   });
 
   const [itens, setItens] = useState<PedidoItem[]>([]);
+  const [itensOvos, setItensOvos] = useState<OvoVendaItem[]>([]);
   const [novoItem, setNovoItem] = useState({
     produto_id: '',
     quantidade: 1,
@@ -414,8 +418,40 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
     setItens([...itens, newItem]);
   };
 
+  const handleAddOvoItem = (ovoItem: OvoVendaItem) => {
+    // Check if product already exists
+    if (itens.some(i => i.produto_ovo_id === ovoItem.produto_ovo_id && i.is_ovo)) {
+      toast.error('Este produto de ovo já foi adicionado ao pedido');
+      return;
+    }
+
+    const newItem: PedidoItem = {
+      produto_id: '',
+      produto_nome: ovoItem.produto_nome,
+      quantidade: ovoItem.quantidade,
+      unidade_medida: ovoItem.unidade_venda,
+      preco_tabela: ovoItem.preco_unitario,
+      preco_unitario: ovoItem.preco_unitario,
+      desconto_percentual: 0,
+      valor_total: ovoItem.valor_total,
+      margem_calculada: ovoItem.margem_calculada,
+      custo_medio: ovoItem.custo_medio_unitario * ovoItem.fator_conversao,
+      is_ovo: true,
+      produto_ovo_id: ovoItem.produto_ovo_id,
+    };
+
+    setItens([...itens, newItem]);
+    setItensOvos([...itensOvos, ovoItem]);
+  };
+
   const handleRemoveItem = (index: number) => {
+    const itemRemoved = itens[index];
     setItens(itens.filter((_, i) => i !== index));
+    
+    // Also remove from itensOvos if it's an egg item
+    if (itemRemoved.is_ovo && itemRemoved.produto_ovo_id) {
+      setItensOvos(itensOvos.filter(o => o.produto_ovo_id !== itemRemoved.produto_ovo_id));
+    }
   };
 
   const handleUpdateItemPrice = (index: number, newPrice: number) => {
@@ -505,25 +541,47 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
 
       if (pedidoError) throw pedidoError;
 
-      // Create order items
-      const pedidoItens = itens.map(item => ({
-        pedido_id: pedido.id,
-        produto_id: item.is_ave_viva ? null : item.produto_id,
-        quantidade: item.quantidade,
-        unidade_medida: item.unidade_medida,
-        preco_tabela: item.preco_tabela,
-        preco_unitario: item.preco_unitario,
-        desconto_percentual: item.desconto_percentual,
-        valor_total: item.valor_total,
-        margem_calculada: item.margem_calculada,
-        lote_producao_id: item.lote_producao_id || null
-      }));
+      // Create order items (excluding egg items which go to pedido_itens_ovos)
+      const pedidoItens = itens
+        .filter(item => !item.is_ovo)
+        .map(item => ({
+          pedido_id: pedido.id,
+          produto_id: item.is_ave_viva ? null : item.produto_id,
+          quantidade: item.quantidade,
+          unidade_medida: item.unidade_medida,
+          preco_tabela: item.preco_tabela,
+          preco_unitario: item.preco_unitario,
+          desconto_percentual: item.desconto_percentual,
+          valor_total: item.valor_total,
+          margem_calculada: item.margem_calculada,
+          lote_producao_id: item.lote_producao_id || null
+        }));
 
-      const { error: itensError } = await supabase
-        .from('pedido_itens')
-        .insert(pedidoItens);
+      if (pedidoItens.length > 0) {
+        const { error: itensError } = await supabase
+          .from('pedido_itens')
+          .insert(pedidoItens);
 
-      if (itensError) throw itensError;
+        if (itensError) throw itensError;
+      }
+
+      // Create egg order items
+      if (itensOvos.length > 0) {
+        const pedidoItensOvos = itensOvos.map(item => ({
+          pedido_id: pedido.id,
+          produto_ovo_id: item.produto_ovo_id,
+          quantidade: item.quantidade,
+          quantidade_unidades: item.quantidade_unidades,
+          preco_unitario: item.preco_unitario,
+          valor_total: item.valor_total
+        }));
+
+        const { error: ovosError } = await supabase
+          .from('pedido_itens_ovos')
+          .insert(pedidoItensOvos);
+
+        if (ovosError) throw ovosError;
+      }
 
       toast.success(`Pedido #${pedido.numero_pedido} criado com sucesso!`);
       onSuccess();
@@ -549,6 +607,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
       valor_frete: 0
     });
     setItens([]);
+    setItensOvos([]);
     setNovoItem({ produto_id: '', quantidade: 1, preco_unitario: 0 });
     setHistoricoCliente([]);
     setActiveTab('produtos');
@@ -704,7 +763,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
 
           {/* Tabs for Products and Live Birds */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="produtos" className="flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 Produtos
@@ -712,6 +771,10 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
               <TabsTrigger value="aves" className="flex items-center gap-2">
                 <Bird className="w-4 h-4" />
                 Aves Vivas
+              </TabsTrigger>
+              <TabsTrigger value="ovos" className="flex items-center gap-2">
+                <Egg className="w-4 h-4" />
+                Ovos
               </TabsTrigger>
             </TabsList>
 
@@ -781,6 +844,14 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                 onAddItem={handleAddLoteItem}
               />
             </TabsContent>
+
+            <TabsContent value="ovos" className="mt-4">
+              <OvosVendaSection
+                integradoId={integradoId}
+                margemMinima={margemMinima}
+                onAddItem={handleAddOvoItem}
+              />
+            </TabsContent>
           </Tabs>
 
           {/* Items Table */}
@@ -804,6 +875,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {item.is_ave_viva && <Bird className="w-4 h-4 text-primary" />}
+                            {item.is_ovo && <Egg className="w-4 h-4 text-amber-600" />}
                             {item.produto_nome}
                           </div>
                         </TableCell>
@@ -811,7 +883,7 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                           {item.quantidade} {item.unidade_medida}
                         </TableCell>
                         <TableCell className="text-right">
-                          {item.is_ave_viva ? (
+                          {item.is_ave_viva || item.is_ovo ? (
                             <span>R$ {item.preco_unitario.toFixed(2)}</span>
                           ) : (
                             <Input
@@ -830,6 +902,11 @@ export default function NovoPedidoDialog({ open, onOpenChange, integradoId, onSu
                         <TableCell className="text-right">
                           {item.is_ave_viva ? (
                             <Badge variant="secondary">Ave Viva</Badge>
+                          ) : item.is_ovo ? (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
+                              <Egg className="w-3 h-3 mr-1" />
+                              Ovo
+                            </Badge>
                           ) : (
                             <Badge variant={item.margem_calculada < margemMinima ? 'destructive' : 'default'}>
                               {item.custo_medio > 0 ? (
