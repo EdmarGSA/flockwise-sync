@@ -176,50 +176,49 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logoGSA} alt="GSA Tibiri" className="w-10 h-10 rounded-lg" />
-            <span className="text-xl font-bold text-foreground">
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <img src={logoGSA} alt="GSA Tibiri" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg" />
+            <span className="text-lg sm:text-xl font-bold text-foreground">
               GSA <span className="text-[#2E7D32]">Tibiri</span>
             </span>
           </div>
           
-          <div className="flex items-center gap-4">
-            <span className="text-muted-foreground hidden sm:block">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <span className="text-muted-foreground hidden md:block text-sm">
               {user?.user_metadata?.full_name || user?.email}
             </span>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => navigate('/configuracoes')}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground h-9 w-9"
             >
               <Settings className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sair
+            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9">
+              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-24">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
             Olá, {user?.user_metadata?.full_name?.split(' ')[0] || 'Produtor'}!
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Selecione um módulo para começar
           </p>
         </div>
 
         {modulesLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {[...Array(6)].map((_, i) => (
               <Card key={i} className="bg-card border-border">
-                <CardHeader className="pb-3">
-                  <Skeleton className="w-12 h-12 rounded-xl mb-3" />
+                <CardHeader className="pb-3 p-4 sm:p-6">
+                  <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl mb-3" />
                   <Skeleton className="h-5 w-32" />
                   <Skeleton className="h-4 w-48 mt-2" />
                 </CardHeader>
@@ -227,7 +226,7 @@ export default function Home() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {modules.map((module) => {
               const status = getModuleStatus(module);
               const isClickable = status === 'available';
@@ -244,9 +243,9 @@ export default function Home() {
                   }`}
                   onClick={() => isClickable && handleModuleClick(module)}
                 >
-                  <CardHeader className="pb-3">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center mb-3 relative`}>
-                      <module.icon className="w-6 h-6 text-white" />
+                <CardHeader className="pb-3 p-4 sm:p-6">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center mb-2 sm:mb-3 relative`}>
+                      <module.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       {status === 'no-permission' && (
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center">
                           <Lock className="w-3 h-3 text-destructive-foreground" />

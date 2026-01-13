@@ -256,51 +256,54 @@ export default function FabricaRacao() {
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="h-9 w-9">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
-              <Factory className="w-6 h-6 text-white" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
+              <Factory className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">Fábrica de Ração</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground hidden sm:inline">Fábrica de Ração</span>
+            <span className="text-lg font-bold text-foreground sm:hidden">Fábrica</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchProdutosCriticos(); fetchStats(); }}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
+          <Button variant="outline" size="sm" onClick={() => { fetchProdutosCriticos(); fetchStats(); }} className="h-9 px-2 sm:px-3">
+            <RefreshCw className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-24">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-6">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="producao" className="flex items-center gap-2">
-              <Cog className="w-4 h-4" />
-              Produção
-            </TabsTrigger>
-            <TabsTrigger value="compras" className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Compras
-            </TabsTrigger>
-            <TabsTrigger value="ordens" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Ordens Compra
-            </TabsTrigger>
-            <TabsTrigger value="recebimento" className="flex items-center gap-2">
-              <Package className="w-4 h-4" />
-              Recebimento
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6">
+            <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-5">
+              <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger value="producao" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                <Cog className="w-4 h-4" />
+                <span className="hidden sm:inline">Produção</span>
+              </TabsTrigger>
+              <TabsTrigger value="compras" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                <ShoppingCart className="w-4 h-4" />
+                <span className="hidden sm:inline">Compras</span>
+              </TabsTrigger>
+              <TabsTrigger value="ordens" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Ordens</span>
+              </TabsTrigger>
+              <TabsTrigger value="recebimento" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                <Package className="w-4 h-4" />
+                <span className="hidden sm:inline">Receb.</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="dashboard">
             {/* Stats Cards - Clickable */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
               <Card 
                 className="bg-card border-green-500/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-green-500"
                 onClick={() => setShowEstoqueRacao(true)}

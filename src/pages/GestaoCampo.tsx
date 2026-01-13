@@ -271,16 +271,16 @@ export default function GestaoCampo() {
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="h-9 w-9">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
-                <Bird className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
+                <Bird className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">
+              <span className="text-lg sm:text-xl font-bold text-foreground">
                 Gestão de Campo
               </span>
             </div>
@@ -288,31 +288,33 @@ export default function GestaoCampo() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-24">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <TabsList className="grid grid-cols-5 w-full max-w-3xl">
-              <TabsTrigger value="lotes" className="flex items-center gap-2">
-                <Bird className="h-4 w-4" />
-                Lotes
-              </TabsTrigger>
-              <TabsTrigger value="nucleos" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Núcleos
-              </TabsTrigger>
-              <TabsTrigger value="galpoes" className="flex items-center gap-2">
-                <Home className="h-4 w-4" />
-                Galpões
-              </TabsTrigger>
-              <TabsTrigger value="areas" className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Áreas
-              </TabsTrigger>
-              <TabsTrigger value="desempenho" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Desempenho
-              </TabsTrigger>
-            </TabsList>
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex w-auto min-w-full sm:w-auto sm:grid sm:grid-cols-5">
+                <TabsTrigger value="lotes" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <Bird className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lotes</span>
+                </TabsTrigger>
+                <TabsTrigger value="nucleos" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <Building2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Núcleos</span>
+                </TabsTrigger>
+                <TabsTrigger value="galpoes" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Galpões</span>
+                </TabsTrigger>
+                <TabsTrigger value="areas" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <MapPin className="h-4 w-4" />
+                  <span className="hidden sm:inline">Áreas</span>
+                </TabsTrigger>
+                <TabsTrigger value="desempenho" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Desemp.</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             {activeTab === 'lotes' ? (
               <Dialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen}>

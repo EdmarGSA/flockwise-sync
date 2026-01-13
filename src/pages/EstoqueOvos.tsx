@@ -203,23 +203,23 @@ export default function EstoqueOvos() {
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="h-9 w-9">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
-              <Egg className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
+              <Egg className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Estoque de Ovos</h1>
-              <p className="text-sm text-muted-foreground">Gestão FIFO e rastreabilidade</p>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground">Estoque de Ovos</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Gestão FIFO e rastreabilidade</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 pt-28">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-28">
         {/* Alertas */}
         {alertasValidade.length > 0 && (
           <Card className="mb-6 border-amber-500/50 bg-amber-500/10">
@@ -233,7 +233,7 @@ export default function EstoqueOvos() {
         )}
 
         {/* Resumo */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {Object.values(resumo).map((item, idx) => (
             <Card key={idx}>
               <CardContent className="p-4">
@@ -248,12 +248,12 @@ export default function EstoqueOvos() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="estoque" className="flex items-center gap-2">
-              <Package className="w-4 h-4" /> Estoque
+          <TabsList className="mb-4 w-full sm:w-auto">
+            <TabsTrigger value="estoque" className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none">
+              <Package className="w-4 h-4" /> <span className="hidden sm:inline">Estoque</span>
             </TabsTrigger>
-            <TabsTrigger value="kardex" className="flex items-center gap-2">
-              <History className="w-4 h-4" /> Movimentação
+            <TabsTrigger value="kardex" className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none">
+              <History className="w-4 h-4" /> <span className="hidden sm:inline">Movimentação</span><span className="sm:hidden">Movim.</span>
             </TabsTrigger>
           </TabsList>
 
@@ -373,8 +373,8 @@ export default function EstoqueOvos() {
               </CardHeader>
               <CardContent>
                 {/* Filtros */}
-                <div className="flex flex-wrap gap-4 mb-4">
-                  <div className="flex-1 min-w-[200px]">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
+                  <div className="flex-1">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -385,28 +385,30 @@ export default function EstoqueOvos() {
                       />
                     </div>
                   </div>
-                  <Select value={filterTipo || 'all'} onValueChange={(v) => setFilterTipo(v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {TIPOS_OVO.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterClassificacao || 'all'} onValueChange={(v) => setFilterClassificacao(v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Classificação" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {CLASSIFICACOES_PESO.map(c => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2 sm:gap-4">
+                    <Select value={filterTipo || 'all'} onValueChange={(v) => setFilterTipo(v === 'all' ? '' : v)}>
+                      <SelectTrigger className="w-full sm:w-[150px]">
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {TIPOS_OVO.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={filterClassificacao || 'all'} onValueChange={(v) => setFilterClassificacao(v === 'all' ? '' : v)}>
+                      <SelectTrigger className="w-full sm:w-[150px]">
+                        <SelectValue placeholder="Classif." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {CLASSIFICACOES_PESO.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {loading ? (

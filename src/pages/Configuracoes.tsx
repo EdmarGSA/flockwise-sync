@@ -100,35 +100,35 @@ const Configuracoes = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-6 pt-24 pb-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+      <main className="container mx-auto px-3 sm:px-6 pt-20 sm:pt-24 pb-12">
+        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="h-9 w-9">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Settings className="w-6 h-6 text-primary-foreground" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+              <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
-              <p className="text-muted-foreground">Gerencie cadastros e configurações do sistema</p>
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Configurações</h1>
+              <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">Gerencie cadastros e configurações</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {menuItems.map((item) => (
             <Card 
               key={item.path}
               className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-lg"
               onClick={() => navigate(item.path)}
             >
-              <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-                  <item.icon className="w-6 h-6 text-primary" />
+              <CardHeader className="p-4 sm:p-6">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                  <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 </div>
-                <CardTitle>{item.title}</CardTitle>
-                <CardDescription>{item.description}</CardDescription>
+                <CardTitle className="text-base sm:text-lg">{item.title}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">{item.description}</CardDescription>
               </CardHeader>
             </Card>
           ))}
