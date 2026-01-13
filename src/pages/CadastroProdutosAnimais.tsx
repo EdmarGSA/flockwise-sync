@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -30,19 +31,20 @@ interface ProdutoAnimal {
 export default function CadastroProdutosAnimais() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [produtos, setProdutos] = useState<ProdutoAnimal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       fetchProdutos();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const fetchProdutos = async () => {
-    if (!user) return;
+    if (!integradoId) return;
     
     setLoading(true);
     try {
@@ -60,7 +62,7 @@ export default function CadastroProdutosAnimais() {
           ativo,
           grupo_animal:grupos_animal(id, nome)
         `)
-        .eq('integrado_id', user.id)
+        .eq('integrado_id', integradoId)
         .order('nome');
 
       if (error) throw error;
@@ -106,7 +108,7 @@ export default function CadastroProdutosAnimais() {
     p.grupo_animal?.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (authLoading) {
+  if (authLoading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -114,7 +116,7 @@ export default function CadastroProdutosAnimais() {
     );
   }
 
-  if (!user) {
+  if (!user || !integradoId) {
     navigate('/auth');
     return null;
   }
@@ -233,7 +235,7 @@ export default function CadastroProdutosAnimais() {
             <DialogTitle>Novo Produto Animal</DialogTitle>
           </DialogHeader>
           <ProdutoAnimalForm
-            integradoId={user.id}
+            integradoId={integradoId}
             onSuccess={() => {
               setShowDialog(false);
               fetchProdutos();

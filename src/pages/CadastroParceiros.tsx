@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,7 @@ interface Parceiro {
 
 const CadastroParceiros = () => {
   const { user, loading } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [parceiros, setParceiros] = useState<Parceiro[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -43,10 +45,10 @@ const CadastroParceiros = () => {
   const [vincularParceiro, setVincularParceiro] = useState<Parceiro | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       fetchParceiros();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const fetchParceiros = async () => {
     try {
@@ -54,7 +56,7 @@ const CadastroParceiros = () => {
       const { data: parceirosData, error: parceirosError } = await supabase
         .from('parceiros')
         .select('*')
-        .eq('integrado_id', user?.id)
+        .eq('integrado_id', integradoId)
         .order('razao_social_nome');
 
       if (parceirosError) throw parceirosError;
@@ -63,7 +65,7 @@ const CadastroParceiros = () => {
       const { data: vinculosData, error: vinculosError } = await supabase
         .from('produto_fornecedor')
         .select('parceiro_id')
-        .eq('integrado_id', user?.id);
+        .eq('integrado_id', integradoId);
 
       if (vinculosError) throw vinculosError;
 
@@ -87,7 +89,7 @@ const CadastroParceiros = () => {
     }
   };
 
-  if (loading) {
+  if (loading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -95,7 +97,7 @@ const CadastroParceiros = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !integradoId) {
     navigate('/auth');
     return null;
   }
@@ -173,7 +175,7 @@ const CadastroParceiros = () => {
             </CardHeader>
             <CardContent>
               <ParceiroForm
-                integradoId={user.id}
+                integradoId={integradoId}
                 onSuccess={() => {
                   setShowForm(false);
                   fetchParceiros();
@@ -319,7 +321,7 @@ const CadastroParceiros = () => {
           open={!!editingParceiro}
           onOpenChange={(open) => !open && setEditingParceiro(null)}
           parceiro={editingParceiro}
-          integradoId={user.id}
+          integradoId={integradoId}
           onSuccess={() => {
             setEditingParceiro(null);
             fetchParceiros();
@@ -331,7 +333,7 @@ const CadastroParceiros = () => {
           onOpenChange={(open) => !open && setVincularParceiro(null)}
           parceiroId={vincularParceiro?.id || ""}
           parceiroNome={vincularParceiro?.razao_social_nome || ""}
-          integradoId={user.id}
+          integradoId={integradoId}
           onSuccess={fetchParceiros}
         />
       </main>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import FornecedoresVinculadosDialog from "@/components/cadastro/FornecedoresVinc
 
 const CadastroProdutos = () => {
   const { user, loading } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [produtos, setProdutos] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
@@ -36,44 +38,28 @@ const CadastroProdutos = () => {
   const [selectedProdutoKardex, setSelectedProdutoKardex] = useState<any>(null);
   const [formulacaoProduto, setFormulacaoProduto] = useState<any>(null);
   const [fornecedoresProduto, setFornecedoresProduto] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (profile) {
+    if (integradoId) {
       initializeDefaultGrupos();
     }
-  }, [profile]);
-
-  const fetchProfile = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user?.id)
-      .maybeSingle();
-    setProfile(data);
-  };
+  }, [integradoId]);
 
   const initializeDefaultGrupos = async () => {
     // Initialize default product groups
     const { data: existingGrupos } = await supabase
       .from("grupos_produto")
       .select("id")
-      .eq("integrado_id", profile?.id)
+      .eq("integrado_id", integradoId)
       .limit(1);
 
     if (!existingGrupos || existingGrupos.length === 0) {
       const defaultGrupos = [
-        { nome: "Ração", descricao: "Rações para animais", integrado_id: profile?.id },
-        { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: profile?.id },
-        { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: profile?.id },
-        { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: profile?.id },
-        { nome: "Vacina", descricao: "Vacinas", integrado_id: profile?.id },
+        { nome: "Ração", descricao: "Rações para animais", integrado_id: integradoId },
+        { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: integradoId },
+        { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: integradoId },
+        { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: integradoId },
+        { nome: "Vacina", descricao: "Vacinas", integrado_id: integradoId },
       ];
 
       await supabase.from('grupos_produto').insert(defaultGrupos as any);
@@ -83,14 +69,14 @@ const CadastroProdutos = () => {
     const { data: existingCategorias } = await supabase
       .from("categorias")
       .select("id")
-      .eq("integrado_id", profile?.id)
+      .eq("integrado_id", integradoId)
       .limit(1);
 
     if (!existingCategorias || existingCategorias.length === 0) {
       const defaultCategorias = [
-        { nome: "Produção Própria", descricao: "Produtos de produção própria", tipo_origem: "producao_propria", integrado_id: profile?.id },
-        { nome: "Fabricação Própria", descricao: "Produtos fabricados internamente", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
-        { nome: "Terceiros", descricao: "Produtos adquiridos de terceiros", tipo_origem: "terceiros", integrado_id: profile?.id },
+        { nome: "Produção Própria", descricao: "Produtos de produção própria", tipo_origem: "producao_propria", integrado_id: integradoId },
+        { nome: "Fabricação Própria", descricao: "Produtos fabricados internamente", tipo_origem: "fabricacao_propria", integrado_id: integradoId },
+        { nome: "Terceiros", descricao: "Produtos adquiridos de terceiros", tipo_origem: "terceiros", integrado_id: integradoId },
       ];
 
       await supabase.from('categorias').insert(defaultCategorias as any);
@@ -103,11 +89,11 @@ const CadastroProdutos = () => {
     setLoadingData(true);
     
     const [produtosRes, categoriasRes, gruposProdutoRes, gruposAnimalRes, fasesRes] = await Promise.all([
-      supabase.from('produtos').select('*, categorias(nome, tipo_origem)').eq('integrado_id', profile?.id),
-      supabase.from('categorias').select('*').eq('integrado_id', profile?.id),
-      supabase.from('grupos_produto').select('*').eq('integrado_id', profile?.id),
-      supabase.from('grupos_animal').select('*').eq('integrado_id', profile?.id),
-      supabase.from('fases_animal').select('*').eq('integrado_id', profile?.id),
+      supabase.from('produtos').select('*, categorias(nome, tipo_origem)').eq('integrado_id', integradoId),
+      supabase.from('categorias').select('*').eq('integrado_id', integradoId),
+      supabase.from('grupos_produto').select('*').eq('integrado_id', integradoId),
+      supabase.from('grupos_animal').select('*').eq('integrado_id', integradoId),
+      supabase.from('fases_animal').select('*').eq('integrado_id', integradoId),
     ]);
 
     if (produtosRes.data) setProdutos(produtosRes.data);
@@ -145,30 +131,30 @@ const CadastroProdutos = () => {
     await supabase
       .from('categorias')
       .delete()
-      .eq('integrado_id', profile?.id);
+      .eq('integrado_id', integradoId);
 
     // Delete existing product groups for this user
     await supabase
       .from('grupos_produto')
       .delete()
-      .eq('integrado_id', profile?.id);
+      .eq('integrado_id', integradoId);
 
     // Recreate default categories
     const defaultCategorias = [
-      { nome: "Produção Própria", descricao: "Produtos de produção própria", tipo_origem: "producao_propria", integrado_id: profile?.id },
-      { nome: "Fabricação Própria", descricao: "Produtos fabricados internamente", tipo_origem: "fabricacao_propria", integrado_id: profile?.id },
-      { nome: "Terceiros", descricao: "Produtos adquiridos de terceiros", tipo_origem: "terceiros", integrado_id: profile?.id },
+      { nome: "Produção Própria", descricao: "Produtos de produção própria", tipo_origem: "producao_propria", integrado_id: integradoId },
+      { nome: "Fabricação Própria", descricao: "Produtos fabricados internamente", tipo_origem: "fabricacao_propria", integrado_id: integradoId },
+      { nome: "Terceiros", descricao: "Produtos adquiridos de terceiros", tipo_origem: "terceiros", integrado_id: integradoId },
     ];
 
     await supabase.from('categorias').insert(defaultCategorias as any);
 
     // Recreate default product groups
     const defaultGrupos = [
-      { nome: "Ração", descricao: "Rações para animais", integrado_id: profile?.id },
-      { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: profile?.id },
-      { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: profile?.id },
-      { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: profile?.id },
-      { nome: "Vacina", descricao: "Vacinas", integrado_id: profile?.id },
+      { nome: "Ração", descricao: "Rações para animais", integrado_id: integradoId },
+      { nome: "Suplemento", descricao: "Suplementos nutricionais", integrado_id: integradoId },
+      { nome: "Cereais", descricao: "Grãos e cereais", integrado_id: integradoId },
+      { nome: "Medicamento", descricao: "Medicamentos veterinários", integrado_id: integradoId },
+      { nome: "Vacina", descricao: "Vacinas", integrado_id: integradoId },
     ];
 
     await supabase.from('grupos_produto').insert(defaultGrupos as any);
@@ -195,7 +181,7 @@ const CadastroProdutos = () => {
     return variants[tipo] || 'outline';
   };
 
-  if (loading) {
+  if (loading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -203,7 +189,7 @@ const CadastroProdutos = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !integradoId) {
     navigate('/auth');
     return null;
   }
@@ -283,7 +269,7 @@ const CadastroProdutos = () => {
                       <DialogTitle>Novo Produto</DialogTitle>
                     </DialogHeader>
                     <ProdutoForm 
-                      integradoId={profile?.id} 
+                      integradoId={integradoId} 
                       userId={user?.id}
                       categorias={categorias}
                       gruposProduto={gruposProduto}
@@ -407,7 +393,7 @@ const CadastroProdutos = () => {
                     <DialogHeader>
                       <DialogTitle>Novo Grupo de Produto</DialogTitle>
                     </DialogHeader>
-                    <GrupoProdutoForm integradoId={profile?.id} onSuccess={handleGrupoSuccess} />
+                    <GrupoProdutoForm integradoId={integradoId} onSuccess={handleGrupoSuccess} />
                   </DialogContent>
                 </Dialog>
               </CardHeader>
@@ -460,7 +446,7 @@ const CadastroProdutos = () => {
                     <DialogHeader>
                       <DialogTitle>Nova Categoria</DialogTitle>
                     </DialogHeader>
-                    <CategoriaForm integradoId={profile?.id} onSuccess={handleCategoriaSuccess} />
+                    <CategoriaForm integradoId={integradoId} onSuccess={handleCategoriaSuccess} />
                   </DialogContent>
                 </Dialog>
               </CardHeader>
@@ -506,7 +492,7 @@ const CadastroProdutos = () => {
           </TabsContent>
 
           <TabsContent value="kardex">
-            <KardexView integradoId={profile?.id} produtos={produtos} />
+            <KardexView integradoId={integradoId} produtos={produtos} />
           </TabsContent>
         </Tabs>
 
@@ -538,7 +524,7 @@ const CadastroProdutos = () => {
             </DialogHeader>
             {selectedProdutoKardex && (
               <KardexView 
-                integradoId={profile?.id} 
+                integradoId={integradoId} 
                 produtos={[selectedProdutoKardex]}
                 produtoId={selectedProdutoKardex.id}
               />
@@ -551,7 +537,7 @@ const CadastroProdutos = () => {
           open={!!formulacaoProduto}
           onOpenChange={() => setFormulacaoProduto(null)}
           produto={formulacaoProduto}
-          integradoId={profile?.id}
+          integradoId={integradoId}
           gruposProduto={gruposProduto}
           produtos={produtos}
         />
