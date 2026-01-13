@@ -47,6 +47,7 @@ interface Lote {
   integrado_id: string;
   peso_medio_pintinhos: number | null;
   nucleo_id: string;
+  galpao_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
   // Saída de Lote fields
@@ -118,6 +119,7 @@ export default function MeusLotes() {
         integrado_id,
         peso_medio_pintinhos,
         nucleo_id,
+        galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome),
         veterinario_id,
@@ -582,6 +584,7 @@ export default function MeusLotes() {
             onOpenChange={setRacaoOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
+            galpaoId={selectedLote.galpao_id}
             nucleo={selectedLote.nucleo?.nome || '-'}
             galpao={selectedLote.galpao?.nome || '-'}
             tipoProducao={selectedLote.nucleo?.tipo_producao || null}

@@ -49,6 +49,7 @@ interface LoteData {
   integrado_id: string;
   peso_medio_pintinhos: number | null;
   nucleo_id: string;
+  galpao_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
   data_prevista_saida: string | null;
@@ -111,6 +112,7 @@ export default function LoteDetalhe() {
         integrado_id,
         peso_medio_pintinhos,
         nucleo_id,
+        galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome),
         veterinario_id,
@@ -553,6 +555,7 @@ export default function LoteDetalhe() {
         onOpenChange={setRacaoOpen}
         loteId={lote.id}
         integradoId={lote.integrado_id}
+        galpaoId={lote.galpao_id}
         nucleo={lote.nucleo?.nome || '-'}
         galpao={lote.galpao?.nome || '-'}
         tipoProducao={lote.nucleo?.tipo_producao || null}
