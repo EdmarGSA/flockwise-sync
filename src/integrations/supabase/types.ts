@@ -1231,6 +1231,7 @@ export type Database = {
           largura: number
           nome: string
           nucleo_id: string
+          silo_id: string | null
           silo_quantidade: number
           silo_volume_total: number | null
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
@@ -1254,6 +1255,7 @@ export type Database = {
           largura: number
           nome: string
           nucleo_id: string
+          silo_id?: string | null
           silo_quantidade?: number
           silo_volume_total?: number | null
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
@@ -1277,6 +1279,7 @@ export type Database = {
           largura?: number
           nome?: string
           nucleo_id?: string
+          silo_id?: string | null
           silo_quantidade?: number
           silo_volume_total?: number | null
           tipo_pressao?: Database["public"]["Enums"]["tipo_pressao"]
@@ -1290,6 +1293,13 @@ export type Database = {
             columns: ["nucleo_id"]
             isOneToOne: false
             referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "galpoes_silo_id_fkey"
+            columns: ["silo_id"]
+            isOneToOne: false
+            referencedRelation: "silos"
             referencedColumns: ["id"]
           },
         ]
@@ -4044,7 +4054,6 @@ export type Database = {
           created_at: string
           diametro_m: number
           fator_tonelada_m3: number
-          galpao_id: string | null
           id: string
           integrado_id: string
           marca: string | null
@@ -4060,7 +4069,6 @@ export type Database = {
           created_at?: string
           diametro_m: number
           fator_tonelada_m3?: number
-          galpao_id?: string | null
           id?: string
           integrado_id: string
           marca?: string | null
@@ -4076,7 +4084,6 @@ export type Database = {
           created_at?: string
           diametro_m?: number
           fator_tonelada_m3?: number
-          galpao_id?: string | null
           id?: string
           integrado_id?: string
           marca?: string | null
@@ -4085,15 +4092,7 @@ export type Database = {
           numero_pernas?: number
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "silos_galpao_id_fkey"
-            columns: ["galpao_id"]
-            isOneToOne: false
-            referencedRelation: "galpoes"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       silos_modelo: {
         Row: {
