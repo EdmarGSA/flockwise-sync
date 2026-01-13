@@ -152,22 +152,23 @@ export default function PedidosTable({ integradoId }: PedidosTableProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-6">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <FileText className="w-5 h-5" />
-          Pedidos de Venda
+          <span className="hidden sm:inline">Pedidos de Venda</span>
+          <span className="sm:hidden">Pedidos</span>
         </CardTitle>
-        <Button onClick={() => setShowNovoPedido(true)}>
+        <Button onClick={() => setShowNovoPedido(true)} size="sm" className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Novo Pedido
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <CardContent className="space-y-4 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por número ou cliente..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -175,14 +176,14 @@ export default function PedidosTable({ integradoId }: PedidosTableProps) {
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filtrar por status" />
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="rascunho">Rascunho</SelectItem>
-              <SelectItem value="pendente_aprovacao">Pendente Aprovação</SelectItem>
+              <SelectItem value="pendente_aprovacao">Pendente</SelectItem>
               <SelectItem value="aprovado">Aprovado</SelectItem>
-              <SelectItem value="em_separacao">Em Separação</SelectItem>
+              <SelectItem value="em_separacao">Separação</SelectItem>
               <SelectItem value="faturado">Faturado</SelectItem>
               <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>

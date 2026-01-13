@@ -236,29 +236,29 @@ const CockpitThoth = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="h-9 w-9">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <Plane className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-bold">Cockpit Thoth</h1>
+              <Plane className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <h1 className="text-lg sm:text-xl font-bold">Cockpit</h1>
             </div>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleRefresh}
-            className="gap-2"
+            className="gap-1 sm:gap-2 h-9 px-2 sm:px-3"
           >
             <RefreshCw className="w-4 h-4" />
-            Atualizar
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Warning Lights Panel */}
         {loadingWarnings ? (
           <div className="bg-card rounded-lg border p-6 flex items-center justify-center">
