@@ -17,6 +17,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import PesagemDetalheDialog from '@/components/veterinario/PesagemDetalheDialog';
+import MortalidadeSemanaDetalheDialog from '@/components/lotes/MortalidadeSemanaDetalheDialog';
 
 interface Lote {
   id: string;
@@ -82,11 +83,20 @@ interface MortalidadeMedia {
 }
 
 interface MortalidadePorSemana {
-  dia: number;
-  mortalidade_real: number;
-  mortalidade_referencia: number | null;
+  semana: number;
+  diaInicio: number;
+  diaFim: number;
+  mortalidade_semana: number;
+  mortalidade_referencia: number;
+  quantidade_mortes_semana: number;
   acima_limite: boolean;
-  quantidade_mortes: number;
+}
+
+interface SemanaSelecionada {
+  semana: number;
+  diaInicio: number;
+  diaFim: number;
+  metaSemana: number;
 }
 
 interface RecebimentoLote {
@@ -125,8 +135,9 @@ export default function MetasPesoLote() {
   const [quantidadeAlojada, setQuantidadeAlojada] = useState<number>(0);
   const [alertasMortalidade, setAlertasMortalidade] = useState<MortalidadePorSemana[]>([]);
   
-  // State para PesagemDetalheDialog
+  // State para PesagemDetalheDialog e MortalidadeSemanaDetalheDialog
   const [pesagemSelecionada, setPesagemSelecionada] = useState<PesagemSelecionada | null>(null);
+  const [semanaSelecionada, setSemanaSelecionada] = useState<SemanaSelecionada | null>(null);
 
   useEffect(() => {
     if (user && loteId && integradoId) {
@@ -330,7 +341,7 @@ export default function MetasPesoLote() {
       });
     }
 
-    // Fetch mortalidade do lote
+    // Fetch mortalidade do lote - agora calculando por semana (incremental)
     if (loteData.data_alojamento && qtdAlojada > 0) {
       const { data: mortalidadeData } = await supabase
         .from('mortalidade')
@@ -341,47 +352,62 @@ export default function MetasPesoLote() {
         .eq('lote_id', loteId);
 
       if (mortalidadeData) {
-        const dataAlojamento = new Date(loteData.data_alojamento);
-        const semanas = [7, 14, 21, 28, 35, 42, 49];
+        // Definir semanas com início e fim
+        const semanasConfig = [
+          { semana: 1, diaInicio: 1, diaFim: 7 },
+          { semana: 2, diaInicio: 8, diaFim: 14 },
+          { semana: 3, diaInicio: 15, diaFim: 21 },
+          { semana: 4, diaInicio: 22, diaFim: 28 },
+          { semana: 5, diaInicio: 29, diaFim: 35 },
+          { semana: 6, diaInicio: 36, diaFim: 42 },
+          { semana: 7, diaInicio: 43, diaFim: 49 },
+        ];
+
+        // Metas acumuladas de referência
+        const metasAcumuladas = mortalidadeMediaData ? [
+          0, // Semana 0 (não existe)
+          Number(mortalidadeMediaData.mortalidade_7_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_14_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_21_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_28_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_35_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_42_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_acima_42_dias) || 0,
+        ] : [];
         
-        const mortalidadeSemanal: MortalidadePorSemana[] = semanas.map(dia => {
-          // Calcular mortes acumuladas até este dia - usando +1 para consistência
-          let mortesAcumuladas = 0;
+        const mortalidadeSemanal: MortalidadePorSemana[] = semanasConfig.map((config) => {
+          // Calcular mortes APENAS desta semana
+          let mortesSemana = 0;
           mortalidadeData.forEach((m: any) => {
-            const diasDesdeMort = calcularIdadeNaData(loteData.data_alojamento, m.data_registro);
-            if (diasDesdeMort <= dia) {
-              mortesAcumuladas += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
+            const diaMorte = calcularIdadeNaData(loteData.data_alojamento, m.data_registro);
+            if (diaMorte >= config.diaInicio && diaMorte <= config.diaFim) {
+              mortesSemana += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
             }
           });
 
-          const mortalidadeReal = (mortesAcumuladas / qtdAlojada) * 100;
+          const mortalidadeSemana = (mortesSemana / qtdAlojada) * 100;
           
-          // Obter referência
-          let refKey: keyof MortalidadeMedia | null = null;
-          if (dia <= 7) refKey = 'mortalidade_7_dias';
-          else if (dia <= 14) refKey = 'mortalidade_14_dias';
-          else if (dia <= 21) refKey = 'mortalidade_21_dias';
-          else if (dia <= 28) refKey = 'mortalidade_28_dias';
-          else if (dia <= 35) refKey = 'mortalidade_35_dias';
-          else if (dia <= 42) refKey = 'mortalidade_42_dias';
-          else refKey = 'mortalidade_acima_42_dias';
-
-          const refValue = mortalidadeMediaData && refKey ? Number((mortalidadeMediaData as any)[refKey]) : null;
+          // Meta da semana = meta acumulada atual - meta acumulada anterior
+          const metaAtual = metasAcumuladas[config.semana] || 0;
+          const metaAnterior = metasAcumuladas[config.semana - 1] || 0;
+          const metaSemana = metaAtual - metaAnterior;
 
           return {
-            dia,
-            mortalidade_real: mortalidadeReal,
-            mortalidade_referencia: refValue,
-            acima_limite: refValue !== null && mortalidadeReal > refValue,
-            quantidade_mortes: mortesAcumuladas,
+            semana: config.semana,
+            diaInicio: config.diaInicio,
+            diaFim: config.diaFim,
+            mortalidade_semana: mortalidadeSemana,
+            mortalidade_referencia: metaSemana,
+            quantidade_mortes_semana: mortesSemana,
+            acima_limite: metaSemana > 0 && mortalidadeSemana > metaSemana,
           };
         });
 
         setMortalidadePorSemana(mortalidadeSemanal);
         
-        // Filtrar alertas - usando +1 para consistência
+        // Filtrar alertas - semanas já transcorridas com mortalidade acima da meta
         const diasDesdeAloj = calcularIdadeLote(loteData.data_alojamento);
-        const alertas = mortalidadeSemanal.filter(m => m.acima_limite && m.dia <= diasDesdeAloj);
+        const alertas = mortalidadeSemanal.filter(m => m.acima_limite && m.diaFim <= diasDesdeAloj);
         setAlertasMortalidade(alertas);
       }
     }
@@ -515,12 +541,22 @@ export default function MetasPesoLote() {
 
   chartData.sort((a, b) => a.dia - b.dia);
 
-  // Prepare chart data for mortalidade
-  const mortalidadeChartData = mortalidadePorSemana.map(m => ({
-    dia: m.dia,
-    real: m.mortalidade_real,
-    referencia: m.mortalidade_referencia,
-  }));
+  // Prepare chart data for mortalidade (convertendo para formato acumulado para o gráfico)
+  const mortalidadeChartData = mortalidadePorSemana.map((m, idx) => {
+    // Calcular mortalidade acumulada até esta semana para o gráfico
+    const mortalidadeAcumulada = mortalidadePorSemana
+      .slice(0, idx + 1)
+      .reduce((acc, s) => acc + s.mortalidade_semana, 0);
+    const referenciaAcumulada = mortalidadePorSemana
+      .slice(0, idx + 1)
+      .reduce((acc, s) => acc + s.mortalidade_referencia, 0);
+    
+    return {
+      dia: m.diaFim,
+      real: mortalidadeAcumulada,
+      referencia: referenciaAcumulada,
+    };
+  });
 
   const diasDesdeAlojamento = lote?.data_alojamento 
     ? calcularIdadeLote(lote.data_alojamento)
@@ -576,8 +612,8 @@ export default function MetasPesoLote() {
                 <AlertTitle>Mortalidade acima da referência!</AlertTitle>
                 <AlertDescription>
                   {alertasMortalidade.map(a => (
-                    <span key={a.dia} className="block">
-                      Dia {a.dia}: {a.mortalidade_real.toFixed(2)}% (Ref: {a.mortalidade_referencia?.toFixed(2)}%)
+                    <span key={a.semana} className="block">
+                      Semana {a.semana} (Dias {a.diaInicio}-{a.diaFim}): {a.mortalidade_semana.toFixed(2)}% (Meta: {a.mortalidade_referencia.toFixed(2)}%)
                     </span>
                   ))}
                 </AlertDescription>
@@ -922,11 +958,12 @@ export default function MetasPesoLote() {
                   <CardContent className="space-y-6">
                     {/* Resumo de Totais */}
                     {(() => {
-                      const ultimaSemanaComDados = mortalidadePorSemana
-                        .filter(m => m.dia <= diasDesdeAlojamento)
-                        .slice(-1)[0];
-                      const totalMortalidadeReal = ultimaSemanaComDados?.mortalidade_real || 0;
-                      const totalQuantidadeMortes = ultimaSemanaComDados?.quantidade_mortes || 0;
+                      // Somar mortalidade de todas as semanas transcorridas
+                      const semanaAtual = Math.ceil(diasDesdeAlojamento / 7);
+                      const semanasTranscorridas = mortalidadePorSemana.filter(m => m.semana <= semanaAtual);
+                      
+                      const totalMortalidadeReal = semanasTranscorridas.reduce((acc, m) => acc + m.mortalidade_semana, 0);
+                      const totalQuantidadeMortes = semanasTranscorridas.reduce((acc, m) => acc + m.quantidade_mortes_semana, 0);
                       
                       // Mortalidade máxima de referência = valor acumulado do dia 42 (ou acima de 42)
                       const totalReferenciaMaxima = mortalidadeMedia 
@@ -995,23 +1032,30 @@ export default function MetasPesoLote() {
                       );
                     })()}
 
-                    {/* Grid de Semanas */}
+                    {/* Grid de Semanas - Cards Clicáveis */}
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                      {mortalidadePorSemana.filter(m => m.dia <= Math.max(diasDesdeAlojamento + 7, 7)).map((m) => (
+                      {mortalidadePorSemana.filter(m => m.diaFim <= Math.max(diasDesdeAlojamento + 7, 7)).map((m) => (
                         <div 
-                          key={m.dia} 
-                          className={`p-4 rounded-lg text-center ${
-                            m.acima_limite ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'
+                          key={m.semana}
+                          onClick={() => lote?.data_alojamento && setSemanaSelecionada({
+                            semana: m.semana,
+                            diaInicio: m.diaInicio,
+                            diaFim: m.diaFim,
+                            metaSemana: m.mortalidade_referencia,
+                          })}
+                          className={`p-4 rounded-lg text-center cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+                            m.acima_limite ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50 hover:bg-muted'
                           }`}
                         >
-                          <p className="text-xs text-muted-foreground font-medium">Dia {m.dia}</p>
+                          <p className="text-xs text-muted-foreground font-medium">Semana {m.semana}</p>
+                          <p className="text-[10px] text-muted-foreground">(Dias {m.diaInicio}-{m.diaFim})</p>
                           <p className={`text-lg font-bold ${m.acima_limite ? 'text-destructive' : ''}`}>
-                            {m.quantidade_mortes.toLocaleString('pt-BR')}
+                            {m.quantidade_mortes_semana.toLocaleString('pt-BR')}
                           </p>
                           <p className={`text-sm ${m.acima_limite ? 'text-destructive' : 'text-muted-foreground'}`}>
-                            {m.mortalidade_real.toFixed(2)}%
+                            {m.mortalidade_semana.toFixed(2)}%
                           </p>
-                          {m.mortalidade_referencia !== null && (
+                          {m.mortalidade_referencia > 0 && (
                             <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-border/50">
                               {m.acima_limite ? (
                                 <AlertTriangle className="w-3 h-3 text-destructive" />
@@ -1019,7 +1063,7 @@ export default function MetasPesoLote() {
                                 <CheckCircle className="w-3 h-3 text-green-500" />
                               )}
                               <span className="text-xs text-muted-foreground">
-                                Ref: {m.mortalidade_referencia.toFixed(2)}%
+                                Meta: {m.mortalidade_referencia.toFixed(2)}%
                               </span>
                             </div>
                           )}
@@ -1148,6 +1192,21 @@ export default function MetasPesoLote() {
           loteId={loteId!}
           dia={pesagemSelecionada.dia}
           pesoReferencia={pesagemSelecionada.pesoReferencia}
+        />
+      )}
+
+      {/* Dialog de detalhes da mortalidade por semana */}
+      {semanaSelecionada && lote?.data_alojamento && (
+        <MortalidadeSemanaDetalheDialog
+          open={!!semanaSelecionada}
+          onOpenChange={(open) => !open && setSemanaSelecionada(null)}
+          loteId={loteId!}
+          semana={semanaSelecionada.semana}
+          diaInicio={semanaSelecionada.diaInicio}
+          diaFim={semanaSelecionada.diaFim}
+          dataAlojamento={lote.data_alojamento}
+          metaSemana={semanaSelecionada.metaSemana}
+          quantidadeAlojada={quantidadeAlojada}
         />
       )}
     </div>
