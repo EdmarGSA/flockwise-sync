@@ -1,14 +1,30 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play, Loader2 } from "lucide-react";
 import logoGSA from "@/assets/logo-gsa.png";
+import { useDemo } from "@/contexts/DemoContext";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const { enterDemoMode, isDemoLoading } = useDemo();
+  const navigate = useNavigate();
+  
   const stats = [
     { value: "11+", label: "Integrados", icon: "✓" },
     { value: "100%", label: "Tempo Real", sublabel: "" },
     { value: "24/7", label: "Monitoramento", sublabel: "" },
     { value: "∞", label: "Possibilidades", sublabel: "" },
   ];
+
+  const handleExplore = () => {
+    navigate('/auth');
+  };
+
+  const handleDemo = async () => {
+    const success = await enterDemoMode();
+    if (success) {
+      navigate('/home');
+    }
+  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
@@ -45,13 +61,33 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            <Button variant="hero" size="xl" className="group">
+            <Button 
+              variant="hero" 
+              size="xl" 
+              className="group"
+              onClick={handleExplore}
+            >
               Explorar
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="glass" size="xl" className="group">
-              <Play className="w-5 h-5" />
-              Ver Demo
+            <Button 
+              variant="glass" 
+              size="xl" 
+              className="group"
+              onClick={handleDemo}
+              disabled={isDemoLoading}
+            >
+              {isDemoLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Carregando...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5" />
+                  Ver Demo
+                </>
+              )}
             </Button>
           </div>
 

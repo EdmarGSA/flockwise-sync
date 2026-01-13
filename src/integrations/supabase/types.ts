@@ -739,6 +739,27 @@ export type Database = {
           },
         ]
       }
+      demo_data_templates: {
+        Row: {
+          created_at: string | null
+          data: Json
+          id: string
+          table_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          id?: string
+          table_name: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       desempenho_aves: {
         Row: {
           consumo_acumulado_racao_g: number
@@ -3699,6 +3720,7 @@ export type Database = {
           full_name: string | null
           id: string
           integrado_id: string | null
+          is_demo: boolean | null
           phone: string | null
           role: string | null
           updated_at: string
@@ -3709,6 +3731,7 @@ export type Database = {
           full_name?: string | null
           id: string
           integrado_id?: string | null
+          is_demo?: boolean | null
           phone?: string | null
           role?: string | null
           updated_at?: string
@@ -3719,6 +3742,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           integrado_id?: string | null
+          is_demo?: boolean | null
           phone?: string | null
           role?: string | null
           updated_at?: string
@@ -4583,6 +4607,7 @@ export type Database = {
         Args: { semanas_vida: number }
         Returns: Database["public"]["Enums"]["fase_postura"]
       }
+      can_modify_data: { Args: never; Returns: boolean }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
       gerar_lote_interno_ovos: {
         Args: { p_integrado_id: string }
@@ -4622,6 +4647,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      initialize_demo_data: {
+        Args: { p_integrado_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      initialize_demo_lotes: {
+        Args: { p_integrado_id: string }
+        Returns: undefined
+      }
+      is_demo_user: { Args: never; Returns: boolean }
       reservar_estoque_ovos_fifo: {
         Args: {
           p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]
