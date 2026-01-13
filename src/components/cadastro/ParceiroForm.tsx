@@ -100,6 +100,31 @@ const ParceiroForm = ({ integradoId, initialData, onSuccess, onCancel }: Parceir
     return value.replace(/\D/g, '').slice(0, 8).replace(/(\d{5})(\d{3})/, '$1-$2');
   };
 
+  // Zod schemas for external API response validation
+  const viacepSchema = z.object({
+    logradouro: z.string().max(255).optional().nullable(),
+    bairro: z.string().max(100).optional().nullable(),
+    localidade: z.string().max(100).optional().nullable(),
+    uf: z.string().max(2).optional().nullable(),
+    ibge: z.string().max(7).optional().nullable(),
+    erro: z.boolean().optional()
+  });
+
+  const brasilApiSchema = z.object({
+    razao_social: z.string().max(255).optional().nullable(),
+    nome_fantasia: z.string().max(255).optional().nullable(),
+    email: z.string().max(255).optional().nullable(),
+    ddd_telefone_1: z.string().max(20).optional().nullable(),
+    cep: z.string().max(10).optional().nullable(),
+    logradouro: z.string().max(255).optional().nullable(),
+    numero: z.string().max(20).optional().nullable(),
+    complemento: z.string().max(100).optional().nullable(),
+    bairro: z.string().max(100).optional().nullable(),
+    municipio: z.string().max(100).optional().nullable(),
+    uf: z.string().max(2).optional().nullable(),
+    codigo_municipio_ibge: z.union([z.string(), z.number()]).optional().nullable()
+  });
+
   const searchCep = async () => {
     const cep = form.getValues('cep')?.replace(/\D/g, '');
     if (!cep || cep.length !== 8) {
@@ -110,8 +135,17 @@ const ParceiroForm = ({ integradoId, initialData, onSuccess, onCancel }: Parceir
     setSearchingCep(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-      const data = await response.json();
+      const rawData = await response.json();
 
+      // Validate response structure
+      const result = viacepSchema.safeParse(rawData);
+      if (!result.success) {
+        console.error('CEP validation error:', result.error);
+        toast.error("Resposta inválida da API de CEP");
+        return;
+      }
+
+      const data = result.data;
       if (data.erro) {
         toast.error("CEP não encontrado");
         return;
@@ -146,7 +180,17 @@ const ParceiroForm = ({ integradoId, initialData, onSuccess, onCancel }: Parceir
         return;
       }
 
-      const data = await response.json();
+      const rawData = await response.json();
+
+      // Validate response structure
+      const result = brasilApiSchema.safeParse(rawData);
+      if (!result.success) {
+        console.error('CNPJ validation error:', result.error);
+        toast.error("Resposta inválida da API de CNPJ");
+        return;
+      }
+
+      const data = result.data;
 
       form.setValue('razao_social_nome', data.razao_social || '');
       form.setValue('nome_fantasia', data.nome_fantasia || '');
