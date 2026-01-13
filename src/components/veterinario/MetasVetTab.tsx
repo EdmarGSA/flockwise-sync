@@ -9,6 +9,7 @@ import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import MortalidadeSemanaDetalheDialog from '@/components/lotes/MortalidadeSemanaDetalheDialog';
 interface Lote {
   id: string;
   quantidade_aves: number;
@@ -42,10 +43,20 @@ interface DesempenhoReferencia {
 }
 
 interface MortalidadePorSemana {
-  dia: number;
-  mortalidade_real: number;
-  mortalidade_referencia: number | null;
+  semana: number;
+  diaInicio: number;
+  diaFim: number;
+  mortalidade_semana: number;
+  mortalidade_referencia: number;
+  quantidade_mortes_semana: number;
   acima_limite: boolean;
+}
+
+interface SemanaSelecionada {
+  semana: number;
+  diaInicio: number;
+  diaFim: number;
+  metaSemana: number;
 }
 
 interface MetasVetTabProps {
@@ -64,6 +75,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
   const [desempenhoReferencia, setDesempenhoReferencia] = useState<DesempenhoReferencia[]>([]);
   const [mortalidadePorSemana, setMortalidadePorSemana] = useState<MortalidadePorSemana[]>([]);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState(0);
+  const [semanaSelecionada, setSemanaSelecionada] = useState<SemanaSelecionada | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -198,37 +210,51 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         .eq('lote_id', loteId);
 
       if (mortalidadeData) {
-        const dataAlojamento = new Date(lote.data_alojamento);
-        const semanas = [7, 14, 21, 28, 35, 42, 49];
+        // Definir semanas com início e fim
+        const semanasConfig = [
+          { semana: 1, diaInicio: 1, diaFim: 7 },
+          { semana: 2, diaInicio: 8, diaFim: 14 },
+          { semana: 3, diaInicio: 15, diaFim: 21 },
+          { semana: 4, diaInicio: 22, diaFim: 28 },
+          { semana: 5, diaInicio: 29, diaFim: 35 },
+          { semana: 6, diaInicio: 36, diaFim: 42 },
+          { semana: 7, diaInicio: 43, diaFim: 49 },
+        ];
+
+        // Metas acumuladas de referência
+        const metasAcumuladas = mortalidadeMediaData ? [
+          0,
+          Number(mortalidadeMediaData.mortalidade_7_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_14_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_21_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_28_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_35_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_42_dias) || 0,
+          Number(mortalidadeMediaData.mortalidade_acima_42_dias) || 0,
+        ] : [];
         
-        const mortalidadeSemanal = semanas.map(dia => {
-          let mortesAcumuladas = 0;
+        const mortalidadeSemanal: MortalidadePorSemana[] = semanasConfig.map((config) => {
+          let mortesSemana = 0;
           mortalidadeData.forEach((m: any) => {
-            // Dia 1 = dia do alojamento
-            const diasDesdeMort = calcularIdadeNaData(lote.data_alojamento!, m.data_registro);
-            if (diasDesdeMort <= dia) {
-              mortesAcumuladas += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
+            const diaMorte = calcularIdadeNaData(lote.data_alojamento!, m.data_registro);
+            if (diaMorte >= config.diaInicio && diaMorte <= config.diaFim) {
+              mortesSemana += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
             }
           });
 
-          const mortalidadeReal = (mortesAcumuladas / qtdAlojada) * 100;
-          
-          const refKeys: Record<number, string> = {
-            7: 'mortalidade_7_dias',
-            14: 'mortalidade_14_dias',
-            21: 'mortalidade_21_dias',
-            28: 'mortalidade_28_dias',
-            35: 'mortalidade_35_dias',
-            42: 'mortalidade_42_dias',
-            49: 'mortalidade_acima_42_dias',
-          };
-          const refValue = mortalidadeMediaData ? Number((mortalidadeMediaData as any)[refKeys[dia]]) : null;
+          const mortalidadeSemana = (mortesSemana / qtdAlojada) * 100;
+          const metaAtual = metasAcumuladas[config.semana] || 0;
+          const metaAnterior = metasAcumuladas[config.semana - 1] || 0;
+          const metaSemana = metaAtual - metaAnterior;
 
           return {
-            dia,
-            mortalidade_real: mortalidadeReal,
-            mortalidade_referencia: refValue,
-            acima_limite: refValue !== null && mortalidadeReal > refValue,
+            semana: config.semana,
+            diaInicio: config.diaInicio,
+            diaFim: config.diaFim,
+            mortalidade_semana: mortalidadeSemana,
+            mortalidade_referencia: metaSemana,
+            quantidade_mortes_semana: mortesSemana,
+            acima_limite: metaSemana > 0 && mortalidadeSemana > metaSemana,
           };
         });
 
@@ -288,20 +314,22 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
   });
   chartData.sort((a, b) => a.dia - b.dia);
 
-  // Mortalidade chart
-  const mortalidadeChartData = mortalidadePorSemana.map(m => ({
-    dia: m.dia,
-    real: m.mortalidade_real,
-    referencia: m.mortalidade_referencia,
-  }));
+  // Mortalidade chart (convertido para acumulado)
+  const mortalidadeChartData = mortalidadePorSemana.map((m, idx) => {
+    const mortalidadeAcumulada = mortalidadePorSemana.slice(0, idx + 1).reduce((acc, s) => acc + s.mortalidade_semana, 0);
+    const referenciaAcumulada = mortalidadePorSemana.slice(0, idx + 1).reduce((acc, s) => acc + s.mortalidade_referencia, 0);
+    return {
+      dia: m.diaFim,
+      real: mortalidadeAcumulada,
+      referencia: referenciaAcumulada,
+    };
+  });
 
-  const alertasMortalidade = mortalidadePorSemana.filter(m => m.acima_limite && m.dia <= diasLote);
+  const alertasMortalidade = mortalidadePorSemana.filter(m => m.acima_limite && m.diaFim <= diasLote);
 
   // Total mortalidade
-  const totalMortalidadeReal = mortalidadePorSemana.find(m => m.dia >= diasLote)?.mortalidade_real || 0;
-  const totalMortalidadeRef = mortalidadePorSemana
-    .filter(m => m.dia <= diasLote)
-    .reduce((acc, m) => acc + (m.mortalidade_referencia || 0), 0);
+  const totalMortalidadeReal = mortalidadePorSemana.reduce((acc, m) => acc + m.mortalidade_semana, 0);
+  const totalMortalidadeRef = mortalidadePorSemana.reduce((acc, m) => acc + m.mortalidade_referencia, 0);
 
   return (
     <div className="space-y-6">
@@ -314,7 +342,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
               <div>
                 <p className="font-medium text-destructive">Alerta de Mortalidade</p>
                 <p className="text-sm text-muted-foreground">
-                  Mortalidade acima do limite em: {alertasMortalidade.map(a => `Dia ${a.dia}`).join(', ')}
+                  Mortalidade acima do limite em: {alertasMortalidade.map(a => `Semana ${a.semana}`).join(', ')}
                 </p>
               </div>
             </div>
@@ -569,6 +597,20 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         </CardContent>
       </Card>
 
+      {/* Dialog de detalhes da mortalidade por semana */}
+      {semanaSelecionada && lote.data_alojamento && (
+        <MortalidadeSemanaDetalheDialog
+          open={!!semanaSelecionada}
+          onOpenChange={(open) => !open && setSemanaSelecionada(null)}
+          loteId={loteId}
+          semana={semanaSelecionada.semana}
+          diaInicio={semanaSelecionada.diaInicio}
+          diaFim={semanaSelecionada.diaFim}
+          dataAlojamento={lote.data_alojamento}
+          metaSemana={semanaSelecionada.metaSemana}
+          quantidadeAlojada={quantidadeAlojada}
+        />
+      )}
     </div>
   );
 }
