@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import PesagemDetalheDialog from '@/components/veterinario/PesagemDetalheDialog';
 import MortalidadeSemanaDetalheDialog from '@/components/lotes/MortalidadeSemanaDetalheDialog';
+import { PesagemAnaliseCard } from '@/components/lotes/PesagemAnaliseCard';
 
 interface Lote {
   id: string;
@@ -60,6 +61,7 @@ interface DesempenhoReferencia {
   peso_g: number;
   ganho_diario_g: number;
   consumo_diario_racao_g: number;
+  consumo_acumulado_racao_g: number;
   conversao_alimentar_acumulada: number;
 }
 
@@ -138,6 +140,17 @@ export default function MetasPesoLote() {
   // State para PesagemDetalheDialog e MortalidadeSemanaDetalheDialog
   const [pesagemSelecionada, setPesagemSelecionada] = useState<PesagemSelecionada | null>(null);
   const [semanaSelecionada, setSemanaSelecionada] = useState<SemanaSelecionada | null>(null);
+  
+  // State para análise de Conversão Alimentar
+  const [conversaoData, setConversaoData] = useState<{
+    pesoMedio: number;
+    avesVivas: number;
+    consumoEstimado: number;
+    conversaoReal: number;
+    conversaoEsperada: number | null;
+    diaReferencia: number | null;
+    pesoReferencia: number | null;
+  } | null>(null);
 
   useEffect(() => {
     if (user && loteId && integradoId) {
@@ -250,7 +263,7 @@ export default function MetasPesoLote() {
     // Fetch desempenho de referência
     const { data: desempenhoData } = await supabase
       .from('desempenho_aves')
-      .select('dia, peso_g, ganho_diario_g, consumo_diario_racao_g, conversao_alimentar_acumulada')
+      .select('dia, peso_g, ganho_diario_g, consumo_diario_racao_g, consumo_acumulado_racao_g, conversao_alimentar_acumulada')
       .eq('linhagem', loteData.linhagem)
       .eq('sexo', loteData.sexo)
       .order('dia', { ascending: true });
@@ -409,6 +422,104 @@ export default function MetasPesoLote() {
         const diasDesdeAloj = calcularIdadeLote(loteData.data_alojamento);
         const alertas = mortalidadeSemanal.filter(m => m.acima_limite && m.diaFim <= diasDesdeAloj);
         setAlertasMortalidade(alertas);
+      }
+    }
+
+    // Calcular dados de Conversão Alimentar baseado na última pesagem
+    if (pesagensData && pesagensData.length > 0 && loteData.data_alojamento && desempenhoData) {
+      // Agrupar pesagens por data e calcular a última
+      const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+        const data = p.data_pesagem;
+        if (!acc[data]) acc[data] = [];
+        acc[data].push(...p.pesagem_itens);
+        return acc;
+      }, {});
+
+      const datasPesagens = Object.keys(pesagensPorData).sort();
+      const ultimaData = datasPesagens[datasPesagens.length - 1];
+      
+      if (ultimaData) {
+        const itensDia = pesagensPorData[ultimaData];
+        const totalAves = itensDia.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
+        const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+        const pesoMedioG = totalAves > 0 ? totalPeso / totalAves : 0;
+        const pesoMedioKg = pesoMedioG / 1000;
+        const diaAtual = calcularIdadeNaData(loteData.data_alojamento, ultimaData);
+
+        // Calcular mortalidade total até a última pesagem
+        const { data: mortalidadeData } = await supabase
+          .from('mortalidade')
+          .select(`
+            mortalidade_itens (quantidade)
+          `)
+          .eq('lote_id', loteId);
+
+        let totalMortes = 0;
+        if (mortalidadeData) {
+          mortalidadeData.forEach((m: any) => {
+            totalMortes += m.mortalidade_itens.reduce((acc: number, item: any) => acc + item.quantidade, 0);
+          });
+        }
+
+        const avesVivas = qtdAlojada - totalMortes;
+
+        // Buscar consumo acumulado da tabela de referência para o dia atual
+        const refDiaAtual = desempenhoData.find((d: any) => d.dia === diaAtual);
+        const consumoAcumuladoG = refDiaAtual ? refDiaAtual.consumo_acumulado_racao_g : 0;
+        
+        // Se não encontrar no dia exato, interpolar ou usar o mais próximo
+        let consumoFinal = consumoAcumuladoG;
+        if (!refDiaAtual) {
+          // Buscar o dia mais próximo disponível
+          const diasDisponiveis = desempenhoData.map((d: any) => d.dia);
+          const diaMaisProximo = diasDisponiveis.reduce((prev: number, curr: number) =>
+            Math.abs(curr - diaAtual) < Math.abs(prev - diaAtual) ? curr : prev
+          );
+          const refMaisProximo = desempenhoData.find((d: any) => d.dia === diaMaisProximo);
+          if (refMaisProximo) {
+            // Interpolar linearmente baseado na diferença de dias
+            const consumoDiarioEstimado = refMaisProximo.consumo_diario_racao_g || 150;
+            consumoFinal = refMaisProximo.consumo_acumulado_racao_g + 
+              (diaAtual - diaMaisProximo) * consumoDiarioEstimado;
+          }
+        }
+
+        // Consumo estimado do lote em kg
+        const consumoEstimadoKg = (consumoFinal * avesVivas) / 1000;
+        const pesoTotalLoteKg = pesoMedioKg * avesVivas;
+        const conversaoReal = pesoTotalLoteKg > 0 ? consumoEstimadoKg / pesoTotalLoteKg : 0;
+
+        // Encontrar o dia de referência cujo peso mais se aproxima do peso medido
+        let diaReferencia: number | null = null;
+        let conversaoEsperada: number | null = null;
+        let pesoReferencia: number | null = null;
+
+        if (desempenhoData.length > 0) {
+          // Peso de referência do dia atual
+          const refPesoAtual = desempenhoData.find((d: any) => d.dia === diaAtual);
+          pesoReferencia = refPesoAtual ? refPesoAtual.peso_g / 1000 : null;
+
+          // Encontrar dia cujo peso_g mais se aproxima do peso medido
+          let menorDiferenca = Infinity;
+          for (const ref of desempenhoData) {
+            const diferenca = Math.abs((ref as any).peso_g - pesoMedioG);
+            if (diferenca < menorDiferenca) {
+              menorDiferenca = diferenca;
+              diaReferencia = (ref as any).dia;
+              conversaoEsperada = (ref as any).conversao_alimentar_acumulada;
+            }
+          }
+        }
+
+        setConversaoData({
+          pesoMedio: pesoMedioKg,
+          avesVivas,
+          consumoEstimado: consumoEstimadoKg,
+          conversaoReal,
+          conversaoEsperada,
+          diaReferencia,
+          pesoReferencia,
+        });
       }
     }
 
@@ -942,6 +1053,22 @@ export default function MetasPesoLote() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Card de Análise de Conversão Alimentar */}
+              {conversaoData && pesagens.length > 0 && (
+                <div className="lg:col-span-3">
+                  <PesagemAnaliseCard
+                    pesoMedio={conversaoData.pesoMedio}
+                    avesVivas={conversaoData.avesVivas}
+                    consumoTotal={conversaoData.consumoEstimado}
+                    conversaoAlimentar={conversaoData.conversaoReal}
+                    conversaoEsperada={conversaoData.conversaoEsperada}
+                    diaAtual={diasDesdeAlojamento}
+                    diaReferencia={conversaoData.diaReferencia}
+                    pesoReferencia={conversaoData.pesoReferencia}
+                  />
+                </div>
+              )}
 
               {/* Histórico Mortalidade por Semana */}
               {mortalidadePorSemana.length > 0 && (
