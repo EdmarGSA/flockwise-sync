@@ -123,6 +123,21 @@ export default function MortalidadeMediaDialog({
         if (error) throw error;
         toast.success('Mortalidade média atualizada com sucesso!');
       } else {
+        // Verificar se já existe antes de inserir
+        const { data: existing } = await supabase
+          .from('mortalidade_media')
+          .select('id')
+          .eq('integrado_id', integradoId)
+          .eq('linhagem', linhagem as 'cobb_500' | 'ross_308' | 'hubbard')
+          .eq('sexo', sexo as 'macho' | 'femea' | 'misto')
+          .maybeSingle();
+
+        if (existing) {
+          toast.error('Já existe uma configuração para esta linhagem e sexo');
+          setSaving(false);
+          return;
+        }
+
         // Inserir novo registro
         const { error } = await supabase
           .from('mortalidade_media')
