@@ -22,15 +22,6 @@ interface Silo {
   fator_tonelada_m3: number;
   capacidade_toneladas: number;
   ativo: boolean;
-  galpao_id: string | null;
-}
-
-interface Galpao {
-  id: string;
-  nome: string;
-  nucleo: {
-    nome: string;
-  };
 }
 
 interface SiloModelo {
@@ -52,14 +43,12 @@ interface SiloFormDialogProps {
 
 const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: SiloFormDialogProps) => {
   const [loading, setLoading] = useState(false);
-  const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [modelos, setModelos] = useState<SiloModelo[]>([]);
   const [selectedModeloId, setSelectedModeloId] = useState<string>('');
   
   // Form state
   const [nome, setNome] = useState('');
   const [marca, setMarca] = useState('');
-  const [galpaoId, setGalpaoId] = useState<string>('');
   const [diametroM, setDiametroM] = useState('');
   const [numeroPernas, setNumeroPernas] = useState('4');
   const [numeroAneis, setNumeroAneis] = useState('3');
@@ -86,13 +75,11 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
 
   useEffect(() => {
     if (open) {
-      fetchGalpoes();
       fetchModelos();
       if (silo) {
         // Editing mode
         setNome(silo.nome);
         setMarca(silo.marca || '');
-        setGalpaoId(silo.galpao_id || '');
         setDiametroM(silo.diametro_m.toString());
         setNumeroPernas(silo.numero_pernas.toString());
         setNumeroAneis(silo.numero_aneis.toString());
@@ -106,27 +93,6 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
       }
     }
   }, [open, silo]);
-
-  const fetchGalpoes = async () => {
-    if (!integradoId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('galpoes')
-        .select(`
-          id,
-          nome,
-          nucleo:nucleos(nome)
-        `)
-        .eq('ativo', true)
-        .order('nome');
-
-      if (error) throw error;
-      setGalpoes(data || []);
-    } catch (error) {
-      console.error('Erro ao buscar galpões:', error);
-    }
-  };
 
   const fetchModelos = async () => {
     try {
@@ -163,7 +129,6 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
   const resetForm = () => {
     setNome('');
     setMarca('');
-    setGalpaoId('');
     setDiametroM('');
     setNumeroPernas('4');
     setNumeroAneis('3');
@@ -198,7 +163,6 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
         integrado_id: integradoId,
         nome: nome.trim(),
         marca: marca.trim() || null,
-        galpao_id: galpaoId || null,
         diametro_m: parseFloat(diametroM),
         numero_pernas: parseInt(numeroPernas),
         numero_aneis: parseInt(numeroAneis),
@@ -215,7 +179,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
           .eq('id', silo.id);
 
         if (error) throw error;
-        toast.success('Silo atualizado com sucesso');
+        toast.success('Tipo de silo atualizado com sucesso');
       } else {
         // Insert
         const { error } = await supabase
@@ -223,7 +187,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
           .insert(payload);
 
         if (error) throw error;
-        toast.success('Silo cadastrado com sucesso');
+        toast.success('Tipo de silo cadastrado com sucesso');
       }
 
       onSuccess();
@@ -241,7 +205,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Warehouse className="w-5 h-5" />
-            {silo ? 'Editar Silo' : 'Novo Silo'}
+            {silo ? 'Editar Tipo de Silo' : 'Novo Tipo de Silo'}
           </DialogTitle>
         </DialogHeader>
 
@@ -286,7 +250,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
                 id="nome"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Silo 1"
+                placeholder="Ex: Silo Kepler 2.44m 5 anéis"
               />
             </div>
             <div className="space-y-2">
@@ -298,23 +262,6 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
                 placeholder="Ex: Kepler Weber"
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="galpao">Galpão (opcional)</Label>
-            <Select value={galpaoId || "none"} onValueChange={(val) => setGalpaoId(val === "none" ? "" : val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o galpão" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhum</SelectItem>
-                {galpoes.map((galpao) => (
-                  <SelectItem key={galpao.id} value={galpao.id}>
-                    {galpao.nome} - {galpao.nucleo?.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <Separator />
@@ -455,7 +402,7 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Salvando...' : silo ? 'Salvar Alterações' : 'Cadastrar Silo'}
+              {loading ? 'Salvando...' : silo ? 'Salvar Alterações' : 'Cadastrar Tipo'}
             </Button>
           </div>
         </form>

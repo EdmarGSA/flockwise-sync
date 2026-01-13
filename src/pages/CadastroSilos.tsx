@@ -5,7 +5,7 @@ import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Plus, Pencil, Trash2, Warehouse } from 'lucide-react';
@@ -24,13 +24,6 @@ interface Silo {
   fator_tonelada_m3: number;
   capacidade_toneladas: number;
   ativo: boolean;
-  galpao_id: string | null;
-  galpao?: {
-    nome: string;
-    nucleo?: {
-      nome: string;
-    };
-  };
 }
 
 const CadastroSilos = () => {
@@ -57,13 +50,7 @@ const CadastroSilos = () => {
     try {
       const { data, error } = await supabase
         .from('silos')
-        .select(`
-          *,
-          galpao:galpoes(
-            nome,
-            nucleo:nucleos(nome)
-          )
-        `)
+        .select('*')
         .eq('integrado_id', integradoId)
         .order('nome');
 
@@ -91,6 +78,22 @@ const CadastroSilos = () => {
     if (!siloToDelete) return;
 
     try {
+      // Verificar se o silo está vinculado a algum galpão
+      const { data: galpoesVinculados, error: checkError } = await supabase
+        .from('galpoes')
+        .select('id, nome')
+        .eq('silo_id', siloToDelete.id)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (galpoesVinculados && galpoesVinculados.length > 0) {
+        toast.error('Este silo está vinculado a um ou mais galpões. Desvincule primeiro.');
+        setDeleteDialogOpen(false);
+        setSiloToDelete(null);
+        return;
+      }
+
       const { error } = await supabase
         .from('silos')
         .delete()
@@ -98,7 +101,7 @@ const CadastroSilos = () => {
 
       if (error) throw error;
 
-      toast.success('Silo excluído com sucesso');
+      toast.success('Tipo de silo excluído com sucesso');
       fetchSilos();
     } catch (error) {
       console.error('Erro ao excluir silo:', error);
@@ -145,18 +148,23 @@ const CadastroSilos = () => {
               <Warehouse className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Cadastro de Silos</h1>
-              <p className="text-muted-foreground">Especificações e capacidades dos silos de ração</p>
+              <h1 className="text-3xl font-bold text-foreground">Tipos de Silos</h1>
+              <p className="text-muted-foreground">Catálogo de especificações de silos</p>
             </div>
           </div>
         </div>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Silos Cadastrados</CardTitle>
+            <div>
+              <CardTitle>Silos Cadastrados</CardTitle>
+              <CardDescription>
+                Cadastre os tipos de silos disponíveis. O vínculo com galpões é feito no cadastro de cada galpão.
+              </CardDescription>
+            </div>
             <Button onClick={() => setFormDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Novo Silo
+              Novo Tipo
             </Button>
           </CardHeader>
           <CardContent>
@@ -167,8 +175,8 @@ const CadastroSilos = () => {
             ) : silos.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Warehouse className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum silo cadastrado</p>
-                <p className="text-sm">Clique em "Novo Silo" para começar</p>
+                <p>Nenhum tipo de silo cadastrado</p>
+                <p className="text-sm">Clique em "Novo Tipo" para começar</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -176,7 +184,6 @@ const CadastroSilos = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Galpão</TableHead>
                       <TableHead className="text-center">Diâmetro</TableHead>
                       <TableHead className="text-center">Anéis</TableHead>
                       <TableHead className="text-center">Volume (m³)</TableHead>
@@ -198,20 +205,6 @@ const CadastroSilos = () => {
                             {silo.nome}
                             {silo.marca && (
                               <span className="text-xs text-muted-foreground block">{silo.marca}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {silo.galpao ? (
-                              <div>
-                                <span>{silo.galpao.nome}</span>
-                                {silo.galpao.nucleo && (
-                                  <span className="text-xs text-muted-foreground block">
-                                    {silo.galpao.nucleo.nome}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">{silo.diametro_m.toFixed(2)} m</TableCell>
@@ -265,7 +258,7 @@ const CadastroSilos = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o silo "{siloToDelete?.nome}"? 
+                Tem certeza que deseja excluir o tipo de silo "{siloToDelete?.nome}"? 
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>

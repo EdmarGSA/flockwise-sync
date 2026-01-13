@@ -60,6 +60,7 @@ interface Galpao {
   ativo: boolean;
   total_aves: number | null;
   aves_por_m2: number | null;
+  silo_id: string | null;
   silo_quantidade: number;
   silo_volume_total: number | null;
   comedouro_tipo: Database['public']['Enums']['tipo_comedouro'];
