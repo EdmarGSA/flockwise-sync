@@ -254,7 +254,9 @@ export default function SeparacaoDialog({ open, onOpenChange, pedido, integradoI
               estoque_ovo_id: reserva.estoque_ovo_id,
               pedido_item_ovo_id: itemOvo.id,
               quantidade_reservada: reserva.quantidade_reservar,
-              integrado_id: integradoId,
+              lote_interno: reserva.lote_interno,
+              data_producao: reserva.data_producao,
+              data_validade: reserva.data_validade,
             });
 
           if (reservaError) throw reservaError;
