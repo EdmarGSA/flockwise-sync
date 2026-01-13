@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { NivelSiloCard } from './NivelSiloCard';
+import { NivelSiloSelector } from './NivelSiloSelector';
 
 interface SolicitacaoRacao {
   id: string;
@@ -39,11 +40,17 @@ interface ProdutoRacao {
   unidade_medida: string;
 }
 
+interface SiloInfo {
+  numero_aneis: number;
+  capacidade_toneladas: number;
+}
+
 interface RacaoLoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   loteId: string;
   integradoId: string;
+  galpaoId: string;
   nucleo: string;
   galpao: string;
   tipoProducao: string | null;
@@ -59,6 +66,7 @@ export function RacaoLoteDialog({
   onOpenChange, 
   loteId, 
   integradoId,
+  galpaoId,
   nucleo,
   galpao,
   tipoProducao,
@@ -73,6 +81,11 @@ export function RacaoLoteDialog({
   const [produtosRacao, setProdutosRacao] = useState<ProdutoRacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('solicitar');
+
+  // Silo info state
+  const [siloInfo, setSiloInfo] = useState<SiloInfo | null>(null);
+  const [nivelFunil, setNivelFunil] = useState(0);
+  const [nivelAneis, setNivelAneis] = useState(0);
 
   // Form state for new request
   const [tipoRacao, setTipoRacao] = useState('');
@@ -90,8 +103,50 @@ export function RacaoLoteDialog({
     if (open) {
       fetchSolicitacoes();
       fetchProdutosRacao();
+      fetchSiloInfo();
+      // Reset silo level when opening
+      setNivelFunil(0);
+      setNivelAneis(0);
     }
-  }, [open, loteId, tipoProducao]);
+  }, [open, loteId, tipoProducao, galpaoId]);
+
+  const fetchSiloInfo = async () => {
+    if (!galpaoId) {
+      setSiloInfo(null);
+      return;
+    }
+
+    // Get silo linked to galpao
+    const { data: galpaoData, error: galpaoError } = await supabase
+      .from('galpoes')
+      .select('silo_id, silo_quantidade')
+      .eq('id', galpaoId)
+      .single();
+
+    if (galpaoError || !galpaoData?.silo_id) {
+      setSiloInfo(null);
+      return;
+    }
+
+    // Get silo specs
+    const { data: siloData, error: siloError } = await supabase
+      .from('silos')
+      .select('numero_aneis, capacidade_toneladas')
+      .eq('id', galpaoData.silo_id)
+      .single();
+
+    if (siloError || !siloData) {
+      setSiloInfo(null);
+      return;
+    }
+
+    // Calculate total capacity based on quantity
+    const qtdSilos = galpaoData.silo_quantidade || 1;
+    setSiloInfo({
+      numero_aneis: siloData.numero_aneis,
+      capacidade_toneladas: siloData.capacidade_toneladas * qtdSilos,
+    });
+  };
 
   const fetchSolicitacoes = async () => {
     const { data, error } = await supabase
@@ -146,6 +201,20 @@ export function RacaoLoteDialog({
     setProdutosRacao(produtosData || []);
   };
 
+  // Calculate estimated level in kg based on silo selector
+  const calcularNivelEstimadoKg = () => {
+    if (!siloInfo) return null;
+    const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
+    const capacidadeFunil = capacidadeKg * 0.15;
+    const capacidadeAneis = capacidadeKg * 0.85;
+    
+    const volumeFunil = nivelFunil * capacidadeFunil;
+    const volumeAneis = siloInfo.numero_aneis > 0 
+      ? (nivelAneis / siloInfo.numero_aneis) * capacidadeAneis 
+      : 0;
+    return volumeFunil + volumeAneis;
+  };
+
   const handleNovaSolicitacao = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -166,6 +235,9 @@ export function RacaoLoteDialog({
         dataPrevisaoEntrega = dateWithTime.toISOString();
       }
 
+      // Calculate estimated silo level
+      const nivelEstimadoKg = calcularNivelEstimadoKg();
+
       const { error } = await supabase
         .from('solicitacoes_racao')
         .insert({
@@ -177,6 +249,9 @@ export function RacaoLoteDialog({
           observacoes: observacoes || null,
           solicitado_por: user?.id,
           status: 'solicitado',
+          nivel_funil: siloInfo ? nivelFunil : null,
+          nivel_aneis: siloInfo ? nivelAneis : null,
+          nivel_estimado_kg: nivelEstimadoKg,
         });
 
       if (error) throw error;
@@ -187,6 +262,8 @@ export function RacaoLoteDialog({
       setDataPrevisao(undefined);
       setHoraPrevisao('');
       setObservacoes('');
+      setNivelFunil(0);
+      setNivelAneis(0);
       fetchSolicitacoes();
       onSuccess();
       setActiveTab('pendentes');
@@ -359,6 +436,18 @@ export function RacaoLoteDialog({
 
           <TabsContent value="solicitar" className="space-y-4 mt-4">
             <form onSubmit={handleNovaSolicitacao} className="space-y-4">
+              {/* Silo level selector - only show if silo is linked */}
+              {siloInfo && (
+                <NivelSiloSelector
+                  numeroAneis={siloInfo.numero_aneis}
+                  capacidadeToneladas={siloInfo.capacidade_toneladas}
+                  nivelFunil={nivelFunil}
+                  nivelAneis={nivelAneis}
+                  onNivelFunilChange={setNivelFunil}
+                  onNivelAneisChange={setNivelAneis}
+                />
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tipoRacao">Tipo de Ração *</Label>

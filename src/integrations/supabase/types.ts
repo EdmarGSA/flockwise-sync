@@ -4138,6 +4138,9 @@ export type Database = {
           id: string
           integrado_id: string
           lote_id: string
+          nivel_aneis: number | null
+          nivel_estimado_kg: number | null
+          nivel_funil: number | null
           observacoes: string | null
           observacoes_envio: string | null
           quantidade_devolvida_kg: number | null
@@ -4161,6 +4164,9 @@ export type Database = {
           id?: string
           integrado_id: string
           lote_id: string
+          nivel_aneis?: number | null
+          nivel_estimado_kg?: number | null
+          nivel_funil?: number | null
           observacoes?: string | null
           observacoes_envio?: string | null
           quantidade_devolvida_kg?: number | null
@@ -4184,6 +4190,9 @@ export type Database = {
           id?: string
           integrado_id?: string
           lote_id?: string
+          nivel_aneis?: number | null
+          nivel_estimado_kg?: number | null
+          nivel_funil?: number | null
           observacoes?: string | null
           observacoes_envio?: string | null
           quantidade_devolvida_kg?: number | null

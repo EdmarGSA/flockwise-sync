@@ -83,6 +83,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
   const [showRacaoDialog, setShowRacaoDialog] = useState(false);
   const [novoLoteData, setNovoLoteData] = useState<{
     loteId: string;
+    galpaoId: string;
     tipoProducao: string;
     quantidadeAves: number;
     dataPrevistaAlojamento: Date;
@@ -332,6 +333,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       if (insertedLote && integradoId) {
         setNovoLoteData({
           loteId: insertedLote.id,
+          galpaoId: data.galpao_id,
           tipoProducao: nucleoData?.tipo_producao || '',
           quantidadeAves: parseInt(data.quantidade_aves),
           dataPrevistaAlojamento: data.data_prevista_alojamento,
@@ -748,6 +750,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
           onOpenChange={setShowRacaoDialog}
           loteId={novoLoteData.loteId}
           integradoId={integradoId}
+          galpaoId={novoLoteData.galpaoId}
           tipoProducao={novoLoteData.tipoProducao}
           quantidadeAves={novoLoteData.quantidadeAves}
           dataPrevistaAlojamento={novoLoteData.dataPrevistaAlojamento}
