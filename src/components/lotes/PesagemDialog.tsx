@@ -315,7 +315,25 @@ export function PesagemDialog({
       ];
 
       const pesoInicialKg = pesoInicialPintinhos || 0.040;
-      const metasCalc = calcularMetasComMultiplicadores(pesoInicialKg, DEFAULT_MULTIPLICADORES);
+      
+      // Buscar multiplicadores específicos da linhagem/sexo do banco de dados
+      let multiplicadoresHist = DEFAULT_MULTIPLICADORES;
+      
+      if (linhagem && sexo && integradoId) {
+        const { data: mult } = await supabase
+          .from('multiplicadores_meta_peso')
+          .select('mult_7_dias, mult_14_dias, mult_21_dias, mult_28_dias, mult_35_dias, mult_42_dias')
+          .eq('integrado_id', integradoId)
+          .eq('linhagem', linhagem)
+          .eq('sexo', sexo)
+          .maybeSingle();
+        
+        if (mult) {
+          multiplicadoresHist = mult;
+        }
+      }
+      
+      const metasCalc = calcularMetasComMultiplicadores(pesoInicialKg, multiplicadoresHist);
 
       const historico: PesagemHistorico[] = periodos.map((periodo) => {
         let pesoLiquidoTotal = 0;
@@ -359,7 +377,7 @@ export function PesagemDialog({
     };
 
     fetchHistoricoPesagens();
-  }, [open, loteId, dataAlojamento, pesoInicialPintinhos]);
+  }, [open, loteId, dataAlojamento, pesoInicialPintinhos, linhagem, sexo, integradoId]);
 
   useEffect(() => {
     const fetchMultiplicadoresAndCalculateMetas = async () => {
