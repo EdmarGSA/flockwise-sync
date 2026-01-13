@@ -455,8 +455,8 @@ export default function MetasPesoLote() {
         const itensDia = pesagensPorData[ultimaData];
         const totalAves = itensDia.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
         const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
-        const pesoMedioG = totalAves > 0 ? totalPeso / totalAves : 0;
-        const pesoMedioKg = pesoMedioG / 1000;
+        // peso_liquido_g já está em kg (nomenclatura incorreta no banco)
+        const pesoMedioKg = totalAves > 0 ? totalPeso / totalAves : 0;
         const diaAtual = calcularIdadeNaData(loteData.data_alojamento, ultimaData);
 
         // Calcular mortalidade total até a última pesagem
@@ -513,7 +513,9 @@ export default function MetasPesoLote() {
           // Encontrar dia cujo peso_g mais se aproxima do peso medido
           let menorDiferenca = Infinity;
           for (const ref of desempenhoData) {
-            const diferenca = Math.abs((ref as any).peso_g - pesoMedioG);
+            // Converter peso de referência para kg para comparar
+            const pesoRefKg = (ref as any).peso_g / 1000;
+            const diferenca = Math.abs(pesoRefKg - pesoMedioKg);
             if (diferenca < menorDiferenca) {
               menorDiferenca = diferenca;
               diaReferencia = (ref as any).dia;
@@ -541,8 +543,8 @@ export default function MetasPesoLote() {
           const itens = pesagensPorData[dataPes];
           const totalAvesDia = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
           const totalPesoDia = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
-          const pesoMedioDiaG = totalAvesDia > 0 ? totalPesoDia / totalAvesDia : 0;
-          const pesoMedioDiaKg = pesoMedioDiaG / 1000;
+          // peso_liquido_g já está em kg
+          const pesoMedioDiaKg = totalAvesDia > 0 ? totalPesoDia / totalAvesDia : 0;
           const diaPes = calcularIdadeNaData(loteData.data_alojamento, dataPes);
           
           // Buscar consumo para este dia
@@ -570,7 +572,9 @@ export default function MetasPesoLote() {
           if (desempenhoData.length > 0) {
             let menorDif = Infinity;
             for (const ref of desempenhoData) {
-              const dif = Math.abs((ref as any).peso_g - pesoMedioDiaG);
+              // Converter peso de referência para kg para comparar
+              const pesoRefKg = (ref as any).peso_g / 1000;
+              const dif = Math.abs(pesoRefKg - pesoMedioDiaKg);
               if (dif < menorDif) {
                 menorDif = dif;
                 caEsperada = (ref as any).conversao_alimentar_acumulada;
