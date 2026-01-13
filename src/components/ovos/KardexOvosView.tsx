@@ -104,12 +104,12 @@ export default function KardexOvosView({ integradoId }: KardexOvosViewProps) {
               />
             </div>
           </div>
-          <Select value={filterTipo} onValueChange={setFilterTipo}>
+          <Select value={filterTipo || 'all'} onValueChange={(v) => setFilterTipo(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Tipo de movimento" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {TIPOS_MOVIMENTO.map(t => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
