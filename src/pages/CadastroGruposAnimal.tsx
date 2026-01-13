@@ -40,7 +40,7 @@ interface FaseAnimal {
 
 const CadastroGruposAnimal = () => {
   const { user, loading } = useAuth();
-  const { integradoId } = useIntegradoId();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [grupos, setGrupos] = useState<GrupoAnimal[]>([]);
   const [fases, setFases] = useState<FaseAnimal[]>([]);
@@ -56,16 +56,16 @@ const CadastroGruposAnimal = () => {
   const [faseForm, setFaseForm] = useState({ nome: "", dia_inicio: 0, dia_fim: 7, descricao: "" });
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       initializeDefaultGroups();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const initializeDefaultGroups = async () => {
     const { data: existingGrupos, error } = await supabase
       .from("grupos_animal")
       .select("id")
-      .eq("integrado_id", user?.id)
+      .eq("integrado_id", integradoId)
       .limit(1);
 
     if (error) {
@@ -101,7 +101,7 @@ const CadastroGruposAnimal = () => {
     const { data, error } = await supabase
       .from("grupos_animal")
       .select("*")
-      .eq("integrado_id", user?.id)
+      .eq("integrado_id", integradoId)
       .order("nome");
     
     if (error) {
@@ -115,7 +115,7 @@ const CadastroGruposAnimal = () => {
     const { data, error } = await supabase
       .from("fases_animal")
       .select("*")
-      .eq("integrado_id", user?.id)
+      .eq("integrado_id", integradoId)
       .order("dia_inicio");
     
     if (error) {
@@ -280,7 +280,7 @@ const CadastroGruposAnimal = () => {
     return fases.filter(f => f.grupo_id === grupoId);
   };
 
-  if (loading) {
+  if (loading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -288,7 +288,7 @@ const CadastroGruposAnimal = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !integradoId) {
     navigate('/auth');
     return null;
   }
