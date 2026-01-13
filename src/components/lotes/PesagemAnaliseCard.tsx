@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart3, TrendingUp, TrendingDown, CalendarDays, CheckCircle, AlertTriangle } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface PesagemAnaliseCardProps {
   pesoMedio: number; // kg
@@ -11,6 +13,7 @@ interface PesagemAnaliseCardProps {
   diaAtual: number;
   diaReferencia: number | null;
   pesoReferencia: number | null; // kg
+  dataPesagem?: string; // data da pesagem para exibição
 }
 
 export function PesagemAnaliseCard({
@@ -22,6 +25,7 @@ export function PesagemAnaliseCard({
   diaAtual,
   diaReferencia,
   pesoReferencia,
+  dataPesagem,
 }: PesagemAnaliseCardProps) {
   const pesoTotalLote = pesoMedio * avesVivas;
   
@@ -97,6 +101,11 @@ export function PesagemAnaliseCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <BarChart3 className="w-4 h-4 text-primary" />
           Análise de Conversão Alimentar
+          {dataPesagem && (
+            <Badge variant="outline" className="ml-auto text-xs font-normal">
+              Pesagem: {format(new Date(dataPesagem + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
