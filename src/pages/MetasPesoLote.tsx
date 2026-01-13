@@ -276,12 +276,32 @@ export default function MetasPesoLote() {
       setPesagens(pesagensProcessed);
     }
 
-    // Fetch mortalidade média de referência
-    const { data: mortalidadeMediaData } = await supabase
+    // Fetch mortalidade média de referência (filtrar por linhagem/sexo com fallback para misto)
+    let mortalidadeMediaData = null;
+    
+    // Primeiro tenta buscar específico para linhagem + sexo
+    const { data: mortalidadeEspecifica } = await supabase
       .from('mortalidade_media')
       .select('*')
       .eq('integrado_id', integradoId!)
+      .eq('linhagem', loteData.linhagem)
+      .eq('sexo', loteData.sexo)
       .maybeSingle();
+    
+    if (mortalidadeEspecifica) {
+      mortalidadeMediaData = mortalidadeEspecifica;
+    } else {
+      // Fallback: buscar linhagem + misto
+      const { data: mortalidadeMisto } = await supabase
+        .from('mortalidade_media')
+        .select('*')
+        .eq('integrado_id', integradoId!)
+        .eq('linhagem', loteData.linhagem)
+        .eq('sexo', 'misto')
+        .maybeSingle();
+      
+      mortalidadeMediaData = mortalidadeMisto;
+    }
 
     if (mortalidadeMediaData) {
       setMortalidadeMedia({

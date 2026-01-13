@@ -5,102 +5,119 @@ import { useIntegradoId } from "@/hooks/useIntegradoId";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, Percent } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Percent, Plus, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import MortalidadeMediaDialog from "@/components/cadastro/MortalidadeMediaDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface MortalidadeMediaData {
+  id: string;
+  linhagem: string;
+  sexo: string;
+  mortalidade_7_dias: number;
+  mortalidade_14_dias: number;
+  mortalidade_21_dias: number;
+  mortalidade_28_dias: number;
+  mortalidade_35_dias: number;
+  mortalidade_42_dias: number;
+  mortalidade_acima_42_dias: number;
+}
+
+const linhagemLabels: Record<string, string> = {
+  cobb_500: 'Cobb 500',
+  ross_308: 'Ross 308',
+  hubbard: 'Hubbard',
+};
+
+const sexoLabels: Record<string, string> = {
+  macho: 'Macho',
+  femea: 'Fêmea',
+  misto: 'Misto',
+};
 
 const CadastroMortalidadeMedia = () => {
   const { user, loading } = useAuth();
   const { integradoId } = useIntegradoId();
   const navigate = useNavigate();
-  const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
-  const [recordId, setRecordId] = useState<string | null>(null);
-  
-  const [values, setValues] = useState({
-    mortalidade_7_dias: 0,
-    mortalidade_14_dias: 0,
-    mortalidade_21_dias: 0,
-    mortalidade_28_dias: 0,
-    mortalidade_35_dias: 0,
-    mortalidade_42_dias: 0,
-    mortalidade_acima_42_dias: 0,
-  });
+  const [tabelas, setTabelas] = useState<MortalidadeMediaData[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editData, setEditData] = useState<MortalidadeMediaData | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       loadData();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const loadData = async () => {
     try {
       const { data, error } = await supabase
         .from('mortalidade_media')
         .select('*')
-        .eq('integrado_id', user?.id)
-        .maybeSingle();
+        .eq('integrado_id', integradoId)
+        .order('linhagem', { ascending: true })
+        .order('sexo', { ascending: true });
 
       if (error) throw error;
 
-      if (data) {
-        setRecordId(data.id);
-        setValues({
-          mortalidade_7_dias: Number(data.mortalidade_7_dias) || 0,
-          mortalidade_14_dias: Number(data.mortalidade_14_dias) || 0,
-          mortalidade_21_dias: Number(data.mortalidade_21_dias) || 0,
-          mortalidade_28_dias: Number(data.mortalidade_28_dias) || 0,
-          mortalidade_35_dias: Number(data.mortalidade_35_dias) || 0,
-          mortalidade_42_dias: Number(data.mortalidade_42_dias) || 0,
-          mortalidade_acima_42_dias: Number(data.mortalidade_acima_42_dias) || 0,
-        });
-      }
+      setTabelas(data || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados de mortalidade média');
+      toast.error('Erro ao carregar tabelas de mortalidade');
     } finally {
       setLoadingData(false);
     }
   };
 
-  const handleChange = (field: keyof typeof values, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setValues(prev => ({ ...prev, [field]: numValue }));
+  const handleEdit = (item: MortalidadeMediaData) => {
+    setEditData(item);
+    setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!user) return;
+  const handleNew = () => {
+    setEditData(null);
+    setDialogOpen(true);
+  };
 
-    setSaving(true);
+  const handleDeleteConfirm = async () => {
+    if (!deletingId) return;
+
     try {
-      if (recordId) {
-        const { error } = await supabase
-          .from('mortalidade_media')
-          .update(values)
-          .eq('id', recordId);
+      const { error } = await supabase
+        .from('mortalidade_media')
+        .delete()
+        .eq('id', deletingId);
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('mortalidade_media')
-          .insert({
-            integrado_id: integradoId,
-            ...values
-          });
+      if (error) throw error;
 
-        if (error) throw error;
-      }
-
-      toast.success('Mortalidade média salva com sucesso!');
+      toast.success('Tabela excluída com sucesso');
       loadData();
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      toast.error('Erro ao salvar dados');
+      console.error('Erro ao excluir:', error);
+      toast.error('Erro ao excluir tabela');
     } finally {
-      setSaving(false);
+      setDeleteDialogOpen(false);
+      setDeletingId(null);
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeletingId(id);
+    setDeleteDialogOpen(true);
   };
 
   if (loading || loadingData) {
@@ -116,16 +133,6 @@ const CadastroMortalidadeMedia = () => {
     return null;
   }
 
-  const weeks = [
-    { key: 'mortalidade_7_dias', label: '7 Dias', week: 1 },
-    { key: 'mortalidade_14_dias', label: '14 Dias', week: 2 },
-    { key: 'mortalidade_21_dias', label: '21 Dias', week: 3 },
-    { key: 'mortalidade_28_dias', label: '28 Dias', week: 4 },
-    { key: 'mortalidade_35_dias', label: '35 Dias', week: 5 },
-    { key: 'mortalidade_42_dias', label: '42 Dias', week: 6 },
-    { key: 'mortalidade_acima_42_dias', label: 'Acima de 42 Dias', week: 7 },
-  ] as const;
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -140,49 +147,117 @@ const CadastroMortalidadeMedia = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Mortalidade Média</h1>
-              <p className="text-muted-foreground">Configure os percentuais de referência por semana</p>
+              <p className="text-muted-foreground">Configure os percentuais de referência por linhagem e sexo</p>
             </div>
           </div>
         </div>
 
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle>Percentuais de Mortalidade por Período</CardTitle>
-            <CardDescription>
-              Defina os valores de referência de mortalidade esperada para cada período do lote
-            </CardDescription>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Tabelas de Mortalidade</CardTitle>
+              <CardDescription>
+                Gerencie os percentuais de mortalidade esperada para cada combinação de linhagem e sexo
+              </CardDescription>
+            </div>
+            <Button onClick={handleNew}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Tabela
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6">
-              {weeks.map((week) => (
-                <div key={week.key} className="flex items-center gap-4">
-                  <Label className="w-40 text-sm font-medium">
-                    Semana {week.week} ({week.label})
-                  </Label>
-                  <div className="flex items-center gap-2 flex-1">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={values[week.key]}
-                      onChange={(e) => handleChange(week.key, e.target.value)}
-                      className="max-w-32"
-                    />
-                    <span className="text-muted-foreground">%</span>
-                  </div>
-                </div>
-              ))}
-
-              <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleSave} disabled={saving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? 'Salvando...' : 'Salvar'}
-                </Button>
+            {tabelas.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Percent className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma tabela de mortalidade cadastrada</p>
+                <p className="text-sm mt-1">Clique em "Nova Tabela" para começar</p>
               </div>
-            </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Linhagem</TableHead>
+                      <TableHead>Sexo</TableHead>
+                      <TableHead className="text-center">7d</TableHead>
+                      <TableHead className="text-center">14d</TableHead>
+                      <TableHead className="text-center">21d</TableHead>
+                      <TableHead className="text-center">28d</TableHead>
+                      <TableHead className="text-center">35d</TableHead>
+                      <TableHead className="text-center">42d</TableHead>
+                      <TableHead className="text-center">42+d</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tabelas.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">
+                          {linhagemLabels[item.linhagem] || item.linhagem}
+                        </TableCell>
+                        <TableCell>
+                          {sexoLabels[item.sexo] || item.sexo}
+                        </TableCell>
+                        <TableCell className="text-center">{item.mortalidade_7_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_14_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_21_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_28_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_35_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_42_dias}%</TableCell>
+                        <TableCell className="text-center">{item.mortalidade_acima_42_dias}%</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(item)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Dialog de criação/edição */}
+        <MortalidadeMediaDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          integradoId={integradoId!}
+          onSuccess={loadData}
+          editData={editData}
+        />
+
+        {/* Dialog de confirmação de exclusão */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir tabela de mortalidade?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. A tabela será permanentemente removida.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm}>
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
