@@ -91,6 +91,9 @@ export function RacaoLoteDialog({
   
   // Two-step state: nivel must be saved before solicitation
   const [nivelSalvo, setNivelSalvo] = useState<number | null>(null);
+  
+  // Refresh key for NivelSiloCard
+  const [siloRefreshKey, setSiloRefreshKey] = useState(0);
 
   // Form state for new request
   const [tipoRacao, setTipoRacao] = useState('');
@@ -117,8 +120,15 @@ export function RacaoLoteDialog({
       setNivelSalvo(null);
       setConsumoEstimado(null);
       setDiasAteEntrega(0);
+      setSiloRefreshKey(0);
     }
   }, [open, loteId, tipoProducao, galpaoId]);
+
+  // Handler when silo level is saved - refresh card and use suggestion
+  const handleLevelSaved = (nivel: number) => {
+    setNivelSalvo(nivel);
+    setSiloRefreshKey(prev => prev + 1);
+  };
 
   // Recalculate consumption when delivery date changes
   useEffect(() => {
@@ -420,11 +430,14 @@ export function RacaoLoteDialog({
         {linhagem && sexo && diasDesdeAlojamento !== undefined && diasDesdeAlojamento > 0 && avesVivas && avesVivas > 0 ? (
           <div className="mb-4">
             <NivelSiloCard
+              key={siloRefreshKey}
               loteId={loteId}
               linhagem={linhagem}
               sexo={sexo}
               diasDesdeAlojamento={diasDesdeAlojamento}
               avesVivas={avesVivas}
+              galpaoId={galpaoId}
+              refreshKey={siloRefreshKey}
               onSugerirQuantidade={(qtd) => {
                 setQuantidade(qtd.toString());
                 setActiveTab('solicitar');
@@ -471,7 +484,7 @@ export function RacaoLoteDialog({
                 avesVivas={avesVivas}
                 linhagem={linhagem}
                 sexo={sexo}
-                onLevelSaved={setNivelSalvo}
+                onLevelSaved={handleLevelSaved}
                 savedLevel={nivelSalvo}
               />
             )}
