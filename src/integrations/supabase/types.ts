@@ -1364,6 +1364,69 @@ export type Database = {
         }
         Relationships: []
       }
+      historico_nivel_silo: {
+        Row: {
+          created_at: string | null
+          divergencia_alerta: boolean | null
+          divergencia_percentual: number | null
+          galpao_id: string
+          id: string
+          integrado_id: string
+          lote_id: string | null
+          nivel_aneis: number
+          nivel_esperado_kg: number | null
+          nivel_estimado_kg: number
+          nivel_funil: number
+          observacoes: string | null
+          registrado_por: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          divergencia_alerta?: boolean | null
+          divergencia_percentual?: number | null
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          lote_id?: string | null
+          nivel_aneis: number
+          nivel_esperado_kg?: number | null
+          nivel_estimado_kg: number
+          nivel_funil: number
+          observacoes?: string | null
+          registrado_por?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          divergencia_alerta?: boolean | null
+          divergencia_percentual?: number | null
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string | null
+          nivel_aneis?: number
+          nivel_esperado_kg?: number | null
+          nivel_estimado_kg?: number
+          nivel_funil?: number
+          observacoes?: string | null
+          registrado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_nivel_silo_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_nivel_silo_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kardex: {
         Row: {
           created_at: string

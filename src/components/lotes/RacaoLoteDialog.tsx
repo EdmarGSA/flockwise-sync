@@ -12,12 +12,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download, CalendarIcon } from 'lucide-react';
+import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download, CalendarIcon, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { NivelSiloCard } from './NivelSiloCard';
-import { NivelSiloSelector } from './NivelSiloSelector';
+import { NivelSiloUpdateForm } from './NivelSiloUpdateForm';
+import { CapacidadeAlertCard } from './CapacidadeAlertCard';
+import { useConsumoEstimado } from '@/hooks/useConsumoEstimado';
 
 interface SolicitacaoRacao {
   id: string;
@@ -77,6 +79,8 @@ export function RacaoLoteDialog({
   onSuccess 
 }: RacaoLoteDialogProps) {
   const { user } = useAuth();
+  const { calcularConsumoAteEntrega } = useConsumoEstimado();
+  
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoRacao[]>([]);
   const [produtosRacao, setProdutosRacao] = useState<ProdutoRacao[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,8 +88,9 @@ export function RacaoLoteDialog({
 
   // Silo info state
   const [siloInfo, setSiloInfo] = useState<SiloInfo | null>(null);
-  const [nivelFunil, setNivelFunil] = useState(0);
-  const [nivelAneis, setNivelAneis] = useState(0);
+  
+  // Two-step state: nivel must be saved before solicitation
+  const [nivelSalvo, setNivelSalvo] = useState<number | null>(null);
 
   // Form state for new request
   const [tipoRacao, setTipoRacao] = useState('');
@@ -93,6 +98,10 @@ export function RacaoLoteDialog({
   const [dataPrevisao, setDataPrevisao] = useState<Date | undefined>(undefined);
   const [horaPrevisao, setHoraPrevisao] = useState('');
   const [observacoes, setObservacoes] = useState('');
+
+  // Capacity validation state
+  const [consumoEstimado, setConsumoEstimado] = useState<number | null>(null);
+  const [diasAteEntrega, setDiasAteEntrega] = useState<number>(0);
 
   // State for recebimento/devolução
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<SolicitacaoRacao | null>(null);
@@ -104,11 +113,30 @@ export function RacaoLoteDialog({
       fetchSolicitacoes();
       fetchProdutosRacao();
       fetchSiloInfo();
-      // Reset silo level when opening
-      setNivelFunil(0);
-      setNivelAneis(0);
+      // Reset states when opening
+      setNivelSalvo(null);
+      setConsumoEstimado(null);
+      setDiasAteEntrega(0);
     }
   }, [open, loteId, tipoProducao, galpaoId]);
+
+  // Recalculate consumption when delivery date changes
+  useEffect(() => {
+    if (dataPrevisao && linhagem && sexo && diasDesdeAlojamento !== undefined && avesVivas) {
+      calcularConsumoAteEntrega({
+        linhagem,
+        sexo,
+        diasDesdeAlojamento,
+        avesVivas,
+        dataEntrega: dataPrevisao,
+      }).then((result) => {
+        if (result) {
+          setConsumoEstimado(result.consumoAteEntrega);
+          setDiasAteEntrega(result.diasAteEntrega);
+        }
+      });
+    }
+  }, [dataPrevisao, linhagem, sexo, diasDesdeAlojamento, avesVivas]);
 
   const fetchSiloInfo = async () => {
     if (!galpaoId) {
@@ -201,26 +229,25 @@ export function RacaoLoteDialog({
     setProdutosRacao(produtosData || []);
   };
 
-  // Calculate estimated level in kg based on silo selector
-  const calcularNivelEstimadoKg = () => {
-    if (!siloInfo) return null;
-    const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
-    const capacidadeFunil = capacidadeKg * 0.15;
-    const capacidadeAneis = capacidadeKg * 0.85;
-    
-    const volumeFunil = nivelFunil * capacidadeFunil;
-    const volumeAneis = siloInfo.numero_aneis > 0 
-      ? (nivelAneis / siloInfo.numero_aneis) * capacidadeAneis 
-      : 0;
-    return volumeFunil + volumeAneis;
-  };
-
   const handleNovaSolicitacao = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!tipoRacao || !quantidade) {
       toast.error('Preencha o tipo de ração e quantidade');
       return;
+    }
+
+    // Validate capacity if we have silo info
+    if (siloInfo && nivelSalvo !== null && consumoEstimado !== null) {
+      const capacidadeKg = siloInfo.capacidade_toneladas * 1000;
+      const nivelNaEntrega = Math.max(0, nivelSalvo - consumoEstimado);
+      const nivelAposRecebimento = nivelNaEntrega + parseFloat(quantidade);
+      
+      if (nivelAposRecebimento > capacidadeKg) {
+        const excesso = nivelAposRecebimento - capacidadeKg;
+        toast.error(`Quantidade excede capacidade do silo em ${excesso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`);
+        return;
+      }
     }
 
     setLoading(true);
@@ -235,9 +262,6 @@ export function RacaoLoteDialog({
         dataPrevisaoEntrega = dateWithTime.toISOString();
       }
 
-      // Calculate estimated silo level
-      const nivelEstimadoKg = calcularNivelEstimadoKg();
-
       const { error } = await supabase
         .from('solicitacoes_racao')
         .insert({
@@ -249,9 +273,7 @@ export function RacaoLoteDialog({
           observacoes: observacoes || null,
           solicitado_por: user?.id,
           status: 'solicitado',
-          nivel_funil: siloInfo ? nivelFunil : null,
-          nivel_aneis: siloInfo ? nivelAneis : null,
-          nivel_estimado_kg: nivelEstimadoKg,
+          nivel_estimado_kg: nivelSalvo,
         });
 
       if (error) throw error;
@@ -262,8 +284,8 @@ export function RacaoLoteDialog({
       setDataPrevisao(undefined);
       setHoraPrevisao('');
       setObservacoes('');
-      setNivelFunil(0);
-      setNivelAneis(0);
+      setNivelSalvo(null);
+      setConsumoEstimado(null);
       fetchSolicitacoes();
       onSuccess();
       setActiveTab('pendentes');
@@ -381,6 +403,9 @@ export function RacaoLoteDialog({
   const pendentes = solicitacoes.filter(s => ['solicitado', 'confirmado', 'enviado'].includes(s.status));
   const recebidas = solicitacoes.filter(s => ['recebido', 'parcialmente_devolvido', 'devolvido'].includes(s.status));
 
+  const canShowSiloUpdateForm = siloInfo && linhagem && sexo && diasDesdeAlojamento !== undefined && avesVivas;
+  const canRequestFeed = !siloInfo || nivelSalvo !== null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -435,114 +460,151 @@ export function RacaoLoteDialog({
           </TabsList>
 
           <TabsContent value="solicitar" className="space-y-4 mt-4">
-            <form onSubmit={handleNovaSolicitacao} className="space-y-4">
-              {/* Silo level selector - only show if silo is linked */}
-              {siloInfo && (
-                <NivelSiloSelector
-                  numeroAneis={siloInfo.numero_aneis}
-                  capacidadeToneladas={siloInfo.capacidade_toneladas}
-                  nivelFunil={nivelFunil}
-                  nivelAneis={nivelAneis}
-                  onNivelFunilChange={setNivelFunil}
-                  onNivelAneisChange={setNivelAneis}
-                />
-              )}
+            {/* Step 1: Update Silo Level - Only show if silo is linked */}
+            {canShowSiloUpdateForm && (
+              <NivelSiloUpdateForm
+                galpaoId={galpaoId}
+                loteId={loteId}
+                integradoId={integradoId}
+                siloInfo={siloInfo!}
+                diasDesdeAlojamento={diasDesdeAlojamento}
+                avesVivas={avesVivas}
+                linhagem={linhagem}
+                sexo={sexo}
+                onLevelSaved={setNivelSalvo}
+                savedLevel={nivelSalvo}
+              />
+            )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tipoRacao">Tipo de Ração *</Label>
-                  <Select value={tipoRacao} onValueChange={setTipoRacao}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a ração" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {produtosRacao.length === 0 ? (
-                        <SelectItem value="none" disabled>
-                          Nenhum produto de ração cadastrado
-                        </SelectItem>
-                      ) : (
-                        produtosRacao.map((produto) => (
-                          <SelectItem key={produto.id} value={produto.nome}>
-                            <div className="flex items-center justify-between w-full gap-4">
-                              <span>{produto.nome}</span>
-                              <span className="text-xs text-muted-foreground">
-                                Estoque: {produto.estoque_atual.toLocaleString('pt-BR')} {produto.unidade_medida}
-                              </span>
-                            </div>
+            {/* Step 2: Request Feed - Only enabled after saving level (or if no silo) */}
+            <div className={cn(
+              "border rounded-lg p-4 space-y-4 transition-opacity",
+              siloInfo && !canRequestFeed && "opacity-50 pointer-events-none"
+            )}>
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium">
+                  {siloInfo ? 'Etapa 2: Solicitar Ração' : 'Solicitar Ração'}
+                </h3>
+                {siloInfo && !canRequestFeed && (
+                  <Badge variant="outline" className="gap-1 text-muted-foreground">
+                    <Lock className="w-3 h-3" />
+                    Grave o nível do silo primeiro
+                  </Badge>
+                )}
+              </div>
+
+              <form onSubmit={handleNovaSolicitacao} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipoRacao">Tipo de Ração *</Label>
+                    <Select value={tipoRacao} onValueChange={setTipoRacao}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a ração" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {produtosRacao.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            Nenhum produto de ração cadastrado
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantidade">Quantidade (kg) *</Label>
-                  <Input
-                    id="quantidade"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={quantidade}
-                    onChange={(e) => setQuantidade(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Data Previsão Entrega</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dataPrevisao && "text-muted-foreground"
+                        ) : (
+                          produtosRacao.map((produto) => (
+                            <SelectItem key={produto.id} value={produto.nome}>
+                              <div className="flex items-center justify-between w-full gap-4">
+                                <span>{produto.nome}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Estoque: {produto.estoque_atual.toLocaleString('pt-BR')} {produto.unidade_medida}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))
                         )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dataPrevisao ? format(dataPrevisao, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dataPrevisao}
-                        onSelect={setDataPrevisao}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantidade">Quantidade (kg) *</Label>
+                    <Input
+                      id="quantidade"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={quantidade}
+                      onChange={(e) => setQuantidade(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data Previsão Entrega</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataPrevisao && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataPrevisao ? format(dataPrevisao, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dataPrevisao}
+                          onSelect={setDataPrevisao}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="horaPrevisao">Hora Previsão</Label>
+                    <Input
+                      id="horaPrevisao"
+                      type="time"
+                      value={horaPrevisao}
+                      onChange={(e) => setHoraPrevisao(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Capacity validation alert */}
+                {siloInfo && nivelSalvo !== null && consumoEstimado !== null && quantidade && parseFloat(quantidade) > 0 && (
+                  <CapacidadeAlertCard
+                    nivelAtual={nivelSalvo}
+                    quantidadeSolicitada={parseFloat(quantidade)}
+                    consumoAteEntrega={consumoEstimado}
+                    capacidadeSilo={siloInfo.capacidade_toneladas * 1000}
+                    diasAteEntrega={diasAteEntrega}
+                  />
+                )}
+
                 <div className="space-y-2">
-                  <Label htmlFor="horaPrevisao">Hora Previsão</Label>
-                  <Input
-                    id="horaPrevisao"
-                    type="time"
-                    value={horaPrevisao}
-                    onChange={(e) => setHoraPrevisao(e.target.value)}
+                  <Label htmlFor="observacoes">Observações</Label>
+                  <Textarea
+                    id="observacoes"
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    placeholder="Observações adicionais..."
+                    rows={3}
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="observacoes">Observações</Label>
-                <Textarea
-                  id="observacoes"
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Observações adicionais..."
-                  rows={3}
-                />
-              </div>
-
-              <Button type="submit" disabled={loading || produtosRacao.length === 0} className="w-full gap-2">
-                <Plus className="w-4 h-4" />
-                {loading ? 'Enviando...' : 'Enviar Solicitação'}
-              </Button>
-            </form>
+                <Button 
+                  type="submit" 
+                  disabled={loading || produtosRacao.length === 0 || (siloInfo && !canRequestFeed)} 
+                  className="w-full gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  {loading ? 'Enviando...' : 'Enviar Solicitação'}
+                </Button>
+              </form>
+            </div>
           </TabsContent>
 
           <TabsContent value="pendentes" className="mt-4">
