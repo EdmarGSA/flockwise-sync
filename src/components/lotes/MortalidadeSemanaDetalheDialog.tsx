@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Skull, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { calcularIdadeNaData } from '@/lib/utils';
 
 interface MortalidadeSemanaDetalheDialogProps {
   open: boolean;
@@ -75,12 +76,7 @@ export default function MortalidadeSemanaDetalheDialog({
     setLoading(true);
 
     try {
-      // Calculate date range for this week
-      const alojamentoDate = new Date(dataAlojamento);
-      const dataInicio = addDays(alojamentoDate, diaInicio - 1);
-      const dataFimCalc = addDays(alojamentoDate, diaFim - 1);
-
-      // Fetch mortality with items for this lot
+      // Fetch ALL mortality for this lot and filter by day using the same function as cards
       const { data: mortalidadeData, error } = await supabase
         .from('mortalidade')
         .select(`
@@ -91,9 +87,7 @@ export default function MortalidadeSemanaDetalheDialog({
             quantidade
           )
         `)
-        .eq('lote_id', loteId)
-        .gte('data_registro', format(dataInicio, 'yyyy-MM-dd'))
-        .lte('data_registro', format(dataFimCalc, 'yyyy-MM-dd'));
+        .eq('lote_id', loteId);
 
       if (error) {
         console.error('Error fetching mortality:', error);
@@ -101,14 +95,18 @@ export default function MortalidadeSemanaDetalheDialog({
         return;
       }
 
-      // Process data by day
+      // Process data by day - using calcularIdadeNaData for consistency with cards
       const porDiaMap: Record<string, MortalidadeDia> = {};
       const motivoTotals: Record<string, number> = {};
       let totalGeral = 0;
 
       mortalidadeData?.forEach((m: any) => {
         const dataReg = m.data_registro;
-        const diaCalc = Math.floor((new Date(dataReg).getTime() - alojamentoDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        // Use the same function as the cards for consistent day calculation
+        const diaCalc = calcularIdadeNaData(dataAlojamento, dataReg);
+
+        // Only process if within this week's range
+        if (diaCalc < diaInicio || diaCalc > diaFim) return;
 
         if (!porDiaMap[dataReg]) {
           porDiaMap[dataReg] = {
