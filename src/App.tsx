@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { DemoProvider } from "@/contexts/DemoContext";
+import DemoBanner from "@/components/DemoBanner";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -306,14 +308,17 @@ const AppRoutes = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-        <PWAInstallPrompt />
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <DemoProvider>
+            <DemoBanner />
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+            <PWAInstallPrompt />
+          </DemoProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
