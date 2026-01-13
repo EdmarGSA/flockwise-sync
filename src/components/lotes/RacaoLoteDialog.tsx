@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,9 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download, CalendarIcon, Lock } from 'lucide-react';
+import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, Download, CalendarIcon, Lock, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -110,6 +112,10 @@ export function RacaoLoteDialog({
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<SolicitacaoRacao | null>(null);
   const [quantidadeRecebida, setQuantidadeRecebida] = useState('');
   const [quantidadeDevolvida, setQuantidadeDevolvida] = useState('');
+  
+  // State for devolução imediata no recebimento
+  const [registrarDevolucaoImediata, setRegistrarDevolucaoImediata] = useState<string | null>(null);
+  const [quantidadeDevolucaoImediata, setQuantidadeDevolucaoImediata] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -313,27 +319,80 @@ export function RacaoLoteDialog({
       return;
     }
 
+    const qtdRecebida = parseFloat(quantidadeRecebida);
+    
+    // Verificar devolução imediata
+    const temDevolucaoImediata = registrarDevolucaoImediata === s.id && quantidadeDevolucaoImediata;
+    let qtdDevolucao = 0;
+    
+    if (temDevolucaoImediata) {
+      qtdDevolucao = parseFloat(quantidadeDevolucaoImediata);
+      if (qtdDevolucao > qtdRecebida) {
+        toast.error('Devolução não pode ser maior que o recebido');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
+      const updateData: any = {
+        status: 'recebido',
+        quantidade_recebida_kg: qtdRecebida,
+        data_recebimento: new Date().toISOString(),
+      };
+      
+      // Se registrar devolução imediata
+      if (temDevolucaoImediata && qtdDevolucao > 0) {
+        updateData.quantidade_devolvida_kg = qtdDevolucao;
+        updateData.data_devolucao = new Date().toISOString();
+        updateData.devolucao_confirmada = false;
+      }
+      
       const { error } = await supabase
         .from('solicitacoes_racao')
-        .update({
-          status: 'recebido',
-          quantidade_recebida_kg: parseFloat(quantidadeRecebida),
-          data_recebimento: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', s.id);
 
       if (error) throw error;
 
-      toast.success('Recebimento confirmado!');
+      toast.success(temDevolucaoImediata ? 'Recebimento confirmado com devolução!' : 'Recebimento confirmado!');
       setQuantidadeRecebida('');
+      setRegistrarDevolucaoImediata(null);
+      setQuantidadeDevolucaoImediata('');
       setSelectedSolicitacao(null);
       fetchSolicitacoes();
       onSuccess();
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao confirmar recebimento');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleCancelarSolicitacao = async (s: SolicitacaoRacao) => {
+    if (!['solicitado', 'confirmado'].includes(s.status)) {
+      toast.error('Solicitação já foi enviada e não pode ser cancelada');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('solicitacoes_racao')
+        .update({
+          status: 'cancelado',
+        })
+        .eq('id', s.id);
+
+      if (error) throw error;
+
+      toast.success('Solicitação cancelada com sucesso');
+      fetchSolicitacoes();
+      onSuccess();
+    } catch (error) {
+      console.error('Erro:', error);
+      toast.error('Erro ao cancelar solicitação');
     } finally {
       setLoading(false);
     }
@@ -385,6 +444,7 @@ export function RacaoLoteDialog({
       recebido: { label: 'Recebido', variant: 'default', icon: <Package className="w-3 h-3" /> },
       parcialmente_devolvido: { label: 'Devol. Parcial', variant: 'secondary', icon: <RefreshCw className="w-3 h-3" /> },
       devolvido: { label: 'Devolvido', variant: 'outline', icon: <RefreshCw className="w-3 h-3" /> },
+      cancelado: { label: 'Cancelado', variant: 'outline', icon: <XCircle className="w-3 h-3" /> },
     };
     const config = variants[status] || { label: status, variant: 'outline', icon: null };
     return (
@@ -412,6 +472,12 @@ export function RacaoLoteDialog({
 
   const pendentes = solicitacoes.filter(s => ['solicitado', 'confirmado', 'enviado'].includes(s.status));
   const recebidas = solicitacoes.filter(s => ['recebido', 'parcialmente_devolvido', 'devolvido'].includes(s.status));
+  
+  // Ordenar recebidas por data (mais recente primeiro) para identificar o último recebimento
+  const recebidasOrdenadas = [...recebidas].sort((a, b) => 
+    new Date(b.data_solicitacao).getTime() - new Date(a.data_solicitacao).getTime()
+  );
+  const ultimoRecebimento = recebidasOrdenadas[0];
 
   const canShowSiloUpdateForm = siloInfo && linhagem && sexo && diasDesdeAlojamento !== undefined && avesVivas;
   const canRequestFeed = !siloInfo || nivelSalvo !== null;
@@ -632,7 +698,37 @@ export function RacaoLoteDialog({
                         <p className="font-medium">{s.tipo_racao}</p>
                         <p className="text-sm text-muted-foreground">{formatDateTime(s.data_solicitacao)}</p>
                       </div>
-                      {getSolicitacaoStatusBadge(s.status)}
+                      <div className="flex items-center gap-2">
+                        {getSolicitacaoStatusBadge(s.status)}
+                        
+                        {/* Botão Cancelar - só para solicitado ou confirmado */}
+                        {(s.status === 'solicitado' || s.status === 'confirmado') && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive">
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja cancelar esta solicitação de {s.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {s.tipo_racao}?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleCancelarSolicitacao(s)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Confirmar Cancelamento
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <span><strong>Solicitado:</strong> {s.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg</span>
@@ -642,9 +738,9 @@ export function RacaoLoteDialog({
                     </div>
                     
                     {s.status === 'enviado' && (
-                      <div className="pt-2 border-t space-y-2">
-                        <Label>Quantidade Recebida (kg)</Label>
-                        <div className="flex gap-2">
+                      <div className="pt-2 border-t space-y-4">
+                        <div className="space-y-2">
+                          <Label>Quantidade Recebida (kg)</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -656,15 +752,45 @@ export function RacaoLoteDialog({
                             }}
                             placeholder={s.quantidade_solicitada_kg.toString()}
                           />
-                          <Button 
-                            onClick={() => handleConfirmarRecebimento(s)}
-                            disabled={loading || selectedSolicitacao?.id !== s.id || !quantidadeRecebida}
-                            className="gap-1"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Confirmar
-                          </Button>
                         </div>
+                        
+                        {/* Checkbox para devolução imediata */}
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`devolucao-${s.id}`}
+                            checked={registrarDevolucaoImediata === s.id}
+                            onCheckedChange={(checked) => {
+                              setRegistrarDevolucaoImediata(checked ? s.id : null);
+                              if (!checked) setQuantidadeDevolucaoImediata('');
+                            }}
+                          />
+                          <Label htmlFor={`devolucao-${s.id}`} className="text-sm cursor-pointer">
+                            Registrar devolução parcial
+                          </Label>
+                        </div>
+                        
+                        {registrarDevolucaoImediata === s.id && (
+                          <div className="space-y-2 pl-6">
+                            <Label>Quantidade a Devolver (kg)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={quantidadeDevolucaoImediata}
+                              onChange={(e) => setQuantidadeDevolucaoImediata(e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                        )}
+                        
+                        <Button 
+                          onClick={() => handleConfirmarRecebimento(s)}
+                          disabled={loading || selectedSolicitacao?.id !== s.id || !quantidadeRecebida}
+                          className="w-full gap-1"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          {registrarDevolucaoImediata === s.id ? 'Receber com Devolução' : 'Confirmar Recebimento'}
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -697,7 +823,8 @@ export function RacaoLoteDialog({
                       )}
                     </div>
                     
-                    {s.status === 'recebido' && !s.quantidade_devolvida_kg && (
+                    {/* Só permite devolução no último recebimento e se não tiver devolução já */}
+                    {s.status === 'recebido' && !s.quantidade_devolvida_kg && s.id === ultimoRecebimento?.id && (
                       <div className="pt-2 border-t space-y-2">
                         <Label>Registrar Devolução (kg)</Label>
                         <div className="flex gap-2">
