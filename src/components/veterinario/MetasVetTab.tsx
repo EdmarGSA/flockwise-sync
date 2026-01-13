@@ -9,8 +9,6 @@ import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import PesagemDetalheDialog from './PesagemDetalheDialog';
-
 interface Lote {
   id: string;
   quantidade_aves: number;
@@ -53,9 +51,12 @@ interface MortalidadePorSemana {
 interface MetasVetTabProps {
   loteId: string;
   lote: Lote;
+  onPesagemClick?: (pesagem: PesagemData, pesoReferencia?: number) => void;
 }
 
-export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
+export type { PesagemData };
+
+export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTabProps) {
   const { user } = useAuth();
   const { integradoId } = useIntegradoId();
   const [metas, setMetas] = useState<MetasPeso | null>(null);
@@ -64,10 +65,6 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
   const [mortalidadePorSemana, setMortalidadePorSemana] = useState<MortalidadePorSemana[]>([]);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState(0);
   const [loading, setLoading] = useState(true);
-  
-  // Estado para o dialog de detalhe de pesagem
-  const [detalheDialogOpen, setDetalheDialogOpen] = useState(false);
-  const [pesagemSelecionada, setPesagemSelecionada] = useState<PesagemData | null>(null);
 
   useEffect(() => {
     if (integradoId) {
@@ -532,8 +529,8 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
                   <button
                     key={pesagem.data_pesagem}
                     onClick={() => {
-                      setPesagemSelecionada(pesagem);
-                      setDetalheDialogOpen(true);
+                      const pesoRef = desempenhoReferencia.find(d => d.dia === pesagem.dia)?.peso_g;
+                      onPesagemClick?.(pesagem, pesoRef ? pesoRef / 1000 : undefined);
                     }}
                     className="flex flex-col p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
                   >
@@ -572,21 +569,6 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
         </CardContent>
       </Card>
 
-      {/* Dialog de Detalhe de Pesagem */}
-      {pesagemSelecionada && (
-        <PesagemDetalheDialog
-          open={detalheDialogOpen}
-          onOpenChange={setDetalheDialogOpen}
-          dataPesagem={pesagemSelecionada.data_pesagem}
-          loteId={loteId}
-          dia={pesagemSelecionada.dia}
-          pesoReferencia={
-            desempenhoReferencia.find(d => d.dia === pesagemSelecionada.dia)?.peso_g 
-              ? desempenhoReferencia.find(d => d.dia === pesagemSelecionada.dia)!.peso_g / 1000
-              : undefined
-          }
-        />
-      )}
     </div>
   );
 }
