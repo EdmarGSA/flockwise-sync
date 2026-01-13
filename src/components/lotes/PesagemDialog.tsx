@@ -302,22 +302,22 @@ export function PesagemDialog({
         .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
         .eq('lote_id', loteId);
       
-      // Group by period - usando +1 para consistência (Dia 1 = dia do alojamento)
-      // Então: Inicial = dias 1-7, 7 dias = dias 8-14, etc.
+      // Períodos centrados nos marcos semanais com janela de +/- 2 dias
+      // Inicial = dia 1 apenas (peso pintinhos), depois janelas para cada semana
       const periodos = [
-        { label: 'Inicial', diasMin: 1, diasMax: 7 },
-        { label: '7 dias', diasMin: 8, diasMax: 14 },
-        { label: '14 dias', diasMin: 15, diasMax: 21 },
-        { label: '21 dias', diasMin: 22, diasMax: 28 },
-        { label: '28 dias', diasMin: 29, diasMax: 35 },
-        { label: '35 dias', diasMin: 36, diasMax: 42 },
-        { label: '42 dias', diasMin: 43, diasMax: 999 },
+        { label: 'Inicial', diasMin: 1, diasMax: 4, metaKey: 'peso_inicial_kg' as const },
+        { label: '7 dias', diasMin: 5, diasMax: 10, metaKey: 'meta_7_dias_kg' as const },
+        { label: '14 dias', diasMin: 11, diasMax: 17, metaKey: 'meta_14_dias_kg' as const },
+        { label: '21 dias', diasMin: 18, diasMax: 24, metaKey: 'meta_21_dias_kg' as const },
+        { label: '28 dias', diasMin: 25, diasMax: 31, metaKey: 'meta_28_dias_kg' as const },
+        { label: '35 dias', diasMin: 32, diasMax: 38, metaKey: 'meta_35_dias_kg' as const },
+        { label: '42 dias', diasMin: 39, diasMax: 999, metaKey: 'meta_42_dias_kg' as const },
       ];
 
       const pesoInicialKg = pesoInicialPintinhos || 0.040;
       const metasCalc = calcularMetasComMultiplicadores(pesoInicialKg, DEFAULT_MULTIPLICADORES);
 
-      const historico: PesagemHistorico[] = periodos.map((periodo, idx) => {
+      const historico: PesagemHistorico[] = periodos.map((periodo) => {
         let pesoLiquidoTotal = 0;
         let quantidadeTotal = 0;
 
@@ -337,14 +337,8 @@ export function PesagemDialog({
 
         const pesoReal = quantidadeTotal > 0 ? pesoLiquidoTotal / quantidadeTotal : null;
         
-        let meta: number | null = null;
-        if (idx === 0) meta = metasCalc.peso_inicial_kg;
-        else if (idx === 1) meta = metasCalc.meta_7_dias_kg;
-        else if (idx === 2) meta = metasCalc.meta_14_dias_kg;
-        else if (idx === 3) meta = metasCalc.meta_21_dias_kg;
-        else if (idx === 4) meta = metasCalc.meta_28_dias_kg;
-        else if (idx === 5) meta = metasCalc.meta_35_dias_kg;
-        else if (idx === 6) meta = metasCalc.meta_42_dias_kg;
+        // Obter meta diretamente pelo metaKey do período
+        const meta = metasCalc[periodo.metaKey] ?? null;
 
         const percentual = pesoReal !== null && meta !== null && meta > 0 
           ? (pesoReal / meta) * 100 
