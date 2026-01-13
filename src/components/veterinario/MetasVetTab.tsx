@@ -153,11 +153,31 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
 
     // Fetch mortalidade
     if (lote.data_alojamento && qtdAlojada > 0 && integradoId) {
-      const { data: mortalidadeMediaData } = await supabase
+      // Primeiro tenta buscar específico para linhagem + sexo
+      let mortalidadeMediaData = null;
+      
+      const { data: mortalidadeEspecifica } = await supabase
         .from('mortalidade_media')
         .select('*')
         .eq('integrado_id', integradoId)
+        .eq('linhagem', lote.linhagem as 'cobb_500' | 'ross_308' | 'hubbard')
+        .eq('sexo', lote.sexo as 'macho' | 'femea' | 'misto')
         .maybeSingle();
+      
+      if (mortalidadeEspecifica) {
+        mortalidadeMediaData = mortalidadeEspecifica;
+      } else {
+        // Fallback: buscar linhagem + misto
+        const { data: mortalidadeMisto } = await supabase
+          .from('mortalidade_media')
+          .select('*')
+          .eq('integrado_id', integradoId)
+          .eq('linhagem', lote.linhagem as 'cobb_500' | 'ross_308' | 'hubbard')
+          .eq('sexo', 'misto')
+          .maybeSingle();
+        
+        mortalidadeMediaData = mortalidadeMisto;
+      }
 
       const { data: mortalidadeData } = await supabase
         .from('mortalidade')

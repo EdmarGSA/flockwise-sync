@@ -1884,6 +1884,7 @@ export type Database = {
           created_at: string
           id: string
           integrado_id: string
+          linhagem: Database["public"]["Enums"]["linhagem_aves"]
           mortalidade_14_dias: number
           mortalidade_21_dias: number
           mortalidade_28_dias: number
@@ -1891,12 +1892,14 @@ export type Database = {
           mortalidade_42_dias: number
           mortalidade_7_dias: number
           mortalidade_acima_42_dias: number
+          sexo: Database["public"]["Enums"]["sexo_ave"]
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           integrado_id: string
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
           mortalidade_14_dias?: number
           mortalidade_21_dias?: number
           mortalidade_28_dias?: number
@@ -1904,12 +1907,14 @@ export type Database = {
           mortalidade_42_dias?: number
           mortalidade_7_dias?: number
           mortalidade_acima_42_dias?: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           integrado_id?: string
+          linhagem?: Database["public"]["Enums"]["linhagem_aves"]
           mortalidade_14_dias?: number
           mortalidade_21_dias?: number
           mortalidade_28_dias?: number
@@ -1917,6 +1922,7 @@ export type Database = {
           mortalidade_42_dias?: number
           mortalidade_7_dias?: number
           mortalidade_acima_42_dias?: number
+          sexo?: Database["public"]["Enums"]["sexo_ave"]
           updated_at?: string
         }
         Relationships: []
