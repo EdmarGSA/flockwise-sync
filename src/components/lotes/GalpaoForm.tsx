@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Calculator, Cylinder } from 'lucide-react';
 
 const galpaoSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
@@ -18,8 +19,8 @@ const galpaoSchema = z.object({
   altura: z.string().min(1, 'Altura obrigatória'),
   tipo_pressao: z.enum(['positiva', 'negativa', 'darkhouse']),
   aves_por_m2: z.string().min(1, 'Densidade de aves obrigatória'),
+  silo_id: z.string().optional(),
   silo_quantidade: z.string().min(1, 'Quantidade de silos obrigatória'),
-  silo_volume_total: z.string().min(1, 'Volume dos silos obrigatório'),
   comedouro_tipo: z.enum(['manual', 'automatico']),
   comedouro_quantidade: z.string().min(1, 'Quantidade de comedouros obrigatória'),
   bebedouro_tipo: z.enum(['niple', 'tacas']),
@@ -36,6 +37,17 @@ interface Nucleo {
   nome: string;
 }
 
+interface Silo {
+  id: string;
+  nome: string;
+  marca: string | null;
+  diametro_m: number;
+  numero_aneis: number;
+  capacidade_volume_m3: number;
+  fator_tonelada_m3: number;
+  capacidade_toneladas: number;
+}
+
 interface GalpaoFormProps {
   onSuccess?: () => void;
 }
@@ -43,6 +55,8 @@ interface GalpaoFormProps {
 export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
   const [loading, setLoading] = useState(false);
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
+  const [silos, setSilos] = useState<Silo[]>([]);
+  const [selectedSilo, setSelectedSilo] = useState<Silo | null>(null);
 
   const form = useForm<GalpaoFormData>({
     resolver: zodResolver(galpaoSchema),
@@ -54,8 +68,8 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
       altura: '',
       tipo_pressao: 'positiva',
       aves_por_m2: '0',
-      silo_quantidade: '0',
-      silo_volume_total: '0',
+      silo_id: '',
+      silo_quantidade: '1',
       comedouro_tipo: 'automatico',
       comedouro_quantidade: '0',
       bebedouro_tipo: 'niple',
@@ -68,6 +82,7 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
 
   useEffect(() => {
     fetchNucleos();
+    fetchSilos();
   }, []);
 
   const fetchNucleos = async () => {
@@ -83,9 +98,37 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
     setNucleos(data || []);
   };
 
+  const fetchSilos = async () => {
+    const { data, error } = await supabase
+      .from('silos')
+      .select('id, nome, marca, diametro_m, numero_aneis, capacidade_volume_m3, fator_tonelada_m3, capacidade_toneladas')
+      .eq('ativo', true)
+      .order('nome');
+    
+    if (error) {
+      console.error('Erro ao buscar silos:', error);
+      return;
+    }
+    setSilos(data || []);
+  };
+
+  const handleSiloChange = (siloId: string) => {
+    form.setValue('silo_id', siloId === 'none' ? '' : siloId);
+    const silo = silos.find(s => s.id === siloId);
+    setSelectedSilo(silo || null);
+  };
+
+  const calcularCapacidadeTotal = () => {
+    if (!selectedSilo) return 0;
+    const quantidade = parseInt(form.watch('silo_quantidade')) || 1;
+    return selectedSilo.capacidade_toneladas * quantidade;
+  };
+
   const onSubmit = async (data: GalpaoFormData) => {
     setLoading(true);
     try {
+      const capacidadeTotal = calcularCapacidadeTotal();
+
       const { error } = await supabase.from('galpoes').insert({
         nome: data.nome,
         nucleo_id: data.nucleo_id,
@@ -94,8 +137,9 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
         altura: parseFloat(data.altura),
         tipo_pressao: data.tipo_pressao,
         aves_por_m2: parseFloat(data.aves_por_m2),
+        silo_id: data.silo_id || null,
         silo_quantidade: parseInt(data.silo_quantidade),
-        silo_volume_total: parseFloat(data.silo_volume_total),
+        silo_volume_total: capacidadeTotal || null,
         comedouro_tipo: data.comedouro_tipo,
         comedouro_quantidade: parseInt(data.comedouro_quantidade),
         bebedouro_tipo: data.bebedouro_tipo,
@@ -109,6 +153,7 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
 
       toast.success('Galpão cadastrado com sucesso!');
       form.reset();
+      setSelectedSilo(null);
       onSuccess?.();
     } catch (error) {
       console.error('Erro ao cadastrar galpão:', error);
@@ -117,6 +162,8 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
       setLoading(false);
     }
   };
+
+  const siloQuantidade = form.watch('silo_quantidade');
 
   return (
     <Card className="bg-card border-border">
@@ -267,17 +314,32 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
 
             {/* Silos */}
             <div>
-              <h3 className="text-lg font-semibold text-foreground mb-3">Silos</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Cylinder className="h-5 w-5" />
+                Silos
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="silo_quantidade"
+                  name="silo_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantidade</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" placeholder="0" {...field} />
-                      </FormControl>
+                      <FormLabel>Tipo de Silo</FormLabel>
+                      <Select onValueChange={handleSiloChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo de silo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum / Não informado</SelectItem>
+                          {silos.map((silo) => (
+                            <SelectItem key={silo.id} value={silo.id}>
+                              {silo.nome} {silo.diametro_m ? `(Ø${silo.diametro_m}m)` : ''} - {silo.capacidade_toneladas.toFixed(2)} ton
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -285,18 +347,43 @@ export function GalpaoForm({ onSuccess }: GalpaoFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="silo_volume_total"
+                  name="silo_quantidade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Volume Total (ton)</FormLabel>
+                      <FormLabel>Quantidade</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          placeholder="1" 
+                          {...field} 
+                          disabled={!selectedSilo}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+
+              {selectedSilo && (
+                <Card className="mt-4 bg-primary/5 border-primary/20">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calculator className="w-4 h-4" />
+                        Capacidade Total de Armazenamento:
+                      </div>
+                      <span className="text-lg font-semibold text-primary">
+                        {calcularCapacidadeTotal().toFixed(2)} toneladas
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {parseInt(siloQuantidade) || 1} silo(s) × {selectedSilo.capacidade_toneladas.toFixed(2)} ton/unidade
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Comedouros */}
