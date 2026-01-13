@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw } from 'lucide-react';
+import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -179,6 +180,34 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
     }
   };
 
+  const handleCancelarSolicitacao = async (s: SolicitacaoRacao) => {
+    if (!['solicitado', 'confirmado'].includes(s.status)) {
+      toast.error('Solicitação já foi enviada e não pode ser cancelada');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('solicitacoes_racao')
+        .update({
+          status: 'cancelado',
+        })
+        .eq('id', s.id);
+
+      if (error) throw error;
+
+      toast.success('Solicitação cancelada com sucesso');
+      fetchSolicitacoes();
+      onSuccess();
+    } catch (error) {
+      console.error('Erro:', error);
+      toast.error('Erro ao cancelar solicitação');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getSolicitacaoStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; icon: React.ReactNode }> = {
       solicitado: { label: 'Solicitado', variant: 'outline', icon: <Clock className="w-3 h-3" /> },
@@ -187,6 +216,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
       recebido: { label: 'Recebido', variant: 'default', icon: <Package className="w-3 h-3" /> },
       parcialmente_devolvido: { label: 'Devol. Parcial', variant: 'secondary', icon: <RefreshCw className="w-3 h-3" /> },
       devolvido: { label: 'Devolvido', variant: 'outline', icon: <RefreshCw className="w-3 h-3" /> },
+      cancelado: { label: 'Cancelado', variant: 'outline', icon: <XCircle className="w-3 h-3" /> },
     };
     const config = variants[status] || { label: status, variant: 'outline', icon: null };
     return (
@@ -340,6 +370,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
                       <TableHead>Recebido</TableHead>
                       <TableHead>Devolvido</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -364,6 +395,36 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
                           ) : '-'}
                         </TableCell>
                         <TableCell>{getSolicitacaoStatusBadge(s.status)}</TableCell>
+                        <TableCell>
+                          {/* Botão Cancelar - só para solicitado ou confirmado */}
+                          {(s.status === 'solicitado' || s.status === 'confirmado') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive">
+                                  <XCircle className="w-4 h-4" />
+                                  Cancelar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja cancelar esta solicitação de {s.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {s.tipo_racao}?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleCancelarSolicitacao(s)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Confirmar Cancelamento
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

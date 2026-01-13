@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, ArrowLeft, Bird, Calendar, Truck, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { Package, ArrowLeft, Bird, Calendar, Truck, CheckCircle, Clock, RefreshCw, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
@@ -205,6 +206,7 @@ export default function GestaoConsumo() {
       recebido: { label: 'Recebido', variant: 'default', icon: <Package className="w-3 h-3" /> },
       parcialmente_devolvido: { label: 'Devol. Parcial', variant: 'secondary', icon: <RefreshCw className="w-3 h-3" /> },
       devolvido: { label: 'Devolvido', variant: 'outline', icon: <RefreshCw className="w-3 h-3" /> },
+      cancelado: { label: 'Cancelado', variant: 'outline', icon: <XCircle className="w-3 h-3" /> },
     };
     const config = variants[status] || { label: status, variant: 'outline', icon: null };
     return (
@@ -237,6 +239,29 @@ export default function GestaoConsumo() {
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao confirmar solicitação');
+    }
+  };
+
+  const handleCancelarSolicitacao = async (solicitacao: SolicitacaoRacao) => {
+    if (!['solicitado', 'confirmado'].includes(solicitacao.status)) {
+      toast.error('Solicitação já foi enviada e não pode ser cancelada');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('solicitacoes_racao')
+        .update({
+          status: 'cancelado',
+        })
+        .eq('id', solicitacao.id);
+
+      if (error) throw error;
+      toast.success('Solicitação cancelada com sucesso');
+      fetchSolicitacoes();
+    } catch (error) {
+      console.error('Erro:', error);
+      toast.error('Erro ao cancelar solicitação');
     }
   };
 
@@ -488,24 +513,76 @@ export default function GestaoConsumo() {
                           <TableCell>
                             <div className="flex gap-1">
                               {solicitacao.status === 'solicitado' && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleConfirmarSolicitacao(solicitacao)}
-                                >
-                                  Confirmar
-                                </Button>
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleConfirmarSolicitacao(solicitacao)}
+                                  >
+                                    Confirmar
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tem certeza que deseja cancelar esta solicitação de {solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {solicitacao.tipo_racao}?
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => handleCancelarSolicitacao(solicitacao)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Confirmar Cancelamento
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
                               )}
                               {solicitacao.status === 'confirmado' && (
-                                <Button 
-                                  size="sm" 
-                                  variant="default"
-                                  onClick={() => handleOpenEnviarDialog(solicitacao)}
-                                  className="gap-1"
-                                >
-                                  <Truck className="w-4 h-4" />
-                                  Enviar
-                                </Button>
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    variant="default"
+                                    onClick={() => handleOpenEnviarDialog(solicitacao)}
+                                    className="gap-1"
+                                  >
+                                    <Truck className="w-4 h-4" />
+                                    Enviar
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tem certeza que deseja cancelar esta solicitação de {solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {solicitacao.tipo_racao}?
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => handleCancelarSolicitacao(solicitacao)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Confirmar Cancelamento
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
                               )}
                               {solicitacao.quantidade_devolvida_kg && 
                                solicitacao.quantidade_devolvida_kg > 0 && 
