@@ -528,6 +528,121 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         </CardContent>
       </Card>
 
+      {/* Histórico Mortalidade por Semana - Cards Clicáveis */}
+      {mortalidadePorSemana.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Skull className="w-5 h-5" />
+              Histórico de Mortalidade por Semana
+            </CardTitle>
+            <CardDescription>
+              Quantidade alojada: {quantidadeAlojada.toLocaleString('pt-BR')} aves
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Resumo de Totais */}
+            {(() => {
+              const totalMortalidadeRealCalc = mortalidadePorSemana.reduce((acc, m) => acc + m.mortalidade_semana, 0);
+              const totalQuantidadeMortes = mortalidadePorSemana.reduce((acc, m) => acc + m.quantidade_mortes_semana, 0);
+              const totalReferenciaMaxima = mortalidadePorSemana.reduce((acc, m) => acc + m.mortalidade_referencia, 0);
+              const dentroDoLimite = totalMortalidadeRealCalc <= totalReferenciaMaxima;
+              const diferencaPercentual = totalReferenciaMaxima > 0
+                ? ((totalMortalidadeRealCalc - totalReferenciaMaxima) / totalReferenciaMaxima) * 100
+                : 0;
+
+              return (
+                <div className={`p-4 rounded-lg border ${
+                  dentroDoLimite 
+                    ? 'bg-green-500/10 border-green-500/30' 
+                    : 'bg-destructive/10 border-destructive/30'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Mortalidade Real Total</p>
+                        <p className={`text-2xl font-bold ${!dentroDoLimite ? 'text-destructive' : ''}`}>
+                          {totalQuantidadeMortes.toLocaleString('pt-BR')} <span className="text-base font-normal text-muted-foreground">aves</span>
+                        </p>
+                        <p className={`text-sm ${!dentroDoLimite ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          {totalMortalidadeRealCalc.toFixed(2)}%
+                        </p>
+                      </div>
+                      
+                      <div className="w-px h-12 bg-border" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Máx. Referência</p>
+                        <p className="text-2xl font-bold text-muted-foreground">
+                          {totalReferenciaMaxima.toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {dentroDoLimite ? (
+                        <>
+                          <CheckCircle className="w-6 h-6 text-green-500" />
+                          <span className="text-sm font-medium text-green-600">Dentro do limite</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-6 h-6 text-destructive" />
+                          <div className="text-right">
+                            <span className="text-sm font-medium text-destructive block">Acima do limite</span>
+                            <Badge variant="destructive" className="text-xs">
+                              +{diferencaPercentual.toFixed(1)}% acima
+                            </Badge>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Grid de Semanas - Cards Clicáveis */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              {mortalidadePorSemana.filter(m => m.diaFim <= Math.max(diasLote + 7, 7)).map((m) => (
+                <div 
+                  key={m.semana}
+                  onClick={() => lote?.data_alojamento && setSemanaSelecionada({
+                    semana: m.semana,
+                    diaInicio: m.diaInicio,
+                    diaFim: m.diaFim,
+                    metaSemana: m.mortalidade_referencia,
+                  })}
+                  className={`p-4 rounded-lg text-center cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+                    m.acima_limite ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50 hover:bg-muted'
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground font-medium">Semana {m.semana}</p>
+                  <p className="text-[10px] text-muted-foreground">(Dias {m.diaInicio}-{m.diaFim})</p>
+                  <p className={`text-lg font-bold ${m.acima_limite ? 'text-destructive' : ''}`}>
+                    {m.quantidade_mortes_semana.toLocaleString('pt-BR')}
+                  </p>
+                  <p className={`text-sm ${m.acima_limite ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {m.mortalidade_semana.toFixed(2)}%
+                  </p>
+                  {m.mortalidade_referencia > 0 && (
+                    <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-border/50">
+                      {m.acima_limite ? (
+                        <AlertTriangle className="w-3 h-3 text-destructive" />
+                      ) : (
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        Meta: {m.mortalidade_referencia.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Histórico de Pesagens - Cards Clicáveis */}
       <Card className="bg-card border-border">
         <CardHeader>
