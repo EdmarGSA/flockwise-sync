@@ -770,6 +770,7 @@ export default function GestaoCampo() {
                           {editingArea && (
                             <AreaEditForm
                               area={editingArea}
+                              integradoId={user!.id}
                               onSuccess={handleAreaEditSuccess}
                               onCancel={() => setEditingArea(null)}
                             />
