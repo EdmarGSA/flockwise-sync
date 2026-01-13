@@ -4,9 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
-import { Target, TrendingUp, Scale, Skull, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Target, TrendingUp, Scale, Skull, AlertTriangle, CheckCircle, Clock, ChevronRight } from 'lucide-react';
 import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import PesagemDetalheDialog from './PesagemDetalheDialog';
 
 interface Lote {
   id: string;
@@ -31,6 +34,8 @@ interface MetasPeso {
 interface PesagemData {
   dia: number;
   peso_real_kg: number;
+  data_pesagem: string;
+  numSessoes: number;
 }
 
 interface DesempenhoReferencia {
@@ -59,6 +64,10 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
   const [mortalidadePorSemana, setMortalidadePorSemana] = useState<MortalidadePorSemana[]>([]);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  // Estado para o dialog de detalhe de pesagem
+  const [detalheDialogOpen, setDetalheDialogOpen] = useState(false);
+  const [pesagemSelecionada, setPesagemSelecionada] = useState<PesagemData | null>(null);
 
   useEffect(() => {
     if (integradoId) {
@@ -123,6 +132,7 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
       const { data: pesagensData } = await supabase
         .from('pesagens')
         .select(`
+          id,
           data_pesagem,
           pesagem_itens (quantidade_aves, peso_liquido_g)
         `)
@@ -131,20 +141,26 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
 
       if (pesagensData) {
         // Agrupar pesagens parciais do mesmo dia
-        const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+        const pesagensPorData = pesagensData.reduce((acc: Record<string, { itens: any[], sessoes: Set<string> }>, p: any) => {
           const data = p.data_pesagem;
-          if (!acc[data]) acc[data] = [];
-          acc[data].push(...p.pesagem_itens);
+          if (!acc[data]) acc[data] = { itens: [], sessoes: new Set() };
+          acc[data].itens.push(...p.pesagem_itens);
+          acc[data].sessoes.add(p.id);
           return acc;
         }, {});
 
         // Calcular média ponderada consolidada por dia - Dia 1 = dia do alojamento
-        const processed = Object.entries(pesagensPorData).map(([data, itens]) => {
+        const processed = Object.entries(pesagensPorData).map(([data, { itens, sessoes }]) => {
           const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
           const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
           const dia = calcularIdadeNaData(lote.data_alojamento!, data);
-          return { dia, peso_real_kg: pesoMedio };
+          return { 
+            dia, 
+            peso_real_kg: pesoMedio,
+            data_pesagem: data,
+            numSessoes: sessoes.size
+          };
         }).sort((a, b) => a.dia - b.dia);
         
         setPesagens(processed);
@@ -486,6 +502,91 @@ export default function MetasVetTab({ loteId, lote }: MetasVetTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Histórico de Pesagens - Cards Clicáveis */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Scale className="w-5 h-5 text-primary" />
+            Histórico de Pesagens
+          </CardTitle>
+          <CardDescription>Clique em um dia para ver os detalhes das pesagens</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pesagens.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {pesagens.slice().reverse().map((pesagem) => {
+                const refData = desempenhoReferencia.find(d => d.dia === pesagem.dia);
+                const pesoRefKg = refData ? refData.peso_g / 1000 : null;
+                const diferenca = pesoRefKg 
+                  ? ((pesagem.peso_real_kg - pesoRefKg) / pesoRefKg) * 100 
+                  : null;
+                
+                const dataFormatada = format(
+                  new Date(pesagem.data_pesagem + 'T12:00:00'), 
+                  "dd/MM", 
+                  { locale: ptBR }
+                );
+
+                return (
+                  <button
+                    key={pesagem.data_pesagem}
+                    onClick={() => {
+                      setPesagemSelecionada(pesagem);
+                      setDetalheDialogOpen(true);
+                    }}
+                    className="flex flex-col p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">Dia {pesagem.dia}</span>
+                      {pesagem.numSessoes > 1 && (
+                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                          {pesagem.numSessoes}x
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="font-bold text-base">
+                      {(pesagem.peso_real_kg * 1000).toFixed(0)}g
+                    </span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-muted-foreground">{dataFormatada}</span>
+                      {diferenca !== null && (
+                        <Badge 
+                          variant={diferenca >= 0 ? "default" : "destructive"} 
+                          className="text-xs h-5 px-1.5"
+                        >
+                          {diferenca >= 0 ? '+' : ''}{diferenca.toFixed(1)}%
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary mt-1 self-end opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhuma pesagem registrada
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog de Detalhe de Pesagem */}
+      {pesagemSelecionada && (
+        <PesagemDetalheDialog
+          open={detalheDialogOpen}
+          onOpenChange={setDetalheDialogOpen}
+          dataPesagem={pesagemSelecionada.data_pesagem}
+          loteId={loteId}
+          dia={pesagemSelecionada.dia}
+          pesoReferencia={
+            desempenhoReferencia.find(d => d.dia === pesagemSelecionada.dia)?.peso_g 
+              ? desempenhoReferencia.find(d => d.dia === pesagemSelecionada.dia)!.peso_g / 1000
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }
