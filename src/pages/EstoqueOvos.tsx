@@ -385,23 +385,23 @@ export default function EstoqueOvos() {
                       />
                     </div>
                   </div>
-                  <Select value={filterTipo} onValueChange={setFilterTipo}>
+                  <Select value={filterTipo || 'all'} onValueChange={(v) => setFilterTipo(v === 'all' ? '' : v)}>
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       {TIPOS_OVO.map(t => (
                         <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={filterClassificacao} onValueChange={setFilterClassificacao}>
+                  <Select value={filterClassificacao || 'all'} onValueChange={(v) => setFilterClassificacao(v === 'all' ? '' : v)}>
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Classificação" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="all">Todas</SelectItem>
                       {CLASSIFICACOES_PESO.map(c => (
                         <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                       ))}
