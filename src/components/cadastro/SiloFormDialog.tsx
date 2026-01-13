@@ -224,12 +224,12 @@ const SiloFormDialog = ({ open, onOpenChange, silo, integradoId, onSuccess }: Si
 
           <div className="space-y-2">
             <Label htmlFor="galpao">Galpão (opcional)</Label>
-            <Select value={galpaoId} onValueChange={setGalpaoId}>
+            <Select value={galpaoId || "none"} onValueChange={(val) => setGalpaoId(val === "none" ? "" : val)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o galpão" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {galpoes.map((galpao) => (
                   <SelectItem key={galpao.id} value={galpao.id}>
                     {galpao.nome} - {galpao.nucleo?.nome}
