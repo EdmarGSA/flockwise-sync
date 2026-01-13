@@ -150,7 +150,20 @@ export default function MetasPesoLote() {
     conversaoEsperada: number | null;
     diaReferencia: number | null;
     pesoReferencia: number | null;
+    diaPesagem: number;
+    dataPesagem: string;
   } | null>(null);
+  
+  // Histórico de CA por pesagem
+  interface HistoricoCAItem {
+    dia: number;
+    dataPesagem: string;
+    pesoMedio: number;
+    conversaoReal: number;
+    conversaoEsperada: number | null;
+    diferencaCA: number | null;
+  }
+  const [historicoCA, setHistoricoCA] = useState<HistoricoCAItem[]>([]);
 
   useEffect(() => {
     if (user && loteId && integradoId) {
@@ -463,21 +476,19 @@ export default function MetasPesoLote() {
 
         const avesVivas = qtdAlojada - totalMortes;
 
-        // Buscar consumo acumulado da tabela de referência para o dia atual
-        const refDiaAtual = desempenhoData.find((d: any) => d.dia === diaAtual);
-        const consumoAcumuladoG = refDiaAtual ? refDiaAtual.consumo_acumulado_racao_g : 0;
+        // Buscar consumo acumulado da tabela de referência para o dia da pesagem
+        const refDiaPesagem = desempenhoData.find((d: any) => d.dia === diaAtual);
+        const consumoAcumuladoG = refDiaPesagem ? refDiaPesagem.consumo_acumulado_racao_g : 0;
         
         // Se não encontrar no dia exato, interpolar ou usar o mais próximo
         let consumoFinal = consumoAcumuladoG;
-        if (!refDiaAtual) {
-          // Buscar o dia mais próximo disponível
+        if (!refDiaPesagem) {
           const diasDisponiveis = desempenhoData.map((d: any) => d.dia);
           const diaMaisProximo = diasDisponiveis.reduce((prev: number, curr: number) =>
             Math.abs(curr - diaAtual) < Math.abs(prev - diaAtual) ? curr : prev
           );
           const refMaisProximo = desempenhoData.find((d: any) => d.dia === diaMaisProximo);
           if (refMaisProximo) {
-            // Interpolar linearmente baseado na diferença de dias
             const consumoDiarioEstimado = refMaisProximo.consumo_diario_racao_g || 150;
             consumoFinal = refMaisProximo.consumo_acumulado_racao_g + 
               (diaAtual - diaMaisProximo) * consumoDiarioEstimado;
@@ -495,9 +506,9 @@ export default function MetasPesoLote() {
         let pesoReferencia: number | null = null;
 
         if (desempenhoData.length > 0) {
-          // Peso de referência do dia atual
-          const refPesoAtual = desempenhoData.find((d: any) => d.dia === diaAtual);
-          pesoReferencia = refPesoAtual ? refPesoAtual.peso_g / 1000 : null;
+          // Peso de referência do dia da pesagem (não do dia atual)
+          const refPesoPesagem = desempenhoData.find((d: any) => d.dia === diaAtual);
+          pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_g / 1000 : null;
 
           // Encontrar dia cujo peso_g mais se aproxima do peso medido
           let menorDiferenca = Infinity;
@@ -519,7 +530,67 @@ export default function MetasPesoLote() {
           conversaoEsperada,
           diaReferencia,
           pesoReferencia,
+          diaPesagem: diaAtual,
+          dataPesagem: ultimaData,
         });
+
+        // Calcular histórico de CA para todas as pesagens
+        const historicoCACalculado: HistoricoCAItem[] = [];
+        
+        for (const dataPes of datasPesagens) {
+          const itens = pesagensPorData[dataPes];
+          const totalAvesDia = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
+          const totalPesoDia = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+          const pesoMedioDiaG = totalAvesDia > 0 ? totalPesoDia / totalAvesDia : 0;
+          const pesoMedioDiaKg = pesoMedioDiaG / 1000;
+          const diaPes = calcularIdadeNaData(loteData.data_alojamento, dataPes);
+          
+          // Buscar consumo para este dia
+          const refDia = desempenhoData.find((d: any) => d.dia === diaPes);
+          let consumoDia = refDia ? refDia.consumo_acumulado_racao_g : 0;
+          
+          if (!refDia && desempenhoData.length > 0) {
+            const diasDisp = desempenhoData.map((d: any) => d.dia);
+            const diaMaisProx = diasDisp.reduce((prev: number, curr: number) =>
+              Math.abs(curr - diaPes) < Math.abs(prev - diaPes) ? curr : prev
+            );
+            const refProx = desempenhoData.find((d: any) => d.dia === diaMaisProx);
+            if (refProx) {
+              const consumoDiarioEst = refProx.consumo_diario_racao_g || 150;
+              consumoDia = refProx.consumo_acumulado_racao_g + (diaPes - diaMaisProx) * consumoDiarioEst;
+            }
+          }
+          
+          const consumoKg = (consumoDia * avesVivas) / 1000;
+          const pesoTotalKg = pesoMedioDiaKg * avesVivas;
+          const caReal = pesoTotalKg > 0 ? consumoKg / pesoTotalKg : 0;
+          
+          // Encontrar CA esperada para o peso medido
+          let caEsperada: number | null = null;
+          if (desempenhoData.length > 0) {
+            let menorDif = Infinity;
+            for (const ref of desempenhoData) {
+              const dif = Math.abs((ref as any).peso_g - pesoMedioDiaG);
+              if (dif < menorDif) {
+                menorDif = dif;
+                caEsperada = (ref as any).conversao_alimentar_acumulada;
+              }
+            }
+          }
+          
+          const difCA = caEsperada !== null ? caReal - caEsperada : null;
+          
+          historicoCACalculado.push({
+            dia: diaPes,
+            dataPesagem: dataPes,
+            pesoMedio: pesoMedioDiaKg,
+            conversaoReal: caReal,
+            conversaoEsperada: caEsperada,
+            diferencaCA: difCA,
+          });
+        }
+        
+        setHistoricoCA(historicoCACalculado);
       }
     }
 
@@ -1063,11 +1134,67 @@ export default function MetasPesoLote() {
                     consumoTotal={conversaoData.consumoEstimado}
                     conversaoAlimentar={conversaoData.conversaoReal}
                     conversaoEsperada={conversaoData.conversaoEsperada}
-                    diaAtual={diasDesdeAlojamento}
+                    diaAtual={conversaoData.diaPesagem}
                     diaReferencia={conversaoData.diaReferencia}
                     pesoReferencia={conversaoData.pesoReferencia}
+                    dataPesagem={conversaoData.dataPesagem}
                   />
                 </div>
+              )}
+
+              {/* Histórico de Conversão Alimentar */}
+              {historicoCA.length > 0 && (
+                <Card className="lg:col-span-3 bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5" />
+                      Histórico de Conversão Alimentar
+                    </CardTitle>
+                    <CardDescription>
+                      Evolução da CA ao longo das pesagens
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {historicoCA.map((item, idx) => {
+                        const dentroMeta = item.diferencaCA !== null && Math.abs(item.diferencaCA) <= 0.03;
+                        const acimaMeta = item.diferencaCA !== null && item.diferencaCA > 0.03;
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            className={`p-3 rounded-lg border text-center space-y-1 ${
+                              dentroMeta 
+                                ? 'bg-green-500/10 border-green-500/30' 
+                                : acimaMeta 
+                                  ? 'bg-destructive/10 border-destructive/30'
+                                  : 'bg-green-500/10 border-green-500/30'
+                            }`}
+                          >
+                            <p className="text-xs text-muted-foreground font-medium">Dia {item.dia}</p>
+                            <p className="text-lg font-bold">{item.pesoMedio.toFixed(3)} kg</p>
+                            <p className={`text-sm font-semibold ${
+                              acimaMeta ? 'text-destructive' : 'text-green-600'
+                            }`}>
+                              CA: {item.conversaoReal.toFixed(2)}
+                            </p>
+                            {item.diferencaCA !== null && (
+                              <Badge 
+                                variant={acimaMeta ? 'destructive' : 'outline'} 
+                                className={`text-xs ${!acimaMeta ? 'bg-green-500/10 text-green-600 border-green-500/30' : ''}`}
+                              >
+                                {item.diferencaCA > 0 ? '+' : ''}{item.diferencaCA.toFixed(2)}
+                              </Badge>
+                            )}
+                            <p className="text-[10px] text-muted-foreground">
+                              {format(new Date(item.dataPesagem), 'dd/MM/yy', { locale: ptBR })}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Histórico Mortalidade por Semana */}
