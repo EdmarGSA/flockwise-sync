@@ -138,6 +138,35 @@ export function EnviarRacaoDialog({
 
     setLoading(true);
     try {
+      // Buscar produto de ração pelo nome para gerar Kardex
+      const produtoEncontrado = produtosRacao.find(p => p.nome === tipoRacao);
+      
+      if (produtoEncontrado) {
+        // Gerar Kardex de saída
+        const { error: kardexError } = await supabase
+          .from('kardex')
+          .insert({
+            produto_id: produtoEncontrado.id,
+            integrado_id: (await supabase.from('solicitacoes_racao').select('integrado_id').eq('id', solicitacao.id).single()).data?.integrado_id,
+            tipo_movimento: 'saida_racao_lote',
+            quantidade: qtd,
+            saldo_anterior: produtoEncontrado.estoque_atual,
+            saldo_atual: produtoEncontrado.estoque_atual - qtd,
+            documento_ref: `SOLIC-${solicitacao.id.slice(0, 8)}`,
+            observacao: `Envio para lote ${loteInfo?.nucleo_nome}/${loteInfo?.galpao_nome}`,
+          });
+
+        if (kardexError) {
+          console.error('Erro ao criar kardex:', kardexError);
+        } else {
+          // Atualizar estoque do produto
+          await supabase
+            .from('produtos')
+            .update({ estoque_atual: produtoEncontrado.estoque_atual - qtd })
+            .eq('id', produtoEncontrado.id);
+        }
+      }
+
       const { error } = await supabase
         .from('solicitacoes_racao')
         .update({

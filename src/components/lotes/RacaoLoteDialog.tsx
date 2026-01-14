@@ -320,6 +320,8 @@ export function RacaoLoteDialog({
     }
 
     const qtdRecebida = parseFloat(quantidadeRecebida);
+    const qtdSolicitada = s.quantidade_solicitada_kg;
+    const divergencia = qtdRecebida - qtdSolicitada;
     
     // Verificar devolução imediata
     const temDevolucaoImediata = registrarDevolucaoImediata === s.id && quantidadeDevolucaoImediata;
@@ -335,10 +337,64 @@ export function RacaoLoteDialog({
 
     setLoading(true);
     try {
+      // Se há divergência entre solicitado e recebido, gerar movimentação de Kardex
+      if (divergencia !== 0) {
+        // Buscar produto de ração pelo nome
+        const { data: produtoData } = await supabase
+          .from('produtos')
+          .select('id, estoque_atual')
+          .ilike('nome', s.tipo_racao)
+          .eq('integrado_id', integradoId)
+          .maybeSingle();
+
+        if (produtoData) {
+          if (divergencia < 0) {
+            // RETORNO: Recebeu menos que o enviado - devolver ao estoque da fábrica
+            const qtdRetorno = Math.abs(divergencia);
+            
+            await supabase.from('kardex').insert({
+              produto_id: produtoData.id,
+              integrado_id: integradoId,
+              tipo_movimento: 'entrada_retorno_racao',
+              quantidade: qtdRetorno,
+              saldo_anterior: produtoData.estoque_atual,
+              saldo_atual: produtoData.estoque_atual + qtdRetorno,
+              documento_ref: `RET-${s.id.slice(0, 8)}`,
+              observacao: `Retorno de ${qtdRetorno.toLocaleString('pt-BR')}kg não recebidos pelo lote (${nucleo}/${galpao})`,
+            });
+
+            // Atualizar estoque do produto
+            await supabase
+              .from('produtos')
+              .update({ estoque_atual: produtoData.estoque_atual + qtdRetorno })
+              .eq('id', produtoData.id);
+          } else {
+            // EXCESSO: Recebeu mais que o enviado - registrar saída extra
+            await supabase.from('kardex').insert({
+              produto_id: produtoData.id,
+              integrado_id: integradoId,
+              tipo_movimento: 'saida_extra_racao',
+              quantidade: divergencia,
+              saldo_anterior: produtoData.estoque_atual,
+              saldo_atual: produtoData.estoque_atual - divergencia,
+              documento_ref: `EXT-${s.id.slice(0, 8)}`,
+              observacao: `${divergencia.toLocaleString('pt-BR')}kg extras enviados ao lote (${nucleo}/${galpao})`,
+            });
+
+            // Atualizar estoque do produto
+            await supabase
+              .from('produtos')
+              .update({ estoque_atual: produtoData.estoque_atual - divergencia })
+              .eq('id', produtoData.id);
+          }
+        }
+      }
+
       const updateData: any = {
         status: 'recebido',
         quantidade_recebida_kg: qtdRecebida,
         data_recebimento: new Date().toISOString(),
+        divergencia_kg: divergencia !== 0 ? divergencia : null,
       };
       
       // Se registrar devolução imediata
@@ -355,7 +411,17 @@ export function RacaoLoteDialog({
 
       if (error) throw error;
 
-      toast.success(temDevolucaoImediata ? 'Recebimento confirmado com devolução!' : 'Recebimento confirmado!');
+      const msgDivergencia = divergencia !== 0 
+        ? (divergencia < 0 
+            ? ` Retorno de ${Math.abs(divergencia).toLocaleString('pt-BR')}kg registrado.` 
+            : ` Saída extra de ${divergencia.toLocaleString('pt-BR')}kg registrada.`)
+        : '';
+      
+      toast.success(
+        temDevolucaoImediata 
+          ? `Recebimento confirmado com devolução!${msgDivergencia}` 
+          : `Recebimento confirmado!${msgDivergencia}`
+      );
       setQuantidadeRecebida('');
       setRegistrarDevolucaoImediata(null);
       setQuantidadeDevolucaoImediata('');

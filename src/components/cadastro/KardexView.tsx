@@ -53,10 +53,17 @@ const KardexView = ({ integradoId, produtos, produtoId }: KardexViewProps) => {
 
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
-      case 'entrada': return 'default';
-      case 'saida': return 'destructive';
-      case 'ajuste': return 'secondary';
-      default: return 'outline';
+      case 'entrada': 
+      case 'entrada_retorno_racao': 
+        return 'default';
+      case 'saida': 
+      case 'saida_racao_lote': 
+      case 'saida_extra_racao': 
+        return 'destructive';
+      case 'ajuste': 
+        return 'secondary';
+      default: 
+        return 'outline';
     }
   };
 
@@ -65,6 +72,9 @@ const KardexView = ({ integradoId, produtos, produtoId }: KardexViewProps) => {
       case 'entrada': return 'Entrada';
       case 'saida': return 'Saída';
       case 'ajuste': return 'Ajuste';
+      case 'saida_racao_lote': return 'Envio Lote';
+      case 'entrada_retorno_racao': return 'Retorno Lote';
+      case 'saida_extra_racao': return 'Envio Extra';
       default: return tipo;
     }
   };
