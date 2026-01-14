@@ -19,7 +19,7 @@ import { AreaForm } from '@/components/campo/AreaForm';
 import { AreaEditForm } from '@/components/campo/AreaEditForm';
 import { LoteForm } from '@/components/lotes/LoteForm';
 import { LotePosturaForm } from '@/components/lotes/postura/LotePosturaForm';
-import { LoteEditForm } from '@/components/lotes/LoteEditForm';
+import { LoteDashboardDialog } from '@/components/campo/LoteDashboardDialog';
 import { DesempenhoForm } from '@/components/campo/DesempenhoForm';
 import { DesempenhoEditForm } from '@/components/campo/DesempenhoEditForm';
 import { DesempenhoTable } from '@/components/campo/DesempenhoTable';
@@ -473,12 +473,12 @@ export default function GestaoCampo() {
                     </Table>
 
                     <Dialog open={!!editingLote} onOpenChange={(open) => !open && setEditingLote(null)}>
-                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
                         <DialogHeader>
-                          <DialogTitle>Editar Lote</DialogTitle>
+                          <DialogTitle>Gerenciar Lote</DialogTitle>
                         </DialogHeader>
                         {editingLote && (
-                          <LoteEditForm
+                          <LoteDashboardDialog
                             lote={editingLote}
                             onSuccess={handleLoteEditSuccess}
                             onCancel={() => setEditingLote(null)}

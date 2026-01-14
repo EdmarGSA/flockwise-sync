@@ -39,6 +39,7 @@ import Financeiro from "./pages/Financeiro";
 import CockpitThoth from "./pages/CockpitThoth";
 import CadastroProdutosOvos from "./pages/CadastroProdutosOvos";
 import EstoqueOvos from "./pages/EstoqueOvos";
+import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -289,6 +290,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <CadastroProdutosAnimais />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/metas-zootecnicas" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <CadastroMetasZootecnicas />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
