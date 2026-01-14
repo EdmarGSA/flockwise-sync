@@ -67,6 +67,7 @@ interface LoteComPesagem extends Lote {
   semanasVida?: number;
   precisaPesar?: boolean;
   quantidadeAlojada?: number | null;
+  avesVivas?: number;
   temSolicitacaoPendente?: boolean;
   temSolicitacaoEnviada?: boolean;
   pendenciasVet?: number;
@@ -161,6 +162,18 @@ export default function MeusLotes() {
           .eq('lote_id', loteData.id)
           .maybeSingle();
 
+        // Get accumulated mortality data
+        const { data: mortalidadeData } = await supabase
+          .from('mortalidade')
+          .select('mortalidade_itens(quantidade)')
+          .eq('lote_id', loteData.id);
+
+        // Calculate total accumulated mortality
+        const mortalidadeAcumulada = mortalidadeData?.reduce((total, m) => {
+          const itens = m.mortalidade_itens as { quantidade: number }[];
+          return total + (itens?.reduce((sum, item) => sum + (item.quantidade || 0), 0) || 0);
+        }, 0) || 0;
+
         // Check for pending feed requests (solicitado, confirmado, or enviado status)
         const { data: solicitacaoData } = await supabase
           .from('solicitacoes_racao')
@@ -189,7 +202,7 @@ export default function MeusLotes() {
         const temSolicitacaoPendente = solicitacaoData && solicitacaoData.length > 0;
         const temSolicitacaoEnviada = solicitacaoData?.some(s => s.status === 'enviado') || false;
         
-        // Calculate quantidade alojada
+        // Calculate quantidade alojada (descounting dead/eliminated on arrival)
         let quantidadeAlojada: number | null = null;
         if (recebimentoData) {
           const mortos = recebimentoData.quantidade_mortos || 0;
@@ -197,6 +210,9 @@ export default function MeusLotes() {
           const eliminadosClassificacao = recebimentoData.quantidade_eliminados_classificacao || 0;
           quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
         }
+
+        // Calculate live birds (alojada - accumulated daily mortality)
+        const avesVivas = (quantidadeAlojada ?? loteData.quantidade_aves) - mortalidadeAcumulada;
         
         // Calculate days since alojamento - Dia 1 = dia do alojamento
         let diasDesdeAlojamento = 0;
@@ -222,10 +238,10 @@ export default function MeusLotes() {
             .eq('lote_id', loteData.id);
           
           const totalOvos = producaoData?.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) || 0;
-          const avesVivas = quantidadeAlojada || loteData.quantidade_aves;
+          const avesVivasPostura = avesVivas;
           
-          // Calculate ovos por ave alojada
-          ovosAveAlojada = avesVivas > 0 ? totalOvos / avesVivas : 0;
+          // Calculate ovos por ave viva
+          ovosAveAlojada = avesVivasPostura > 0 ? totalOvos / avesVivasPostura : 0;
           
           // Calculate approximate % postura (last 7 days average)
           const { data: recentProducao } = await supabase
@@ -237,7 +253,8 @@ export default function MeusLotes() {
           
           if (recentProducao && recentProducao.length > 0) {
             const avgDailyOvos = recentProducao.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) / recentProducao.length;
-            percentualPostura = avesVivas > 0 ? (avgDailyOvos / avesVivas) * 100 : 0;
+            percentualPostura = avesVivasPostura > 0 ? (avgDailyOvos / avesVivasPostura) * 100 : 0;
+            
           }
           
           // Get reference % from desempenho_postura
@@ -282,6 +299,7 @@ export default function MeusLotes() {
           semanasVida,
           precisaPesar,
           quantidadeAlojada,
+          avesVivas,
           temSolicitacaoPendente,
           temSolicitacaoEnviada,
           pendenciasVet,
@@ -531,7 +549,7 @@ export default function MeusLotes() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center gap-2">
                       <Bird className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium">{(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
+                      <span className="font-medium">{(lote.avesVivas ?? lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
                     </div>
                     {lote.status === 'alojado' && (
                       <div className="flex justify-end">
@@ -564,7 +582,7 @@ export default function MeusLotes() {
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
             galpaoId={selectedLote.galpao_id}
-            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
             dataAlojamento={selectedLote.data_alojamento}
@@ -593,7 +611,7 @@ export default function MeusLotes() {
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
-            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
             onSuccess={fetchLotes}
           />
           <NotificacoesVetDialog
@@ -642,7 +660,7 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             linhagem={selectedLote.linhagem_postura || ''}
             semanasVida={selectedLote.semanasVida || 0}
-            avesVivas={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
             onSuccess={fetchLotes}
           />
           <MetasPosturaDialog
