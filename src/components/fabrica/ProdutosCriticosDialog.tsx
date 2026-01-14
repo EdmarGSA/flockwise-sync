@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, ArrowRight, Truck, Clock } from 'lucide-react';
+import { Package, ArrowRight, Truck, Clock, ShoppingCart } from 'lucide-react';
 import ConsolidacaoCompraDialog from './ConsolidacaoCompraDialog';
 
 interface ProdutoCritico {
@@ -149,8 +149,14 @@ export default function ProdutosCriticosDialog({
           {loading ? (
             <div className="py-8 text-center text-muted-foreground">Carregando...</div>
           ) : produtosComFornecedor.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              Nenhum produto em situação crítica
+            <div className="py-8 text-center space-y-4">
+              <p className="text-muted-foreground">
+                Nenhum produto em situação crítica
+              </p>
+              <Button onClick={() => setShowConsolidacao(true)}>
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Continuar com Nova Compra
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">

@@ -97,34 +97,39 @@ export default function NovaOrdemCompraDialog({
 
   useEffect(() => {
     if (open) {
-      // Initialize items from fornecedor produtos
-      const initialItems: ItemOC[] = fornecedor.produtos.map(({ produto, preco_compra }) => {
-        const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
-        const fatorConversao = produto.fator_conversao || 1;
-        
-        // Calculate suggested quantity in stock units, then convert to purchase units
-        const qtdEstoqueNecessaria = Math.max(
-          produto.estoque_minimo - produto.estoque_atual,
-          produto.consumo_medio_diario * 15 // 15 days supply
-        );
-        
-        // Convert to purchase units (round up)
-        const qtdCompra = Math.ceil(qtdEstoqueNecessaria / fatorConversao);
-        const qtdEstoque = qtdCompra * fatorConversao;
-        
-        return {
-          produto_id: produto.id,
-          nome: produto.nome,
-          unidade_compra: unidadeCompra,
-          unidade_estoque: produto.unidade_medida,
-          fator_conversao: fatorConversao,
-          quantidade: qtdCompra,
-          quantidade_estoque: qtdEstoque,
-          preco_unitario: preco_compra,
-          preco_total: qtdCompra * preco_compra
-        };
-      });
-      setItens(initialItems);
+      // Initialize items from fornecedor produtos (if any)
+      if (fornecedor.produtos.length > 0) {
+        const initialItems: ItemOC[] = fornecedor.produtos.map(({ produto, preco_compra }) => {
+          const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
+          const fatorConversao = produto.fator_conversao || 1;
+          
+          // Calculate suggested quantity in stock units, then convert to purchase units
+          const qtdEstoqueNecessaria = Math.max(
+            produto.estoque_minimo - produto.estoque_atual,
+            produto.consumo_medio_diario * 15 // 15 days supply
+          );
+          
+          // Convert to purchase units (round up)
+          const qtdCompra = Math.ceil(qtdEstoqueNecessaria / fatorConversao);
+          const qtdEstoque = qtdCompra * fatorConversao;
+          
+          return {
+            produto_id: produto.id,
+            nome: produto.nome,
+            unidade_compra: unidadeCompra,
+            unidade_estoque: produto.unidade_medida,
+            fator_conversao: fatorConversao,
+            quantidade: qtdCompra,
+            quantidade_estoque: qtdEstoque,
+            preco_unitario: preco_compra,
+            preco_total: qtdCompra * preco_compra
+          };
+        });
+        setItens(initialItems);
+      } else {
+        // Manual mode - start with empty items
+        setItens([]);
+      }
       fetchOutrosProdutos();
     }
   }, [open, fornecedor]);
@@ -382,7 +387,11 @@ export default function NovaOrdemCompraDialog({
           {outrosProdutos.length > 0 && (
             <div className="flex items-end gap-3 p-4 bg-muted/30 rounded-lg">
               <div className="flex-1">
-                <Label>Adicionar Outros Produtos do Fornecedor</Label>
+                <Label>
+                  {fornecedor.produtos.length === 0 
+                    ? 'Adicionar Produtos' 
+                    : 'Adicionar Outros Produtos do Fornecedor'}
+                </Label>
                 <Select value={selectedProduto} onValueChange={setSelectedProduto}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um produto..." />
@@ -402,6 +411,14 @@ export default function NovaOrdemCompraDialog({
                 <Plus className="w-4 h-4 mr-2" />
                 Adicionar
               </Button>
+            </div>
+          )}
+
+          {/* Empty state for manual mode */}
+          {fornecedor.produtos.length === 0 && itens.length === 0 && outrosProdutos.length === 0 && (
+            <div className="py-8 text-center text-muted-foreground border border-dashed rounded-lg">
+              Este fornecedor não possui produtos cadastrados. 
+              Vincule produtos ao fornecedor em Cadastros → Produtos.
             </div>
           )}
 
