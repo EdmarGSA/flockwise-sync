@@ -549,7 +549,16 @@ export default function MeusLotes() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center gap-2">
                       <Bird className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium">{(lote.avesVivas ?? lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {(lote.avesVivas ?? lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')} aves
+                        </span>
+                        {lote.quantidadeAlojada && lote.quantidadeAlojada !== lote.quantidade_aves && (
+                          <span className="text-xs text-muted-foreground">
+                            (alojadas: {lote.quantidadeAlojada.toLocaleString('pt-BR')})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {lote.status === 'alojado' && (
                       <div className="flex justify-end">
