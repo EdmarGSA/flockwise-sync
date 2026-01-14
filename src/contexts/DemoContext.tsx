@@ -60,8 +60,11 @@ export const DemoProvider = ({ children }: { children: ReactNode }) => {
     setIsDemoLoading(true);
     
     try {
-      // Sign in anonymously
-      const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+      // Login com usuário demo compartilhado
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: 'demo@gsatibiri.com.br',
+        password: 'demo123456'
+      });
       
       if (authError) throw authError;
       
@@ -71,72 +74,32 @@ export const DemoProvider = ({ children }: { children: ReactNode }) => {
 
       const userId = authData.user.id;
 
-      // Create demo profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          full_name: 'Usuário Demo',
-          integrado_id: userId,
-          is_demo: true
-        }, {
-          onConflict: 'id'
-        });
-
-      if (profileError) throw profileError;
-
-      // Create admin role for demo user
-      await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: userId,
-          role: 'admin'
-        }, {
-          onConflict: 'user_id,role'
-        });
-
-      // Grant access to all modules
-      const { data: modules } = await supabase
-        .from('modulos')
+      // Verificar se dados demo já existem
+      const { data: existingData } = await supabase
+        .from('nucleos')
         .select('id')
-        .eq('ativo', true);
+        .eq('integrado_id', userId)
+        .limit(1);
 
-      if (modules) {
-        for (const mod of modules) {
-          // Try insert, ignore if exists
-          const { error } = await supabase
-            .from('user_modulos')
-            .insert({
-              user_id: userId,
-              modulo_id: mod.id,
-              nivel_acesso: 'full' as const,
-              permitido: true,
-              integrado_id: userId
-            });
-          
-          // Ignore duplicate key errors
-          if (error && !error.code?.includes('23505')) {
-            console.warn('Error inserting module access:', error);
-          }
-        }
+      // Só inicializa se não houver dados
+      if (!existingData || existingData.length === 0) {
+        // Initialize demo data
+        await supabase.rpc('initialize_demo_data', {
+          p_user_id: userId,
+          p_integrado_id: userId
+        });
+
+        // Initialize demo lots (needs areas to be created first)
+        await supabase.rpc('initialize_demo_lotes', {
+          p_integrado_id: userId
+        });
       }
-
-      // Initialize demo data
-      await supabase.rpc('initialize_demo_data', {
-        p_user_id: userId,
-        p_integrado_id: userId
-      });
-
-      // Initialize demo lots (needs areas to be created first)
-      await supabase.rpc('initialize_demo_lotes', {
-        p_integrado_id: userId
-      });
 
       setIsDemo(true);
       
       toast({
         title: "Bem-vindo ao modo demonstração!",
-        description: "Explore todas as funcionalidades do sistema com dados de exemplo.",
+        description: "Explore todas as funcionalidades do sistema com dados acumulados.",
       });
 
       return true;
