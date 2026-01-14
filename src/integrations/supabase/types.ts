@@ -1861,6 +1861,138 @@ export type Database = {
           },
         ]
       }
+      metas_zootecnicas: {
+        Row: {
+          ca_14_dias_alerta: number | null
+          ca_14_dias_ok: number | null
+          ca_21_dias_alerta: number | null
+          ca_21_dias_ok: number | null
+          ca_28_dias_alerta: number | null
+          ca_28_dias_ok: number | null
+          ca_35_dias_alerta: number | null
+          ca_35_dias_ok: number | null
+          ca_42_dias_alerta: number | null
+          ca_42_dias_ok: number | null
+          ca_7_dias_alerta: number | null
+          ca_7_dias_ok: number | null
+          carencia_medicamento_minimo: number | null
+          consumo_14_dias_max: number | null
+          consumo_14_dias_min: number | null
+          consumo_21_dias_max: number | null
+          consumo_21_dias_min: number | null
+          consumo_28_dias_max: number | null
+          consumo_28_dias_min: number | null
+          consumo_35_dias_max: number | null
+          consumo_35_dias_min: number | null
+          consumo_42_dias_max: number | null
+          consumo_42_dias_min: number | null
+          consumo_7_dias_max: number | null
+          consumo_7_dias_min: number | null
+          created_at: string | null
+          id: string
+          integrado_id: string
+          mortalidade_14_dias_alerta: number | null
+          mortalidade_14_dias_ok: number | null
+          mortalidade_21_dias_alerta: number | null
+          mortalidade_21_dias_ok: number | null
+          mortalidade_28_dias_alerta: number | null
+          mortalidade_28_dias_ok: number | null
+          mortalidade_35_dias_alerta: number | null
+          mortalidade_35_dias_ok: number | null
+          mortalidade_42_dias_alerta: number | null
+          mortalidade_42_dias_ok: number | null
+          mortalidade_7_dias_alerta: number | null
+          mortalidade_7_dias_ok: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ca_14_dias_alerta?: number | null
+          ca_14_dias_ok?: number | null
+          ca_21_dias_alerta?: number | null
+          ca_21_dias_ok?: number | null
+          ca_28_dias_alerta?: number | null
+          ca_28_dias_ok?: number | null
+          ca_35_dias_alerta?: number | null
+          ca_35_dias_ok?: number | null
+          ca_42_dias_alerta?: number | null
+          ca_42_dias_ok?: number | null
+          ca_7_dias_alerta?: number | null
+          ca_7_dias_ok?: number | null
+          carencia_medicamento_minimo?: number | null
+          consumo_14_dias_max?: number | null
+          consumo_14_dias_min?: number | null
+          consumo_21_dias_max?: number | null
+          consumo_21_dias_min?: number | null
+          consumo_28_dias_max?: number | null
+          consumo_28_dias_min?: number | null
+          consumo_35_dias_max?: number | null
+          consumo_35_dias_min?: number | null
+          consumo_42_dias_max?: number | null
+          consumo_42_dias_min?: number | null
+          consumo_7_dias_max?: number | null
+          consumo_7_dias_min?: number | null
+          created_at?: string | null
+          id?: string
+          integrado_id: string
+          mortalidade_14_dias_alerta?: number | null
+          mortalidade_14_dias_ok?: number | null
+          mortalidade_21_dias_alerta?: number | null
+          mortalidade_21_dias_ok?: number | null
+          mortalidade_28_dias_alerta?: number | null
+          mortalidade_28_dias_ok?: number | null
+          mortalidade_35_dias_alerta?: number | null
+          mortalidade_35_dias_ok?: number | null
+          mortalidade_42_dias_alerta?: number | null
+          mortalidade_42_dias_ok?: number | null
+          mortalidade_7_dias_alerta?: number | null
+          mortalidade_7_dias_ok?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ca_14_dias_alerta?: number | null
+          ca_14_dias_ok?: number | null
+          ca_21_dias_alerta?: number | null
+          ca_21_dias_ok?: number | null
+          ca_28_dias_alerta?: number | null
+          ca_28_dias_ok?: number | null
+          ca_35_dias_alerta?: number | null
+          ca_35_dias_ok?: number | null
+          ca_42_dias_alerta?: number | null
+          ca_42_dias_ok?: number | null
+          ca_7_dias_alerta?: number | null
+          ca_7_dias_ok?: number | null
+          carencia_medicamento_minimo?: number | null
+          consumo_14_dias_max?: number | null
+          consumo_14_dias_min?: number | null
+          consumo_21_dias_max?: number | null
+          consumo_21_dias_min?: number | null
+          consumo_28_dias_max?: number | null
+          consumo_28_dias_min?: number | null
+          consumo_35_dias_max?: number | null
+          consumo_35_dias_min?: number | null
+          consumo_42_dias_max?: number | null
+          consumo_42_dias_min?: number | null
+          consumo_7_dias_max?: number | null
+          consumo_7_dias_min?: number | null
+          created_at?: string | null
+          id?: string
+          integrado_id?: string
+          mortalidade_14_dias_alerta?: number | null
+          mortalidade_14_dias_ok?: number | null
+          mortalidade_21_dias_alerta?: number | null
+          mortalidade_21_dias_ok?: number | null
+          mortalidade_28_dias_alerta?: number | null
+          mortalidade_28_dias_ok?: number | null
+          mortalidade_35_dias_alerta?: number | null
+          mortalidade_35_dias_ok?: number | null
+          mortalidade_42_dias_alerta?: number | null
+          mortalidade_42_dias_ok?: number | null
+          mortalidade_7_dias_alerta?: number | null
+          mortalidade_7_dias_ok?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       modulos: {
         Row: {
           ativo: boolean | null
