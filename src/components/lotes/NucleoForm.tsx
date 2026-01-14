@@ -81,16 +81,26 @@ export function NucleoForm({ onSuccess }: NucleoFormProps) {
   }, []);
 
   const fetchIntegrados = async () => {
+    // Buscar integrados normais E usuários demo (que também podem ser integrados)
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, company_name')
-      .eq('role', 'integrado');
+      .select('id, full_name, company_name, is_demo')
+      .or('role.eq.integrado,is_demo.eq.true');
     
     if (error) {
       console.error('Erro ao buscar integrados:', error);
       return;
     }
-    setIntegrados(data || []);
+    
+    // Remover duplicatas por ID
+    const uniqueIntegrados = data?.reduce((acc, curr) => {
+      if (!acc.find(i => i.id === curr.id)) {
+        acc.push(curr);
+      }
+      return acc;
+    }, [] as typeof data) || [];
+    
+    setIntegrados(uniqueIntegrados);
   };
 
   const fetchGruposAnimal = async () => {
