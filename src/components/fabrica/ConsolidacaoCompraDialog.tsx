@@ -84,7 +84,7 @@ export default function ConsolidacaoCompraDialog({
         .from('parceiros')
         .select('id, razao_social_nome')
         .eq('integrado_id', integradoId)
-        .eq('tipo', 'fornecedor')
+        .eq('tipo_cadastro', 'fornecedor')
         .eq('ativo', true)
         .order('razao_social_nome');
 
