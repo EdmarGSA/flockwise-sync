@@ -67,8 +67,18 @@ export function RecebimentoLoteDialog({
   const onSubmit = async (data: RecebimentoFormData) => {
     setLoading(true);
     try {
+      const mortos = parseInt(data.quantidade_mortos);
       const eliminadosLocomotor = parseInt(data.quantidade_eliminados_locomotor);
       const eliminadosClassificacao = parseInt(data.quantidade_eliminados_classificacao);
+      const totalPerdas = mortos + eliminadosLocomotor + eliminadosClassificacao;
+
+      // Validação: perdas não podem exceder 50% das aves
+      if (totalPerdas > quantidadeAves * 0.5) {
+        toast.error(`Total de perdas (${totalPerdas.toLocaleString()}) excede 50% das aves. Verifique os valores.`);
+        setLoading(false);
+        return;
+      }
+
       const totalEliminados = eliminadosLocomotor + eliminadosClassificacao;
 
       // Insert reception record
