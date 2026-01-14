@@ -30,8 +30,48 @@ Deno.serve(async (req) => {
     const existingUser = existingUsers?.users?.find(u => u.email === email)
 
     if (existingUser) {
+      const userId = existingUser.id
+
+      // Ensure demo user has correct profile setup
+      await supabaseAdmin
+        .from('profiles')
+        .update({ is_demo: true })
+        .eq('id', userId)
+
+      // Ensure admin role exists
+      const { data: existingRoles } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+
+      if (!existingRoles || existingRoles.length === 0) {
+        await supabaseAdmin
+          .from('user_roles')
+          .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' })
+      }
+
+      // Ensure module access
+      const { data: modules } = await supabaseAdmin
+        .from('modulos')
+        .select('id')
+        .eq('ativo', true)
+
+      if (modules) {
+        for (const mod of modules) {
+          await supabaseAdmin
+            .from('user_modulos')
+            .upsert({
+              user_id: userId,
+              modulo_id: mod.id,
+              nivel_acesso: 'full',
+              permitido: true,
+              integrado_id: userId
+            }, { onConflict: 'user_id,modulo_id' })
+        }
+      }
+
       return new Response(
-        JSON.stringify({ success: true, message: 'Demo user already exists', userId: existingUser.id }),
+        JSON.stringify({ success: true, message: 'Demo user configured', userId }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
