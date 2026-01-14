@@ -158,58 +158,57 @@ export function SolicitarRacaoLoteDialog({
 
   const fetchProdutosRacao = async () => {
     try {
-      // Get products that are type 'racao' and belong to the correct animal group
-      const { data: fases, error: fasesError } = await supabase
-        .from('fases_animal')
-        .select('produto_racao_id')
-        .eq('grupo_id', tipoProducao)
-        .not('produto_racao_id', 'is', null);
+      // Buscar produtos de ração diretamente pelo grupo_animal_id (tipoProducao = UUID do grupo)
+      const { data: produtosData, error } = await supabase
+        .from('produtos')
+        .select('id, nome, sku')
+        .eq('grupo_animal_id', tipoProducao)
+        .eq('ativo', true)
+        .order('nome');
 
-      if (fasesError) {
-        console.error('Erro ao buscar fases:', fasesError);
+      if (!error && produtosData && produtosData.length > 0) {
+        setProdutos(produtosData as Produto[]);
+        setSelectedProdutoId(produtosData[0].id);
+        return;
       }
 
-      const produtoIds = fases?.map(f => f.produto_racao_id).filter(Boolean) || [];
+      // Fallback 1: buscar produtos do grupo "Ração" do integrado
+      const { data: grupoRacao } = await supabase
+        .from('grupos_produto')
+        .select('id')
+        .eq('integrado_id', integradoId)
+        .ilike('nome', '%ração%')
+        .maybeSingle();
 
-      if (produtoIds.length > 0) {
-        const { data: produtosData, error } = await supabase
+      if (grupoRacao) {
+        const { data: racoes } = await supabase
           .from('produtos')
           .select('id, nome, sku')
-          .in('id', produtoIds)
-          .eq('ativo', true);
+          .eq('grupo_produto_id', grupoRacao.id)
+          .eq('ativo', true)
+          .order('nome')
+          .limit(20);
 
-        if (!error && produtosData) {
-          setProdutos(produtosData as Produto[]);
-          if (produtosData.length > 0) {
-            setSelectedProdutoId(produtosData[0].id);
-          }
+        if (racoes && racoes.length > 0) {
+          setProdutos(racoes as Produto[]);
+          setSelectedProdutoId(racoes[0].id);
+          return;
         }
       }
 
-      // Fallback: get all products from fases_animal (any group) if no specific ones found
-      if (produtoIds.length === 0) {
-        const { data: todasFases } = await supabase
-          .from('fases_animal')
-          .select('produto_racao_id')
-          .not('produto_racao_id', 'is', null);
-        
-        const todosIds = [...new Set(todasFases?.map(f => f.produto_racao_id).filter(Boolean) || [])];
-        
-        if (todosIds.length > 0) {
-          const { data: allRacoes, error } = await supabase
-            .from('produtos')
-            .select('id, nome, sku')
-            .in('id', todosIds)
-            .eq('ativo', true)
-            .limit(20);
+      // Fallback 2: buscar produtos com fase_animal vinculada (do integrado)
+      const { data: allRacoes } = await supabase
+        .from('produtos')
+        .select('id, nome, sku')
+        .not('fase_animal_id', 'is', null)
+        .eq('integrado_id', integradoId)
+        .eq('ativo', true)
+        .order('nome')
+        .limit(20);
 
-          if (!error && allRacoes) {
-            setProdutos(allRacoes as Produto[]);
-            if (allRacoes.length > 0) {
-              setSelectedProdutoId(allRacoes[0].id);
-            }
-          }
-        }
+      if (allRacoes && allRacoes.length > 0) {
+        setProdutos(allRacoes as Produto[]);
+        setSelectedProdutoId(allRacoes[0].id);
       }
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
