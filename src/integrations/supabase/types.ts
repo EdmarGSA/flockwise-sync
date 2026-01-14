@@ -4222,6 +4222,7 @@ export type Database = {
           data_recebimento: string | null
           data_solicitacao: string
           devolucao_confirmada: boolean | null
+          divergencia_kg: number | null
           id: string
           integrado_id: string
           lote_id: string
@@ -4248,6 +4249,7 @@ export type Database = {
           data_recebimento?: string | null
           data_solicitacao?: string
           devolucao_confirmada?: boolean | null
+          divergencia_kg?: number | null
           id?: string
           integrado_id: string
           lote_id: string
@@ -4274,6 +4276,7 @@ export type Database = {
           data_recebimento?: string | null
           data_solicitacao?: string
           devolucao_confirmada?: boolean | null
+          divergencia_kg?: number | null
           id?: string
           integrado_id?: string
           lote_id?: string
