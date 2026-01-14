@@ -13,7 +13,7 @@ import {
   Target, 
   Package, 
   Stethoscope, 
-  Truck, 
+  Truck,
   ClipboardCheck,
   Egg,
   Lock,
@@ -30,7 +30,7 @@ import { RacaoLoteDialog } from '@/components/lotes/RacaoLoteDialog';
 import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog';
 import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
 import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
-import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
+
 import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
 import { SiloBadge } from '@/components/lotes/SiloBadge';
@@ -85,7 +85,7 @@ export default function LoteDetalhe() {
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
   const [jejumDialogOpen, setJejumDialogOpen] = useState(false);
   const [saidaInfoOpen, setSaidaInfoOpen] = useState(false);
-  const [fechamentoOpen, setFechamentoOpen] = useState(false);
+  
   const [producaoOvosOpen, setProducaoOvosOpen] = useState(false);
 
   useEffect(() => {
@@ -242,22 +242,6 @@ export default function LoteDetalhe() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleAlojar = async () => {
-    try {
-      const { error } = await supabase
-        .from('lotes')
-        .update({ status: 'saiu_para_entrega' })
-        .eq('id', lote.id);
-
-      if (error) throw error;
-
-      toast.success('Status alterado para "Saiu para Entrega"');
-      fetchLote();
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast.error('Erro ao atualizar status');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -328,28 +312,18 @@ export default function LoteDetalhe() {
         <div className="grid grid-cols-2 gap-3">
           {/* Status: previsao */}
           {lote.status === 'previsao' && (
-            <>
-              <Button 
-                size="lg" 
-                onClick={handleAlojar}
-                className="h-20 flex-col gap-1"
-              >
-                <Truck className="w-6 h-6" />
-                <span>Alojar</span>
-              </Button>
-              <Button 
-                size="lg" 
-                variant={temSolicitacaoPendente ? 'destructive' : 'outline'}
-                onClick={() => setRacaoOpen(true)}
-                className="h-20 flex-col gap-1 relative"
-              >
-                <Package className="w-6 h-6" />
-                <span>Ração</span>
-                {temSolicitacaoPendente && (
-                  <span className="absolute top-2 right-2 w-3 h-3 bg-white rounded-full animate-pulse" />
-                )}
-              </Button>
-            </>
+            <Button 
+              size="lg" 
+              variant={temSolicitacaoPendente ? 'destructive' : 'outline'}
+              onClick={() => setRacaoOpen(true)}
+              className="h-20 flex-col gap-1 relative col-span-2"
+            >
+              <Package className="w-6 h-6" />
+              <span>Ração</span>
+              {temSolicitacaoPendente && (
+                <span className="absolute top-2 right-2 w-3 h-3 bg-white rounded-full animate-pulse" />
+              )}
+            </Button>
           )}
 
           {/* Status: saiu_para_entrega */}
@@ -497,16 +471,6 @@ export default function LoteDetalhe() {
                   <span>Jejum</span>
                 </Button>
               )}
-
-              <Button 
-                size="lg" 
-                variant="secondary"
-                onClick={() => setFechamentoOpen(true)}
-                className="h-20 flex-col gap-1"
-              >
-                <Lock className="w-6 h-6" />
-                <span>Fechamento</span>
-              </Button>
             </>
           )}
 
@@ -593,18 +557,6 @@ export default function LoteDetalhe() {
         saidaAbate={lote.saida_abate}
         jejumConfirmado={lote.jejum_confirmado}
         jejumConfirmadoEm={lote.jejum_confirmado_em}
-      />
-      <FechamentoLoteDialog
-        open={fechamentoOpen}
-        onOpenChange={setFechamentoOpen}
-        loteId={lote.id}
-        integradoId={lote.integrado_id}
-        dataAlojamento={lote.data_alojamento || ''}
-        quantidadeAlojada={quantidadeAlojada || lote.quantidade_aves}
-        pesoInicialPintinhos={lote.peso_medio_pintinhos}
-        linhagem={lote.linhagem}
-        sexo={lote.sexo}
-        onSuccess={fetchLote}
       />
       <ProducaoOvosDialog
         open={producaoOvosOpen}
