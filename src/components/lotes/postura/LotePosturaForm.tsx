@@ -204,6 +204,21 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
       console.error('Erro ao buscar veterinários:', error);
       return;
     }
+    
+    // Se não houver veterinários, incluir usuário demo como fallback
+    if (!data || data.length === 0) {
+      const { data: demoUser } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('is_demo', true)
+        .maybeSingle();
+      
+      if (demoUser) {
+        setVeterinarios([{ id: demoUser.id, full_name: demoUser.full_name || 'Usuário Demo' }]);
+        return;
+      }
+    }
+    
     setVeterinarios(data || []);
   };
 
@@ -214,6 +229,21 @@ export function LotePosturaForm({ onSuccess }: LotePosturaFormProps) {
       console.error('Erro ao buscar criadores:', error);
       return;
     }
+    
+    // Se não houver criadores, incluir usuário demo como fallback
+    if (!data || data.length === 0) {
+      const { data: demoUser } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('is_demo', true)
+        .maybeSingle();
+      
+      if (demoUser) {
+        setCriadores([{ id: demoUser.id, full_name: demoUser.full_name || 'Usuário Demo' }]);
+        return;
+      }
+    }
+    
     setCriadores((data as Criador[]) || []);
   };
 
