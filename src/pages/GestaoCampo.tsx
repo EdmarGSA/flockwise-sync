@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -97,6 +98,7 @@ interface Lote {
 
 export default function GestaoCampo() {
   const { user, loading } = useAuth();
+  const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
@@ -119,24 +121,25 @@ export default function GestaoCampo() {
   const [tipoLoteAbertura, setTipoLoteAbertura] = useState<'corte' | 'postura'>('corte');
 
   useEffect(() => {
-    if (user) {
+    if (integradoId) {
       fetchData();
     }
-  }, [user]);
+  }, [integradoId]);
 
   const fetchData = async () => {
+    if (!integradoId) return;
     setLoadingData(true);
     
     const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes, gruposRes] = await Promise.all([
-      supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude').eq('integrado_id', user!.id),
-      supabase.from('galpoes').select('*,nucleo:nucleos(nome)').eq('nucleo.integrado_id', user!.id),
-      supabase.from('areas').select('id, nome, descricao, cor, ativo').eq('integrado_id', user!.id),
+      supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude').eq('integrado_id', integradoId),
+      supabase.from('galpoes').select('*,nucleo:nucleos(nome)').eq('nucleo.integrado_id', integradoId),
+      supabase.from('areas').select('id, nome, descricao, cor, ativo').eq('integrado_id', integradoId),
       supabase.from('lotes').select(`
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
         linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
-      `).eq('integrado_id', user!.id).order('created_at', { ascending: false }),
+      `).eq('integrado_id', integradoId).order('created_at', { ascending: false }),
       supabase.from('desempenho_aves').select('*').order('dia', { ascending: true }),
-      supabase.from('grupos_animal').select('id, nome').eq('ativo', true).eq('integrado_id', user!.id)
+      supabase.from('grupos_animal').select('id, nome').eq('ativo', true).eq('integrado_id', integradoId)
     ]);
 
     if (nucleosRes.data) setNucleos(nucleosRes.data);
@@ -149,7 +152,7 @@ export default function GestaoCampo() {
     setLoadingData(false);
   };
 
-  if (loading) {
+  if (loading || loadingIntegrado) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-foreground">Carregando...</p>
