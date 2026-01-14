@@ -274,7 +274,11 @@ export function FechamentoLoteDialog({
                   </div>
                   <div>
                     <p className="text-muted-foreground">Data Alojamento</p>
-                    <p className="font-medium">{format(parseISO(dataAlojamento), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                    <p className="font-medium">
+                      {dataAlojamento && !isNaN(parseISO(dataAlojamento).getTime()) 
+                        ? format(parseISO(dataAlojamento), 'dd/MM/yyyy', { locale: ptBR }) 
+                        : '-'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Linhagem / Sexo</p>
