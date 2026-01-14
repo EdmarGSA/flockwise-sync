@@ -71,10 +71,10 @@ export default function ConsolidacaoCompraDialog({
 
   // Fetch all suppliers when products list is empty (manual purchase mode)
   useEffect(() => {
-    if (open && isManualMode) {
+    if (open && isManualMode && integradoId) {
       fetchTodosFornecedores();
     }
-  }, [open, isManualMode]);
+  }, [open, isManualMode, integradoId]);
 
   const fetchTodosFornecedores = async () => {
     setLoadingFornecedores(true);
