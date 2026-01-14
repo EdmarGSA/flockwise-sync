@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes } from 'date-fns';
 import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -23,9 +23,10 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 interface MortalidadeDialogProps {
   open: boolean;
@@ -72,6 +73,7 @@ export function MortalidadeDialog({
 }: MortalidadeDialogProps) {
   const [items, setItems] = useState<MortalidadeItem[]>([]);
   const [dataRegistro, setDataRegistro] = useState<Date>(new Date());
+  const [horaRegistro, setHoraRegistro] = useState<string>('08:00');
   const [motivo, setMotivo] = useState<MotivoMortalidade>('natural');
   const [submotivo, setSubmotivo] = useState<SubmotivoEliminacao>('problema_locomotor');
   const [quantidade, setQuantidade] = useState('');
@@ -236,6 +238,7 @@ export function MortalidadeDialog({
   const handleClose = () => {
     setItems([]);
     setDataRegistro(new Date());
+    setHoraRegistro('08:00');
     setQuantidade('');
     setPesoKg('');
     setMotivo('natural');
@@ -293,34 +296,51 @@ export function MortalidadeDialog({
             </Card>
           )}
 
-          {/* Date Picker */}
+          {/* Date and Time Picker */}
           <div className="space-y-2">
-            <Label>Data do Registro</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dataRegistro && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataRegistro ? format(dataRegistro, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dataRegistro}
-                  onSelect={(date) => date && setDataRegistro(date)}
-                  disabled={(date) => date > new Date()}
-                  initialFocus
-                  className="pointer-events-auto"
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+            <Label>Data e Hora do Registro</Label>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "flex-1 justify-start text-left font-normal",
+                      !dataRegistro && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dataRegistro ? format(dataRegistro, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dataRegistro}
+                    onSelect={(date) => date && setDataRegistro(date)}
+                    disabled={getDateDisabledFunction()}
+                    initialFocus
+                    className="pointer-events-auto"
+                    locale={ptBR}
+                  />
+                  <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                    Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                value={horaRegistro}
+                onChange={(e) => setHoraRegistro(e.target.value)}
+                className="w-28"
+              />
+            </div>
+            {isRetroactiveDate(dataRegistro) && (
+              <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
+                <Clock className="w-3 h-3" />
+                Registro retroativo
+              </Badge>
+            )}
           </div>
 
           {/* Input Form */}

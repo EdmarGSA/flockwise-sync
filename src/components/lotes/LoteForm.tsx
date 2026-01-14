@@ -13,17 +13,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, AlertCircle, AlertTriangle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { SolicitarRacaoLoteDialog } from '@/components/consumo/SolicitarRacaoLoteDialog';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
+
 const loteSchema = z.object({
   nucleo_id: z.string().uuid('Selecione um núcleo'),
   galpao_id: z.string().uuid('Selecione um galpão'),
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
+  hora_prevista_alojamento: z.string().default('08:00'),
   linhagem: z.string().min(1, 'Selecione uma linhagem'),
   sexo: z.enum(['macho', 'femea', 'misto']),
   veterinario_id: z.string().optional(),
@@ -100,6 +104,7 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
       criador_id: '',
       observacoes: '',
       custo_aves: '',
+      hora_prevista_alojamento: '08:00',
     },
   });
 
@@ -622,35 +627,54 @@ export function LoteForm({ onSuccess }: LoteFormProps) {
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Data Prevista de Alojamento</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP", { locale: ptBR })
-                        ) : (
-                          <span>Selecione uma data</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "flex-1 pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy", { locale: ptBR })
+                          ) : (
+                            <span>Selecione uma data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={getDateDisabledFunction(true)}
+                        initialFocus
+                        className="pointer-events-auto"
+                        locale={ptBR}
+                      />
+                      <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                        Retroativo até {MAX_RETROACTIVE_DAYS} dias | Futuro liberado
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <Input
+                    type="time"
+                    className="w-28"
+                    value={form.watch('hora_prevista_alojamento')}
+                    onChange={(e) => form.setValue('hora_prevista_alojamento', e.target.value)}
+                  />
+                </div>
+                {field.value && isRetroactiveDate(field.value) && (
+                  <Badge variant="outline" className="w-fit text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1 mt-1">
+                    <Clock className="w-3 h-3" />
+                    Data retroativa
+                  </Badge>
+                )}
                 <FormMessage />
               </FormItem>
             )}

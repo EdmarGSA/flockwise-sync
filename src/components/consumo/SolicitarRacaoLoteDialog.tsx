@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarIcon, Truck, SkipForward, Package, Save, CheckCircle } from 'lucide-react';
+import { CalendarIcon, Truck, SkipForward, Package, Save, CheckCircle, Clock } from 'lucide-react';
 import { format, subDays, setHours, setMinutes, isValid, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useMemo } from 'react';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 interface Produto {
   id: string;
@@ -538,11 +539,22 @@ export function SolicitarRacaoLoteDialog({
                       mode="single"
                       selected={dataEntrega}
                       onSelect={setDataEntrega}
+                      disabled={getDateDisabledFunction(true)}
                       locale={ptBR}
                       initialFocus
+                      className="pointer-events-auto"
                     />
+                    <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                      Retroativo até {MAX_RETROACTIVE_DAYS} dias | Futuro liberado
+                    </div>
                   </PopoverContent>
                 </Popover>
+                {dataEntrega && isRetroactiveDate(dataEntrega) && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1 mt-1 ml-0">
+                    <Clock className="w-3 h-3" />
+                    Retroativo
+                  </Badge>
+                )}
               </div>
 
               <div className="space-y-2">
