@@ -1,0 +1,6 @@
+-- Atribuir role admin ao usuário demo existente
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'admin'::app_role
+FROM auth.users
+WHERE email = 'demo@gsatibiri.com.br'
+ON CONFLICT (user_id, role) DO NOTHING;

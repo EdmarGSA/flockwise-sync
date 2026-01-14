@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Users, Shield, Plus, Pencil } from "lucide-react";
+import { ArrowLeft, Users, Shield, Plus, Pencil, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -16,6 +17,7 @@ import MembroEditDialog from "@/components/cadastro/MembroEditDialog";
 
 const CadastroMembros = () => {
   const { user, loading } = useAuth();
+  const { isDemo } = useDemo();
   const navigate = useNavigate();
   const [members, setMembers] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -116,6 +118,49 @@ const CadastroMembros = () => {
   if (!user) {
     navigate('/auth');
     return null;
+  }
+
+  // Block demo users from accessing member management
+  if (isDemo) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 pt-24 pb-12">
+          <div className="flex items-center gap-4 mb-8">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Cadastro de Membros</h1>
+                <p className="text-muted-foreground">Gerencie os usuários do sistema</p>
+              </div>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="py-16">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">Acesso Restrito no Demo</h2>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  O gerenciamento de membros não está disponível no modo demonstração 
+                  por questões de segurança e privacidade.
+                </p>
+                <Button onClick={() => navigate('/auth')} className="gap-2">
+                  Criar Conta para Acessar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
   }
 
   return (
