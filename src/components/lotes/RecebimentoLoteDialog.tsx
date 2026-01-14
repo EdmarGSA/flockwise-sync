@@ -9,10 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CalendarIcon, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 const recebimentoSchema = z.object({
   quantidade_mortos: z.string().min(1, 'Obrigatório'),
@@ -44,6 +51,8 @@ export function RecebimentoLoteDialog({
   onSuccess 
 }: RecebimentoLoteDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [dataAlojamento, setDataAlojamento] = useState<Date>(new Date());
+  const [horaAlojamento, setHoraAlojamento] = useState<string>('08:00');
 
   const form = useForm<RecebimentoFormData>({
     resolver: zodResolver(recebimentoSchema),
@@ -100,12 +109,16 @@ export function RecebimentoLoteDialog({
 
       if (recebimentoError) throw recebimentoError;
 
+      // Combine date and time for data_alojamento
+      const [hours, minutes] = horaAlojamento.split(':').map(Number);
+      const dataAlojamentoCompleta = setMinutes(setHours(dataAlojamento, hours), minutes);
+
       // Update lote status to 'alojado'
       const { error: loteError } = await supabase
         .from('lotes')
         .update({
           status: 'alojado',
-          data_alojamento: format(new Date(), 'yyyy-MM-dd'),
+          data_alojamento: format(dataAlojamentoCompleta, 'yyyy-MM-dd'),
         })
         .eq('id', loteId);
 
@@ -132,6 +145,53 @@ export function RecebimentoLoteDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Data e Hora do Alojamento */}
+            <div className="space-y-2">
+              <Label>Data e Hora do Alojamento</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !dataAlojamento && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataAlojamento ? format(dataAlojamento, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataAlojamento}
+                      onSelect={(date) => date && setDataAlojamento(date)}
+                      disabled={getDateDisabledFunction()}
+                      initialFocus
+                      className="pointer-events-auto"
+                      locale={ptBR}
+                    />
+                    <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                      Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  type="time"
+                  value={horaAlojamento}
+                  onChange={(e) => setHoraAlojamento(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+              {isRetroactiveDate(dataAlojamento) && (
+                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
+                  <Clock className="w-3 h-3" />
+                  Registro retroativo
+                </Badge>
+              )}
+            </div>
+
             {/* Cálculo de quantidade alojada */}
             {(() => {
               const mortos = parseInt(form.watch('quantidade_mortos') || '0');

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn, calcularIdadeNaData } from '@/lib/utils';
 import { NivelSiloUpdateForm } from './NivelSiloUpdateForm';
 import { PesagemAnaliseCard } from './PesagemAnaliseCard';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 interface PesagemItem {
   id: string;
@@ -146,6 +147,7 @@ export function PesagemDialog({
   const [metas, setMetas] = useState<MetasPeso | null>(null);
   const [pesoReferencia, setPesoReferencia] = useState<number | null>(null);
   const [dataPesagem, setDataPesagem] = useState<Date>(new Date());
+  const [horaPesagem, setHoraPesagem] = useState<string>('08:00');
   const [historicoPesagens, setHistoricoPesagens] = useState<PesagemHistorico[]>([]);
   
   // Silo state
@@ -385,6 +387,7 @@ export function PesagemDialog({
       
       setItens([]);
       setDataPesagem(new Date());
+      setHoraPesagem('08:00');
       setQuantidadeAves('');
       setPesoBruto('');
       setSavedSiloLevel(null);
@@ -529,13 +532,17 @@ export function PesagemDialog({
     setLoading(true);
 
     try {
+      // Combine date and time
+      const [hours, minutes] = horaPesagem.split(':').map(Number);
+      const dataHoraPesagem = setMinutes(setHours(dataPesagem, hours), minutes);
+
       // Create pesagem record
       const { data: pesagem, error: pesagemError } = await supabase
         .from('pesagens')
         .insert({
           lote_id: loteId,
           integrado_id: integradoId,
-          data_pesagem: format(dataPesagem, 'yyyy-MM-dd'),
+          data_pesagem: format(dataHoraPesagem, 'yyyy-MM-dd'),
         })
         .select()
         .single();
@@ -637,34 +644,51 @@ export function PesagemDialog({
             "space-y-6 transition-opacity",
             showSiloStep && !siloLevelSaved && "opacity-50 pointer-events-none"
           )}>
-            {/* Date Picker */}
+            {/* Date and Time Picker */}
             <div className="space-y-2">
-              <Label>Data da Pesagem</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataPesagem && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataPesagem ? format(dataPesagem, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataPesagem}
-                    onSelect={(date) => date && setDataPesagem(date)}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                    className="pointer-events-auto"
-                    locale={ptBR}
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label>Data e Hora da Pesagem</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !dataPesagem && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataPesagem ? format(dataPesagem, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataPesagem}
+                      onSelect={(date) => date && setDataPesagem(date)}
+                      disabled={getDateDisabledFunction()}
+                      initialFocus
+                      className="pointer-events-auto"
+                      locale={ptBR}
+                    />
+                    <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                      Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  type="time"
+                  value={horaPesagem}
+                  onChange={(e) => setHoraPesagem(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+              {isRetroactiveDate(dataPesagem) && (
+                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
+                  <Clock className="w-3 h-3" />
+                  Registro retroativo
+                </Badge>
+              )}
             </div>
 
             {/* Metas Card with Real Values */}

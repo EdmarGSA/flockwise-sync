@@ -3,13 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Package, Save, AlertTriangle, CheckCircle, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Package, Save, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, CalendarIcon, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useMemo } from 'react';
+import { format, setHours, setMinutes } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 interface SiloInfo {
   numero_aneis: number;
@@ -57,6 +64,8 @@ export function NivelSiloUpdateForm({
   const [loading, setSaving] = useState(false);
   const [nivelEsperado, setNivelEsperado] = useState<number | null>(null);
   const [lastHistorico, setLastHistorico] = useState<HistoricoNivel | null>(null);
+  const [dataRegistro, setDataRegistro] = useState<Date>(new Date());
+  const [horaRegistro, setHoraRegistro] = useState<string>('08:00');
 
   // Generate ring options from 0 to numeroAneis in 0.5 increments
   const opcoesAneis = useMemo(() => {
@@ -209,6 +218,10 @@ export function NivelSiloUpdateForm({
       const divergencia = divergenciaPercentual;
       const alertaDivergencia = divergencia !== null && Math.abs(divergencia) > 20;
 
+      // Combine date and time
+      const [hours, minutes] = horaRegistro.split(':').map(Number);
+      const dataHoraRegistro = setMinutes(setHours(dataRegistro, hours), minutes);
+
       const { error } = await supabase
         .from('historico_nivel_silo')
         .insert({
@@ -222,6 +235,7 @@ export function NivelSiloUpdateForm({
           divergencia_percentual: divergencia,
           divergencia_alerta: alertaDivergencia,
           registrado_por: user?.id,
+          created_at: dataHoraRegistro.toISOString(),
         });
 
       if (error) throw error;
@@ -283,6 +297,55 @@ export function NivelSiloUpdateForm({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Date and Time Picker */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Data e Hora do Registro</Label>
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={isAlreadySaved}
+                  className={cn(
+                    "flex-1 justify-start text-left font-normal",
+                    !dataRegistro && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dataRegistro ? format(dataRegistro, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dataRegistro}
+                  onSelect={(date) => date && setDataRegistro(date)}
+                  disabled={getDateDisabledFunction()}
+                  initialFocus
+                  className="pointer-events-auto"
+                  locale={ptBR}
+                />
+                <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                  Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Input
+              type="time"
+              value={horaRegistro}
+              onChange={(e) => setHoraRegistro(e.target.value)}
+              disabled={isAlreadySaved}
+              className="w-28"
+            />
+          </div>
+          {isRetroactiveDate(dataRegistro) && (
+            <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
+              <Clock className="w-3 h-3" />
+              Registro retroativo
+            </Badge>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Funil</Label>
