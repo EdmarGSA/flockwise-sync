@@ -17,11 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Truck, Package, Calendar, Info } from 'lucide-react';
+import { Truck, Package, Calendar, Info, Clock, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getDateDisabledFunction, isRetroactiveDate } from '@/lib/dateValidation';
 
 interface SolicitacaoRacao {
   id: string;
@@ -67,15 +71,26 @@ export function EnviarRacaoDialog({
   const [produtosRacao, setProdutosRacao] = useState<ProdutoRacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const [dataEnvio, setDataEnvio] = useState<Date>(new Date());
+  const [horaEnvio, setHoraEnvio] = useState(format(new Date(), 'HH:mm'));
 
   useEffect(() => {
     if (open) {
       setTipoRacao(solicitacao.tipo_racao);
       setQuantidade(solicitacao.quantidade_solicitada_kg.toString());
       setObservacoes('');
+      setDataEnvio(new Date());
+      setHoraEnvio(format(new Date(), 'HH:mm'));
       fetchProdutosRacao();
     }
   }, [open, solicitacao]);
+
+  const combinarDataHora = (data: Date, hora: string): Date => {
+    const [hours, minutes] = hora.split(':').map(Number);
+    const combined = new Date(data);
+    combined.setHours(hours, minutes, 0, 0);
+    return combined;
+  };
 
   const fetchProdutosRacao = async () => {
     if (!loteInfo) return;
@@ -173,7 +188,7 @@ export function EnviarRacaoDialog({
           tipo_racao: tipoRacao,
           quantidade_solicitada_kg: qtd,
           status: 'enviado',
-          data_envio: new Date().toISOString(),
+          data_envio: combinarDataHora(dataEnvio, horaEnvio).toISOString(),
           observacoes_envio: observacoes.trim() || null,
         })
         .eq('id', solicitacao.id);
@@ -275,6 +290,43 @@ export function EnviarRacaoDialog({
                 className="pl-10"
                 placeholder="0,00"
               />
+            </div>
+          </div>
+
+          {/* Data e Hora do Envio */}
+          <div className="space-y-2">
+            <Label>Data e Hora do Envio</Label>
+            <div className="flex gap-2 items-center">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="flex-1 justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(dataEnvio, "dd/MM/yyyy", { locale: ptBR })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dataEnvio}
+                    onSelect={(date) => date && setDataEnvio(date)}
+                    disabled={getDateDisabledFunction(false)}
+                    locale={ptBR}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                className="w-28"
+                value={horaEnvio}
+                onChange={(e) => setHoraEnvio(e.target.value)}
+              />
+              {isRetroactiveDate(dataEnvio) && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300 whitespace-nowrap">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Retroativo
+                </Badge>
+              )}
             </div>
           </div>
 
