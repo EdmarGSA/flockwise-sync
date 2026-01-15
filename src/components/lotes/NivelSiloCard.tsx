@@ -47,6 +47,7 @@ export function NivelSiloCard({
   const [loading, setLoading] = useState(true);
   const [historicoNivel, setHistoricoNivel] = useState<HistoricoNivel | null>(null);
   const [consumoDesdeHistorico, setConsumoDesdeHistorico] = useState(0);
+  const [racaoRecebidaDesdeHistorico, setRacaoRecebidaDesdeHistorico] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -118,9 +119,25 @@ export function NivelSiloCard({
             const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
             setConsumoDesdeHistorico(consumoDiarioKg * diasDecorridos);
           }
+
+          // NOVO: Buscar ração recebida APÓS o último registro de nível
+          const { data: racaoRecebida } = await supabase
+            .from('solicitacoes_racao')
+            .select('quantidade_recebida_kg, data_recebimento')
+            .eq('lote_id', loteId)
+            .eq('status', 'recebido')
+            .gt('data_recebimento', historicoDate.toISOString());
+
+          const totalRecebidoDesdeHistorico = (racaoRecebida || []).reduce(
+            (sum, r) => sum + (r.quantidade_recebida_kg || 0), 
+            0
+          );
+          
+          setRacaoRecebidaDesdeHistorico(totalRecebidoDesdeHistorico);
         } else {
           setHistoricoNivel(null);
           setConsumoDesdeHistorico(0);
+          setRacaoRecebidaDesdeHistorico(0);
         }
       }
     } catch (error) {
@@ -143,9 +160,10 @@ export function NivelSiloCard({
   };
 
   // Calculate nivelSilo: prefer historico if available, otherwise use calculation
+  // Formula: Nível Informado + Ração Recebida Depois - Consumo Desde Registro
   const nivelSiloCalculado = totalRecebido - consumoEstimado;
   const nivelSilo = historicoNivel 
-    ? Math.max(0, historicoNivel.nivel_estimado_kg - consumoDesdeHistorico)
+    ? Math.max(0, historicoNivel.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico)
     : nivelSiloCalculado;
   
   const diasRestantes = consumoDiarioEstimado > 0 ? Math.floor(nivelSilo / consumoDiarioEstimado) : 0;
