@@ -160,7 +160,8 @@ export function PesagemDialog({
   
   // CA Analysis state
   const [desempenhoData, setDesempenhoData] = useState<DesempenhoAves[]>([]);
-  const [consumoEstimado, setConsumoEstimado] = useState<number>(0);
+  const [consumoReal, setConsumoReal] = useState<number>(0);
+  const [totalRecebido, setTotalRecebido] = useState<number>(0);
   
   // Form inputs
   const [quantidadeAves, setQuantidadeAves] = useState('');
@@ -243,31 +244,35 @@ export function PesagemDialog({
     fetchDesempenhoData();
   }, [open, linhagem, sexo]);
 
-  // Calculate estimated consumption
+  // Calculate real consumption from silo data when silo level is saved
   useEffect(() => {
-    const calculateConsumo = async () => {
-      if (!open || !linhagem || !sexo || diasDesdeAlojamento <= 0 || !avesVivas) {
-        setConsumoEstimado(0);
+    const calcularConsumoReal = async () => {
+      if (!open || !loteId || savedSiloLevel === null) {
+        setConsumoReal(0);
+        setTotalRecebido(0);
         return;
       }
 
-      const { data: consumoData } = await supabase
-        .from('desempenho_aves')
-        .select('consumo_acumulado_racao_g')
-        .eq('linhagem', linhagem)
-        .eq('sexo', sexo)
-        .eq('dia', diasDesdeAlojamento)
-        .maybeSingle();
+      // Buscar total de ração recebida para o lote
+      const { data: solicitacoes } = await supabase
+        .from('solicitacoes_racao')
+        .select('quantidade_recebida_kg')
+        .eq('lote_id', loteId)
+        .eq('status', 'recebido');
 
-      if (consumoData) {
-        // consumo_acumulado_racao_g is per bird, convert to kg for whole lot
-        const consumoTotal = (consumoData.consumo_acumulado_racao_g * avesVivas) / 1000;
-        setConsumoEstimado(consumoTotal);
-      }
+      const totalRecebidoKg = (solicitacoes || []).reduce(
+        (sum, s) => sum + (s.quantidade_recebida_kg || 0), 0
+      );
+
+      // Consumo Real = Total Recebido - Nível Atual do Silo
+      const consumoRealKg = Math.max(0, totalRecebidoKg - savedSiloLevel);
+      
+      setTotalRecebido(totalRecebidoKg);
+      setConsumoReal(consumoRealKg);
     };
 
-    calculateConsumo();
-  }, [open, linhagem, sexo, diasDesdeAlojamento, avesVivas]);
+    calcularConsumoReal();
+  }, [open, loteId, savedSiloLevel]);
 
   // Fetch reference weight from desempenho_aves
   useEffect(() => {
@@ -578,9 +583,9 @@ export function PesagemDialog({
   const totalPesoLiquido = itens.reduce((acc, item) => acc + item.peso_liquido_kg, 0);
   const pesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves : 0;
 
-  // Calculate CA analysis
+  // Calculate CA analysis using REAL consumption from silo
   const pesoTotalLote = pesoMedio * avesVivas;
-  const conversaoAlimentar = pesoTotalLote > 0 ? consumoEstimado / pesoTotalLote : 0;
+  const conversaoAlimentar = pesoTotalLote > 0 ? consumoReal / pesoTotalLote : 0;
 
   // Find closest reference day for the measured weight
   const analiseCA = useMemo(() => {
@@ -629,13 +634,17 @@ export function PesagemDialog({
       const [hours, minutes] = horaPesagem.split(':').map(Number);
       const dataHoraPesagem = setMinutes(setHours(dataPesagem, hours), minutes);
 
-      // Create pesagem record
+      // Create pesagem record with real consumption data from silo
       const { data: pesagem, error: pesagemError } = await supabase
         .from('pesagens')
         .insert({
           lote_id: loteId,
           integrado_id: integradoId,
           data_pesagem: format(dataHoraPesagem, 'yyyy-MM-dd'),
+          nivel_silo_kg: savedSiloLevel,
+          total_recebido_kg: totalRecebido,
+          consumo_real_kg: consumoReal,
+          conversao_alimentar: conversaoAlimentar > 0 ? conversaoAlimentar : null,
         })
         .select()
         .single();
@@ -1080,18 +1089,34 @@ export function PesagemDialog({
               </Card>
             )}
 
-            {/* Step 3: CA Analysis Card */}
-            {itens.length > 0 && consumoEstimado > 0 && (
+            {/* Step 3: CA Analysis Card - show when silo level saved or when there are items */}
+            {itens.length > 0 && savedSiloLevel !== null && consumoReal > 0 && (
               <PesagemAnaliseCard
                 pesoMedio={pesoMedio}
                 avesVivas={avesVivas}
-                consumoTotal={consumoEstimado}
+                consumoTotal={consumoReal}
                 conversaoAlimentar={conversaoAlimentar}
                 conversaoEsperada={analiseCA.conversaoEsperada}
                 diaAtual={diasDesdeAlojamento}
                 diaReferencia={analiseCA.diaReferencia}
                 pesoReferencia={analiseCA.pesoReferenciaAtual}
               />
+            )}
+            
+            {/* Show info if consumption cannot be calculated */}
+            {itens.length > 0 && (savedSiloLevel === null || consumoReal === 0) && (
+              <Card className="border-amber-500/30 bg-amber-500/5">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <Calculator className="w-4 h-4" />
+                    <span className="text-sm">
+                      {savedSiloLevel === null 
+                        ? 'Informe o nível do silo para calcular a Conversão Alimentar real'
+                        : 'Sem ração recebida registrada para calcular o consumo'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Actions */}

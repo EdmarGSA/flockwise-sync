@@ -145,7 +145,7 @@ export default function MetasPesoLote() {
   const [conversaoData, setConversaoData] = useState<{
     pesoMedio: number;
     avesVivas: number;
-    consumoEstimado: number;
+    consumoReal: number;
     conversaoReal: number;
     conversaoEsperada: number | null;
     diaReferencia: number | null;
@@ -285,11 +285,15 @@ export default function MetasPesoLote() {
       setDesempenhoReferencia(desempenhoData);
     }
 
-    // Fetch pesagens
+    // Fetch pesagens with real consumption data
     const { data: pesagensData } = await supabase
       .from('pesagens')
       .select(`
         data_pesagem,
+        consumo_real_kg,
+        conversao_alimentar,
+        nivel_silo_kg,
+        total_recebido_kg,
         pesagem_itens (
           quantidade_aves,
           peso_liquido_g
@@ -438,13 +442,20 @@ export default function MetasPesoLote() {
       }
     }
 
-    // Calcular dados de Conversão Alimentar baseado na última pesagem
+    // Calcular dados de Conversão Alimentar baseado na última pesagem - USANDO CONSUMO REAL DO SILO
     if (pesagensData && pesagensData.length > 0 && loteData.data_alojamento && desempenhoData) {
-      // Agrupar pesagens por data e calcular a última
-      const pesagensPorData = pesagensData.reduce((acc: Record<string, any[]>, p: any) => {
+      // Agrupar pesagens por data
+      const pesagensPorData = pesagensData.reduce((acc: Record<string, { itens: any[], consumoReal: number | null, conversaoGravada: number | null }>, p: any) => {
         const data = p.data_pesagem;
-        if (!acc[data]) acc[data] = [];
-        acc[data].push(...p.pesagem_itens);
+        if (!acc[data]) acc[data] = { itens: [], consumoReal: null, conversaoGravada: null };
+        acc[data].itens.push(...p.pesagem_itens);
+        // Usar consumo real gravado na pesagem (se disponível)
+        if (p.consumo_real_kg !== null) {
+          acc[data].consumoReal = p.consumo_real_kg;
+        }
+        if (p.conversao_alimentar !== null) {
+          acc[data].conversaoGravada = p.conversao_alimentar;
+        }
         return acc;
       }, {});
 
@@ -452,7 +463,8 @@ export default function MetasPesoLote() {
       const ultimaData = datasPesagens[datasPesagens.length - 1];
       
       if (ultimaData) {
-        const itensDia = pesagensPorData[ultimaData];
+        const dadosDia = pesagensPorData[ultimaData];
+        const itensDia = dadosDia.itens;
         const totalAves = itensDia.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
         const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
         // peso_liquido_g já está em kg (nomenclatura incorreta no banco)
@@ -486,29 +498,39 @@ export default function MetasPesoLote() {
         // Aves vivas NA DATA da última pesagem (não mortalidade total atual)
         const avesVivasNaPesagem = calcularAvesVivasAteData(ultimaData);
 
-        // Buscar consumo acumulado da tabela de referência para o dia da pesagem
-        const refDiaPesagem = desempenhoData.find((d: any) => d.dia === diaDaPesagem);
-        const consumoAcumuladoG = refDiaPesagem ? refDiaPesagem.consumo_acumulado_racao_g : 0;
+        // USAR CONSUMO REAL DO SILO (gravado na pesagem) OU CALCULAR EM TEMPO REAL
+        let consumoRealKg = dadosDia.consumoReal;
         
-        // Se não encontrar no dia exato, interpolar ou usar o mais próximo
-        let consumoFinal = consumoAcumuladoG;
-        if (!refDiaPesagem) {
-          const diasDisponiveis = desempenhoData.map((d: any) => d.dia);
-          const diaMaisProximo = diasDisponiveis.reduce((prev: number, curr: number) =>
-            Math.abs(curr - diaDaPesagem) < Math.abs(prev - diaDaPesagem) ? curr : prev
+        // Se não tiver consumo real gravado, calcular em tempo real buscando dados do silo
+        if (consumoRealKg === null) {
+          // Fallback: buscar último nível do silo e total recebido até a data da pesagem
+          const { data: historicoSilo } = await supabase
+            .from('historico_nivel_silo')
+            .select('nivel_estimado_kg, created_at')
+            .eq('lote_id', loteId)
+            .lte('created_at', ultimaData + 'T23:59:59')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const { data: solicitacoes } = await supabase
+            .from('solicitacoes_racao')
+            .select('quantidade_recebida_kg, data_recebimento')
+            .eq('lote_id', loteId)
+            .eq('status', 'recebido')
+            .lte('data_recebimento', ultimaData);
+
+          const totalRecebido = (solicitacoes || []).reduce(
+            (sum, s) => sum + (s.quantidade_recebida_kg || 0), 0
           );
-          const refMaisProximo = desempenhoData.find((d: any) => d.dia === diaMaisProximo);
-          if (refMaisProximo) {
-            const consumoDiarioEstimado = refMaisProximo.consumo_diario_racao_g || 150;
-            consumoFinal = refMaisProximo.consumo_acumulado_racao_g + 
-              (diaDaPesagem - diaMaisProximo) * consumoDiarioEstimado;
-          }
+
+          const nivelSilo = historicoSilo?.nivel_estimado_kg || 0;
+          consumoRealKg = Math.max(0, totalRecebido - nivelSilo);
         }
 
-        // Consumo estimado do lote em kg - usando aves vivas na data da pesagem
-        const consumoEstimadoKg = (consumoFinal * avesVivasNaPesagem) / 1000;
         const pesoTotalLoteKg = pesoMedioKg * avesVivasNaPesagem;
-        const conversaoReal = pesoTotalLoteKg > 0 ? consumoEstimadoKg / pesoTotalLoteKg : 0;
+        // Usar CA gravada se disponível, senão calcular
+        const conversaoReal = dadosDia.conversaoGravada ?? (pesoTotalLoteKg > 0 ? consumoRealKg / pesoTotalLoteKg : 0);
 
         // Encontrar o dia de referência cujo peso mais se aproxima do peso medido
         let diaReferencia: number | null = null;
@@ -537,7 +559,7 @@ export default function MetasPesoLote() {
         setConversaoData({
           pesoMedio: pesoMedioKg,
           avesVivas: avesVivasNaPesagem,
-          consumoEstimado: consumoEstimadoKg,
+          consumoReal: consumoRealKg,
           conversaoReal,
           conversaoEsperada,
           diaReferencia,
@@ -546,11 +568,12 @@ export default function MetasPesoLote() {
           dataPesagem: ultimaData,
         });
 
-        // Calcular histórico de CA para todas as pesagens - usando aves vivas por data
+        // Calcular histórico de CA para todas as pesagens - USANDO CONSUMO REAL
         const historicoCACalculado: HistoricoCAItem[] = [];
         
         for (const dataPes of datasPesagens) {
-          const itens = pesagensPorData[dataPes];
+          const dados = pesagensPorData[dataPes];
+          const itens = dados.itens;
           const totalAvesDia = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
           const totalPesoDia = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
           // peso_liquido_g já está em kg
@@ -560,24 +583,37 @@ export default function MetasPesoLote() {
           // Calcular aves vivas ATÉ esta data específica de pesagem
           const avesVivasDia = calcularAvesVivasAteData(dataPes);
           
-          // Buscar consumo para este dia
-          const refDia = desempenhoData.find((d: any) => d.dia === diaPes);
-          let consumoDia = refDia ? refDia.consumo_acumulado_racao_g : 0;
+          // Usar consumo real gravado OU calcular em tempo real
+          let consumoDia = dados.consumoReal;
           
-          if (!refDia && desempenhoData.length > 0) {
-            const diasDisp = desempenhoData.map((d: any) => d.dia);
-            const diaMaisProx = diasDisp.reduce((prev: number, curr: number) =>
-              Math.abs(curr - diaPes) < Math.abs(prev - diaPes) ? curr : prev
+          if (consumoDia === null) {
+            // Fallback: buscar dados do silo para esta data específica
+            const { data: historicoSiloDia } = await supabase
+              .from('historico_nivel_silo')
+              .select('nivel_estimado_kg')
+              .eq('lote_id', loteId)
+              .lte('created_at', dataPes + 'T23:59:59')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const { data: solicitacoesDia } = await supabase
+              .from('solicitacoes_racao')
+              .select('quantidade_recebida_kg')
+              .eq('lote_id', loteId)
+              .eq('status', 'recebido')
+              .lte('data_recebimento', dataPes);
+
+            const totalRecebidoDia = (solicitacoesDia || []).reduce(
+              (sum, s) => sum + (s.quantidade_recebida_kg || 0), 0
             );
-            const refProx = desempenhoData.find((d: any) => d.dia === diaMaisProx);
-            if (refProx) {
-              const consumoDiarioEst = refProx.consumo_diario_racao_g || 150;
-              consumoDia = refProx.consumo_acumulado_racao_g + (diaPes - diaMaisProx) * consumoDiarioEst;
-            }
+
+            const nivelSiloDia = historicoSiloDia?.nivel_estimado_kg || 0;
+            consumoDia = Math.max(0, totalRecebidoDia - nivelSiloDia);
           }
           
-          // Tratar dias 0-6 onde consumo é zero na referência
-          if (consumoDia === 0 && diaPes <= 6) {
+          // Tratar caso onde consumo é zero nos primeiros dias
+          if (consumoDia === 0 && diaPes <= 3) {
             historicoCACalculado.push({
               dia: diaPes,
               dataPesagem: dataPes,
@@ -589,10 +625,9 @@ export default function MetasPesoLote() {
             continue;
           }
           
-          // Usar aves vivas DA DATA da pesagem (não total atual)
-          const consumoKg = (consumoDia * avesVivasDia) / 1000;
+          // Usar CA gravada ou calcular
           const pesoTotalKg = pesoMedioDiaKg * avesVivasDia;
-          const caReal = pesoTotalKg > 0 ? consumoKg / pesoTotalKg : 0;
+          const caReal = dados.conversaoGravada ?? (pesoTotalKg > 0 ? consumoDia / pesoTotalKg : 0);
           
           // Encontrar CA esperada para o peso medido
           let caEsperada: number | null = null;
@@ -1162,7 +1197,7 @@ export default function MetasPesoLote() {
                   <PesagemAnaliseCard
                     pesoMedio={conversaoData.pesoMedio}
                     avesVivas={conversaoData.avesVivas}
-                    consumoTotal={conversaoData.consumoEstimado}
+                    consumoTotal={conversaoData.consumoReal}
                     conversaoAlimentar={conversaoData.conversaoReal}
                     conversaoEsperada={conversaoData.conversaoEsperada}
                     diaAtual={conversaoData.diaPesagem}
