@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format, setHours, setMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,14 +9,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package, Clock } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package, Clock, CloudOff, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn, calcularIdadeNaData } from '@/lib/utils';
 import { NivelSiloUpdateForm } from './NivelSiloUpdateForm';
 import { PesagemAnaliseCard } from './PesagemAnaliseCard';
 import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
+import { savePesagemDraft, getPesagemDraft, deletePesagemDraft, PesagemDraftData } from '@/services/offlineDB';
 
 interface PesagemItem {
   id: string;
@@ -153,6 +155,7 @@ export function PesagemDialog({
   // Silo state
   const [siloInfo, setSiloInfo] = useState<SiloInfo | null>(null);
   const [savedSiloLevel, setSavedSiloLevel] = useState<number | null>(null);
+  const [siloAceito, setSiloAceito] = useState(false);
   const [loadingSilo, setLoadingSilo] = useState(true);
   
   // CA Analysis state
@@ -163,6 +166,15 @@ export function PesagemDialog({
   const [quantidadeAves, setQuantidadeAves] = useState('');
   const [pesoBruto, setPesoBruto] = useState('');
   const [pesoTara, setPesoTara] = useState('');
+  
+  // Draft state
+  const [hasDraft, setHasDraft] = useState(false);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  
+  // Refs for focus management
+  const pesoBrutoInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch silo info for the galpao
   useEffect(() => {
@@ -381,16 +393,92 @@ export function PesagemDialog({
     fetchHistoricoPesagens();
   }, [open, loteId, dataAlojamento, pesoInicialPintinhos, linhagem, sexo, integradoId]);
 
+  // Auto-save draft to IndexedDB whenever items or settings change
+  const saveDraft = useCallback(async () => {
+    if (!loteId || !galpaoId) return;
+    
+    const draft: PesagemDraftData = {
+      loteId,
+      galpaoId,
+      itens,
+      dataPesagem: dataPesagem.toISOString(),
+      horaPesagem,
+      pesoTara,
+      savedSiloLevel,
+      siloAceito,
+      lastModified: new Date().toISOString(),
+    };
+    
+    await savePesagemDraft(draft);
+    setHasDraft(true);
+  }, [loteId, galpaoId, itens, dataPesagem, horaPesagem, pesoTara, savedSiloLevel, siloAceito]);
+
+  // Auto-save effect
+  useEffect(() => {
+    if (!open || !draftLoaded) return;
+    
+    // Save draft whenever items or settings change
+    if (itens.length > 0 || savedSiloLevel !== null) {
+      saveDraft();
+    }
+  }, [itens, dataPesagem, horaPesagem, pesoTara, savedSiloLevel, siloAceito, open, draftLoaded, saveDraft]);
+
+  // Check for existing draft on open
+  useEffect(() => {
+    const checkDraft = async () => {
+      if (!open || !loteId) return;
+      
+      const draft = await getPesagemDraft(loteId);
+      if (draft && draft.itens.length > 0) {
+        setHasDraft(true);
+        setShowDraftDialog(true);
+      } else {
+        setDraftLoaded(true);
+      }
+    };
+    
+    if (open) {
+      checkDraft();
+    }
+  }, [open, loteId]);
+
+  const handleRestoreDraft = async () => {
+    const draft = await getPesagemDraft(loteId);
+    if (draft) {
+      setItens(draft.itens);
+      setDataPesagem(new Date(draft.dataPesagem));
+      setHoraPesagem(draft.horaPesagem);
+      setPesoTara(draft.pesoTara);
+      setSavedSiloLevel(draft.savedSiloLevel);
+      setSiloAceito(draft.siloAceito);
+      toast.success(`${draft.itens.length} pesagem(ns) restaurada(s)!`);
+    }
+    setShowDraftDialog(false);
+    setDraftLoaded(true);
+  };
+
+  const handleDiscardDraft = async () => {
+    await deletePesagemDraft(loteId);
+    setHasDraft(false);
+    setShowDraftDialog(false);
+    setDraftLoaded(true);
+    // Reset state for fresh start
+    setItens([]);
+    setDataPesagem(new Date());
+    setHoraPesagem('08:00');
+    setSavedSiloLevel(null);
+    setSiloAceito(false);
+  };
+
   useEffect(() => {
     const fetchMultiplicadoresAndCalculateMetas = async () => {
       if (!open) return;
       
-      setItens([]);
-      setDataPesagem(new Date());
-      setHoraPesagem('08:00');
+      // Don't reset if draft is being restored
+      if (!draftLoaded) return;
+      
       setQuantidadeAves('');
       setPesoBruto('');
-      setSavedSiloLevel(null);
       // Não limpa a tara - mantém o valor anterior
       
       // Calculate metas if initial weight available (já está em kg)
@@ -420,7 +508,7 @@ export function PesagemDialog({
     };
 
     fetchMultiplicadoresAndCalculateMetas();
-  }, [open, pesoInicialPintinhos, linhagem, sexo, integradoId]);
+  }, [open, pesoInicialPintinhos, linhagem, sexo, integradoId, draftLoaded]);
 
   const handleAddItem = () => {
     const quantidade = parseInt(quantidadeAves) || 0;
@@ -472,6 +560,11 @@ export function PesagemDialog({
     // Clear inputs - mantém a tara para reutilização
     setQuantidadeAves('');
     setPesoBruto('');
+    
+    // Focus on peso bruto field for next entry
+    setTimeout(() => {
+      pesoBrutoInputRef.current?.focus();
+    }, 50);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -574,6 +667,10 @@ export function PesagemDialog({
           }, { onConflict: 'lote_id' });
       }
 
+      // Clear draft after successful save
+      await deletePesagemDraft(loteId);
+      setHasDraft(false);
+
       toast.success(`Pesagem salva! Peso médio: ${pesoMedio.toFixed(3)} kg | CA: ${conversaoAlimentar.toFixed(2)}`);
       onOpenChange(false);
       onSuccess?.();
@@ -583,6 +680,35 @@ export function PesagemDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle dialog close with confirmation if there are unsaved items
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    if (!newOpen && itens.length > 0) {
+      setShowCloseConfirm(true);
+    } else {
+      // Reset draft loaded state when closing
+      if (!newOpen) {
+        setDraftLoaded(false);
+        setHasDraft(false);
+      }
+      onOpenChange(newOpen);
+    }
+  };
+
+  const handleConfirmClose = async () => {
+    // Draft is already auto-saved, just close
+    setShowCloseConfirm(false);
+    setDraftLoaded(false);
+    onOpenChange(false);
+  };
+
+  const handleDiscardAndClose = async () => {
+    await deletePesagemDraft(loteId);
+    setHasDraft(false);
+    setShowCloseConfirm(false);
+    setDraftLoaded(false);
+    onOpenChange(false);
   };
 
   // Preview calculation
@@ -596,19 +722,69 @@ export function PesagemDialog({
   const showSiloStep = siloInfo !== null && !loadingSilo;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Scale className="w-5 h-5" />
-            Pesagem de Aves (kg)
-            {diasDesdeAlojamento > 0 && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                | Dia {diasDesdeAlojamento}
-              </span>
-            )}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      {/* Draft Restoration Dialog */}
+      <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-primary" />
+              Pesagem em Andamento
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Encontramos uma pesagem salva localmente para este lote. Deseja continuar de onde parou?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDiscardDraft}>
+              Iniciar Nova
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestoreDraft}>
+              Continuar Anterior
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close Confirmation Dialog */}
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pesagens não salvas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem {itens.length} pesagem(ns) não salva(s). Os dados foram salvos localmente e você pode continuar depois, ou descartar para iniciar nova pesagem.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDiscardAndClose}>
+              Descartar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmClose}>
+              Continuar Depois
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="w-5 h-5" />
+              Pesagem de Aves (kg)
+              {diasDesdeAlojamento > 0 && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  | Dia {diasDesdeAlojamento}
+                </span>
+              )}
+              {hasDraft && itens.length > 0 && (
+                <Badge variant="secondary" className="ml-2 gap-1">
+                  <CloudOff className="w-3 h-3" />
+                  {itens.length} salvo(s) localmente
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
 
         <div className="space-y-6">
           {/* Step 1: Silo Level Update */}
@@ -622,7 +798,10 @@ export function PesagemDialog({
               avesVivas={avesVivas}
               linhagem={linhagem}
               sexo={sexo}
-              onLevelSaved={(nivel) => setSavedSiloLevel(nivel)}
+              onLevelSaved={(nivel, aceito) => {
+                setSavedSiloLevel(nivel);
+                setSiloAceito(aceito || false);
+              }}
               savedLevel={savedSiloLevel}
             />
           )}
@@ -784,6 +963,7 @@ export function PesagemDialog({
                   <div className="space-y-2">
                     <Label htmlFor="bruto">Peso Bruto (kg)</Label>
                     <Input
+                      ref={pesoBrutoInputRef}
                       id="bruto"
                       type="number"
                       min="0"
@@ -916,7 +1096,7 @@ export function PesagemDialog({
 
             {/* Actions */}
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleSave} disabled={loading || itens.length === 0} className="gap-2">
@@ -928,5 +1108,6 @@ export function PesagemDialog({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
