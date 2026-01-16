@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import MortalidadeSemanaDetalheDialog from './MortalidadeSemanaDetalheDialog';
 import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
 
 interface MortalidadeDialogProps {
@@ -81,6 +82,24 @@ export function MortalidadeDialog({
   const [saving, setSaving] = useState(false);
   const [historicoMortalidade, setHistoricoMortalidade] = useState<MortalidadeSemana[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState(0);
+  const [selectedSemana, setSelectedSemana] = useState<{
+    semana: number;
+    diaInicio: number;
+    diaFim: number;
+  } | null>(null);
+
+  // Mapeamento de semana para range de dias
+  const getSemanaRange = (semana: number): { diaInicio: number; diaFim: number } => {
+    switch (semana) {
+      case 7: return { diaInicio: 1, diaFim: 7 };
+      case 14: return { diaInicio: 8, diaFim: 14 };
+      case 21: return { diaInicio: 15, diaFim: 21 };
+      case 28: return { diaInicio: 22, diaFim: 28 };
+      case 35: return { diaInicio: 29, diaFim: 35 };
+      case 42: return { diaInicio: 36, diaFim: 45 };
+      default: return { diaInicio: 1, diaFim: 7 };
+    }
+  };
 
   // Calcular dias desde alojamento - Dia 1 = dia do alojamento
   const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
@@ -247,6 +266,7 @@ export function MortalidadeDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -268,18 +288,30 @@ export function MortalidadeDialog({
                 <div className="grid grid-cols-7 gap-1 text-center text-xs">
                   {historicoMortalidade.map((semana) => {
                     const isActive = diasDesdeAlojamento >= (semana.semana === 42 ? 36 : semana.semana - 6);
+                    const hasData = semana.quantidade > 0;
                     return (
                       <div 
-                        key={semana.semana} 
+                        key={semana.semana}
+                        onClick={() => {
+                          if (isActive && hasData) {
+                            const range = getSemanaRange(semana.semana);
+                            setSelectedSemana({
+                              semana: semana.semana === 42 ? 6 : Math.ceil(semana.semana / 7),
+                              diaInicio: range.diaInicio,
+                              diaFim: range.diaFim,
+                            });
+                          }
+                        }}
                         className={cn(
-                          "p-2 rounded",
-                          isActive ? "bg-muted" : "bg-muted/30 opacity-50"
+                          "p-2 rounded transition-colors",
+                          isActive ? "bg-muted" : "bg-muted/30 opacity-50",
+                          isActive && hasData && "cursor-pointer hover:bg-muted/80 hover:ring-1 hover:ring-primary/50"
                         )}
                       >
                         <span className="text-muted-foreground block">{semana.label}</span>
                         <span className="font-bold block text-sm">{semana.quantidade || '--'}</span>
                         <span className="text-muted-foreground">
-                          {semana.quantidade > 0 ? `${semana.percentual.toFixed(2)}%` : '--'}
+                          {hasData ? `${semana.percentual.toFixed(2)}%` : '--'}
                         </span>
                       </div>
                     );
@@ -502,5 +534,21 @@ export function MortalidadeDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Diálogo de detalhe como irmão (padrão Radix UI) */}
+    {dataAlojamento && selectedSemana && (
+      <MortalidadeSemanaDetalheDialog
+        open={!!selectedSemana}
+        onOpenChange={(open) => !open && setSelectedSemana(null)}
+        loteId={loteId}
+        semana={selectedSemana.semana}
+        diaInicio={selectedSemana.diaInicio}
+        diaFim={selectedSemana.diaFim}
+        dataAlojamento={dataAlojamento}
+        metaSemana={0}
+        quantidadeAlojada={quantidadeAves}
+      />
+    )}
+  </>
   );
 }
