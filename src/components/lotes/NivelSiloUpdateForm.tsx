@@ -95,16 +95,28 @@ export function NivelSiloUpdateForm({
 
   const percentualPreenchido = capacidadeKg > 0 ? (nivelEstimadoKg / capacidadeKg) * 100 : 0;
 
-  // Calculate divergence
-  const divergenciaPercentual = useMemo(() => {
-    if (nivelEsperado === null || nivelEsperado === 0) return null;
-    return ((nivelEstimadoKg - nivelEsperado) / nivelEsperado) * 100;
+  // Calculate divergence in kg and percentage
+  const divergenciaKg = useMemo(() => {
+    if (nivelEsperado === null) return null;
+    return nivelEstimadoKg - nivelEsperado;
   }, [nivelEstimadoKg, nivelEsperado]);
 
+  const divergenciaPercentual = useMemo(() => {
+    if (nivelEsperado === null) return null;
+    if (nivelEsperado === 0) {
+      // When expected is 0, use absolute difference to determine percentage
+      if (divergenciaKg === null || divergenciaKg === 0) return 0;
+      return divergenciaKg > 0 ? 100 : -100;
+    }
+    return ((nivelEstimadoKg - nivelEsperado) / nivelEsperado) * 100;
+  }, [nivelEstimadoKg, nivelEsperado, divergenciaKg]);
+
   // Fetch last historical level and calculate expected level
+  // Skip recalculation if already saved
   useEffect(() => {
+    if (savedLevel !== null && savedLevel !== undefined) return;
     fetchLastHistorico();
-  }, [galpaoId, loteId, dataRegistro, horaRegistro]);
+  }, [galpaoId, loteId, dataRegistro, horaRegistro, savedLevel]);
 
   const fetchLastHistorico = async () => {
     try {
@@ -444,14 +456,18 @@ export function NivelSiloUpdateForm({
         )}
 
         {/* Divergence alert */}
-        {divergenciaPercentual !== null && Math.abs(divergenciaPercentual) > 20 && nivelEsperado !== null && (
+        {divergenciaPercentual !== null && Math.abs(divergenciaPercentual) > 20 && nivelEsperado !== null && divergenciaKg !== null && (
           <Alert variant={divergenciaPercentual > 0 ? "default" : "destructive"} className={divergenciaPercentual > 0 ? "border-blue-500 bg-blue-50 text-blue-800" : ""}>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               <span className="font-medium">
                 Informado: {nivelEstimadoKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg | 
-                Esperado: {nivelEsperado.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg | 
-                Diferença: {divergenciaPercentual > 0 ? '+' : ''}{divergenciaPercentual.toFixed(0)}%
+                Esperado: {nivelEsperado.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+              </span>
+              <br />
+              <span className="font-bold">
+                Diferença: {divergenciaKg > 0 ? '+' : ''}{divergenciaKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg 
+                ({divergenciaPercentual > 0 ? '+' : ''}{divergenciaPercentual.toFixed(0)}%)
               </span>
               <br />
               {divergenciaPercentual > 0 
