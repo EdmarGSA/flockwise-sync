@@ -104,15 +104,20 @@ export function NivelSiloUpdateForm({
   // Fetch last historical level and calculate expected level
   useEffect(() => {
     fetchLastHistorico();
-  }, [galpaoId, loteId]);
+  }, [galpaoId, loteId, dataRegistro, horaRegistro]);
 
   const fetchLastHistorico = async () => {
     try {
-      // Get last recorded level
+      // Combine date and time for calculation reference
+      const [hours, minutes] = horaRegistro.split(':').map(Number);
+      const dataHoraRegistro = setMinutes(setHours(dataRegistro, hours), minutes);
+      
+      // Get last recorded level BEFORE the selected registration date
       const { data: historico, error: historicoError } = await supabase
         .from('historico_nivel_silo')
         .select('nivel_estimado_kg, created_at')
         .eq('galpao_id', galpaoId)
+        .lt('created_at', dataHoraRegistro.toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -122,22 +127,24 @@ export function NivelSiloUpdateForm({
         return;
       }
 
-      // If no history exists, calculate expected level from total received - total consumed
+      // If no history exists before selected date, calculate expected level from total received - total consumed
       if (!historico) {
         setLastHistorico(null);
         
-        // Calculate expected level for first recording
+        // Calculate expected level for first recording (up to selected date)
         if (diasDesdeAlojamento !== undefined && avesVivas && linhagem && sexo) {
-          // Get all feed received for this lot
+          // Get all feed received for this lot UP TO the selected date
           const { data: racaoRecebida } = await supabase
             .from('solicitacoes_racao')
-            .select('quantidade_recebida_kg')
+            .select('quantidade_recebida_kg, data_recebimento')
             .eq('lote_id', loteId)
-            .eq('status', 'recebido');
+            .eq('status', 'recebido')
+            .lte('data_recebimento', dataHoraRegistro.toISOString());
 
           const totalRecebido = racaoRecebida?.reduce((sum, r) => sum + (r.quantidade_recebida_kg || 0), 0) || 0;
 
-          // Get consumption data from day 1 to current day
+          // Calculate days since housing up to selected date
+          // (simplified: use current diasDesdeAlojamento as approximation)
           const { data: consumoData } = await supabase
             .from('desempenho_aves')
             .select('dia, consumo_diario_racao_g')
@@ -163,26 +170,27 @@ export function NivelSiloUpdateForm({
       setLastHistorico(historico);
 
       // Calculate expected level based on:
-      // nivel_anterior + racao_recebida_desde_ultima_atualizacao - consumo_estimado
+      // nivel_anterior + racao_recebida_entre_ultima_atualizacao_e_data_selecionada - consumo_estimado
 
       const lastDate = new Date(historico.created_at);
       let nivelAnterior = historico.nivel_estimado_kg;
 
-      // Get feed received since last update
+      // Get feed received BETWEEN last update and selected date (not current date!)
       const { data: racaoRecebida } = await supabase
         .from('solicitacoes_racao')
         .select('quantidade_recebida_kg, data_recebimento')
         .eq('lote_id', loteId)
         .eq('status', 'recebido')
-        .gt('data_recebimento', lastDate.toISOString());
+        .gt('data_recebimento', lastDate.toISOString())
+        .lte('data_recebimento', dataHoraRegistro.toISOString());
 
       const totalRecebido = racaoRecebida?.reduce((sum, r) => sum + (r.quantidade_recebida_kg || 0), 0) || 0;
 
-      // Calculate estimated consumption since last update
+      // Calculate estimated consumption between last update and selected date
       let consumoEstimado = 0;
       if (diasDesdeAlojamento !== undefined && avesVivas && linhagem && sexo) {
         const diasDesdeUltimaAtualizacao = Math.floor(
-          (new Date().getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+          (dataHoraRegistro.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
         );
 
         if (diasDesdeUltimaAtualizacao > 0) {
