@@ -10,6 +10,26 @@ interface OfflineRecord {
   errorMessage?: string;
 }
 
+interface PesagemDraftItem {
+  id: string;
+  quantidade_aves: number;
+  peso_bruto_kg: number;
+  peso_tara_kg: number;
+  peso_liquido_kg: number;
+}
+
+interface PesagemDraft {
+  loteId: string;
+  galpaoId: string;
+  itens: PesagemDraftItem[];
+  dataPesagem: string; // ISO string
+  horaPesagem: string;
+  pesoTara: string;
+  savedSiloLevel: number | null;
+  siloAceito: boolean;
+  lastModified: string; // ISO string
+}
+
 interface VetOfflineDB extends DBSchema {
   'pending-records': {
     key: string;
@@ -31,10 +51,14 @@ interface VetOfflineDB extends DBSchema {
       sistemaAfetado?: string;
     };
   };
+  'pesagem-draft': {
+    key: string;
+    value: PesagemDraft;
+  };
 }
 
 const DB_NAME = 'vet-offline-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<VetOfflineDB> | null = null;
 
@@ -58,6 +82,11 @@ export async function getDB(): Promise<IDBPDatabase<VetOfflineDB>> {
       // Store for cached media (blobs)
       if (!db.objectStoreNames.contains('cached-midias')) {
         db.createObjectStore('cached-midias', { keyPath: 'id' });
+      }
+
+      // Store for pesagem drafts
+      if (!db.objectStoreNames.contains('pesagem-draft')) {
+        db.createObjectStore('pesagem-draft', { keyPath: 'loteId' });
       }
     },
   });
@@ -162,4 +191,38 @@ export async function getCachedMidias(autopsiaId: string): Promise<any[]> {
 export async function deleteCachedMidia(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('cached-midias', id);
+}
+
+// Pesagem Draft functions
+export interface PesagemDraftData {
+  loteId: string;
+  galpaoId: string;
+  itens: {
+    id: string;
+    quantidade_aves: number;
+    peso_bruto_kg: number;
+    peso_tara_kg: number;
+    peso_liquido_kg: number;
+  }[];
+  dataPesagem: string;
+  horaPesagem: string;
+  pesoTara: string;
+  savedSiloLevel: number | null;
+  siloAceito: boolean;
+  lastModified: string;
+}
+
+export async function savePesagemDraft(draft: PesagemDraftData): Promise<void> {
+  const db = await getDB();
+  await db.put('pesagem-draft', draft);
+}
+
+export async function getPesagemDraft(loteId: string): Promise<PesagemDraftData | undefined> {
+  const db = await getDB();
+  return db.get('pesagem-draft', loteId);
+}
+
+export async function deletePesagemDraft(loteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('pesagem-draft', loteId);
 }

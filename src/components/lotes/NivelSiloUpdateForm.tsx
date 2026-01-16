@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Package, Save, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, CalendarIcon, Clock } from 'lucide-react';
+import { Package, Save, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, CalendarIcon, Clock, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,7 +32,7 @@ interface NivelSiloUpdateFormProps {
   avesVivas?: number;
   linhagem?: 'cobb_500' | 'ross_308' | 'hubbard';
   sexo?: 'macho' | 'femea' | 'misto';
-  onLevelSaved: (nivelEstimadoKg: number) => void;
+  onLevelSaved: (nivelEstimadoKg: number, aceito?: boolean) => void;
   savedLevel?: number | null;
 }
 
@@ -261,10 +261,65 @@ export function NivelSiloUpdateForm({
       if (error) throw error;
 
       toast.success('Nível do silo gravado com sucesso!');
-      onLevelSaved(nivelEstimadoKg);
+      onLevelSaved(nivelEstimadoKg, false);
     } catch (error) {
       console.error('Erro ao gravar nível:', error);
       toast.error('Erro ao gravar nível do silo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAceitarNivelAtual = async () => {
+    if (loading || nivelEsperado === null) return;
+    setSaving(true);
+
+    try {
+      // Combine date and time
+      const [hours, minutes] = horaRegistro.split(':').map(Number);
+      const dataHoraRegistro = setMinutes(setHours(dataRegistro, hours), minutes);
+
+      // Calculate funil and aneis for expected level
+      const capacidadeKgTotal = siloInfo.capacidade_toneladas * 1000;
+      const capacidadeFunilTotal = capacidadeKgTotal * 0.15;
+      const capacidadeAneisTotal = capacidadeKgTotal * 0.85;
+      
+      // Estimate funil and aneis levels from expected kg
+      let funilLevel = 0;
+      let aneisLevel = 0;
+      
+      if (nivelEsperado <= capacidadeFunilTotal) {
+        funilLevel = nivelEsperado / capacidadeFunilTotal;
+      } else {
+        funilLevel = 1;
+        const remainingKg = nivelEsperado - capacidadeFunilTotal;
+        aneisLevel = (remainingKg / capacidadeAneisTotal) * siloInfo.numero_aneis;
+      }
+
+      const { error } = await supabase
+        .from('historico_nivel_silo')
+        .insert({
+          galpao_id: galpaoId,
+          lote_id: loteId,
+          integrado_id: integradoId,
+          nivel_funil: Math.min(funilLevel, 1),
+          nivel_aneis: Math.min(aneisLevel, siloInfo.numero_aneis),
+          nivel_estimado_kg: nivelEsperado,
+          nivel_esperado_kg: nivelEsperado,
+          divergencia_percentual: 0,
+          divergencia_alerta: false,
+          registrado_por: user?.id,
+          created_at: dataHoraRegistro.toISOString(),
+          observacoes: 'Nível aceito conforme sistema',
+        });
+
+      if (error) throw error;
+
+      toast.success('Nível do silo aceito conforme sistema!');
+      onLevelSaved(nivelEsperado, true);
+    } catch (error) {
+      console.error('Erro ao aceitar nível:', error);
+      toast.error('Erro ao aceitar nível do silo');
     } finally {
       setSaving(false);
     }
@@ -478,15 +533,28 @@ export function NivelSiloUpdateForm({
         )}
 
         {!isAlreadySaved && (
-          <Button 
-            onClick={handleSave} 
-            disabled={loading}
-            className="w-full gap-2"
-            variant="secondary"
-          >
-            <Save className="w-4 h-4" />
-            {loading ? 'Gravando...' : 'Gravar Nível'}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              onClick={handleSave} 
+              disabled={loading}
+              className="flex-1 gap-2"
+              variant="secondary"
+            >
+              <Save className="w-4 h-4" />
+              {loading ? 'Gravando...' : 'Gravar Nível Informado'}
+            </Button>
+            {nivelEsperado !== null && (
+              <Button 
+                onClick={handleAceitarNivelAtual} 
+                disabled={loading}
+                className="flex-1 gap-2"
+                variant="outline"
+              >
+                <Check className="w-4 h-4" />
+                {loading ? 'Aceitando...' : 'Aceitar Nível Atual'}
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
