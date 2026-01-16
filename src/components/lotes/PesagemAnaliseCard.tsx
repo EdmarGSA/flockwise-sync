@@ -120,7 +120,7 @@ export function PesagemAnaliseCard({
             <p className="text-lg font-bold">{pesoTotalLote.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</p>
           </div>
           <div className="bg-background/50 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground">Consumo Estimado</p>
+            <p className="text-xs text-muted-foreground">Consumo Real (Silo)</p>
             <p className="text-lg font-bold">{consumoTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</p>
           </div>
           <div className="bg-primary/20 rounded-lg p-3">

@@ -3214,27 +3214,39 @@ export type Database = {
       }
       pesagens: {
         Row: {
+          consumo_real_kg: number | null
+          conversao_alimentar: number | null
           created_at: string
           data_pesagem: string
           id: string
           integrado_id: string
           lote_id: string
+          nivel_silo_kg: number | null
+          total_recebido_kg: number | null
           updated_at: string
         }
         Insert: {
+          consumo_real_kg?: number | null
+          conversao_alimentar?: number | null
           created_at?: string
           data_pesagem?: string
           id?: string
           integrado_id: string
           lote_id: string
+          nivel_silo_kg?: number | null
+          total_recebido_kg?: number | null
           updated_at?: string
         }
         Update: {
+          consumo_real_kg?: number | null
+          conversao_alimentar?: number | null
           created_at?: string
           data_pesagem?: string
           id?: string
           integrado_id?: string
           lote_id?: string
+          nivel_silo_kg?: number | null
+          total_recebido_kg?: number | null
           updated_at?: string
         }
         Relationships: [
