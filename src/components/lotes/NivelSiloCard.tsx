@@ -27,6 +27,8 @@ interface DesempenhoAve {
 
 interface HistoricoNivel {
   nivel_estimado_kg: number;
+  nivel_esperado_kg: number | null;
+  divergencia_percentual: number | null;
   created_at: string;
 }
 
@@ -48,6 +50,7 @@ export function NivelSiloCard({
   const [historicoNivel, setHistoricoNivel] = useState<HistoricoNivel | null>(null);
   const [consumoDesdeHistorico, setConsumoDesdeHistorico] = useState(0);
   const [racaoRecebidaDesdeHistorico, setRacaoRecebidaDesdeHistorico] = useState(0);
+  const [divergenciaAcumuladaKg, setDivergenciaAcumuladaKg] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -99,11 +102,24 @@ export function NivelSiloCard({
       if (galpaoId) {
         const { data: historico } = await supabase
           .from('historico_nivel_silo')
-          .select('nivel_estimado_kg, created_at')
+          .select('nivel_estimado_kg, nivel_esperado_kg, divergencia_percentual, created_at')
           .eq('galpao_id', galpaoId)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        
+        // Fetch all historical records to calculate accumulated divergence
+        const { data: allHistorico } = await supabase
+          .from('historico_nivel_silo')
+          .select('nivel_estimado_kg, nivel_esperado_kg')
+          .eq('galpao_id', galpaoId)
+          .not('nivel_esperado_kg', 'is', null);
+        
+        const divergenciaTotal = (allHistorico || []).reduce((sum, h) => {
+          const diffKg = (h.nivel_estimado_kg || 0) - (h.nivel_esperado_kg || 0);
+          return sum + diffKg;
+        }, 0);
+        setDivergenciaAcumuladaKg(divergenciaTotal);
 
         if (historico) {
           setHistoricoNivel(historico);
@@ -138,6 +154,7 @@ export function NivelSiloCard({
           setHistoricoNivel(null);
           setConsumoDesdeHistorico(0);
           setRacaoRecebidaDesdeHistorico(0);
+          setDivergenciaAcumuladaKg(0);
         }
       }
     } catch (error) {
@@ -292,6 +309,19 @@ export function NivelSiloCard({
             {diasRestantes < 0 ? 'Déficit' : `${diasRestantes} dias`}
           </span>
         </div>
+
+        {/* Accumulated divergence display */}
+        {divergenciaAcumuladaKg !== 0 && (
+          <div className="flex items-center justify-between text-sm border-t pt-3">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Divergência acumulada:</span>
+            </div>
+            <Badge variant={divergenciaAcumuladaKg < 0 ? "destructive" : "secondary"} className="gap-1">
+              {divergenciaAcumuladaKg > 0 ? '+' : ''}{divergenciaAcumuladaKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+            </Badge>
+          </div>
+        )}
 
         {/* Alert for critical silo level */}
         {isCritical && quantidadeSugerida > 0 && (
