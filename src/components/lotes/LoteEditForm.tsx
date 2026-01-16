@@ -289,29 +289,20 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="previsao">Previsão</SelectItem>
-                      <SelectItem value="saiu_para_entrega">Saiu p/ Entrega</SelectItem>
-                      <SelectItem value="alojado">Alojado</SelectItem>
-                      <SelectItem value="fechado">Fechado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Status - Read-only display */}
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Input 
+                value={
+                  lote.status === 'previsao' ? 'Previsão' :
+                  lote.status === 'saiu_para_entrega' ? 'Saiu p/ Entrega' :
+                  lote.status === 'alojado' ? 'Alojado' :
+                  lote.status === 'fechado' ? 'Fechado' : '-'
+                } 
+                disabled 
+                className="bg-muted"
+              />
+            </FormItem>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -502,12 +493,12 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                 <Button
                   type="button"
                   variant="secondary"
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                   disabled={loading}
                   onClick={handleAlojar}
                 >
                   <Home className="w-4 h-4 mr-2" />
-                  {loading ? 'Alojando...' : 'Alojar'}
+                  {loading ? 'Atualizando...' : 'Saiu p/ Entrega'}
                 </Button>
                 <Button type="submit" className="flex-1" disabled={loading}>
                   {loading ? 'Salvando...' : 'Salvar'}
