@@ -332,6 +332,16 @@ export default function ConferenciaFisicaDialog({
   };
 
   const handleSalvarConferencia = async () => {
+    // Block finalization if there are unlinked items
+    const itensNaoVinculados = itens.filter(i => !i.produto_id);
+    if (itensNaoVinculados.length > 0) {
+      toast.error(
+        `${itensNaoVinculados.length} item(ns) não vinculado(s). Vincule os produtos antes de prosseguir.`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -396,7 +406,7 @@ export default function ConferenciaFisicaDialog({
             quantidade_fisica: edited?.quantidade_fisica || 0,
             preco_nfe: edited?.preco_nfe || item.preco_nfe,
             lote_fornecedor: edited?.lote_fornecedor || '',
-            unidade_compra: edited?.unidade_compra || item.produtos.unidade_medida,
+            unidade_compra: edited?.unidade_compra || item.produtos?.unidade_medida || item.unidade_compra || 'UN',
             fator_conversao: edited?.fator_conversao || 1,
             quantidade_estoque: (edited?.quantidade_fisica || 0) * (edited?.fator_conversao || 1)
           };
@@ -642,7 +652,7 @@ export default function ConferenciaFisicaDialog({
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          {fatorConversao > 1 && qtdFisica > 0 ? (
+                          {fatorConversao > 1 && qtdFisica > 0 && item.produtos ? (
                             <div className="flex items-center justify-center gap-1 text-sm">
                               <ArrowRight className="w-3 h-3 text-muted-foreground" />
                               <span className="font-medium text-green-600">{qtdEstoque.toFixed(0)}</span>
