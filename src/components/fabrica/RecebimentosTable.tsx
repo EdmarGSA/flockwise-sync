@@ -10,7 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Package, MoreHorizontal, Eye, FileCheck, AlertTriangle, Plus, Search, DollarSign } from 'lucide-react';
+import { Package, MoreHorizontal, Eye, FileCheck, AlertTriangle, Plus, Search, DollarSign, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import IniciarRecebimentoDialog from './IniciarRecebimentoDialog';
 import RecebimentoViewDialog from './RecebimentoViewDialog';
 import LiberacaoPrecoDialog from './LiberacaoPrecoDialog';
@@ -44,6 +54,8 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
   const [selectedRecebimento, setSelectedRecebimento] = useState<Recebimento | null>(null);
   const [showLiberacao, setShowLiberacao] = useState(false);
   const [liberacaoRecebimento, setLiberacaoRecebimento] = useState<Recebimento | null>(null);
+  const [recebimentoParaExcluir, setRecebimentoParaExcluir] = useState<Recebimento | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
     fetchRecebimentos();
@@ -78,6 +90,54 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
       toast.error('Erro ao carregar recebimentos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExcluirRecebimento = async () => {
+    if (!recebimentoParaExcluir) return;
+    setExcluindo(true);
+
+    try {
+      // Verificar se há kardex vinculado (segurança extra)
+      const { count: kardexCount } = await supabase
+        .from('kardex')
+        .select('*', { count: 'exact', head: true })
+        .eq('recebimento_id', recebimentoParaExcluir.id);
+
+      if (kardexCount && kardexCount > 0) {
+        toast.error('Não é possível excluir: existem movimentações de estoque vinculadas');
+        return;
+      }
+
+      // 1. Excluir divergências
+      await supabase
+        .from('divergencias_recebimento')
+        .delete()
+        .eq('recebimento_id', recebimentoParaExcluir.id);
+
+      // 2. Excluir itens
+      await supabase
+        .from('recebimento_itens')
+        .delete()
+        .eq('recebimento_id', recebimentoParaExcluir.id);
+
+      // 3. Excluir recebimento
+      const { error } = await supabase
+        .from('recebimentos_mercadoria')
+        .delete()
+        .eq('id', recebimentoParaExcluir.id);
+
+      if (error) throw error;
+
+      toast.success('Recebimento excluído com sucesso');
+      fetchRecebimentos();
+      onRefresh?.();
+    } catch (error) {
+      console.error('Erro ao excluir recebimento:', error);
+      toast.error('Erro ao excluir recebimento');
+    } finally {
+      setExcluindo(false);
+      setRecebimentoParaExcluir(null);
     }
   };
 
@@ -245,6 +305,15 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
                               Liberar Preço
                             </DropdownMenuItem>
                           )}
+                          {rec.status !== 'finalizado' && (
+                            <DropdownMenuItem 
+                              onClick={() => setRecebimentoParaExcluir(rec)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -285,6 +354,36 @@ export default function RecebimentosTable({ integradoId, onRefresh }: Recebiment
           onSuccess={handleSuccess}
         />
       )}
+
+      <AlertDialog 
+        open={!!recebimentoParaExcluir} 
+        onOpenChange={(open) => !open && setRecebimentoParaExcluir(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Recebimento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o recebimento{' '}
+              {recebimentoParaExcluir?.numero_nfe 
+                ? `NF-e ${recebimentoParaExcluir.numero_nfe}` 
+                : 'sem NF-e'}?
+              <br /><br />
+              Esta ação não pode ser desfeita. Todos os itens e divergências 
+              relacionados também serão excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleExcluirRecebimento}
+              disabled={excluindo}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {excluindo ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
