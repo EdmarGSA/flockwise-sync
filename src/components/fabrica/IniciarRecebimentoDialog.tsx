@@ -654,7 +654,7 @@ export default function IniciarRecebimentoDialog({
           }
         }
 
-        // If there are unlinked items, pause and open the assistant
+        // If there are unlinked items, create recebimento WITH items first, then open assistant
         if (itensNaoVinculadosList.length > 0) {
           // Create the recebimento first
           const { data: recebimento, error: recError } = await supabase
@@ -665,14 +665,24 @@ export default function IniciarRecebimentoDialog({
 
           if (recError) throw recError;
 
-          // Store pending data
-          setPendingRecebimentoId(recebimento.id);
-          setPendingItensProcessados(itensToInsert.map(item => ({
+          // INSERT ALL ITEMS NOW (including those with produto_id = null)
+          const itensWithRecebimentoId = itensToInsert.map(item => ({
             ...item,
             recebimento_id: recebimento.id
-          })));
+          }));
+
+          const { data: insertedItens, error: itensError } = await supabase
+            .from('recebimento_itens')
+            .insert(itensWithRecebimentoId)
+            .select('id, codigo_produto_nfe, descricao_produto_nfe, produto_id');
+
+          if (itensError) throw itensError;
+
+          // Store the inserted item IDs for the assistant to UPDATE later
+          setPendingRecebimentoId(recebimento.id);
+          setPendingItensProcessados(insertedItens || []);
           
-          // Open assistant
+          // Open assistant with unlinked items
           setItensNaoVinculados(itensNaoVinculadosList);
           setParceiroIdAssistente(parceiroIdForXml);
           setParceiroNomeAssistente(nfeData.razaoSocialFornecedor);
@@ -736,7 +746,7 @@ export default function IniciarRecebimentoDialog({
     }
   };
 
-  // Handle assistant completion - update items with linked products
+  // Handle assistant completion - UPDATE items with linked products
   const handleAssistenteComplete = async (vinculos: VinculoCriado[]) => {
     if (!pendingRecebimentoId || pendingItensProcessados.length === 0) {
       setShowAssistente(false);
@@ -745,53 +755,35 @@ export default function IniciarRecebimentoDialog({
 
     setLoading(true);
     try {
-      // Update pending items with linked product IDs
-      const itensToInsert = pendingItensProcessados.map((item, index) => {
-        // Find if this item was one of the unlinked ones
-        const vinculoIndex = itensNaoVinculados.findIndex((nv, nvIndex) => {
-          const originalIndex = pendingItensProcessados.findIndex(
-            pi => pi.produto_id === null && 
-                  pi.codigo_produto_nfe === nv.codigo &&
-                  pi.descricao_produto_nfe === nv.descricao
-          );
-          return originalIndex === index;
-        });
+      // Update each unlinked item with its new produto_id
+      for (let i = 0; i < vinculos.length; i++) {
+        const vinculo = vinculos[i];
+        
+        // Find the corresponding inserted item by matching codigo/descricao
+        const naoVinculado = itensNaoVinculados[i];
+        const insertedItem = pendingItensProcessados.find(
+          item => item.codigo_produto_nfe === naoVinculado.codigo &&
+                  item.descricao_produto_nfe === naoVinculado.descricao &&
+                  item.produto_id === null
+        );
 
-        if (vinculoIndex !== -1) {
-          const vinculo = vinculos[vinculoIndex];
-          if (vinculo && vinculo.tipo !== 'pulado' && vinculo.produtoId) {
-            return { ...item, produto_id: vinculo.produtoId };
+        if (insertedItem && vinculo.tipo !== 'pulado' && vinculo.produtoId) {
+          // UPDATE the item with the linked product
+          const { error } = await supabase
+            .from('recebimento_itens')
+            .update({ produto_id: vinculo.produtoId })
+            .eq('id', insertedItem.id);
+
+          if (error) {
+            console.error('Erro ao atualizar item:', error);
           }
         }
-        return item;
-      });
-
-      // Filter out skipped items (those still without produto_id that were skipped)
-      const itensFinais = itensToInsert.filter((item, index) => {
-        if (item.produto_id === null) {
-          const vinculoIndex = itensNaoVinculados.findIndex((nv) => {
-            return pendingItensProcessados[index]?.codigo_produto_nfe === nv.codigo;
-          });
-          if (vinculoIndex !== -1) {
-            const vinculo = vinculos[vinculoIndex];
-            return vinculo?.tipo !== 'pulado';
-          }
-        }
-        return true;
-      });
-
-      if (itensFinais.length > 0) {
-        const { error: itensError } = await supabase
-          .from('recebimento_itens')
-          .insert(itensFinais);
-
-        if (itensError) throw itensError;
       }
 
       setRecebimentoId(pendingRecebimentoId);
       setShowAssistente(false);
       setShowConferencia(true);
-      toast.success('Recebimento iniciado! Prossiga com a conferência física.');
+      toast.success('Recebimento pronto! Prossiga com a conferência física.');
     } catch (error) {
       console.error('Erro ao finalizar recebimento:', error);
       toast.error('Erro ao finalizar recebimento');
