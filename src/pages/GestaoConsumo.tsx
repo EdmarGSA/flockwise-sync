@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, ArrowLeft, Bird, Truck, CheckCircle, Clock, RefreshCw, XCircle, AlertTriangle, Flame, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { differenceInHours } from 'date-fns';
 import { format } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
@@ -132,6 +133,7 @@ export default function GestaoConsumo() {
         status,
         integrado_id,
         nucleo_id,
+        galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome)
       `)
@@ -145,7 +147,7 @@ export default function GestaoConsumo() {
 
     const lotesProcessados: LoteConsumo[] = await Promise.all(
       (data || []).map(async (lote) => {
-        const loteData = lote as LoteConsumo;
+        const loteData = lote as LoteConsumo & { galpao_id?: string };
 
         // Get recebimento data for quantidade alojada
         const { data: recebimentoData } = await supabase
@@ -162,6 +164,21 @@ export default function GestaoConsumo() {
           quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
         }
 
+        // Fetch accumulated mortality
+        const { data: mortalidadeData } = await supabase
+          .from('mortalidade')
+          .select('mortalidade_itens(quantidade)')
+          .eq('lote_id', loteData.id);
+
+        const mortalidadeAcumulada = (mortalidadeData || []).reduce((total, m) => {
+          const itens = m.mortalidade_itens as { quantidade: number }[] || [];
+          return total + itens.reduce((sum, item) => sum + (item.quantidade || 0), 0);
+        }, 0);
+
+        // Calculate aves vivas (considering mortality)
+        const avesBase = quantidadeAlojada ?? loteData.quantidade_aves;
+        const avesVivas = Math.max(0, avesBase - mortalidadeAcumulada);
+
         // Dia 1 = dia do alojamento
         const diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
 
@@ -173,8 +190,6 @@ export default function GestaoConsumo() {
         let consumoEsperadoKg = 0;
         
         if (diasDesdeAlojamento && diasDesdeAlojamento > 0) {
-          const avesVivas = quantidadeAlojada ?? loteData.quantidade_aves;
-          
           // Fetch total received feed
           const { data: solicitacoesData } = await supabase
             .from('solicitacoes_racao')
@@ -207,15 +222,59 @@ export default function GestaoConsumo() {
           if (desempenho) {
             consumoEsperadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
             consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-            nivelSilo = totalRecebido - consumoEsperadoKg;
+            
+            // Default fallback: total received - expected consumption
+            let nivelSiloCalculado = totalRecebido - consumoEsperadoKg;
+
+            // Check for historico_nivel_silo (manual record) if galpao_id exists
+            if (loteData.galpao_id) {
+              const { data: historicoNivel } = await supabase
+                .from('historico_nivel_silo')
+                .select('nivel_estimado_kg, created_at')
+                .eq('galpao_id', loteData.galpao_id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (historicoNivel) {
+                const historicoDate = new Date(historicoNivel.created_at);
+                const now = new Date();
+                const horasDecorridas = differenceInHours(now, historicoDate);
+                const diasDecorridos = horasDecorridas / 24;
+                
+                // Calculate consumption since historico was recorded
+                const consumoDesdeHistorico = consumoDiarioKg * diasDecorridos;
+
+                // Fetch feed received AFTER the last historico record
+                const { data: racaoRecebida } = await supabase
+                  .from('solicitacoes_racao')
+                  .select('quantidade_recebida_kg, data_recebimento')
+                  .eq('lote_id', loteData.id)
+                  .eq('status', 'recebido')
+                  .gt('data_recebimento', historicoDate.toISOString());
+
+                const racaoRecebidaDesdeHistorico = (racaoRecebida || []).reduce(
+                  (sum, r) => sum + (r.quantidade_recebida_kg || 0), 
+                  0
+                );
+
+                // Calculate silo level using historico formula:
+                // Nível = Informado + Ração Recebida Depois - Consumo Desde Registro
+                nivelSiloCalculado = Math.max(0, 
+                  historicoNivel.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico
+                );
+              }
+            }
+
+            nivelSilo = nivelSiloCalculado;
             diasEstoque = consumoDiarioKg > 0 ? Math.floor(nivelSilo / consumoDiarioKg) : 0;
             
-            // Real consumption = total received - current silo level (estimated)
+            // Real consumption = total received - current silo level
             consumoRealKg = totalRecebido - nivelSilo;
           }
         }
 
-        // Calculate trend based on last 3 weighings or estimations
+        // Calculate trend based on consumption deviation
         const tendencia: 'subindo' | 'caindo' | 'estavel' = 
           consumoRealKg > consumoEsperadoKg * 1.05 ? 'subindo' : 
           consumoRealKg < consumoEsperadoKg * 0.95 ? 'caindo' : 'estavel';
