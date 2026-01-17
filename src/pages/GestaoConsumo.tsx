@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, ArrowLeft, Bird, Calendar, Truck, CheckCircle, Clock, RefreshCw, XCircle } from 'lucide-react';
+import { Package, ArrowLeft, Bird, Truck, CheckCircle, Clock, RefreshCw, XCircle, AlertTriangle, Flame } from 'lucide-react';
 import { format } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RacaoGestaoDialog } from '@/components/consumo/RacaoGestaoDialog';
 import { EnviarRacaoDialog } from '@/components/consumo/EnviarRacaoDialog';
+import { LotesAlarmeDialog } from '@/components/consumo/LotesAlarmeDialog';
+import { SolicitacoesFilterDialog } from '@/components/consumo/SolicitacoesFilterDialog';
+import { LotesListDialog } from '@/components/consumo/LotesListDialog';
 
 interface LoteConsumo {
   id: string;
@@ -28,6 +32,8 @@ interface LoteConsumo {
   galpao: { nome: string } | null;
   quantidadeAlojada?: number | null;
   diasDesdeAlojamento?: number;
+  nivelSilo?: number;
+  diasEstoque?: number;
 }
 
 interface SolicitacaoRacao {
@@ -41,7 +47,10 @@ interface SolicitacaoRacao {
   quantidade_recebida_kg: number | null;
   quantidade_devolvida_kg: number | null;
   devolucao_confirmada: boolean;
+  urgente?: boolean;
 }
+
+type SolicitacaoFilter = 'todos' | 'a_confirmar' | 'a_enviar' | 'enviados' | 'urgentes';
 
 export default function GestaoConsumo() {
   const { user, loading } = useAuth();
@@ -53,6 +62,16 @@ export default function GestaoConsumo() {
   const [selectedLote, setSelectedLote] = useState<LoteConsumo | null>(null);
   const [enviarDialogOpen, setEnviarDialogOpen] = useState(false);
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<SolicitacaoRacao | null>(null);
+  
+  // Filter state for solicitacoes
+  const [solicitacaoFilter, setSolicitacaoFilter] = useState<SolicitacaoFilter>('todos');
+  
+  // Dialog states for cards
+  const [lotesDialogOpen, setLotesDialogOpen] = useState(false);
+  const [alarmeDialogOpen, setAlarmeDialogOpen] = useState(false);
+  const [pendentesDialogOpen, setPendentesDialogOpen] = useState(false);
+  const [transitoDialogOpen, setTransitoDialogOpen] = useState(false);
+  const [devolucaoDialogOpen, setDevolucaoDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -133,10 +152,56 @@ export default function GestaoConsumo() {
         // Dia 1 = dia do alojamento
         const diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
 
+        // Calculate silo level
+        let nivelSilo = 0;
+        let diasEstoque = 0;
+        
+        if (diasDesdeAlojamento && diasDesdeAlojamento > 0) {
+          const avesVivas = quantidadeAlojada ?? loteData.quantidade_aves;
+          
+          // Fetch total received feed
+          const { data: solicitacoesData } = await supabase
+            .from('solicitacoes_racao')
+            .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status')
+            .eq('lote_id', loteData.id);
+
+          const totalRecebido = (solicitacoesData || []).reduce((total, s) => {
+            if (s.status === 'recebido' || s.status === 'parcialmente_devolvido') {
+              const rec = s.quantidade_recebida_kg || 0;
+              const dev = s.devolucao_confirmada ? (s.quantidade_devolvida_kg || 0) : 0;
+              return total + (rec - dev);
+            }
+            return total;
+          }, 0);
+
+          // Fetch performance reference
+          const linhagem = (loteData.linhagem || 'cobb_500') as 'cobb_500' | 'ross_308' | 'hubbard';
+          const sexo = (loteData.sexo || 'misto') as 'macho' | 'femea' | 'misto';
+          
+          const { data: desempenho } = await supabase
+            .from('desempenho_aves')
+            .select('consumo_acumulado_racao_g, consumo_diario_racao_g')
+            .eq('linhagem', linhagem)
+            .eq('sexo', sexo)
+            .lte('dia', Math.max(diasDesdeAlojamento, 1))
+            .order('dia', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (desempenho) {
+            const consumoEstimadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
+            const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
+            nivelSilo = totalRecebido - consumoEstimadoKg;
+            diasEstoque = consumoDiarioKg > 0 ? Math.floor(nivelSilo / consumoDiarioKg) : 0;
+          }
+        }
+
         return {
           ...loteData,
           quantidadeAlojada,
           diasDesdeAlojamento,
+          nivelSilo,
+          diasEstoque,
         };
       })
     );
@@ -158,6 +223,35 @@ export default function GestaoConsumo() {
     setSolicitacoes(data || []);
   };
 
+  // Filtered solicitacoes based on tab
+  const filteredSolicitacoes = useMemo(() => {
+    switch (solicitacaoFilter) {
+      case 'a_confirmar':
+        return solicitacoes.filter(s => s.status === 'solicitado');
+      case 'a_enviar':
+        return solicitacoes.filter(s => s.status === 'confirmado');
+      case 'enviados':
+        return solicitacoes.filter(s => s.status === 'enviado');
+      case 'urgentes':
+        return solicitacoes.filter(s => s.urgente && !['cancelado', 'recebido', 'devolvido'].includes(s.status));
+      default:
+        return solicitacoes;
+    }
+  }, [solicitacoes, solicitacaoFilter]);
+
+  // Stats
+  const lotesEmAlarme = useMemo(() => 
+    lotes.filter(l => l.diasDesdeAlojamento && l.diasDesdeAlojamento > 0 && (l.diasEstoque || 0) < 1),
+    [lotes]
+  );
+
+  const pendentesCount = solicitacoes.filter(s => s.status === 'solicitado').length;
+  const enviadosCount = solicitacoes.filter(s => s.status === 'enviado').length;
+  const devolucoesPendentes = solicitacoes.filter(s => 
+    (s.quantidade_devolvida_kg || 0) > 0 && !s.devolucao_confirmada
+  );
+  const urgentesCount = solicitacoes.filter(s => s.urgente && !['cancelado', 'recebido', 'devolvido'].includes(s.status)).length;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -170,24 +264,6 @@ export default function GestaoConsumo() {
     return <Navigate to="/auth" replace />;
   }
 
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
-
-  const getSexoLabel = (sexo: string) => {
-    const labels: Record<string, string> = {
-      macho: 'Macho',
-      femea: 'Fêmea',
-      misto: 'Misto',
-    };
-    return labels[sexo] || sexo;
-  };
-
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
       previsao: { label: 'Previsão', variant: 'outline' },
@@ -198,7 +274,30 @@ export default function GestaoConsumo() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getSolicitacaoStatusBadge = (status: string) => {
+  const getDiasEstoqueBadge = (dias: number, nivel: number) => {
+    if (nivel < 0 || dias < 1) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          {nivel < 0 ? 'Déficit' : `${dias}d`}
+        </Badge>
+      );
+    }
+    if (dias <= 3) {
+      return (
+        <Badge variant="secondary" className="gap-1 bg-amber-500/20 text-amber-600 border-amber-500/30">
+          {dias}d
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="gap-1 bg-green-500/20 text-green-600 border-green-500/30">
+        {dias}d
+      </Badge>
+    );
+  };
+
+  const getSolicitacaoStatusBadge = (status: string, urgente?: boolean) => {
     const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; icon: React.ReactNode }> = {
       solicitado: { label: 'Solicitado', variant: 'outline', icon: <Clock className="w-3 h-3" /> },
       confirmado: { label: 'Confirmado', variant: 'secondary', icon: <CheckCircle className="w-3 h-3" /> },
@@ -210,10 +309,17 @@ export default function GestaoConsumo() {
     };
     const config = variants[status] || { label: status, variant: 'outline', icon: null };
     return (
-      <Badge variant={config.variant} className="gap-1">
-        {config.icon}
-        {config.label}
-      </Badge>
+      <div className="flex items-center gap-1">
+        {urgente && (
+          <Badge variant="destructive" className="gap-0.5 px-1.5 py-0.5">
+            <Flame className="w-3 h-3" />
+          </Badge>
+        )}
+        <Badge variant={config.variant} className="gap-1">
+          {config.icon}
+          {config.label}
+        </Badge>
+      </div>
     );
   };
 
@@ -296,32 +402,42 @@ export default function GestaoConsumo() {
     }
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
-  };
-
   const formatDateTime = (dateStr: string | null) => {
     if (!dateStr) return '-';
     return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
   };
 
-  const getLoteSolicitacoes = (loteId: string) => {
-    return solicitacoes.filter(s => s.lote_id === loteId);
-  };
+  // Prepare data for dialogs
+  const lotesListData = lotes.map(l => ({
+    id: l.id,
+    nucleo_nome: l.nucleo?.nome || '-',
+    galpao_nome: l.galpao?.nome || '-',
+    quantidade_aves: l.quantidadeAlojada ?? l.quantidade_aves,
+    idade: l.diasDesdeAlojamento || 0,
+    status: l.status,
+    nivel_silo: l.nivelSilo || 0,
+    dias_estoque: l.diasEstoque || 0,
+  }));
 
-  const getPendingCount = () => {
-    return solicitacoes.filter(s => s.status === 'solicitado').length;
-  };
+  const lotesAlarmeData = lotesEmAlarme.map(l => ({
+    id: l.id,
+    nucleo_nome: l.nucleo?.nome || '-',
+    galpao_nome: l.galpao?.nome || '-',
+    quantidade_aves: l.quantidadeAlojada ?? l.quantidade_aves,
+    idade: l.diasDesdeAlojamento || 0,
+    nivel_silo: l.nivelSilo || 0,
+    dias_estoque: l.diasEstoque || 0,
+  }));
 
-  const getEnviadosCount = () => {
-    return solicitacoes.filter(s => s.status === 'enviado').length;
-  };
-
-  const getDevolucoesPendentes = () => {
-    return solicitacoes.filter(s => 
-      (s.quantidade_devolvida_kg || 0) > 0 && !s.devolucao_confirmada
-    ).length;
+  const getSolicitacoesWithLoteInfo = (filter: (s: SolicitacaoRacao) => boolean) => {
+    return solicitacoes.filter(filter).map(s => {
+      const lote = lotes.find(l => l.id === s.lote_id);
+      return {
+        ...s,
+        nucleo_nome: lote?.nucleo?.nome,
+        galpao_nome: lote?.galpao?.nome,
+      };
+    });
   };
 
   return (
@@ -345,47 +461,79 @@ export default function GestaoConsumo() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card className="bg-card border-border">
+        {/* Stats Cards - Clickable */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card 
+            className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setLotesDialogOpen(true)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-sm">Lotes Ativos</p>
+                  <p className="text-muted-foreground text-sm">Lotes</p>
                   <p className="text-2xl font-bold text-primary">{lotes.length}</p>
                 </div>
                 <Bird className="w-8 h-8 text-primary/50" />
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card border-border">
+          
+          <Card 
+            className={`bg-card border-border cursor-pointer hover:border-primary/50 transition-colors ${lotesEmAlarme.length > 0 ? 'border-destructive/50 bg-destructive/5' : ''}`}
+            onClick={() => setAlarmeDialogOpen(true)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-sm">Solicit. Pendentes</p>
-                  <p className="text-2xl font-bold text-amber-500">{getPendingCount()}</p>
+                  <p className="text-muted-foreground text-sm">🔔 Alarme</p>
+                  <p className={`text-2xl font-bold ${lotesEmAlarme.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {lotesEmAlarme.length}
+                  </p>
+                </div>
+                <AlertTriangle className={`w-8 h-8 ${lotesEmAlarme.length > 0 ? 'text-destructive' : 'text-muted-foreground/50'}`} />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setPendentesDialogOpen(true)}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Pendentes</p>
+                  <p className="text-2xl font-bold text-amber-500">{pendentesCount}</p>
                 </div>
                 <Clock className="w-8 h-8 text-amber-500/50" />
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card border-border">
+          
+          <Card 
+            className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setTransitoDialogOpen(true)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm">Em Trânsito</p>
-                  <p className="text-2xl font-bold text-destructive">{getEnviadosCount()}</p>
+                  <p className="text-2xl font-bold text-destructive">{enviadosCount}</p>
                 </div>
                 <Truck className="w-8 h-8 text-destructive/50" />
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card border-border">
+          
+          <Card 
+            className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setDevolucaoDialogOpen(true)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-sm">Devol. Pendentes</p>
-                  <p className="text-2xl font-bold text-orange-500">{getDevolucoesPendentes()}</p>
+                  <p className="text-muted-foreground text-sm">Devol. Pend.</p>
+                  <p className="text-2xl font-bold text-orange-500">{devolucoesPendentes.length}</p>
                 </div>
                 <RefreshCw className="w-8 h-8 text-orange-500/50" />
               </div>
@@ -393,7 +541,7 @@ export default function GestaoConsumo() {
           </Card>
         </div>
 
-        {/* Lotes Table */}
+        {/* Lotes Table - Updated columns */}
         <Card className="bg-card border-border mb-8">
           <CardHeader>
             <CardTitle className="text-foreground">Lotes Ativos</CardTitle>
@@ -415,9 +563,9 @@ export default function GestaoConsumo() {
                       <TableHead>Núcleo</TableHead>
                       <TableHead>Galpão</TableHead>
                       <TableHead>Qtd. Aves</TableHead>
-                      <TableHead>Linhagem</TableHead>
-                      <TableHead>Sexo</TableHead>
                       <TableHead>Idade</TableHead>
+                      <TableHead>Nível Silo</TableHead>
+                      <TableHead>Dias Estoque</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -430,11 +578,23 @@ export default function GestaoConsumo() {
                         <TableCell>
                           {(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}
                         </TableCell>
-                        <TableCell>{getLinhagemLabel(lote.linhagem)}</TableCell>
-                        <TableCell>{getSexoLabel(lote.sexo)}</TableCell>
                         <TableCell>
                           {lote.diasDesdeAlojamento !== undefined && lote.diasDesdeAlojamento > 0 ? (
                             <Badge variant="secondary">{lote.diasDesdeAlojamento} dias</Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
+                            lote.nivelSilo !== undefined && lote.nivelSilo < 0 ? (
+                              <span className="text-destructive font-medium">Déficit</span>
+                            ) : (
+                              `${(lote.nivelSilo || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`
+                            )
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
+                            getDiasEstoqueBadge(lote.diasEstoque || 0, lote.nivelSilo || 0)
                           ) : '-'}
                         </TableCell>
                         <TableCell>
@@ -457,7 +617,7 @@ export default function GestaoConsumo() {
           </CardContent>
         </Card>
 
-        {/* Solicitações Pendentes */}
+        {/* Solicitações with Filters */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
@@ -466,7 +626,20 @@ export default function GestaoConsumo() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {solicitacoes.length === 0 ? (
+            <Tabs value={solicitacaoFilter} onValueChange={(v) => setSolicitacaoFilter(v as SolicitacaoFilter)} className="mb-4">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="todos">Todos</TabsTrigger>
+                <TabsTrigger value="a_confirmar">A Confirmar</TabsTrigger>
+                <TabsTrigger value="a_enviar">A Enviar</TabsTrigger>
+                <TabsTrigger value="enviados">Enviados</TabsTrigger>
+                <TabsTrigger value="urgentes" className="gap-1">
+                  <Flame className="w-3 h-3" />
+                  Urgentes {urgentesCount > 0 && `(${urgentesCount})`}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {filteredSolicitacoes.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Nenhuma solicitação de ração.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -484,7 +657,7 @@ export default function GestaoConsumo() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {solicitacoes.map((solicitacao) => {
+                    {filteredSolicitacoes.map((solicitacao) => {
                       const lote = lotes.find(l => l.id === solicitacao.lote_id);
                       return (
                         <TableRow key={solicitacao.id}>
@@ -494,7 +667,7 @@ export default function GestaoConsumo() {
                           <TableCell>{solicitacao.tipo_racao}</TableCell>
                           <TableCell>{solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg</TableCell>
                           <TableCell>{formatDateTime(solicitacao.data_prevista_entrega)}</TableCell>
-                          <TableCell>{getSolicitacaoStatusBadge(solicitacao.status)}</TableCell>
+                          <TableCell>{getSolicitacaoStatusBadge(solicitacao.status, solicitacao.urgente)}</TableCell>
                           <TableCell>
                             {solicitacao.quantidade_recebida_kg 
                               ? `${solicitacao.quantidade_recebida_kg.toLocaleString('pt-BR')} kg` 
@@ -610,6 +783,7 @@ export default function GestaoConsumo() {
         </Card>
       </main>
 
+      {/* Dialogs */}
       {selectedLote && (
         <RacaoGestaoDialog
           open={racaoDialogOpen}
@@ -636,6 +810,51 @@ export default function GestaoConsumo() {
           onSuccess={fetchSolicitacoes}
         />
       )}
+
+      <LotesListDialog
+        open={lotesDialogOpen}
+        onOpenChange={setLotesDialogOpen}
+        lotes={lotesListData}
+        onSolicitarRacao={(loteId) => {
+          const lote = lotes.find(l => l.id === loteId);
+          if (lote) {
+            setLotesDialogOpen(false);
+            handleRacao(lote);
+          }
+        }}
+      />
+
+      <LotesAlarmeDialog
+        open={alarmeDialogOpen}
+        onOpenChange={setAlarmeDialogOpen}
+        lotes={lotesAlarmeData}
+      />
+
+      <SolicitacoesFilterDialog
+        open={pendentesDialogOpen}
+        onOpenChange={setPendentesDialogOpen}
+        title="Solicitações Pendentes (A Confirmar)"
+        icon={<Clock className="w-5 h-5 text-amber-500" />}
+        solicitacoes={getSolicitacoesWithLoteInfo(s => s.status === 'solicitado')}
+        onConfirmar={handleConfirmarSolicitacao}
+      />
+
+      <SolicitacoesFilterDialog
+        open={transitoDialogOpen}
+        onOpenChange={setTransitoDialogOpen}
+        title="Solicitações Em Trânsito"
+        icon={<Truck className="w-5 h-5 text-destructive" />}
+        solicitacoes={getSolicitacoesWithLoteInfo(s => s.status === 'enviado')}
+      />
+
+      <SolicitacoesFilterDialog
+        open={devolucaoDialogOpen}
+        onOpenChange={setDevolucaoDialogOpen}
+        title="Devoluções Pendentes de Confirmação"
+        icon={<RefreshCw className="w-5 h-5 text-orange-500" />}
+        solicitacoes={getSolicitacoesWithLoteInfo(s => (s.quantidade_devolvida_kg || 0) > 0 && !s.devolucao_confirmada)}
+        onConfirmarDevolucao={handleConfirmarDevolucao}
+      />
     </div>
   );
 }

@@ -4382,6 +4382,7 @@ export type Database = {
           status: string
           tipo_racao: string
           updated_at: string
+          urgente: boolean | null
         }
         Insert: {
           confirmado_por?: string | null
@@ -4409,6 +4410,7 @@ export type Database = {
           status?: string
           tipo_racao: string
           updated_at?: string
+          urgente?: boolean | null
         }
         Update: {
           confirmado_por?: string | null
@@ -4436,6 +4438,7 @@ export type Database = {
           status?: string
           tipo_racao?: string
           updated_at?: string
+          urgente?: boolean | null
         }
         Relationships: []
       }

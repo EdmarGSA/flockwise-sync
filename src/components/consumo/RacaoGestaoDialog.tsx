@@ -10,9 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
+import { Package, Plus, Truck, Clock, CheckCircle, RefreshCw, XCircle, Flame } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -70,6 +71,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
   const [dataPrevisao, setDataPrevisao] = useState('');
   const [horaPrevisao, setHoraPrevisao] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [urgente, setUrgente] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -159,6 +161,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
           observacoes: observacoes || null,
           solicitado_por: user?.id,
           status: 'solicitado',
+          urgente: urgente,
         });
 
       if (error) throw error;
@@ -169,6 +172,7 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
       setDataPrevisao('');
       setHoraPrevisao('');
       setObservacoes('');
+      setUrgente(false);
       fetchSolicitacoes();
       onSuccess();
       setActiveTab('historico');
@@ -346,6 +350,18 @@ export function RacaoGestaoDialog({ open, onOpenChange, lote, onSuccess }: Racao
                   onChange={(e) => setObservacoes(e.target.value)}
                   placeholder="Observações adicionais..."
                   rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-destructive" />
+                  <Label htmlFor="urgente" className="cursor-pointer">Marcar como Urgente</Label>
+                </div>
+                <Switch
+                  id="urgente"
+                  checked={urgente}
+                  onCheckedChange={setUrgente}
                 />
               </div>
 
