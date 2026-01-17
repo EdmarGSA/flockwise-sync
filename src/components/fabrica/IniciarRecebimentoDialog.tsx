@@ -57,7 +57,25 @@ interface NFeData {
     valorUnitario: number;
     valorTotal: number;
     unidade: string;
+    gtin: string;
   }[];
+}
+
+interface ProdutoFornecedor {
+  id: string;
+  produto_id: string;
+  codigo_produto_fornecedor: string | null;
+  unidade_compra_fornecedor: string | null;
+  fator_conversao_fornecedor: number | null;
+  gtin_esperado: string | null;
+  descricao_produto_fornecedor: string | null;
+  produtos: {
+    id: string;
+    nome: string;
+    sku: string;
+    unidade_medida: string;
+    codigo_barras_ean: string | null;
+  };
 }
 
 interface Parceiro {
@@ -272,13 +290,15 @@ export default function IniciarRecebimentoDialog({
         for (let i = 0; i < det.length; i++) {
           const item = det[i];
           const prod = item.getElementsByTagName('prod')[0];
+          const cEAN = prod?.getElementsByTagName('cEAN')[0]?.textContent || '';
           itens.push({
             codigo: prod?.getElementsByTagName('cProd')[0]?.textContent || '',
             descricao: prod?.getElementsByTagName('xProd')[0]?.textContent || '',
             quantidade: parseFloat(prod?.getElementsByTagName('qCom')[0]?.textContent || '0'),
             valorUnitario: parseFloat(prod?.getElementsByTagName('vUnCom')[0]?.textContent || '0'),
             valorTotal: parseFloat(prod?.getElementsByTagName('vProd')[0]?.textContent || '0'),
-            unidade: prod?.getElementsByTagName('uCom')[0]?.textContent || ''
+            unidade: prod?.getElementsByTagName('uCom')[0]?.textContent || '',
+            gtin: cEAN !== 'SEM GTIN' ? cEAN : ''
           });
         }
 
@@ -470,21 +490,81 @@ export default function IniciarRecebimentoDialog({
           });
         }
       } else if (mode === 'xml' && nfeData) {
-        for (const nfeItem of nfeData.itens) {
-          const { data: produto } = await supabase
-            .from('produtos')
-            .select('id, unidade_medida, unidade_compra, fator_conversao')
-            .eq('integrado_id', integradoId)
-            .or(`sku.eq.${nfeItem.codigo},nome.ilike.%${nfeItem.descricao.substring(0, 30)}%`)
-            .maybeSingle();
+        // First, try to find the supplier by CNPJ
+        const { data: parceiroData } = await supabase
+          .from('parceiros')
+          .select('id')
+          .eq('integrado_id', integradoId)
+          .eq('cpf_cnpj', nfeData.cnpjFornecedor.replace(/\D/g, ''))
+          .maybeSingle();
 
-          if (produto) {
-            const unidadeCompra = produto.unidade_compra || produto.unidade_medida;
-            const fatorConversao = produto.fator_conversao || 1;
+        for (const nfeItem of nfeData.itens) {
+          let matchedProduto: any = null;
+          let produtoFornecedor: ProdutoFornecedor | null = null;
+
+          // 1st Priority: Match by CNPJ + Supplier Product Code (cProd)
+          if (parceiroData) {
+            const { data: pfData } = await supabase
+              .from('produto_fornecedor')
+              .select(`
+                id,
+                produto_id,
+                codigo_produto_fornecedor,
+                unidade_compra_fornecedor,
+                fator_conversao_fornecedor,
+                gtin_esperado,
+                descricao_produto_fornecedor,
+                produtos (id, nome, sku, unidade_medida, codigo_barras_ean)
+              `)
+              .eq('parceiro_id', parceiroData.id)
+              .eq('codigo_produto_fornecedor', nfeItem.codigo)
+              .eq('ativo', true)
+              .maybeSingle();
+
+            if (pfData) {
+              produtoFornecedor = pfData as unknown as ProdutoFornecedor;
+              matchedProduto = pfData.produtos;
+            }
+          }
+
+          // 2nd Priority: Match by GTIN (EAN)
+          if (!matchedProduto && nfeItem.gtin) {
+            const { data: produtoByGtin } = await supabase
+              .from('produtos')
+              .select('id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean')
+              .eq('integrado_id', integradoId)
+              .eq('codigo_barras_ean', nfeItem.gtin)
+              .eq('ativo', true)
+              .maybeSingle();
+
+            if (produtoByGtin) {
+              matchedProduto = produtoByGtin;
+            }
+          }
+
+          // 3rd Priority: Match by SKU or Name (fallback)
+          if (!matchedProduto) {
+            const { data: produtoFallback } = await supabase
+              .from('produtos')
+              .select('id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean')
+              .eq('integrado_id', integradoId)
+              .eq('ativo', true)
+              .or(`sku.eq.${nfeItem.codigo},nome.ilike.%${nfeItem.descricao.substring(0, 30)}%`)
+              .maybeSingle();
+
+            if (produtoFallback) {
+              matchedProduto = produtoFallback;
+            }
+          }
+
+          if (matchedProduto) {
+            // Use supplier-specific conversion factor if available
+            const unidadeCompra = produtoFornecedor?.unidade_compra_fornecedor || matchedProduto.unidade_compra || matchedProduto.unidade_medida;
+            const fatorConversao = produtoFornecedor?.fator_conversao_fornecedor || matchedProduto.fator_conversao || 1;
 
             itensToInsert.push({
               recebimento_id: recebimento.id,
-              produto_id: produto.id,
+              produto_id: matchedProduto.id,
               quantidade_oc: 0,
               quantidade_nfe: nfeItem.quantidade,
               quantidade_fisica: 0,
@@ -495,7 +575,28 @@ export default function IniciarRecebimentoDialog({
               unidade_nfe: nfeItem.unidade,
               unidade_compra: unidadeCompra,
               fator_conversao: fatorConversao,
-              quantidade_estoque: 0
+              quantidade_estoque: 0,
+              gtin_nfe: nfeItem.gtin || null,
+              gtin_esperado: produtoFornecedor?.gtin_esperado || matchedProduto.codigo_barras_ean || null
+            });
+          } else {
+            // Product not matched - insert with null product_id for manual linking later
+            itensToInsert.push({
+              recebimento_id: recebimento.id,
+              produto_id: null,
+              quantidade_oc: 0,
+              quantidade_nfe: nfeItem.quantidade,
+              quantidade_fisica: 0,
+              preco_oc: 0,
+              preco_nfe: nfeItem.valorUnitario,
+              codigo_produto_nfe: nfeItem.codigo,
+              descricao_produto_nfe: nfeItem.descricao,
+              unidade_nfe: nfeItem.unidade,
+              unidade_compra: nfeItem.unidade,
+              fator_conversao: 1,
+              quantidade_estoque: 0,
+              gtin_nfe: nfeItem.gtin || null,
+              gtin_esperado: null
             });
           }
         }
