@@ -22,6 +22,11 @@ interface RacaoCritica {
   deficit: number;
   sugestaoProducao: number;
   unidade_medida: string;
+  opExistente?: {
+    id: string;
+    status: string;
+    numero_op: number;
+  };
 }
 
 interface GestaoProducaoTabProps {
@@ -158,6 +163,29 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
             sugestaoProducao: Math.abs(deficit) + MARGEM_SEGURANCA,
             unidade_medida: racao.unidade_medida
           });
+        }
+      }
+
+      // 6. Fetch existing OPs for critical feeds
+      if (criticas.length > 0) {
+        const { data: opsData } = await supabase
+          .from('ordens_producao')
+          .select('id, produto_id, status, numero_op')
+          .eq('integrado_id', integradoId)
+          .in('produto_id', criticas.map(c => c.id))
+          .in('status', ['rascunho', 'pendente', 'aprovada', 'em_producao']);
+
+        if (opsData) {
+          for (const critica of criticas) {
+            const op = opsData.find(o => o.produto_id === critica.id);
+            if (op) {
+              critica.opExistente = {
+                id: op.id,
+                status: op.status,
+                numero_op: op.numero_op
+              };
+            }
+          }
         }
       }
 
