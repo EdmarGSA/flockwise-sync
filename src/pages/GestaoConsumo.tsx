@@ -704,8 +704,28 @@ export default function GestaoConsumo() {
           }}
         />
 
+        {/* Quick Navigation Buttons */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => document.getElementById('lotes-aberto')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <Bird className="w-4 h-4" />
+            Lotes em Aberto
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => document.getElementById('solicitacoes-racao')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <Clock className="w-4 h-4" />
+            Solicitações de Ração
+          </Button>
+        </div>
+
         {/* 5. Lotes Table - Updated with trend column */}
-        <Card className="bg-card border-border mb-8">
+        <Card id="lotes-aberto" className="bg-card border-border mb-8">
           <CardHeader>
             <CardTitle className="text-foreground">Lotes em Aberto</CardTitle>
           </CardHeader>
@@ -787,7 +807,7 @@ export default function GestaoConsumo() {
         </Card>
 
         {/* 6. Solicitações with Filters */}
-        <Card className="bg-card border-border">
+        <Card id="solicitacoes-racao" className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
               <Clock className="w-5 h-5" />
