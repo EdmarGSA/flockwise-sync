@@ -82,28 +82,28 @@ export default function PrevisaoConsumoDialog({
         return;
       }
 
-      // 2. Fetch all phases with their linked products
-      const { data: fases, error: fasesError } = await supabase
-        .from('fases_animal')
+      // 2. Fetch products that have fase_animal_id linked (correct linking direction)
+      const { data: produtosComFase, error: produtosError } = await supabase
+        .from('produtos')
         .select(`
           id,
           nome,
-          dia_inicio,
-          dia_fim,
-          produto_racao_id,
-          produtos!fases_animal_produto_racao_id_fkey (
+          sku,
+          estoque_atual,
+          unidade_medida,
+          fase_animal_id,
+          fases_animal!produtos_fase_animal_id_fkey (
             id,
             nome,
-            sku,
-            estoque_atual,
-            unidade_medida
+            dia_inicio,
+            dia_fim
           )
         `)
         .eq('integrado_id', integradoId)
         .eq('ativo', true)
-        .not('produto_racao_id', 'is', null);
+        .not('fase_animal_id', 'is', null);
 
-      if (fasesError) throw fasesError;
+      if (produtosError) throw produtosError;
 
       // 3. Fetch all desempenho_aves for efficiency (batch query)
       const { data: desempenhoData } = await supabase
@@ -146,20 +146,15 @@ export default function PrevisaoConsumoDialog({
         for (let d = 0; d < 3; d++) {
           const diaFuturo = idadeDias + d + 1; // +1 porque é previsão para amanhã em diante
 
-          // Find the phase for this day
-          const faseAtual = (fases || []).find(
-            f => diaFuturo >= f.dia_inicio && diaFuturo <= f.dia_fim && f.produtos
-          );
+          // Find the product whose linked phase covers this day
+          const produtoAtual = (produtosComFase || []).find(p => {
+            const fase = p.fases_animal as { id: string; nome: string; dia_inicio: number; dia_fim: number } | null;
+            return fase && diaFuturo >= fase.dia_inicio && diaFuturo <= fase.dia_fim;
+          });
 
-          if (!faseAtual || !faseAtual.produtos) continue;
+          if (!produtoAtual || !produtoAtual.fases_animal) continue;
 
-          const produto = faseAtual.produtos as {
-            id: string;
-            nome: string;
-            sku: string;
-            estoque_atual: number;
-            unidade_medida: string;
-          };
+          const fase = produtoAtual.fases_animal as { id: string; nome: string; dia_inicio: number; dia_fim: number };
 
           // Get theoretical consumption from desempenho map
           const desempenhoKey = `${lote.linhagem}-${lote.sexo}-${diaFuturo}`;
@@ -167,9 +162,15 @@ export default function PrevisaoConsumoDialog({
           const consumoKg = (consumoGramas / 1000) * lote.quantidade_aves;
 
           // Initialize if not exists
-          if (!consumoPorProduto[produto.id]) {
-            consumoPorProduto[produto.id] = {
-              produto,
+          if (!consumoPorProduto[produtoAtual.id]) {
+            consumoPorProduto[produtoAtual.id] = {
+              produto: {
+                id: produtoAtual.id,
+                nome: produtoAtual.nome,
+                sku: produtoAtual.sku,
+                estoque_atual: produtoAtual.estoque_atual,
+                unidade_medida: produtoAtual.unidade_medida,
+              },
               fases_nomes: new Set(),
               consumo_dia1: 0,
               consumo_dia2: 0,
@@ -179,14 +180,14 @@ export default function PrevisaoConsumoDialog({
           }
 
           // Add phase name
-          consumoPorProduto[produto.id].fases_nomes.add(faseAtual.nome);
+          consumoPorProduto[produtoAtual.id].fases_nomes.add(fase.nome);
 
           // Add consumption to the right day
-          if (d === 0) consumoPorProduto[produto.id].consumo_dia1 += consumoKg;
-          else if (d === 1) consumoPorProduto[produto.id].consumo_dia2 += consumoKg;
-          else consumoPorProduto[produto.id].consumo_dia3 += consumoKg;
+          if (d === 0) consumoPorProduto[produtoAtual.id].consumo_dia1 += consumoKg;
+          else if (d === 1) consumoPorProduto[produtoAtual.id].consumo_dia2 += consumoKg;
+          else consumoPorProduto[produtoAtual.id].consumo_dia3 += consumoKg;
 
-          consumoPorProduto[produto.id].lotes.add(lote.id);
+          consumoPorProduto[produtoAtual.id].lotes.add(lote.id);
         }
       }
 
