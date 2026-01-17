@@ -105,6 +105,18 @@ export default function PrevisaoConsumoDialog({
 
       if (fasesError) throw fasesError;
 
+      // 3. Fetch all desempenho_aves for efficiency (batch query)
+      const { data: desempenhoData } = await supabase
+        .from('desempenho_aves')
+        .select('linhagem, sexo, dia, consumo_diario_racao_g');
+
+      // Create a lookup map for desempenho
+      const desempenhoMap: Record<string, number> = {};
+      (desempenhoData || []).forEach(d => {
+        const key = `${d.linhagem}-${d.sexo}-${d.dia}`;
+        desempenhoMap[key] = Number(d.consumo_diario_racao_g);
+      });
+
       // Map to aggregate consumption by product
       const consumoPorProduto: Record<string, {
         produto: {
@@ -114,14 +126,14 @@ export default function PrevisaoConsumoDialog({
           estoque_atual: number;
           unidade_medida: string;
         };
-        fase_nome: string;
+        fases_nomes: Set<string>;
         consumo_dia1: number;
         consumo_dia2: number;
         consumo_dia3: number;
         lotes: Set<string>;
       }> = {};
 
-      // 3. For each lot, calculate consumption for next 3 days
+      // 4. For each lot, calculate consumption for next 3 days
       for (const lote of lotes) {
         if (!lote.data_alojamento || !lote.linhagem || !lote.sexo) continue;
 
@@ -149,30 +161,25 @@ export default function PrevisaoConsumoDialog({
             unidade_medida: string;
           };
 
-          // Get theoretical consumption from desempenho_aves
-          const { data: desempenho } = await supabase
-            .from('desempenho_aves')
-            .select('consumo_diario_racao_g')
-            .eq('linhagem', lote.linhagem)
-            .eq('sexo', lote.sexo)
-            .eq('dia', diaFuturo)
-            .maybeSingle();
-
-          const consumoKg = desempenho
-            ? (Number(desempenho.consumo_diario_racao_g) / 1000) * lote.quantidade_aves
-            : 0;
+          // Get theoretical consumption from desempenho map
+          const desempenhoKey = `${lote.linhagem}-${lote.sexo}-${diaFuturo}`;
+          const consumoGramas = desempenhoMap[desempenhoKey] || 0;
+          const consumoKg = (consumoGramas / 1000) * lote.quantidade_aves;
 
           // Initialize if not exists
           if (!consumoPorProduto[produto.id]) {
             consumoPorProduto[produto.id] = {
               produto,
-              fase_nome: faseAtual.nome,
+              fases_nomes: new Set(),
               consumo_dia1: 0,
               consumo_dia2: 0,
               consumo_dia3: 0,
               lotes: new Set(),
             };
           }
+
+          // Add phase name
+          consumoPorProduto[produto.id].fases_nomes.add(faseAtual.nome);
 
           // Add consumption to the right day
           if (d === 0) consumoPorProduto[produto.id].consumo_dia1 += consumoKg;
@@ -183,7 +190,7 @@ export default function PrevisaoConsumoDialog({
         }
       }
 
-      // 4. Convert to array and calculate totals
+      // 5. Convert to array and calculate totals
       const previsoesArr: PrevisaoRacao[] = Object.entries(consumoPorProduto).map(([id, data]) => {
         const consumo_total_3d = data.consumo_dia1 + data.consumo_dia2 + data.consumo_dia3;
         const saldo = data.produto.estoque_atual - consumo_total_3d;
@@ -199,7 +206,7 @@ export default function PrevisaoConsumoDialog({
           id: data.produto.id,
           nome: data.produto.nome,
           sku: data.produto.sku,
-          fase_nome: data.fase_nome,
+          fase_nome: Array.from(data.fases_nomes).join(', '),
           estoque_atual: data.produto.estoque_atual,
           unidade_medida: data.produto.unidade_medida,
           consumo_dia1: data.consumo_dia1,
