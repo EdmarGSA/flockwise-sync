@@ -26,6 +26,8 @@ import { ConsumoAnomaliaCard } from '@/components/consumo/ConsumoAnomaliaCard';
 import { RiscoEstoqueCard } from '@/components/consumo/RiscoEstoqueCard';
 import { AnomaliaListDialog } from '@/components/consumo/AnomaliaListDialog';
 import { RiscoEstoqueDialog } from '@/components/consumo/RiscoEstoqueDialog';
+import { LotesAbertoDialog } from '@/components/consumo/LotesAbertoDialog';
+import { SolicitacoesRacaoDialog } from '@/components/consumo/SolicitacoesRacaoDialog';
 
 interface LoteConsumo {
   id: string;
@@ -86,6 +88,8 @@ export default function GestaoConsumo() {
   const [devolucaoDialogOpen, setDevolucaoDialogOpen] = useState(false);
   const [anomaliaDialogOpen, setAnomaliaDialogOpen] = useState(false);
   const [riscoDialogOpen, setRiscoDialogOpen] = useState(false);
+  const [lotesAbertoDialogOpen, setLotesAbertoDialogOpen] = useState(false);
+  const [solicitacoesDialogOpen, setSolicitacoesDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -704,12 +708,12 @@ export default function GestaoConsumo() {
           }}
         />
 
-        {/* Quick Navigation Buttons */}
+        {/* Quick Access Buttons */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => document.getElementById('lotes-aberto')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => setLotesAbertoDialogOpen(true)}
           >
             <Bird className="w-4 h-4" />
             Lotes em Aberto
@@ -717,259 +721,12 @@ export default function GestaoConsumo() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => document.getElementById('solicitacoes-racao')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => setSolicitacoesDialogOpen(true)}
           >
             <Clock className="w-4 h-4" />
             Solicitações de Ração
           </Button>
         </div>
-
-        {/* 5. Lotes Table - Updated with trend column */}
-        <Card id="lotes-aberto" className="bg-card border-border mb-8">
-          <CardHeader>
-            <CardTitle className="text-foreground">Lotes em Aberto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingData ? (
-              <p className="text-muted-foreground">Carregando...</p>
-            ) : lotes.length === 0 ? (
-              <div className="text-center py-12">
-                <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Nenhum lote ativo encontrado.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Núcleo</TableHead>
-                      <TableHead>Galpão</TableHead>
-                      <TableHead>Qtd. Aves</TableHead>
-                      <TableHead>Idade</TableHead>
-                      <TableHead>Nível Silo</TableHead>
-                      <TableHead>Dias Estoque</TableHead>
-                      <TableHead>Tend.</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lotes.map((lote) => (
-                      <TableRow key={lote.id} className={(lote.diasEstoque || 0) < 1 && (lote.diasDesdeAlojamento || 0) > 0 ? 'bg-destructive/5' : ''}>
-                        <TableCell>{getStatusBadge(lote.status)}</TableCell>
-                        <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
-                        <TableCell>{lote.galpao?.nome || '-'}</TableCell>
-                        <TableCell>
-                          {(lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')}
-                        </TableCell>
-                        <TableCell>
-                          {lote.diasDesdeAlojamento !== undefined && lote.diasDesdeAlojamento > 0 ? (
-                            <Badge variant="secondary">{lote.diasDesdeAlojamento} dias</Badge>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
-                            lote.nivelSilo !== undefined && lote.nivelSilo < 0 ? (
-                              <span className="text-destructive font-medium">Déficit</span>
-                            ) : (
-                              `${(lote.nivelSilo || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`
-                            )
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
-                            getDiasEstoqueBadge(lote.diasEstoque || 0, lote.nivelSilo || 0)
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
-                            getTrendIcon(lote.tendencia)
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleRacao(lote)}
-                            className="gap-1"
-                          >
-                            <Package className="w-4 h-4" />
-                            Ração
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 6. Solicitações with Filters */}
-        <Card id="solicitacoes-racao" className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Solicitações de Ração
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={solicitacaoFilter} onValueChange={(v) => setSolicitacaoFilter(v as SolicitacaoFilter)} className="mb-4">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="todos">Todos</TabsTrigger>
-                <TabsTrigger value="a_confirmar">A Confirmar</TabsTrigger>
-                <TabsTrigger value="a_enviar">A Enviar</TabsTrigger>
-                <TabsTrigger value="enviados">Enviados</TabsTrigger>
-                <TabsTrigger value="urgentes" className="gap-1">
-                  <Flame className="w-3 h-3" />
-                  Urgentes {urgentesCount > 0 && `(${urgentesCount})`}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {filteredSolicitacoes.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">Nenhuma solicitação de ração.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Lote</TableHead>
-                      <TableHead>Tipo Ração</TableHead>
-                      <TableHead>Qtd. Solicitada</TableHead>
-                      <TableHead>Previsão Entrega</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Recebido</TableHead>
-                      <TableHead>Devolvido</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSolicitacoes.map((solicitacao) => {
-                      const lote = lotes.find(l => l.id === solicitacao.lote_id);
-                      return (
-                        <TableRow key={solicitacao.id}>
-                          <TableCell className="font-medium">
-                            {lote ? `${lote.nucleo?.nome} - ${lote.galpao?.nome}` : '-'}
-                          </TableCell>
-                          <TableCell>{solicitacao.tipo_racao}</TableCell>
-                          <TableCell>{solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg</TableCell>
-                          <TableCell>{formatDateTime(solicitacao.data_prevista_entrega)}</TableCell>
-                          <TableCell>{getSolicitacaoStatusBadge(solicitacao.status, solicitacao.urgente)}</TableCell>
-                          <TableCell>
-                            {solicitacao.quantidade_recebida_kg 
-                              ? `${solicitacao.quantidade_recebida_kg.toLocaleString('pt-BR')} kg` 
-                              : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {solicitacao.quantidade_devolvida_kg && solicitacao.quantidade_devolvida_kg > 0 ? (
-                              <div className="flex items-center gap-1">
-                                <span>{solicitacao.quantidade_devolvida_kg.toLocaleString('pt-BR')} kg</span>
-                                {solicitacao.devolucao_confirmada && (
-                                  <CheckCircle className="w-4 h-4 text-primary" />
-                                )}
-                              </div>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              {solicitacao.status === 'solicitado' && (
-                                <>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handleConfirmarSolicitacao(solicitacao)}
-                                  >
-                                    Confirmar
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                        <XCircle className="w-4 h-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tem certeza que deseja cancelar esta solicitação de {solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {solicitacao.tipo_racao}?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Voltar</AlertDialogCancel>
-                                        <AlertDialogAction 
-                                          onClick={() => handleCancelarSolicitacao(solicitacao)}
-                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        >
-                                          Confirmar Cancelamento
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </>
-                              )}
-                              {solicitacao.status === 'confirmado' && (
-                                <>
-                                  <Button 
-                                    size="sm" 
-                                    variant="default"
-                                    onClick={() => handleOpenEnviarDialog(solicitacao)}
-                                    className="gap-1"
-                                  >
-                                    <Truck className="w-4 h-4" />
-                                    Enviar
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                        <XCircle className="w-4 h-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Cancelar Solicitação</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tem certeza que deseja cancelar esta solicitação de {solicitacao.quantidade_solicitada_kg.toLocaleString('pt-BR')} kg de {solicitacao.tipo_racao}?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Voltar</AlertDialogCancel>
-                                        <AlertDialogAction 
-                                          onClick={() => handleCancelarSolicitacao(solicitacao)}
-                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        >
-                                          Confirmar Cancelamento
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </>
-                              )}
-                              {solicitacao.quantidade_devolvida_kg && 
-                               solicitacao.quantidade_devolvida_kg > 0 && 
-                               !solicitacao.devolucao_confirmada && (
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary"
-                                  onClick={() => handleConfirmarDevolucao(solicitacao)}
-                                  className="gap-1"
-                                >
-                                  <RefreshCw className="w-4 h-4" />
-                                  Confirm. Devol.
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </main>
 
       {/* Dialogs */}
@@ -1045,7 +802,6 @@ export default function GestaoConsumo() {
         onConfirmarDevolucao={handleConfirmarDevolucao}
       />
 
-      {/* New Dialogs */}
       <AnomaliaListDialog
         open={anomaliaDialogOpen}
         onOpenChange={setAnomaliaDialogOpen}
@@ -1056,6 +812,38 @@ export default function GestaoConsumo() {
         open={riscoDialogOpen}
         onOpenChange={setRiscoDialogOpen}
         lotes={lotesEmRisco}
+      />
+
+      {/* New Quick Access Dialogs */}
+      <LotesAbertoDialog
+        open={lotesAbertoDialogOpen}
+        onOpenChange={setLotesAbertoDialogOpen}
+        lotes={lotes.map(l => ({
+          ...l,
+          tendencia: l.tendencia === 'subindo' ? 'up' as const : l.tendencia === 'caindo' ? 'down' as const : 'stable' as const
+        }))}
+        loading={loadingData}
+        onRacao={(lote) => {
+          const originalLote = lotes.find(l => l.id === lote.id);
+          if (originalLote) {
+            setLotesAbertoDialogOpen(false);
+            handleRacao(originalLote);
+          }
+        }}
+      />
+
+      <SolicitacoesRacaoDialog
+        open={solicitacoesDialogOpen}
+        onOpenChange={setSolicitacoesDialogOpen}
+        solicitacoes={filteredSolicitacoes}
+        lotes={lotes}
+        filter={solicitacaoFilter}
+        onFilterChange={setSolicitacaoFilter}
+        urgentesCount={urgentesCount}
+        onConfirmar={handleConfirmarSolicitacao}
+        onEnviar={handleOpenEnviarDialog}
+        onCancelar={handleCancelarSolicitacao}
+        onConfirmarDevolucao={handleConfirmarDevolucao}
       />
     </div>
   );
