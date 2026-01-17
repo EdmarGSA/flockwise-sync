@@ -756,18 +756,24 @@ export default function IniciarRecebimentoDialog({
     setLoading(true);
     try {
       // Update each unlinked item with its new produto_id
-      for (let i = 0; i < vinculos.length; i++) {
-        const vinculo = vinculos[i];
-        
+      for (const vinculo of vinculos) {
+        // Skip items that were not linked
+        if (vinculo.tipo === 'pulado' || !vinculo.produtoId) {
+          continue;
+        }
+
+        // Use itemIndex to get the correct item from the original array
+        const naoVinculado = itensNaoVinculados[vinculo.itemIndex];
+        if (!naoVinculado) continue; // Extra protection
+
         // Find the corresponding inserted item by matching codigo/descricao
-        const naoVinculado = itensNaoVinculados[i];
         const insertedItem = pendingItensProcessados.find(
           item => item.codigo_produto_nfe === naoVinculado.codigo &&
                   item.descricao_produto_nfe === naoVinculado.descricao &&
                   item.produto_id === null
         );
 
-        if (insertedItem && vinculo.tipo !== 'pulado' && vinculo.produtoId) {
+        if (insertedItem) {
           // UPDATE the item with the linked product
           const { error } = await supabase
             .from('recebimento_itens')
