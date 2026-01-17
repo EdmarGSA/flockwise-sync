@@ -3549,7 +3549,10 @@ export type Database = {
           ativo: boolean | null
           codigo_produto_fornecedor: string | null
           created_at: string
+          descricao_produto_fornecedor: string | null
+          fator_conversao_fornecedor: number | null
           fornecedor_principal: boolean | null
+          gtin_esperado: string | null
           id: string
           integrado_id: string
           parceiro_id: string
@@ -3557,13 +3560,17 @@ export type Database = {
           preco_compra: number | null
           produto_id: string
           quantidade_minima: number | null
+          unidade_compra_fornecedor: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean | null
           codigo_produto_fornecedor?: string | null
           created_at?: string
+          descricao_produto_fornecedor?: string | null
+          fator_conversao_fornecedor?: number | null
           fornecedor_principal?: boolean | null
+          gtin_esperado?: string | null
           id?: string
           integrado_id: string
           parceiro_id: string
@@ -3571,13 +3578,17 @@ export type Database = {
           preco_compra?: number | null
           produto_id: string
           quantidade_minima?: number | null
+          unidade_compra_fornecedor?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean | null
           codigo_produto_fornecedor?: string | null
           created_at?: string
+          descricao_produto_fornecedor?: string | null
+          fator_conversao_fornecedor?: number | null
           fornecedor_principal?: boolean | null
+          gtin_esperado?: string | null
           id?: string
           integrado_id?: string
           parceiro_id?: string
@@ -3585,6 +3596,7 @@ export type Database = {
           preco_compra?: number | null
           produto_id?: string
           quantidade_minima?: number | null
+          unidade_compra_fornecedor?: string | null
           updated_at?: string
         }
         Relationships: [

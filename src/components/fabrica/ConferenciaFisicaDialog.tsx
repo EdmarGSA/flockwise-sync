@@ -14,7 +14,7 @@ import DivergenciasReportDialog from './DivergenciasReportDialog';
 
 interface RecebimentoItem {
   id: string;
-  produto_id: string;
+  produto_id: string | null;
   quantidade_oc: number;
   quantidade_nfe: number;
   quantidade_fisica: number;
@@ -26,6 +26,8 @@ interface RecebimentoItem {
   unidade_compra: string | null;
   fator_conversao: number | null;
   quantidade_estoque: number | null;
+  gtin_nfe: string | null;
+  gtin_esperado: string | null;
   produtos: {
     id: string;
     nome: string;
@@ -33,7 +35,8 @@ interface RecebimentoItem {
     unidade_medida: string;
     unidade_compra: string | null;
     fator_conversao: number | null;
-  };
+    codigo_barras_ean: string | null;
+  } | null;
 }
 
 interface Produto {
@@ -43,7 +46,10 @@ interface Produto {
   unidade_medida: string;
   unidade_compra: string | null;
   fator_conversao: number | null;
+  codigo_barras_ean: string | null;
 }
+
+type GtinStatus = 'ok' | 'divergente' | 'sem_cadastro' | 'sem_gtin';
 
 interface ConferenciaFisicaDialogProps {
   open: boolean;
@@ -106,7 +112,9 @@ export default function ConferenciaFisicaDialog({
           unidade_compra,
           fator_conversao,
           quantidade_estoque,
-          produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao)
+          gtin_nfe,
+          gtin_esperado,
+          produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean)
         `)
         .eq('recebimento_id', recebimentoId);
 
@@ -124,8 +132,8 @@ export default function ConferenciaFisicaDialog({
       }> = {};
       
       data?.forEach(item => {
-        const unidadeCompra = item.unidade_compra || item.produtos.unidade_compra || item.produtos.unidade_medida;
-        const fatorConversao = item.fator_conversao || item.produtos.fator_conversao || 1;
+        const unidadeCompra = item.unidade_compra || item.produtos?.unidade_compra || item.produtos?.unidade_medida || 'UN';
+        const fatorConversao = item.fator_conversao || item.produtos?.fator_conversao || 1;
         
         edited[item.id] = {
           quantidade_fisica: item.quantidade_fisica || 0,
@@ -149,7 +157,7 @@ export default function ConferenciaFisicaDialog({
     try {
       const { data, error } = await supabase
         .from('produtos')
-        .select('id, nome, sku, unidade_medida, unidade_compra, fator_conversao')
+        .select('id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean')
         .eq('integrado_id', integradoId)
         .eq('ativo', true)
         .order('nome');
@@ -159,6 +167,16 @@ export default function ConferenciaFisicaDialog({
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
     }
+  };
+
+  const getGtinStatus = (item: RecebimentoItem): GtinStatus => {
+    const gtinNfe = item.gtin_nfe;
+    const gtinEsperado = item.gtin_esperado || item.produtos?.codigo_barras_ean;
+
+    if (!gtinNfe) return 'sem_gtin';
+    if (!gtinEsperado) return 'sem_cadastro';
+    if (gtinNfe === gtinEsperado) return 'ok';
+    return 'divergente';
   };
 
   const handleQuantidadeFisicaChange = (itemId: string, value: string) => {
@@ -476,6 +494,7 @@ export default function ConferenciaFisicaDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produto</TableHead>
+                    <TableHead className="text-center">GTIN</TableHead>
                     <TableHead className="text-center">Qtd OC</TableHead>
                     <TableHead className="text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -502,24 +521,61 @@ export default function ConferenciaFisicaDialog({
                     const qtdNfe = edited?.quantidade_nfe || 0;
                     const precoNfe = edited?.preco_nfe || 0;
                     const status = getDivergenciaStatus(item, qtdFisica, qtdNfe);
-                    const unidadeCompra = edited?.unidade_compra || item.produtos.unidade_medida;
+                    const unidadeCompra = edited?.unidade_compra || item.produtos?.unidade_medida || 'UN';
                     const fatorConversao = edited?.fator_conversao || 1;
                     const qtdEstoque = calcularQuantidadeEstoque(item.id);
+                    const gtinStatus = getGtinStatus(item);
                     
                     return (
                       <TableRow key={item.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{item.produtos.nome}</div>
-                            <div className="text-xs text-muted-foreground">
-                              SKU: {item.produtos.sku}
-                            </div>
-                            {item.descricao_produto_nfe && item.descricao_produto_nfe !== item.produtos.nome && (
+                            {item.produtos ? (
+                              <>
+                                <div className="font-medium">{item.produtos.nome}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  SKU: {item.produtos.sku}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-yellow-600">
+                                <div className="font-medium flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Produto não vinculado
+                                </div>
+                                <div className="text-xs">
+                                  Cód: {item.codigo_produto_nfe}
+                                </div>
+                              </div>
+                            )}
+                            {item.descricao_produto_nfe && item.produtos && item.descricao_produto_nfe !== item.produtos.nome && (
                               <div className="text-xs text-blue-500">
                                 NF-e: {item.descricao_produto_nfe}
                               </div>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {gtinStatus === 'ok' && (
+                            <Badge className="bg-green-600 text-xs">
+                              <Check className="w-3 h-3 mr-1" />
+                              OK
+                            </Badge>
+                          )}
+                          {gtinStatus === 'divergente' && (
+                            <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-xs" title={`NF-e: ${item.gtin_nfe}\nEsperado: ${item.gtin_esperado || item.produtos?.codigo_barras_ean}`}>
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Diferente
+                            </Badge>
+                          )}
+                          {gtinStatus === 'sem_cadastro' && (
+                            <Badge variant="secondary" className="text-xs" title="GTIN não cadastrado no sistema">
+                              N/C
+                            </Badge>
+                          )}
+                          {gtinStatus === 'sem_gtin' && (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           {item.quantidade_oc > 0 ? (
