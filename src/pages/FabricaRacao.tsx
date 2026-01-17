@@ -40,6 +40,9 @@ interface ProdutoCritico {
   consumo_medio_diario: number;
   dias_restantes: number;
   nivel_critico: 'critico' | 'atencao' | 'ok';
+  estoque_comprometido: number;
+  estoque_disponivel: number;
+  ops_vinculadas: number;
 }
 
 export default function FabricaRacao() {
@@ -224,6 +227,42 @@ const [stats, setStats] = useState({
 
       if (produtosError) throw produtosError;
 
+      // Fetch OPs em aberto com seus insumos para calcular estoque comprometido
+      const { data: opsItens, error: opsError } = await supabase
+        .from('ordens_producao_itens')
+        .select(`
+          insumo_id,
+          quantidade_necessaria,
+          ordens_producao!inner(
+            status,
+            integrado_id
+          )
+        `)
+        .eq('ordens_producao.integrado_id', integradoId)
+        .in('ordens_producao.status', ['rascunho', 'pendente', 'aprovada', 'em_producao']);
+
+      if (opsError) {
+        console.error('Erro ao buscar OPs:', opsError);
+      }
+
+      // Calcular estoque comprometido por insumo e contar OPs
+      const estoqueComprometido: Record<string, number> = {};
+      const opsContagem: Record<string, Set<string>> = {};
+      
+      (opsItens || []).forEach(item => {
+        const insumoId = item.insumo_id;
+        if (!estoqueComprometido[insumoId]) {
+          estoqueComprometido[insumoId] = 0;
+          opsContagem[insumoId] = new Set();
+        }
+        estoqueComprometido[insumoId] += Number(item.quantidade_necessaria);
+        // Contar OPs únicas por insumo
+        const opId = (item as any).ordens_producao?.id;
+        if (opId) {
+          opsContagem[insumoId].add(opId);
+        }
+      });
+
       // Fetch kardex movements from last 15 days for consumption calculation
       const fifteenDaysAgo = new Date();
       fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
@@ -246,16 +285,24 @@ const [stats, setStats] = useState({
         consumoPorProduto[mov.produto_id] += Number(mov.quantidade);
       });
 
-      // Calculate critical products
+      // Calculate critical products - CONSIDERANDO ESTOQUE COMPROMETIDO
       const produtosAnalisados: ProdutoCritico[] = (produtos || []).map(produto => {
         const consumoTotal = consumoPorProduto[produto.id] || 0;
         const consumoMedioDiario = consumoTotal / 15;
+        
+        // Calcular estoque comprometido e disponível
+        const comprometido = estoqueComprometido[produto.id] || 0;
+        const estoqueDisponivel = produto.estoque_atual - comprometido;
+        const opsVinculadas = opsContagem[produto.id]?.size || 0;
+        
+        // Usar estoque DISPONÍVEL para calcular dias restantes
         const diasRestantes = consumoMedioDiario > 0 
-          ? Math.floor(produto.estoque_atual / consumoMedioDiario) 
+          ? Math.floor(estoqueDisponivel / consumoMedioDiario) 
           : 999;
 
         let nivelCritico: 'critico' | 'atencao' | 'ok' = 'ok';
-        if (produto.estoque_atual < produto.estoque_minimo || diasRestantes < 3) {
+        // Considerar estoque disponível, não o atual
+        if (estoqueDisponivel < produto.estoque_minimo || diasRestantes < 3) {
           nivelCritico = 'critico';
         } else if (diasRestantes <= 7) {
           nivelCritico = 'atencao';
@@ -272,7 +319,10 @@ const [stats, setStats] = useState({
           fator_conversao: produto.fator_conversao || 1,
           consumo_medio_diario: consumoMedioDiario,
           dias_restantes: diasRestantes,
-          nivel_critico: nivelCritico
+          nivel_critico: nivelCritico,
+          estoque_comprometido: comprometido,
+          estoque_disponivel: estoqueDisponivel,
+          ops_vinculadas: opsVinculadas
         };
       }).filter(p => p.nivel_critico !== 'ok')
         .sort((a, b) => a.dias_restantes - b.dias_restantes);
