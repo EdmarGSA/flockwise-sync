@@ -108,11 +108,11 @@ export default function FabricaRacao() {
 
         estoqueRacao = (racoesData || []).reduce((sum, p) => sum + (p.estoque_atual || 0), 0);
 
-        // Get consumption from last 15 days for feed products
+        // Build detailed feed data for EstoqueRacaoDialog
         const fifteenDaysAgo = new Date();
         fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-
         const racaoIds = (racoesData || []).map(p => p.id);
+
         if (racaoIds.length > 0) {
           const { data: kardexRacao } = await supabase
             .from('kardex')
@@ -121,7 +121,6 @@ export default function FabricaRacao() {
             .in('produto_id', racaoIds)
             .gte('created_at', fifteenDaysAgo.toISOString());
 
-          // Calculate consumption per product
           const consumoPorProduto: Record<string, number> = {};
           (kardexRacao || [])
             .filter(k => k.tipo_movimento === 'saida' || k.tipo_movimento === 'ajuste_saida')
@@ -132,7 +131,6 @@ export default function FabricaRacao() {
               consumoPorProduto[k.produto_id] += Number(k.quantidade);
             });
 
-          // Build detailed feed data
           (racoesData || []).forEach(racao => {
             const consumoTotal = consumoPorProduto[racao.id] || 0;
             const consumoMedioDiario = consumoTotal / 15;
@@ -152,10 +150,42 @@ export default function FabricaRacao() {
               percentual_total: percentualTotal,
             });
           });
+        }
+      }
 
-          const consumoTotalGeral = Object.values(consumoPorProduto).reduce((a, b) => a + b, 0);
-          const consumoDiario = consumoTotalGeral / 15;
-          previsaoConsumo3d = consumoDiario * 3;
+      // Calculate consumption forecast based on lot ages and phases
+      const { data: lotes } = await supabase
+        .from('lotes')
+        .select('id, quantidade_aves, data_alojamento, linhagem, sexo')
+        .eq('integrado_id', integradoId)
+        .eq('status', 'alojado');
+
+      if (lotes && lotes.length > 0) {
+        for (const lote of lotes) {
+          if (!lote.data_alojamento || !lote.linhagem || !lote.sexo) continue;
+
+          const dataAlojamento = new Date(lote.data_alojamento);
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          const idadeDias = Math.floor((hoje.getTime() - dataAlojamento.getTime()) / (1000 * 60 * 60 * 24));
+
+          // Calculate consumption for next 3 days based on age
+          for (let d = 1; d <= 3; d++) {
+            const diaFuturo = idadeDias + d;
+
+            const { data: desempenho } = await supabase
+              .from('desempenho_aves')
+              .select('consumo_diario_racao_g')
+              .eq('linhagem', lote.linhagem)
+              .eq('sexo', lote.sexo)
+              .eq('dia', diaFuturo)
+              .maybeSingle();
+
+            if (desempenho) {
+              const consumoKg = (Number(desempenho.consumo_diario_racao_g) / 1000) * lote.quantidade_aves;
+              previsaoConsumo3d += consumoKg;
+            }
+          }
         }
       }
 
@@ -483,7 +513,7 @@ export default function FabricaRacao() {
       <PrevisaoConsumoDialog
         open={showPrevisaoConsumo}
         onOpenChange={setShowPrevisaoConsumo}
-        racoes={racoesDetalhadas}
+        integradoId={integradoId || ''}
         totalPrevisao={stats.previsaoConsumo3d}
       />
 
