@@ -3919,7 +3919,7 @@ export type Database = {
           ordem_compra_item_id: string | null
           preco_nfe: number | null
           preco_oc: number | null
-          produto_id: string
+          produto_id: string | null
           quantidade_estoque: number | null
           quantidade_fisica: number | null
           quantidade_nfe: number | null
@@ -3941,7 +3941,7 @@ export type Database = {
           ordem_compra_item_id?: string | null
           preco_nfe?: number | null
           preco_oc?: number | null
-          produto_id: string
+          produto_id?: string | null
           quantidade_estoque?: number | null
           quantidade_fisica?: number | null
           quantidade_nfe?: number | null
@@ -3963,7 +3963,7 @@ export type Database = {
           ordem_compra_item_id?: string | null
           preco_nfe?: number | null
           preco_oc?: number | null
-          produto_id?: string
+          produto_id?: string | null
           quantidade_estoque?: number | null
           quantidade_fisica?: number | null
           quantidade_nfe?: number | null
