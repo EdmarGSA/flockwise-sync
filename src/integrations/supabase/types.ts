@@ -3912,6 +3912,8 @@ export type Database = {
           data_validade: string | null
           descricao_produto_nfe: string | null
           fator_conversao: number | null
+          gtin_esperado: string | null
+          gtin_nfe: string | null
           id: string
           lote_fornecedor: string | null
           ordem_compra_item_id: string | null
@@ -3932,6 +3934,8 @@ export type Database = {
           data_validade?: string | null
           descricao_produto_nfe?: string | null
           fator_conversao?: number | null
+          gtin_esperado?: string | null
+          gtin_nfe?: string | null
           id?: string
           lote_fornecedor?: string | null
           ordem_compra_item_id?: string | null
@@ -3952,6 +3956,8 @@ export type Database = {
           data_validade?: string | null
           descricao_produto_nfe?: string | null
           fator_conversao?: number | null
+          gtin_esperado?: string | null
+          gtin_nfe?: string | null
           id?: string
           lote_fornecedor?: string | null
           ordem_compra_item_id?: string | null
