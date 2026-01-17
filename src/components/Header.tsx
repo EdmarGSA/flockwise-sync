@@ -93,7 +93,7 @@ const Header = () => {
                 Entrar
               </Button>
               <Button variant="hero" size="sm" onClick={() => navigate('/auth')}>
-                Solicitar Demo
+                Cadastro
               </Button>
             </>
           )}
