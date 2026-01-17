@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, CheckCircle, Package, ArrowRight, Trash2, Plus, FileText, Pencil } from 'lucide-react';
 import ConferenciaFisicaDialog from './ConferenciaFisicaDialog';
-import { AssistenteImportacaoDialog, ItemNaoVinculado } from './AssistenteImportacaoDialog';
+import { AssistenteImportacaoDialog, ItemNaoVinculado, VinculoCriado } from './AssistenteImportacaoDialog';
+import CadastroFornecedorRapidoDialog from './CadastroFornecedorRapidoDialog';
 
 interface OrdemCompra {
   id: string;
@@ -40,6 +41,19 @@ interface OrdemCompra {
   }[];
 }
 
+interface NFeDataItem {
+  codigo: string;
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  unidade: string;
+  gtin: string;
+  ncm: string;
+  cest: string;
+  origem: string;
+}
+
 interface NFeData {
   numero: string;
   serie: string;
@@ -51,15 +65,7 @@ interface NFeData {
   valorFrete: number;
   valorDesconto: number;
   condicaoPagamento: string;
-  itens: {
-    codigo: string;
-    descricao: string;
-    quantidade: number;
-    valorUnitario: number;
-    valorTotal: number;
-    unidade: string;
-    gtin: string;
-  }[];
+  itens: NFeDataItem[];
 }
 
 interface ProdutoFornecedor {
@@ -132,6 +138,15 @@ export default function IniciarRecebimentoDialog({
   const [itensNaoVinculados, setItensNaoVinculados] = useState<ItemNaoVinculado[]>([]);
   const [parceiroIdAssistente, setParceiroIdAssistente] = useState<string>('');
   const [parceiroNomeAssistente, setParceiroNomeAssistente] = useState<string>('');
+  
+  // Quick supplier registration state
+  const [showCadastroFornecedor, setShowCadastroFornecedor] = useState(false);
+  const [fornecedorXmlCnpj, setFornecedorXmlCnpj] = useState('');
+  const [fornecedorXmlRazaoSocial, setFornecedorXmlRazaoSocial] = useState('');
+  
+  // Pending receipt data while assistant is open
+  const [pendingRecebimentoId, setPendingRecebimentoId] = useState<string | null>(null);
+  const [pendingItensProcessados, setPendingItensProcessados] = useState<any[]>([]);
 
   // Manual mode state
   const [parceiros, setParceiros] = useState<Parceiro[]>([]);
@@ -174,6 +189,11 @@ export default function IniciarRecebimentoDialog({
     setQtdItem('');
     setValorItem('');
     setProdutoSearch('');
+    setShowAssistente(false);
+    setItensNaoVinculados([]);
+    setShowCadastroFornecedor(false);
+    setPendingRecebimentoId(null);
+    setPendingItensProcessados([]);
   };
 
   const fetchOrdensCompra = async () => {
@@ -291,11 +311,30 @@ export default function IniciarRecebimentoDialog({
           }
         }
 
-        const itens: NFeData['itens'] = [];
+        const itens: NFeDataItem[] = [];
         for (let i = 0; i < det.length; i++) {
           const item = det[i];
           const prod = item.getElementsByTagName('prod')[0];
+          const imposto = item.getElementsByTagName('imposto')[0];
           const cEAN = prod?.getElementsByTagName('cEAN')[0]?.textContent || '';
+          
+          // Extract NCM and CEST from prod
+          const ncm = prod?.getElementsByTagName('NCM')[0]?.textContent || '';
+          const cest = prod?.getElementsByTagName('CEST')[0]?.textContent || '';
+          
+          // Extract origem from ICMS
+          let origem = '0';
+          if (imposto) {
+            const icmsElements = ['ICMS00', 'ICMS10', 'ICMS20', 'ICMS30', 'ICMS40', 'ICMS51', 'ICMS60', 'ICMS70', 'ICMS90', 'ICMSSN101', 'ICMSSN102', 'ICMSSN201', 'ICMSSN202', 'ICMSSN500', 'ICMSSN900'];
+            for (const icmsTag of icmsElements) {
+              const icmsElement = imposto.getElementsByTagName(icmsTag)[0];
+              if (icmsElement) {
+                origem = icmsElement.getElementsByTagName('orig')[0]?.textContent || '0';
+                break;
+              }
+            }
+          }
+          
           itens.push({
             codigo: prod?.getElementsByTagName('cProd')[0]?.textContent || '',
             descricao: prod?.getElementsByTagName('xProd')[0]?.textContent || '',
@@ -303,7 +342,10 @@ export default function IniciarRecebimentoDialog({
             valorUnitario: parseFloat(prod?.getElementsByTagName('vUnCom')[0]?.textContent || '0'),
             valorTotal: parseFloat(prod?.getElementsByTagName('vProd')[0]?.textContent || '0'),
             unidade: prod?.getElementsByTagName('uCom')[0]?.textContent || '',
-            gtin: cEAN !== 'SEM GTIN' ? cEAN : ''
+            gtin: cEAN !== 'SEM GTIN' ? cEAN : '',
+            ncm,
+            cest,
+            origem
           });
         }
 
@@ -418,6 +460,27 @@ export default function IniciarRecebimentoDialog({
       const oc = getSelectedOC();
       const parceiro = parceiros.find(p => p.id === selectedParceiro);
       
+      // For XML mode, first verify supplier exists
+      let parceiroIdForXml: string | null = null;
+      if (mode === 'xml' && nfeData) {
+        const { data: parceiroData } = await supabase
+          .from('parceiros')
+          .select('id, razao_social_nome')
+          .eq('integrado_id', integradoId)
+          .eq('cpf_cnpj', nfeData.cnpjFornecedor.replace(/\D/g, ''))
+          .maybeSingle();
+
+        if (!parceiroData) {
+          // Supplier not found - show quick registration dialog
+          setFornecedorXmlCnpj(nfeData.cnpjFornecedor);
+          setFornecedorXmlRazaoSocial(nfeData.razaoSocialFornecedor);
+          setShowCadastroFornecedor(true);
+          setLoading(false);
+          return;
+        }
+        parceiroIdForXml = parceiroData.id;
+      }
+
       // Build recebimento data based on mode
       const recebimentoData: any = {
         integrado_id: integradoId,
@@ -456,16 +519,10 @@ export default function IniciarRecebimentoDialog({
         recebimentoData.razao_social_fornecedor = parceiro?.razao_social_nome || null;
       }
 
-      const { data: recebimento, error: recError } = await supabase
-        .from('recebimentos_mercadoria')
-        .insert(recebimentoData)
-        .select()
-        .single();
-
-      if (recError) throw recError;
-
-      // Create recebimento_itens
-      const itensToInsert = [];
+      // Create recebimento_itens array and track unlinked items
+      const itensToInsert: any[] = [];
+      const itensNaoVinculadosList: ItemNaoVinculado[] = [];
+      const itensNaoVinculadosIndices: number[] = [];
 
       if (mode === 'oc' && oc) {
         for (const item of oc.ordens_compra_itens) {
@@ -478,7 +535,6 @@ export default function IniciarRecebimentoDialog({
           const fatorConversao = item.fator_conversao || item.produtos.fator_conversao || 1;
 
           itensToInsert.push({
-            recebimento_id: recebimento.id,
             ordem_compra_item_id: item.id,
             produto_id: item.produto_id,
             quantidade_oc: item.quantidade - (item.quantidade_recebida || 0),
@@ -494,42 +550,33 @@ export default function IniciarRecebimentoDialog({
             quantidade_estoque: 0
           });
         }
-      } else if (mode === 'xml' && nfeData) {
-        // First, try to find the supplier by CNPJ
-        const { data: parceiroData } = await supabase
-          .from('parceiros')
-          .select('id')
-          .eq('integrado_id', integradoId)
-          .eq('cpf_cnpj', nfeData.cnpjFornecedor.replace(/\D/g, ''))
-          .maybeSingle();
-
-        for (const nfeItem of nfeData.itens) {
+      } else if (mode === 'xml' && nfeData && parceiroIdForXml) {
+        for (let i = 0; i < nfeData.itens.length; i++) {
+          const nfeItem = nfeData.itens[i];
           let matchedProduto: any = null;
           let produtoFornecedor: ProdutoFornecedor | null = null;
 
           // 1st Priority: Match by CNPJ + Supplier Product Code (cProd)
-          if (parceiroData) {
-            const { data: pfData } = await supabase
-              .from('produto_fornecedor')
-              .select(`
-                id,
-                produto_id,
-                codigo_produto_fornecedor,
-                unidade_compra_fornecedor,
-                fator_conversao_fornecedor,
-                gtin_esperado,
-                descricao_produto_fornecedor,
-                produtos (id, nome, sku, unidade_medida, codigo_barras_ean)
-              `)
-              .eq('parceiro_id', parceiroData.id)
-              .eq('codigo_produto_fornecedor', nfeItem.codigo)
-              .eq('ativo', true)
-              .maybeSingle();
+          const { data: pfData } = await supabase
+            .from('produto_fornecedor')
+            .select(`
+              id,
+              produto_id,
+              codigo_produto_fornecedor,
+              unidade_compra_fornecedor,
+              fator_conversao_fornecedor,
+              gtin_esperado,
+              descricao_produto_fornecedor,
+              produtos (id, nome, sku, unidade_medida, codigo_barras_ean)
+            `)
+            .eq('parceiro_id', parceiroIdForXml)
+            .eq('codigo_produto_fornecedor', nfeItem.codigo)
+            .eq('ativo', true)
+            .maybeSingle();
 
-            if (pfData) {
-              produtoFornecedor = pfData as unknown as ProdutoFornecedor;
-              matchedProduto = pfData.produtos;
-            }
+          if (pfData) {
+            produtoFornecedor = pfData as unknown as ProdutoFornecedor;
+            matchedProduto = pfData.produtos;
           }
 
           // 2nd Priority: Match by GTIN (EAN)
@@ -568,7 +615,6 @@ export default function IniciarRecebimentoDialog({
             const fatorConversao = produtoFornecedor?.fator_conversao_fornecedor || matchedProduto.fator_conversao || 1;
 
             itensToInsert.push({
-              recebimento_id: recebimento.id,
               produto_id: matchedProduto.id,
               quantidade_oc: 0,
               quantidade_nfe: nfeItem.quantidade,
@@ -585,9 +631,11 @@ export default function IniciarRecebimentoDialog({
               gtin_esperado: produtoFornecedor?.gtin_esperado || matchedProduto.codigo_barras_ean || null
             });
           } else {
-            // Product not matched - insert with null product_id for manual linking later
+            // Product not matched - track for assistant
+            itensNaoVinculadosIndices.push(itensToInsert.length);
+            itensNaoVinculadosList.push(nfeItem);
+            
             itensToInsert.push({
-              recebimento_id: recebimento.id,
               produto_id: null,
               quantidade_oc: 0,
               quantidade_nfe: nfeItem.quantidade,
@@ -605,13 +653,39 @@ export default function IniciarRecebimentoDialog({
             });
           }
         }
+
+        // If there are unlinked items, pause and open the assistant
+        if (itensNaoVinculadosList.length > 0) {
+          // Create the recebimento first
+          const { data: recebimento, error: recError } = await supabase
+            .from('recebimentos_mercadoria')
+            .insert(recebimentoData)
+            .select()
+            .single();
+
+          if (recError) throw recError;
+
+          // Store pending data
+          setPendingRecebimentoId(recebimento.id);
+          setPendingItensProcessados(itensToInsert.map(item => ({
+            ...item,
+            recebimento_id: recebimento.id
+          })));
+          
+          // Open assistant
+          setItensNaoVinculados(itensNaoVinculadosList);
+          setParceiroIdAssistente(parceiroIdForXml);
+          setParceiroNomeAssistente(nfeData.razaoSocialFornecedor);
+          setShowAssistente(true);
+          setLoading(false);
+          return;
+        }
       } else if (mode === 'manual') {
         for (const item of itensManual) {
           const unidadeCompra = item.unidade_compra || item.unidade_medida;
           const fatorConversao = item.fator_conversao || 1;
 
           itensToInsert.push({
-            recebimento_id: recebimento.id,
             produto_id: item.produto_id,
             quantidade_oc: 0,
             quantidade_nfe: item.quantidade_nfe,
@@ -628,10 +702,25 @@ export default function IniciarRecebimentoDialog({
         }
       }
 
+      // Create recebimento (if not already created for assistant flow)
+      const { data: recebimento, error: recError } = await supabase
+        .from('recebimentos_mercadoria')
+        .insert(recebimentoData)
+        .select()
+        .single();
+
+      if (recError) throw recError;
+
+      // Insert items with recebimento_id
       if (itensToInsert.length > 0) {
+        const itensWithRecebimentoId = itensToInsert.map(item => ({
+          ...item,
+          recebimento_id: recebimento.id
+        }));
+
         const { error: itensError } = await supabase
           .from('recebimento_itens')
-          .insert(itensToInsert);
+          .insert(itensWithRecebimentoId);
 
         if (itensError) throw itensError;
       }
@@ -647,11 +736,116 @@ export default function IniciarRecebimentoDialog({
     }
   };
 
+  // Handle assistant completion - update items with linked products
+  const handleAssistenteComplete = async (vinculos: VinculoCriado[]) => {
+    if (!pendingRecebimentoId || pendingItensProcessados.length === 0) {
+      setShowAssistente(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Update pending items with linked product IDs
+      const itensToInsert = pendingItensProcessados.map((item, index) => {
+        // Find if this item was one of the unlinked ones
+        const vinculoIndex = itensNaoVinculados.findIndex((nv, nvIndex) => {
+          const originalIndex = pendingItensProcessados.findIndex(
+            pi => pi.produto_id === null && 
+                  pi.codigo_produto_nfe === nv.codigo &&
+                  pi.descricao_produto_nfe === nv.descricao
+          );
+          return originalIndex === index;
+        });
+
+        if (vinculoIndex !== -1) {
+          const vinculo = vinculos[vinculoIndex];
+          if (vinculo && vinculo.tipo !== 'pulado' && vinculo.produtoId) {
+            return { ...item, produto_id: vinculo.produtoId };
+          }
+        }
+        return item;
+      });
+
+      // Filter out skipped items (those still without produto_id that were skipped)
+      const itensFinais = itensToInsert.filter((item, index) => {
+        if (item.produto_id === null) {
+          const vinculoIndex = itensNaoVinculados.findIndex((nv) => {
+            return pendingItensProcessados[index]?.codigo_produto_nfe === nv.codigo;
+          });
+          if (vinculoIndex !== -1) {
+            const vinculo = vinculos[vinculoIndex];
+            return vinculo?.tipo !== 'pulado';
+          }
+        }
+        return true;
+      });
+
+      if (itensFinais.length > 0) {
+        const { error: itensError } = await supabase
+          .from('recebimento_itens')
+          .insert(itensFinais);
+
+        if (itensError) throw itensError;
+      }
+
+      setRecebimentoId(pendingRecebimentoId);
+      setShowAssistente(false);
+      setShowConferencia(true);
+      toast.success('Recebimento iniciado! Prossiga com a conferência física.');
+    } catch (error) {
+      console.error('Erro ao finalizar recebimento:', error);
+      toast.error('Erro ao finalizar recebimento');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle quick supplier registration success
+  const handleFornecedorCadastrado = (parceiroId: string, razaoSocial: string) => {
+    setShowCadastroFornecedor(false);
+    fetchParceiros(); // Refresh list
+    toast.success(`Fornecedor "${razaoSocial}" cadastrado! Continue o recebimento.`);
+    // User can now try again - the supplier exists
+  };
+
   const handleConferenciaSuccess = () => {
     setShowConferencia(false);
     onOpenChange(false);
     onSuccess();
   };
+
+  // Render quick supplier registration dialog
+  if (showCadastroFornecedor) {
+    return (
+      <CadastroFornecedorRapidoDialog
+        open={showCadastroFornecedor}
+        onOpenChange={setShowCadastroFornecedor}
+        cnpj={fornecedorXmlCnpj}
+        razaoSocial={fornecedorXmlRazaoSocial}
+        integradoId={integradoId}
+        onSuccess={handleFornecedorCadastrado}
+        onCancel={() => {
+          setShowCadastroFornecedor(false);
+          onOpenChange(false);
+        }}
+      />
+    );
+  }
+
+  // Render assistant dialog for unlinked items
+  if (showAssistente && itensNaoVinculados.length > 0) {
+    return (
+      <AssistenteImportacaoDialog
+        open={showAssistente}
+        onOpenChange={setShowAssistente}
+        itensNaoVinculados={itensNaoVinculados}
+        parceiroId={parceiroIdAssistente}
+        parceiroNome={parceiroNomeAssistente}
+        integradoId={integradoId}
+        onComplete={handleAssistenteComplete}
+      />
+    );
+  }
 
   if (showConferencia && recebimentoId) {
     return (

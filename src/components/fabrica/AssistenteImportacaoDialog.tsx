@@ -57,7 +57,7 @@ interface GrupoProduto {
   nome: string;
 }
 
-interface VinculoCriado {
+export interface VinculoCriado {
   itemIndex: number;
   tipo: 'vinculado' | 'cadastrado' | 'pulado';
   produtoId?: string;
