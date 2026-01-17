@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { GaugeChart } from './GaugeChart';
-import { Package, Factory, FlaskConical, Loader2 } from 'lucide-react';
+import { StatusProgressCard } from './StatusProgressCard';
+import { Factory, Package, FlaskConical, Loader2 } from 'lucide-react';
 
 interface ProducaoEstoquePanelProps {
   userId: string;
@@ -115,58 +115,44 @@ export const ProducaoEstoquePanel = ({ userId }: ProducaoEstoquePanelProps) => {
   }
 
   return (
-    <div className="bg-card rounded-lg border shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-6">
+    <div className="bg-card rounded-lg border shadow-sm p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4">
         <Factory className="w-5 h-5 text-primary" />
         <h3 className="font-semibold">Produção & Estoque</h3>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Stock Turnover Gauge */}
-        <div className="flex flex-col items-center">
-          <GaugeChart
-            value={giroEstoque || 45}
-            max={120}
-            thresholds={{ danger: 90, warning: 60, ok: 45 }}
-            title="Giro Estoque"
-            unit="dias"
-            inverted={true}
-            size="md"
-          />
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Ideal: 45-60 dias
-          </p>
-        </div>
+      <div className="space-y-3">
+        {/* Stock Turnover */}
+        <StatusProgressCard
+          title="Giro de Estoque"
+          value={giroEstoque || 45}
+          unit="dias"
+          max={120}
+          metaMin={45}
+          metaMax={60}
+          inverted={true}
+          icon={<Package className="w-4 h-4" />}
+        />
 
-        {/* Factory Status Gauge */}
-        <div className="flex flex-col items-center">
-          <GaugeChart
-            value={statusFabrica || 90}
-            max={100}
-            thresholds={{ danger: 70, warning: 85, ok: 90 }}
-            title="Status Fábrica"
-            unit="%"
-            size="md"
-          />
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Meta: 90%+ operacional
-          </p>
-        </div>
+        {/* Factory Status */}
+        <StatusProgressCard
+          title="Status Fábrica"
+          value={statusFabrica || 90}
+          unit="%"
+          max={100}
+          metaMin={90}
+          icon={<Factory className="w-4 h-4" />}
+        />
 
-        {/* Quality Gauge */}
-        <div className="flex flex-col items-center">
-          <GaugeChart
-            value={qualidadeMP || 95}
-            max={100}
-            thresholds={{ danger: 80, warning: 90, ok: 95 }}
-            title="Qualidade MP"
-            unit="% lib."
-            size="md"
-          />
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Meta: 95%+ liberado
-          </p>
-        </div>
+        {/* Quality */}
+        <StatusProgressCard
+          title="Qualidade MP"
+          value={qualidadeMP || 95}
+          unit="% lib."
+          max={100}
+          metaMin={95}
+          icon={<FlaskConical className="w-4 h-4" />}
+        />
       </div>
     </div>
   );

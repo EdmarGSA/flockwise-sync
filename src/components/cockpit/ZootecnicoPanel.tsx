@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { CompassIndicator } from './CompassIndicator';
-import { GaugeChart } from './GaugeChart';
-import { TachometerGauge } from './TachometerGauge';
-import { Bird, Loader2 } from 'lucide-react';
+import { MetricaExecutivaCard } from './MetricaExecutivaCard';
+import { Bird, TrendingUp, Skull, Utensils, Loader2 } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 
 interface ZootecnicoPanelProps {
@@ -158,46 +156,73 @@ export const ZootecnicoPanel = ({ userId }: ZootecnicoPanelProps) => {
     );
   }
 
+  const gpdPercentage = gpdData?.percentage || 100;
+  const gpdStatus = gpdPercentage >= 98 ? 'ok' : gpdPercentage >= 90 ? 'warning' : 'danger';
+
+  const caValue = caData || 1.65;
+  const caMeta = 1.55;
+  const caStatus = caValue <= caMeta ? 'ok' : caValue <= 1.65 ? 'warning' : 'danger';
+
+  const mortValue = mortalidadeData || 0;
+  const mortMeta = 0.15;
+  const mortStatus = mortValue <= mortMeta ? 'ok' : mortValue <= 0.3 ? 'warning' : 'danger';
+
   return (
-    <div className="bg-card rounded-lg border shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-6">
+    <div className="bg-card rounded-lg border shadow-sm p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4">
         <Bird className="w-5 h-5 text-primary" />
         <h3 className="font-semibold">Zootécnico</h3>
       </div>
 
-      <div className="space-y-4">
-        {/* Compass - GPD Performance */}
-        <CompassIndicator
-          percentage={gpdData?.percentage || 100}
+      <div className="space-y-3">
+        {/* GPD Performance */}
+        <MetricaExecutivaCard
           title="Performance GPD"
-          subtitle="vs Curva de Referência"
-          referenceValue={gpdData?.reference}
-          actualValue={gpdData?.actual}
-          unit=" kg/dia"
+          value={gpdPercentage}
+          unit="%"
+          decimals={0}
+          status={gpdStatus}
+          statusLabel={gpdStatus === 'ok' ? 'EXCELENTE' : gpdStatus === 'warning' ? 'ABAIXO' : 'CRÍTICO'}
+          referencia={gpdData?.reference ? gpdData.reference * 1000 : 0}
+          referenciaLabel="Ref (g/dia)"
+          meta={98}
+          metaLabel="Meta"
+          progressValue={gpdPercentage}
+          progressMax={120}
+          trend={gpdPercentage >= 100 ? 'up' : 'down'}
+          icon={<TrendingUp className="w-4 h-4" />}
         />
 
-        {/* Feed Conversion Gauge */}
-        <div className="flex justify-center">
-          <GaugeChart
-            value={caData || 1.65}
-            min={1.3}
-            max={2.0}
-            thresholds={{ danger: 1.7, warning: 1.6, ok: 1.55 }}
-            title="Conversão Alimentar"
-            unit=""
-            inverted={true}
-            size="lg"
-          />
-        </div>
+        {/* Feed Conversion */}
+        <MetricaExecutivaCard
+          title="Conversão Alimentar"
+          value={caValue}
+          unit=""
+          decimals={2}
+          status={caStatus}
+          statusLabel={caStatus === 'ok' ? 'NA META' : caStatus === 'warning' ? 'ACIMA' : 'CRÍTICO'}
+          meta={caMeta}
+          metaLabel="Meta CA"
+          progressValue={2 - caValue}
+          progressMax={0.7}
+          detalhe={caValue > caMeta ? `Excesso: +${(caValue - caMeta).toFixed(2)}` : 'Dentro da meta'}
+          icon={<Utensils className="w-4 h-4" />}
+        />
 
-        {/* Mortality Tachometer */}
-        <TachometerGauge
-          value={mortalidadeData || 0}
-          max={0.5}
-          zones={{ green: 0.15, yellow: 0.3 }}
+        {/* Mortality */}
+        <MetricaExecutivaCard
           title="Mortalidade Diária"
+          value={mortValue}
           unit="%"
           decimals={3}
+          status={mortStatus}
+          statusLabel={mortStatus === 'ok' ? 'NORMAL' : mortStatus === 'warning' ? 'ELEVADA' : 'CRÍTICA'}
+          meta={mortMeta}
+          metaLabel="Alerta"
+          progressValue={mortValue}
+          progressMax={0.5}
+          detalhe="Hoje"
+          icon={<Skull className="w-4 h-4" />}
         />
       </div>
     </div>
@@ -215,7 +240,7 @@ export const getZootecnicoData = async (userId: string) => {
     .eq('status', 'alojado');
 
   if (!lotes || lotes.length === 0) {
-    return { gpd: 100, mortalidade: 0 };
+    return { gpd: 100, mortalidade: 0, ca: 1.55 };
   }
 
   const totalAves = lotes.reduce((acc, l) => acc + (l.quantidade_aves || 0), 0);
@@ -242,6 +267,7 @@ export const getZootecnicoData = async (userId: string) => {
 
   return {
     gpd: 98, // Would need full GPD calculation
-    mortalidade
+    mortalidade,
+    ca: 1.55
   };
 };

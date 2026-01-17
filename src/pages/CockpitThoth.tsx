@@ -7,6 +7,7 @@ import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plane, RefreshCw } from 'lucide-react';
 import { WarningLights, createWarningLights } from '@/components/cockpit/WarningLights';
+import { ScoreOperacionalCard, calculateOperationalScore } from '@/components/cockpit/ScoreOperacionalCard';
 import { ProducaoEstoquePanel } from '@/components/cockpit/ProducaoEstoquePanel';
 import { FinanceiroPanel } from '@/components/cockpit/FinanceiroPanel';
 import { ZootecnicoPanel } from '@/components/cockpit/ZootecnicoPanel';
@@ -19,7 +20,7 @@ const CockpitThoth = () => {
   const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch all data for warning lights
+  // Fetch all data for warning lights and score
   const { data: warningData, isLoading: loadingWarnings, refetch } = useQuery({
     queryKey: ['cockpit-warnings', integradoId, refreshKey],
     queryFn: async () => {
@@ -193,6 +194,20 @@ const CockpitThoth = () => {
         }
       }
 
+      // 9. CA (Conversão Alimentar) - get average from recent fechamentos
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const { data: fechamentos } = await supabase
+        .from('fechamento_lotes')
+        .select('conversao_alimentar')
+        .eq('integrado_id', integradoId)
+        .gte('created_at', sixtyDaysAgo.toISOString());
+
+      const ca = fechamentos && fechamentos.length > 0
+        ? fechamentos.reduce((acc, f) => acc + (f.conversao_alimentar || 0), 0) / fechamentos.length
+        : 1.55;
+
       return {
         giroEstoque,
         statusFabrica,
@@ -201,7 +216,8 @@ const CockpitThoth = () => {
         creditoUtilizado,
         atrasoCR,
         gpd,
-        mortalidade
+        mortalidade,
+        ca
       };
     },
     enabled: !!integradoId,
@@ -222,6 +238,17 @@ const CockpitThoth = () => {
   }
 
   const warningLights = warningData ? createWarningLights(warningData) : [];
+  
+  // Calculate operational score
+  const scoreData = warningData ? calculateOperationalScore({
+    gpd: warningData.gpd,
+    ca: warningData.ca || 1.55,
+    caMeta: 1.55,
+    mortalidade: warningData.mortalidade,
+    mortalidadeMeta: 0.15,
+    giroEstoque: warningData.giroEstoque,
+    caixa7dias: warningData.caixa7dias
+  }) : { score: 0, indicators: [] };
 
   return (
     <div className="min-h-screen bg-background">
@@ -250,6 +277,13 @@ const CockpitThoth = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Score Operacional - NEW */}
+        <ScoreOperacionalCard 
+          score={scoreData.score}
+          indicators={scoreData.indicators}
+          loading={loadingWarnings}
+        />
+
         {/* Warning Lights Panel */}
         {loadingWarnings ? (
           <div className="bg-card rounded-lg border p-6 flex items-center justify-center">
@@ -260,7 +294,7 @@ const CockpitThoth = () => {
         )}
 
         {/* Main Panels Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Production & Stock Panel */}
           <ProducaoEstoquePanel userId={integradoId} />
 
