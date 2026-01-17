@@ -58,7 +58,7 @@ interface RecebimentoItem {
     nome: string;
     sku: string;
     unidade_medida: string;
-  };
+  } | null;
 }
 
 interface Divergencia {
@@ -372,9 +372,11 @@ export default function RecebimentoViewDialog({
                   <TableRow key={item.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{item.produtos.nome}</div>
+                        <div className="font-medium">
+                          {item.produtos?.nome || <span className="text-muted-foreground italic">Produto não vinculado</span>}
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          {item.produtos.sku} | {item.produtos.unidade_medida}
+                          {item.produtos ? `${item.produtos.sku} | ${item.produtos.unidade_medida}` : 'Pendente de vinculação'}
                         </div>
                       </div>
                     </TableCell>
