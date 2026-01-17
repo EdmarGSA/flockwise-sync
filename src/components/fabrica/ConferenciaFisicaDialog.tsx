@@ -112,15 +112,20 @@ export default function ConferenciaFisicaDialog({
           unidade_compra,
           fator_conversao,
           quantidade_estoque,
-          gtin_nfe,
-          gtin_esperado,
           produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean)
         `)
         .eq('recebimento_id', recebimentoId);
 
       if (error) throw error;
 
-      setItens(data || []);
+      // Cast and add gtin fields (may not exist in DB yet)
+      const itensWithGtin = (data || []).map((item: any) => ({
+        ...item,
+        gtin_nfe: item.gtin_nfe || null,
+        gtin_esperado: item.gtin_esperado || null
+      })) as RecebimentoItem[];
+
+      setItens(itensWithGtin);
       
       const edited: Record<string, { 
         quantidade_fisica: number; 
@@ -131,7 +136,7 @@ export default function ConferenciaFisicaDialog({
         fator_conversao: number;
       }> = {};
       
-      data?.forEach(item => {
+      itensWithGtin.forEach(item => {
         const unidadeCompra = item.unidade_compra || item.produtos?.unidade_compra || item.produtos?.unidade_medida || 'UN';
         const fatorConversao = item.fator_conversao || item.produtos?.fator_conversao || 1;
         
@@ -265,20 +270,27 @@ export default function ConferenciaFisicaDialog({
           unidade_compra,
           fator_conversao,
           quantidade_estoque,
-          produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao)
+          produtos(id, nome, sku, unidade_medida, unidade_compra, fator_conversao, codigo_barras_ean)
         `)
         .single();
 
       if (error) throw error;
 
+      // Add gtin fields to match interface
+      const newItem: RecebimentoItem = {
+        ...(data as any),
+        gtin_nfe: null,
+        gtin_esperado: produto.codigo_barras_ean || null
+      };
+
       // Add to local state
-      setItens([...itens, data]);
+      setItens([...itens, newItem]);
       setEditedItens({
         ...editedItens,
-        [data.id]: {
-          quantidade_fisica: data.quantidade_fisica,
-          quantidade_nfe: data.quantidade_nfe,
-          preco_nfe: data.preco_nfe,
+        [newItem.id]: {
+          quantidade_fisica: newItem.quantidade_fisica,
+          quantidade_nfe: newItem.quantidade_nfe,
+          preco_nfe: newItem.preco_nfe,
           lote_fornecedor: '',
           unidade_compra: unidadeCompra,
           fator_conversao: fatorConversao
