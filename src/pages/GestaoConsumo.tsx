@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, ArrowLeft, Bird, Truck, CheckCircle, Clock, RefreshCw, XCircle, AlertTriangle, Flame } from 'lucide-react';
+import { Package, ArrowLeft, Bird, Truck, CheckCircle, Clock, RefreshCw, XCircle, AlertTriangle, Flame, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
@@ -18,6 +18,13 @@ import { EnviarRacaoDialog } from '@/components/consumo/EnviarRacaoDialog';
 import { LotesAlarmeDialog } from '@/components/consumo/LotesAlarmeDialog';
 import { SolicitacoesFilterDialog } from '@/components/consumo/SolicitacoesFilterDialog';
 import { LotesListDialog } from '@/components/consumo/LotesListDialog';
+import { ConsumoChartSection } from '@/components/consumo/ConsumoChartSection';
+import { InsightBox } from '@/components/consumo/InsightBox';
+import { SilosMapSection } from '@/components/consumo/SilosMapSection';
+import { ConsumoAnomaliaCard } from '@/components/consumo/ConsumoAnomaliaCard';
+import { RiscoEstoqueCard } from '@/components/consumo/RiscoEstoqueCard';
+import { AnomaliaListDialog } from '@/components/consumo/AnomaliaListDialog';
+import { RiscoEstoqueDialog } from '@/components/consumo/RiscoEstoqueDialog';
 
 interface LoteConsumo {
   id: string;
@@ -34,6 +41,10 @@ interface LoteConsumo {
   diasDesdeAlojamento?: number;
   nivelSilo?: number;
   diasEstoque?: number;
+  consumoDiarioKg?: number;
+  consumoRealKg?: number;
+  consumoEsperadoKg?: number;
+  tendencia?: 'subindo' | 'caindo' | 'estavel';
 }
 
 interface SolicitacaoRacao {
@@ -72,6 +83,8 @@ export default function GestaoConsumo() {
   const [pendentesDialogOpen, setPendentesDialogOpen] = useState(false);
   const [transitoDialogOpen, setTransitoDialogOpen] = useState(false);
   const [devolucaoDialogOpen, setDevolucaoDialogOpen] = useState(false);
+  const [anomaliaDialogOpen, setAnomaliaDialogOpen] = useState(false);
+  const [riscoDialogOpen, setRiscoDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -152,9 +165,12 @@ export default function GestaoConsumo() {
         // Dia 1 = dia do alojamento
         const diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
 
-        // Calculate silo level
+        // Calculate silo level and consumption data
         let nivelSilo = 0;
         let diasEstoque = 0;
+        let consumoDiarioKg = 0;
+        let consumoRealKg = 0;
+        let consumoEsperadoKg = 0;
         
         if (diasDesdeAlojamento && diasDesdeAlojamento > 0) {
           const avesVivas = quantidadeAlojada ?? loteData.quantidade_aves;
@@ -189,12 +205,20 @@ export default function GestaoConsumo() {
             .maybeSingle();
 
           if (desempenho) {
-            const consumoEstimadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-            const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-            nivelSilo = totalRecebido - consumoEstimadoKg;
+            consumoEsperadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
+            consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
+            nivelSilo = totalRecebido - consumoEsperadoKg;
             diasEstoque = consumoDiarioKg > 0 ? Math.floor(nivelSilo / consumoDiarioKg) : 0;
+            
+            // Real consumption = total received - current silo level (estimated)
+            consumoRealKg = totalRecebido - nivelSilo;
           }
         }
+
+        // Calculate trend based on last 3 weighings or estimations
+        const tendencia: 'subindo' | 'caindo' | 'estavel' = 
+          consumoRealKg > consumoEsperadoKg * 1.05 ? 'subindo' : 
+          consumoRealKg < consumoEsperadoKg * 0.95 ? 'caindo' : 'estavel';
 
         return {
           ...loteData,
@@ -202,9 +226,20 @@ export default function GestaoConsumo() {
           diasDesdeAlojamento,
           nivelSilo,
           diasEstoque,
+          consumoDiarioKg,
+          consumoRealKg,
+          consumoEsperadoKg,
+          tendencia,
         };
       })
     );
+
+    // Sort by dias_estoque (ascending) - critical first
+    lotesProcessados.sort((a, b) => {
+      const diasA = a.diasDesdeAlojamento && a.diasDesdeAlojamento > 0 ? (a.diasEstoque || 0) : 999;
+      const diasB = b.diasDesdeAlojamento && b.diasDesdeAlojamento > 0 ? (b.diasEstoque || 0) : 999;
+      return diasA - diasB;
+    });
 
     setLotes(lotesProcessados);
   };
@@ -252,6 +287,42 @@ export default function GestaoConsumo() {
   );
   const urgentesCount = solicitacoes.filter(s => s.urgente && !['cancelado', 'recebido', 'devolvido'].includes(s.status)).length;
 
+  // Anomaly data for dialog
+  const lotesComAnomalia = useMemo(() => {
+    return lotes
+      .filter(l => {
+        if (!l.consumoRealKg || !l.consumoEsperadoKg || (l.diasDesdeAlojamento || 0) <= 0) return false;
+        const desvio = Math.abs(((l.consumoRealKg - l.consumoEsperadoKg) / l.consumoEsperadoKg) * 100);
+        return desvio > 15;
+      })
+      .map(l => ({
+        id: l.id,
+        nucleo_nome: l.nucleo?.nome || '-',
+        galpao_nome: l.galpao?.nome || '-',
+        consumoRealKg: l.consumoRealKg || 0,
+        consumoEsperadoKg: l.consumoEsperadoKg || 0,
+        desvioPercent: Math.round(((l.consumoRealKg! - l.consumoEsperadoKg!) / l.consumoEsperadoKg!) * 100),
+      }));
+  }, [lotes]);
+
+  // Risk data for dialog
+  const lotesEmRisco = useMemo(() => {
+    return lotes
+      .filter(l => {
+        const diasEstoque = l.diasEstoque || 0;
+        const diasDesdeAlojamento = l.diasDesdeAlojamento || 0;
+        return diasDesdeAlojamento > 0 && diasEstoque >= 1 && diasEstoque <= 3;
+      })
+      .map(l => ({
+        id: l.id,
+        nucleo_nome: l.nucleo?.nome || '-',
+        galpao_nome: l.galpao?.nome || '-',
+        diasEstoque: l.diasEstoque || 0,
+        nivelSilo: l.nivelSilo || 0,
+        consumoDiarioKg: l.consumoDiarioKg || 0,
+      }));
+  }, [lotes]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -295,6 +366,17 @@ export default function GestaoConsumo() {
         {dias}d
       </Badge>
     );
+  };
+
+  const getTrendIcon = (tendencia?: 'subindo' | 'caindo' | 'estavel') => {
+    switch (tendencia) {
+      case 'subindo':
+        return <TrendingUp className="w-4 h-4 text-amber-500" />;
+      case 'caindo':
+        return <TrendingDown className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Minus className="w-4 h-4 text-muted-foreground" />;
+    }
   };
 
   const getSolicitacaoStatusBadge = (status: string, urgente?: boolean) => {
@@ -461,8 +543,8 @@ export default function GestaoConsumo() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
-        {/* Stats Cards - Clickable */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        {/* 1. Painel de Alertas Imediatos (Topo) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 mb-6">
           <Card 
             className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => setLotesDialogOpen(true)}
@@ -494,6 +576,12 @@ export default function GestaoConsumo() {
               </div>
             </CardContent>
           </Card>
+
+          {/* New: Risk Card */}
+          <RiscoEstoqueCard lotes={lotes} onClick={() => setRiscoDialogOpen(true)} />
+
+          {/* New: Anomaly Card */}
+          <ConsumoAnomaliaCard lotes={lotes} onClick={() => setAnomaliaDialogOpen(true)} />
           
           <Card 
             className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors"
@@ -541,10 +629,26 @@ export default function GestaoConsumo() {
           </Card>
         </div>
 
-        {/* Lotes Table - Updated columns */}
+        {/* 2. Visão Geral de Consumo (Gráficos) */}
+        <ConsumoChartSection lotes={lotes} loading={loadingData} />
+
+        {/* 3. Insight Box */}
+        <InsightBox lotes={lotes} />
+
+        {/* 4. Mapa Visual de Silos */}
+        <SilosMapSection 
+          lotes={lotes} 
+          loading={loadingData}
+          onLoteClick={(loteId) => {
+            const lote = lotes.find(l => l.id === loteId);
+            if (lote) handleRacao(lote);
+          }}
+        />
+
+        {/* 5. Lotes Table - Updated with trend column */}
         <Card className="bg-card border-border mb-8">
           <CardHeader>
-            <CardTitle className="text-foreground">Lotes Ativos</CardTitle>
+            <CardTitle className="text-foreground">Lotes em Aberto</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingData ? (
@@ -566,12 +670,13 @@ export default function GestaoConsumo() {
                       <TableHead>Idade</TableHead>
                       <TableHead>Nível Silo</TableHead>
                       <TableHead>Dias Estoque</TableHead>
+                      <TableHead>Tend.</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {lotes.map((lote) => (
-                      <TableRow key={lote.id}>
+                      <TableRow key={lote.id} className={(lote.diasEstoque || 0) < 1 && (lote.diasDesdeAlojamento || 0) > 0 ? 'bg-destructive/5' : ''}>
                         <TableCell>{getStatusBadge(lote.status)}</TableCell>
                         <TableCell className="font-medium">{lote.nucleo?.nome || '-'}</TableCell>
                         <TableCell>{lote.galpao?.nome || '-'}</TableCell>
@@ -598,6 +703,11 @@ export default function GestaoConsumo() {
                           ) : '-'}
                         </TableCell>
                         <TableCell>
+                          {lote.diasDesdeAlojamento && lote.diasDesdeAlojamento > 0 ? (
+                            getTrendIcon(lote.tendencia)
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
                           <Button 
                             size="sm" 
                             variant="outline"
@@ -617,7 +727,7 @@ export default function GestaoConsumo() {
           </CardContent>
         </Card>
 
-        {/* Solicitações with Filters */}
+        {/* 6. Solicitações with Filters */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
@@ -854,6 +964,19 @@ export default function GestaoConsumo() {
         icon={<RefreshCw className="w-5 h-5 text-orange-500" />}
         solicitacoes={getSolicitacoesWithLoteInfo(s => (s.quantidade_devolvida_kg || 0) > 0 && !s.devolucao_confirmada)}
         onConfirmarDevolucao={handleConfirmarDevolucao}
+      />
+
+      {/* New Dialogs */}
+      <AnomaliaListDialog
+        open={anomaliaDialogOpen}
+        onOpenChange={setAnomaliaDialogOpen}
+        lotes={lotesComAnomalia}
+      />
+
+      <RiscoEstoqueDialog
+        open={riscoDialogOpen}
+        onOpenChange={setRiscoDialogOpen}
+        lotes={lotesEmRisco}
       />
     </div>
   );
