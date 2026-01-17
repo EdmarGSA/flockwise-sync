@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, CheckCircle, Package, ArrowRight, Trash2, Plus, FileText, Pencil } from 'lucide-react';
 import ConferenciaFisicaDialog from './ConferenciaFisicaDialog';
+import { AssistenteImportacaoDialog, ItemNaoVinculado } from './AssistenteImportacaoDialog';
 
 interface OrdemCompra {
   id: string;
@@ -127,6 +128,10 @@ export default function IniciarRecebimentoDialog({
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [showConferencia, setShowConferencia] = useState(false);
   const [recebimentoId, setRecebimentoId] = useState<string | null>(null);
+  const [showAssistente, setShowAssistente] = useState(false);
+  const [itensNaoVinculados, setItensNaoVinculados] = useState<ItemNaoVinculado[]>([]);
+  const [parceiroIdAssistente, setParceiroIdAssistente] = useState<string>('');
+  const [parceiroNomeAssistente, setParceiroNomeAssistente] = useState<string>('');
 
   // Manual mode state
   const [parceiros, setParceiros] = useState<Parceiro[]>([]);
