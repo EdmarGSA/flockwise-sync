@@ -50,12 +50,14 @@ export default function FabricaRacao() {
   const [produtosCriticos, setProdutosCriticos] = useState<ProdutoCritico[]>([]);
   const [showProdutosCriticos, setShowProdutosCriticos] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [stats, setStats] = useState({
+const [stats, setStats] = useState({
     alertasCriticos: 0,
     alertasAtencao: 0,
     ocsPendentes: 0,
     estoqueRacao: 0,
-    previsaoConsumo3d: 0
+    previsaoConsumo3d: 0,
+    racoesNegativas: 0,
+    racoesCriticas: 0
   });
 
   // States for analytical dialogs
@@ -189,12 +191,18 @@ export default function FabricaRacao() {
         }
       }
 
+      // Calculate feed alerts (negative and critical stock)
+      const racoesNegativas = racoesDetalhadasTemp.filter(r => r.estoque_atual < 0).length;
+      const racoesCriticas = racoesDetalhadasTemp.filter(r => r.estoque_atual >= 0 && r.dias_restantes < 3 && r.dias_restantes !== 999).length;
+
       setRacoesDetalhadas(racoesDetalhadasTemp);
       setStats(prev => ({
         ...prev,
         ocsPendentes: ocs?.length || 0,
         estoqueRacao,
-        previsaoConsumo3d
+        previsaoConsumo3d,
+        racoesNegativas,
+        racoesCriticas
       }));
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -335,18 +343,52 @@ export default function FabricaRacao() {
             {/* Stats Cards - Clickable */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
               <Card 
-                className="bg-card border-green-500/50 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg hover:border-green-500"
+                className={`bg-card cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${
+                  stats.racoesNegativas > 0 
+                    ? 'border-destructive/50 hover:border-destructive' 
+                    : stats.racoesCriticas > 0 
+                      ? 'border-yellow-500/50 hover:border-yellow-500'
+                      : 'border-green-500/50 hover:border-green-500'
+                }`}
                 onClick={() => setShowEstoqueRacao(true)}
               >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-muted-foreground text-sm">Estoque Ração</p>
-                      <p className="text-2xl font-bold text-green-500">
+                      <p className={`text-2xl font-bold ${
+                        stats.racoesNegativas > 0 
+                          ? 'text-destructive' 
+                          : stats.racoesCriticas > 0 
+                            ? 'text-yellow-500'
+                            : 'text-green-500'
+                      }`}>
                         {stats.estoqueRacao.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
                       </p>
+                      {(stats.racoesNegativas > 0 || stats.racoesCriticas > 0) && (
+                        <div className="flex gap-2 mt-2">
+                          {stats.racoesNegativas > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                              <AlertTriangle className="w-3 h-3" />
+                              {stats.racoesNegativas} Neg
+                            </span>
+                          )}
+                          {stats.racoesCriticas > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500">
+                              <AlertTriangle className="w-3 h-3" />
+                              {stats.racoesCriticas} Crít
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <TrendingUp className="w-8 h-8 text-green-500/50" />
+                    <TrendingUp className={`w-8 h-8 ${
+                      stats.racoesNegativas > 0 
+                        ? 'text-destructive/50' 
+                        : stats.racoesCriticas > 0 
+                          ? 'text-yellow-500/50'
+                          : 'text-green-500/50'
+                    }`} />
                   </div>
                 </CardContent>
               </Card>
