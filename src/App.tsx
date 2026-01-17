@@ -40,6 +40,7 @@ import CockpitThoth from "./pages/CockpitThoth";
 import CadastroProdutosOvos from "./pages/CadastroProdutosOvos";
 import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
+import OrdensProducao from "./pages/OrdensProducao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -155,6 +156,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="fabrica-racao">
           <FabricaRacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/ordens-producao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="fabrica-racao">
+          <OrdensProducao />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
