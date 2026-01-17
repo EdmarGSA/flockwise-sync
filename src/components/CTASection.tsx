@@ -27,13 +27,18 @@ const CTASection = () => {
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button variant="hero" size="xl" className="group">
-                  Solicitar Demonstração
+                <Button variant="hero" size="xl" className="group" onClick={() => window.location.href = '/auth'}>
+                  Cadastro
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
-                <Button variant="glass" size="xl" className="group">
+                <Button 
+                  variant="glass" 
+                  size="xl" 
+                  className="group"
+                  onClick={() => window.open('https://wa.me/5575983111535', '_blank')}
+                >
                   <MessageCircle className="w-5 h-5" />
-                  Falar no WhatsApp
+                  WhatsApp (75) 98311-1535
                 </Button>
               </div>
             </div>
