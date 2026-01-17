@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,11 @@ interface RacaoCritica {
   deficit: number;
   sugestaoProducao: number;
   unidade_medida: string;
+  opExistente?: {
+    id: string;
+    status: string;
+    numero_op: number;
+  };
 }
 
 interface RacoesCriticasCardProps {
@@ -20,11 +26,43 @@ interface RacoesCriticasCardProps {
   onGerarOP: (racao: RacaoCritica) => void;
 }
 
+const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'rascunho': return 'secondary';
+    case 'pendente': return 'outline';
+    case 'aprovada': return 'default';
+    case 'em_producao': return 'default';
+    default: return 'outline';
+  }
+};
+
+const getStatusLabel = (status: string): string => {
+  const labels: Record<string, string> = {
+    'rascunho': 'Rascunho',
+    'pendente': 'Pendente',
+    'aprovada': 'Aprovada',
+    'em_producao': 'Em Produção'
+  };
+  return labels[status] || status;
+};
+
+const getStatusClasses = (status: string): string => {
+  switch (status) {
+    case 'rascunho': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30';
+    case 'pendente': return 'bg-orange-500/10 text-orange-600 border-orange-500/30';
+    case 'aprovada': return 'bg-blue-500/10 text-blue-600 border-blue-500/30';
+    case 'em_producao': return 'bg-green-500/10 text-green-600 border-green-500/30';
+    default: return '';
+  }
+};
+
 export default function RacoesCriticasCard({
   racoesCriticas,
   loading = false,
   onGerarOP
 }: RacoesCriticasCardProps) {
+  const navigate = useNavigate();
+
   if (loading) {
     return (
       <Card className="bg-card border-border">
@@ -76,7 +114,7 @@ export default function RacoesCriticasCard({
                 <TableHead className="text-right">Estoque Atual</TableHead>
                 <TableHead className="text-right">Déficit</TableHead>
                 <TableHead className="text-right">Sugestão Produção</TableHead>
-                <TableHead className="text-right">Ação</TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -98,14 +136,24 @@ export default function RacoesCriticasCard({
                     {racao.sugestaoProducao.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} {racao.unidade_medida}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      size="sm" 
-                      onClick={() => onGerarOP(racao)}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      <Factory className="w-4 h-4 mr-1" />
-                      Gerar OP
-                    </Button>
+                    {racao.opExistente ? (
+                      <Badge 
+                        variant={getStatusVariant(racao.opExistente.status)}
+                        className={`cursor-pointer ${getStatusClasses(racao.opExistente.status)}`}
+                        onClick={() => navigate('/ordens-producao')}
+                      >
+                        OP #{racao.opExistente.numero_op} - {getStatusLabel(racao.opExistente.status)}
+                      </Badge>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        onClick={() => onGerarOP(racao)}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Factory className="w-4 h-4 mr-1" />
+                        Gerar OP
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
