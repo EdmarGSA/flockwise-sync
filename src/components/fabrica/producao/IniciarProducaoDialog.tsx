@@ -30,15 +30,16 @@ interface InsumoRevisao {
   id: string;
   insumo_id: string;
   nome: string;
-  quantidade_necessaria: number;
-  quantidade_ajustada: number;
+  quantidade_necessaria: number;    // Original quantity from OP (reference)
+  quantidade_planejada: number;     // Editable "Previsto" - recalculates proportionally
+  quantidade_real: number;          // "Usar" - actual quantity weighed (no proportional effect)
   estoque_disponivel: number;
   unidade_medida: string;
   custo_unitario: number;
   isOk: boolean;
-  variacao_percentual: number;
+  variacao_percentual: number;      // Between planejada and real
   status: 'ok' | 'alerta' | 'critico';
-  proporcao_original: number; // Proporção na fórmula (0-1)
+  proporcao_original: number;       // Proportion in formula (0-1)
 }
 
 interface IniciarProducaoDialogProps {
@@ -140,7 +141,8 @@ export default function IniciarProducaoDialog({
             insumo_id: item.insumo_id,
             nome: insumoData?.nome || '-',
             quantidade_necessaria: qtdNecessaria,
-            quantidade_ajustada: qtdNecessaria,
+            quantidade_planejada: qtdNecessaria,  // Starts equal to original
+            quantidade_real: qtdNecessaria,       // Starts equal to planejada
             estoque_disponivel: estoqueAtual,
             unidade_medida: item.unidade_medida,
             custo_unitario: custoUnit,
@@ -182,18 +184,19 @@ export default function IniciarProducaoDialog({
     return 'critico';
   };
 
-  const updateInsumoQuantidade = (id: string, quantidade: number) => {
+  // Update "Previsto" (quantidade_planejada) - with proportional recalculation
+  const updatePrevisto = (id: string, quantidade: number) => {
     if (!proporcionalidadeAtiva) {
       // Manual mode: only update the edited item
       setInsumos(prev => prev.map(i => {
         if (i.id === id) {
-          const variacao = calcularVariacao(quantidade, i.quantidade_necessaria);
           return { 
             ...i, 
-            quantidade_ajustada: quantidade,
+            quantidade_planejada: quantidade,
+            quantidade_real: quantidade, // Initialize "Usar" with same value
             isOk: i.estoque_disponivel >= quantidade,
-            variacao_percentual: variacao,
-            status: getStatus(variacao)
+            variacao_percentual: 0, // Reset variation
+            status: 'ok' as const
           };
         }
         return i;
@@ -213,18 +216,34 @@ export default function IniciarProducaoDialog({
 
     // Recalculate all ingredients proportionally
     setInsumos(prev => prev.map(i => {
-      const novaQtdAjustada = i.id === id 
+      const novaQtdPlanejada = i.id === id 
         ? quantidade 
         : Math.round(novoTotal * i.proporcao_original * 100) / 100;
       
-      const variacao = calcularVariacao(novaQtdAjustada, i.quantidade_necessaria);
       return {
         ...i,
-        quantidade_ajustada: novaQtdAjustada,
-        isOk: i.estoque_disponivel >= novaQtdAjustada,
-        variacao_percentual: variacao,
-        status: getStatus(variacao)
+        quantidade_planejada: novaQtdPlanejada,
+        quantidade_real: novaQtdPlanejada, // Initialize "Usar" with same value
+        isOk: i.estoque_disponivel >= novaQtdPlanejada,
+        variacao_percentual: 0, // Reset variation since previsto = real
+        status: 'ok' as const
       };
+    }));
+  };
+
+  // Update "Usar" (quantidade_real) - NO proportional recalculation, only local variance
+  const updateQuantidadeReal = (id: string, quantidade: number) => {
+    setInsumos(prev => prev.map(i => {
+      if (i.id === id) {
+        const variacao = calcularVariacao(quantidade, i.quantidade_planejada);
+        return { 
+          ...i, 
+          quantidade_real: quantidade,
+          variacao_percentual: variacao,
+          status: getStatus(variacao)
+        };
+      }
+      return i;
     }));
   };
 
@@ -233,8 +252,8 @@ export default function IniciarProducaoDialog({
   const hasVariacaoCritica = insumos.some(i => i.status === 'critico');
   const hasVariacaoAlerta = insumos.some(i => i.status === 'alerta');
 
-  // Calculate estimated cost based on adjusted quantities
-  const custoTotalEstimado = insumos.reduce((sum, i) => sum + (i.quantidade_ajustada * i.custo_unitario), 0);
+  // Calculate estimated cost based on planned quantities
+  const custoTotalEstimado = insumos.reduce((sum, i) => sum + (i.quantidade_planejada * i.custo_unitario), 0);
   const custoPorKgEstimado = quantidadeProduzida > 0 ? custoTotalEstimado / quantidadeProduzida : 0;
 
   const getVariacaoBadge = (insumo: InsumoRevisao) => {
@@ -289,14 +308,14 @@ export default function IniciarProducaoDialog({
 
       if (opError) throw opError;
 
-      // 2. Update item quantities with adjusted values
+      // 2. Update item quantities with planned values
       for (const insumo of insumos) {
         await supabase
           .from('ordens_producao_itens')
           .update({ 
-            quantidade_necessaria: insumo.quantidade_ajustada,
+            quantidade_necessaria: insumo.quantidade_planejada,
             custo_unitario: insumo.custo_unitario,
-            custo_total: insumo.quantidade_ajustada * insumo.custo_unitario
+            custo_total: insumo.quantidade_planejada * insumo.custo_unitario
           })
           .eq('id', insumo.id);
       }
@@ -310,13 +329,14 @@ export default function IniciarProducaoDialog({
           origem: 'manual',
           dados_adicionais: { 
             lote_producao: loteProducao,
-            quantidade_ajustada: quantidadeProduzida,
+            quantidade_planejada: quantidadeProduzida,
             custo_estimado: custoTotalEstimado,
-            insumos_ajustados: insumos.map(i => ({
+            insumos: insumos.map(i => ({
               id: i.insumo_id,
               nome: i.nome,
               quantidade_original: i.quantidade_necessaria,
-              quantidade_ajustada: i.quantidade_ajustada,
+              quantidade_planejada: i.quantidade_planejada,
+              quantidade_real: i.quantidade_real,
               variacao: i.variacao_percentual
             }))
           }
@@ -512,13 +532,20 @@ export default function IniciarProducaoDialog({
                         {insumo.estoque_disponivel.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} {insumo.unidade_medida}
                       </TableCell>
                       <TableCell className="text-right">
-                        {insumo.quantidade_necessaria.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} {insumo.unidade_medida}
+                        <Input
+                          type="number"
+                          value={insumo.quantidade_planejada}
+                          onChange={(e) => updatePrevisto(insumo.id, Number(e.target.value))}
+                          className="w-28 text-right ml-auto"
+                          min={0}
+                          step={0.01}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
                           type="number"
-                          value={insumo.quantidade_ajustada}
-                          onChange={(e) => updateInsumoQuantidade(insumo.id, Number(e.target.value))}
+                          value={insumo.quantidade_real}
+                          onChange={(e) => updateQuantidadeReal(insumo.id, Number(e.target.value))}
                           className="w-28 text-right ml-auto"
                           min={0}
                           step={0.01}
