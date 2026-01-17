@@ -211,7 +211,7 @@ export function useLoteAnalytics() {
       // Buscar dados de performance para todos os lotes
       const loteIds = lotes.map(l => l.id);
       
-      const [mortalidadeRes, pesagensRes, desempenhoRes] = await Promise.all([
+      const [mortalidadeRes, pesagensRes, desempenhoRes, historicoSiloRes, solicitacoesRes] = await Promise.all([
         supabase
           .from('mortalidade')
           .select('lote_id, mortalidade_itens(quantidade)')
@@ -225,11 +225,39 @@ export function useLoteAnalytics() {
           .from('desempenho_aves')
           .select('*')
           .order('dia', { ascending: true }),
+        // Buscar dados de silo para calcular consumo real
+        supabase
+          .from('historico_nivel_silo')
+          .select('lote_id, nivel_estimado_kg, created_at')
+          .in('lote_id', loteIds)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('solicitacoes_racao')
+          .select('lote_id, quantidade_recebida_kg')
+          .in('lote_id', loteIds)
+          .eq('status', 'recebido'),
       ]);
 
       const mortalidadeData = mortalidadeRes.data || [];
       const pesagensData = pesagensRes.data || [];
       const desempenhoData = desempenhoRes.data || [];
+      const historicoSiloData = historicoSiloRes.data || [];
+      const solicitacoesData = solicitacoesRes.data || [];
+
+      // Função para calcular consumo real do silo para um lote
+      const getConsumoRealSilo = (loteId: string): number => {
+        // Total de ração recebida
+        const totalRecebido = solicitacoesData
+          .filter(s => s.lote_id === loteId)
+          .reduce((sum, s) => sum + (s.quantidade_recebida_kg || 0), 0);
+        
+        // Último nível do silo (já ordenado por created_at desc)
+        const ultimoSilo = historicoSiloData.find(h => h.lote_id === loteId);
+        const nivelSilo = ultimoSilo?.nivel_estimado_kg || 0;
+        
+        // Consumo real = recebido - estoque atual
+        return Math.max(0, totalRecebido - nivelSilo);
+      };
 
       // Processar cada lote
       const analyticsData: LoteAnalytics[] = lotes.map(lote => {
@@ -276,15 +304,21 @@ export function useLoteAnalytics() {
           ? (desempenhoRef.consumo_acumulado_racao_g / 1000) * avesVivas 
           : 0;
         
-        // Usar consumo real da pesagem ou estimado
-        const consumoRealKg = ultimaPesagem?.consumo_real_kg || consumoEstimadoKg;
+        // Usar consumo real: 1) pesagem, 2) cálculo do silo, 3) estimado
+        let consumoRealKg = ultimaPesagem?.consumo_real_kg || 0;
+        if (!consumoRealKg || consumoRealKg === 0) {
+          consumoRealKg = getConsumoRealSilo(lote.id);
+        }
+        if (!consumoRealKg || consumoRealKg === 0) {
+          consumoRealKg = consumoEstimadoKg; // fallback final
+        }
         
-        // Calcular CA em tempo real se não houver valor salvo na pesagem
+        // Calcular CA em tempo real
         // Fórmula: CA = Consumo Total (kg) / (Peso Médio (kg) × Aves Vivas)
         let caAtual = ultimaPesagem?.conversao_alimentar || 0;
-        if (caAtual === 0 && pesoAtual > 0 && avesVivas > 0) {
+        if (caAtual === 0 && pesoAtual > 0 && avesVivas > 0 && consumoRealKg > 0) {
           const massaTotalKg = pesoAtual * avesVivas;
-          if (massaTotalKg > 0 && consumoRealKg > 0) {
+          if (massaTotalKg > 0) {
             caAtual = consumoRealKg / massaTotalKg;
           }
         }
