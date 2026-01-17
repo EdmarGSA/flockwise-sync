@@ -81,7 +81,14 @@ export function NivelSiloSelector({
             <Label className="text-xs text-muted-foreground">Anéis preenchidos</Label>
             <Select 
               value={nivelAneis.toString()} 
-              onValueChange={(v) => onNivelAneisChange(parseFloat(v))}
+              onValueChange={(v) => {
+                const aneis = parseFloat(v);
+                onNivelAneisChange(aneis);
+                // Se tem ração nos anéis, funil está necessariamente cheio (gravidade)
+                if (aneis > 0) {
+                  onNivelFunilChange(1);
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
