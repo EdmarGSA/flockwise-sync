@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, ArrowRight, Check, Scale, Copy, Plus, Pencil, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, Scale, Copy, Plus, Pencil, X, Link2 } from 'lucide-react';
 import DivergenciasReportDialog from './DivergenciasReportDialog';
+import { VinculoProdutoConferenciaDialog } from './VinculoProdutoConferenciaDialog';
 
 interface RecebimentoItem {
   id: string;
@@ -85,6 +86,11 @@ export default function ConferenciaFisicaDialog({
   const [selectedProduto, setSelectedProduto] = useState('');
   const [newProdutoQtd, setNewProdutoQtd] = useState('');
   const [newProdutoPreco, setNewProdutoPreco] = useState('');
+  
+  // Vinculação state
+  const [showVinculo, setShowVinculo] = useState(false);
+  const [itemParaVincular, setItemParaVincular] = useState<RecebimentoItem | null>(null);
+  const [parceiroId, setParceiroId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && recebimentoId) {
@@ -96,6 +102,7 @@ export default function ConferenciaFisicaDialog({
   const fetchItens = async () => {
     setLoading(true);
     try {
+      // Fetch items
       const { data, error } = await supabase
         .from('recebimento_itens')
         .select(`
@@ -117,6 +124,8 @@ export default function ConferenciaFisicaDialog({
         .eq('recebimento_id', recebimentoId);
 
       if (error) throw error;
+
+      // Note: parceiro_id lookup handled separately to avoid type issues
 
       // Cast and add gtin fields (may not exist in DB yet)
       const itensWithGtin = (data || []).map((item: any) => ({
@@ -565,9 +574,21 @@ export default function ConferenciaFisicaDialog({
                                   <AlertTriangle className="w-3 h-3" />
                                   Produto não vinculado
                                 </div>
-                                <div className="text-xs">
+                                <div className="text-xs mb-1">
                                   Cód: {item.codigo_produto_nfe}
                                 </div>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs"
+                                  onClick={() => {
+                                    setItemParaVincular(item);
+                                    setShowVinculo(true);
+                                  }}
+                                >
+                                  <Link2 className="w-3 h-3 mr-1" />
+                                  Vincular
+                                </Button>
                               </div>
                             )}
                             {item.descricao_produto_nfe && item.produtos && item.descricao_produto_nfe !== item.produtos.nome && (
@@ -750,6 +771,30 @@ export default function ConferenciaFisicaDialog({
                 {saving ? 'Salvando...' : 'Conferir e Analisar Divergências'}
               </Button>
             </div>
+
+            {/* Vinculação Dialog */}
+            <VinculoProdutoConferenciaDialog
+              open={showVinculo}
+              onOpenChange={setShowVinculo}
+              item={itemParaVincular ? {
+                id: itemParaVincular.id,
+                descricao_nfe: itemParaVincular.descricao_produto_nfe || '',
+                codigo_produto_nfe: itemParaVincular.codigo_produto_nfe,
+                ncm_nfe: null,
+                gtin_nfe: itemParaVincular.gtin_nfe,
+                cest_nfe: null,
+                unidade_compra: itemParaVincular.unidade_compra,
+                preco_nfe: itemParaVincular.preco_nfe,
+                quantidade_nfe: itemParaVincular.quantidade_nfe
+              } : null}
+              integradoId={integradoId}
+              parceiroId={parceiroId}
+              recebimentoId={recebimentoId}
+              onVinculado={() => {
+                fetchItens();
+                setItemParaVincular(null);
+              }}
+            />
           </>
         )}
       </DialogContent>
