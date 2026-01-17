@@ -309,15 +309,41 @@ export function useLoteAnalytics() {
           ? ((consumoRealKg - consumoEsperadoKg) / consumoEsperadoKg) * 100 
           : 0;
 
-        // Atraso de ciclo (estimativa baseada no peso)
+        // Atraso de ciclo - buscar dia equivalente na tabela de referência
+        // Mesma lógica usada em MetasPesoLote.tsx
         let atrasoDias = 0;
         let dataEstimadaSaida: string | null = null;
-        if (lote.data_prevista_saida && pesoAtual > 0 && pesoReferencia > 0) {
-          const proporcaoPeso = pesoAtual / pesoReferencia;
-          if (proporcaoPeso < 0.95) {
-            // Estimar atraso baseado na diferença de peso
-            atrasoDias = Math.round((1 - proporcaoPeso) * 7); // Aproximadamente 1 dia por 10% de atraso
-            dataEstimadaSaida = addDays(new Date(lote.data_prevista_saida), atrasoDias).toISOString();
+        
+        if (pesoAtual > 0 && desempenhoData.length > 0) {
+          // Filtrar dados da mesma linhagem e sexo
+          const desempenhoFiltrado = desempenhoData.filter(
+            d => d.linhagem === lote.linhagem && d.sexo === lote.sexo
+          );
+          
+          if (desempenhoFiltrado.length > 0) {
+            // Encontrar o dia cujo peso de referência é mais próximo do peso atual
+            let menorDiferenca = Infinity;
+            let diaReferenciaEquivalente: number | null = null;
+            
+            for (const ref of desempenhoFiltrado) {
+              const pesoRefKg = ref.peso_g / 1000;
+              const diferenca = Math.abs(pesoRefKg - pesoAtual);
+              if (diferenca < menorDiferenca) {
+                menorDiferenca = diferenca;
+                diaReferenciaEquivalente = ref.dia;
+              }
+            }
+            
+            // Atraso = idade atual - dia equivalente
+            // Positivo = atrasado, Negativo = adiantado
+            if (diaReferenciaEquivalente !== null) {
+              atrasoDias = idadeDias - diaReferenciaEquivalente;
+              
+              // Calcular data estimada de saída se houver atraso
+              if (atrasoDias > 0 && lote.data_prevista_saida) {
+                dataEstimadaSaida = addDays(new Date(lote.data_prevista_saida), atrasoDias).toISOString();
+              }
+            }
           }
         }
 
