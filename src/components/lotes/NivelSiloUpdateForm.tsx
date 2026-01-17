@@ -444,7 +444,14 @@ export function NivelSiloUpdateForm({
             <Label className="text-xs text-muted-foreground">Anéis preenchidos</Label>
             <Select 
               value={nivelAneis.toString()} 
-              onValueChange={(v) => setNivelAneis(parseFloat(v))}
+              onValueChange={(v) => {
+                const aneis = parseFloat(v);
+                setNivelAneis(aneis);
+                // Se tem ração nos anéis, funil está necessariamente cheio (gravidade)
+                if (aneis > 0) {
+                  setNivelFunil(1);
+                }
+              }}
               disabled={isAlreadySaved}
             >
               <SelectTrigger>
