@@ -38,6 +38,7 @@ interface InsumoRevisao {
   isOk: boolean;
   variacao_percentual: number;
   status: 'ok' | 'alerta' | 'critico';
+  proporcao_original: number; // Proporção na fórmula (0-1)
 }
 
 interface IniciarProducaoDialogProps {
@@ -117,7 +118,7 @@ export default function IniciarProducaoDialog({
       if (error) throw error;
 
       // Fetch current stock for each item
-      const insumosComEstoque: InsumoRevisao[] = await Promise.all(
+      const insumosTemp = await Promise.all(
         (data || []).map(async (item) => {
           const insumoData = item.insumo as any;
           
@@ -145,10 +146,20 @@ export default function IniciarProducaoDialog({
             custo_unitario: custoUnit,
             isOk: estoqueAtual >= qtdNecessaria,
             variacao_percentual: 0,
-            status: 'ok' as const
+            status: 'ok' as const,
+            proporcao_original: 0 // Will be calculated below
           };
         })
       );
+
+      // Calculate total to determine proportions
+      const totalOriginal = insumosTemp.reduce((sum, i) => sum + i.quantidade_necessaria, 0);
+      
+      // Set proportion for each ingredient
+      const insumosComEstoque: InsumoRevisao[] = insumosTemp.map(insumo => ({
+        ...insumo,
+        proporcao_original: totalOriginal > 0 ? insumo.quantidade_necessaria / totalOriginal : 0
+      }));
 
       setInsumos(insumosComEstoque);
     } catch (error) {
@@ -172,8 +183,9 @@ export default function IniciarProducaoDialog({
   };
 
   const updateInsumoQuantidade = (id: string, quantidade: number) => {
-    setInsumos(prev => {
-      const updated = prev.map(i => {
+    if (!proporcionalidadeAtiva) {
+      // Manual mode: only update the edited item
+      setInsumos(prev => prev.map(i => {
         if (i.id === id) {
           const variacao = calcularVariacao(quantidade, i.quantidade_necessaria);
           return { 
@@ -185,16 +197,35 @@ export default function IniciarProducaoDialog({
           };
         }
         return i;
-      });
+      }));
+      return;
+    }
 
-      // If proportionality is active, produced quantity = sum of ingredients
-      if (proporcionalidadeAtiva) {
-        const totalInsumos = updated.reduce((sum, i) => sum + i.quantidade_ajustada, 0);
-        setQuantidadeProduzida(Math.round(totalInsumos));
-      }
+    // Proportional mode: recalculate ALL ingredients
+    const insumoEditado = insumos.find(i => i.id === id);
+    if (!insumoEditado || insumoEditado.proporcao_original === 0) return;
 
-      return updated;
-    });
+    // Calculate new total based on the edited ingredient's proportion
+    // Ex: corn was 429kg (42.9% of total), now is 425kg
+    // New total = 425 / 0.429 = 990.6 kg (proportional)
+    const novoTotal = quantidade / insumoEditado.proporcao_original;
+    setQuantidadeProduzida(Math.round(novoTotal));
+
+    // Recalculate all ingredients proportionally
+    setInsumos(prev => prev.map(i => {
+      const novaQtdAjustada = i.id === id 
+        ? quantidade 
+        : Math.round(novoTotal * i.proporcao_original * 100) / 100;
+      
+      const variacao = calcularVariacao(novaQtdAjustada, i.quantidade_necessaria);
+      return {
+        ...i,
+        quantidade_ajustada: novaQtdAjustada,
+        isOk: i.estoque_disponivel >= novaQtdAjustada,
+        variacao_percentual: variacao,
+        status: getStatus(variacao)
+      };
+    }));
   };
 
   const allInsumosOk = insumos.every(i => i.isOk);
