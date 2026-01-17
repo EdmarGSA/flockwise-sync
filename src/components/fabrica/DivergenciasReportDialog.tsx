@@ -327,33 +327,45 @@ export default function DivergenciasReportDialog({
 
       // Update contas_pagar if linked to OC
       if (recebimento?.ordem_compra_id) {
+        // Verificar se já existe conta pendente para esta OC (evitar duplicação)
+        const { data: contaExistente } = await supabase
+          .from('contas_pagar')
+          .select('id')
+          .eq('ordem_compra_id', recebimento.ordem_compra_id)
+          .eq('status', 'pendente')
+          .maybeSingle();
+
+        // Deletar conta prevista (se existir)
         await supabase
           .from('contas_pagar')
           .delete()
           .eq('ordem_compra_id', recebimento.ordem_compra_id)
           .eq('status', 'previsto');
 
-        const { data: oc } = await supabase
-          .from('ordens_compra')
-          .select('parceiro_id, data_vencimento, prazo_pagamento_dias')
-          .eq('id', recebimento.ordem_compra_id)
-          .single();
+        // Só criar nova conta se não existir uma pendente
+        if (!contaExistente) {
+          const { data: oc } = await supabase
+            .from('ordens_compra')
+            .select('parceiro_id, data_vencimento, prazo_pagamento_dias')
+            .eq('id', recebimento.ordem_compra_id)
+            .single();
 
-        if (oc) {
-          const vencimento = oc.data_vencimento || new Date(Date.now() + (oc.prazo_pagamento_dias || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          if (oc) {
+            const vencimento = oc.data_vencimento || new Date(Date.now() + (oc.prazo_pagamento_dias || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-          await supabase
-            .from('contas_pagar')
-            .insert({
-              integrado_id: integradoId,
-              ordem_compra_id: recebimento.ordem_compra_id,
-              parceiro_id: oc.parceiro_id,
-              descricao: `NF-e ${recebimento.numero_nfe || 'S/N'} - Recebimento`,
-              valor: recebimento.valor_nfe,
-              data_vencimento: vencimento,
-              status: 'pendente',
-              categoria: 'compra_mercadoria'
-            });
+            await supabase
+              .from('contas_pagar')
+              .insert({
+                integrado_id: integradoId,
+                ordem_compra_id: recebimento.ordem_compra_id,
+                parceiro_id: oc.parceiro_id,
+                descricao: `NF-e ${recebimento.numero_nfe || 'S/N'} - Recebimento`,
+                valor: recebimento.valor_nfe,
+                data_vencimento: vencimento,
+                status: 'pendente',
+                categoria: 'compra_mercadoria'
+              });
+          }
         }
 
         // Update OC status
