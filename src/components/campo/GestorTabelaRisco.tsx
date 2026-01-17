@@ -88,6 +88,16 @@ export function GestorTabelaRisco({ analytics, loading }: GestorTabelaRiscoProps
     }
   };
 
+  const getAtrasoDisplay = (atrasoDias: number) => {
+    if (atrasoDias === 0) {
+      return <span className="text-green-500">0d</span>;
+    } else if (atrasoDias <= 2) {
+      return <span className="text-yellow-500">+{atrasoDias.toFixed(1)}d</span>;
+    } else {
+      return <span className="text-destructive font-medium">+{atrasoDias.toFixed(1)}d</span>;
+    }
+  };
+
   if (loading) {
     return (
       <Card className="bg-card border-border">
@@ -147,6 +157,7 @@ export function GestorTabelaRisco({ analytics, loading }: GestorTabelaRiscoProps
                 <TableHead className="text-muted-foreground text-center">Mort.</TableHead>
                 <TableHead className="text-muted-foreground text-center">CA</TableHead>
                 <TableHead className="text-muted-foreground text-center">Peso vs Meta</TableHead>
+                <TableHead className="text-muted-foreground text-center">Atraso</TableHead>
                 <TableHead className="text-muted-foreground text-center">Score</TableHead>
                 <TableHead className="text-muted-foreground text-center">Status</TableHead>
                 <TableHead className="text-muted-foreground w-10"></TableHead>
@@ -186,6 +197,9 @@ export function GestorTabelaRisco({ analytics, loading }: GestorTabelaRiscoProps
                   </TableCell>
                   <TableCell className="text-center">
                     {getPesoVsMetaDisplay(lote.pesoVsMeta)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {getAtrasoDisplay(lote.atrasoDias)}
                   </TableCell>
                   <TableCell className="text-center">
                     {getScoreBadge(lote.score)}
