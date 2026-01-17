@@ -42,6 +42,15 @@ const formSchema = z.object({
   status_comercial: z.string().default("consumo"),
 });
 
+interface ProdutoFormDefaultValues {
+  nome?: string;
+  ncm?: string;
+  codigo_barras_ean?: string;
+  cest?: string;
+  custo_unitario?: number;
+  origem_mercadoria?: string;
+}
+
 interface ProdutoFormProps {
   integradoId: string;
   userId: string;
@@ -49,7 +58,8 @@ interface ProdutoFormProps {
   gruposProduto: any[];
   gruposAnimal: any[];
   fasesAnimal: any[];
-  onSuccess: () => void;
+  onSuccess: (produtoId?: string) => void;
+  defaultValues?: ProdutoFormDefaultValues;
 }
 
 const unidadesMedida = ["UN", "KG", "G", "L", "ML", "M", "CM", "M2", "M3", "CX", "PCT", "SC", "FD", "TON"];
@@ -77,7 +87,7 @@ const generateSKU = () => {
   return `PRD-${timestamp}-${random}`;
 };
 
-const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAnimal, fasesAnimal, onSuccess }: ProdutoFormProps) => {
+const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAnimal, fasesAnimal, onSuccess, defaultValues: defaultValuesFromProps }: ProdutoFormProps) => {
   const [loading, setLoading] = useState(false);
   const [fasesDisponiveis, setFasesDisponiveis] = useState<any[]>([]);
 
@@ -85,7 +95,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
     resolver: zodResolver(formSchema),
     defaultValues: {
       sku: generateSKU(),
-      nome: "",
+      nome: defaultValuesFromProps?.nome || "",
       descricao: "",
       categoria_id: "",
       grupo_produto_id: "",
@@ -94,16 +104,16 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       marca: "",
       ativo: true,
       unidade_medida: "UN",
-      codigo_barras_ean: "",
+      codigo_barras_ean: defaultValuesFromProps?.codigo_barras_ean || "",
       estoque_atual: 0,
       estoque_minimo: 0,
       localizacao_estoque: "",
-      custo_unitario: 0,
+      custo_unitario: defaultValuesFromProps?.custo_unitario || 0,
       custo_medio: 0,
       preco_venda: 0,
-      ncm: "",
-      cest: "",
-      origem_mercadoria: "0",
+      ncm: defaultValuesFromProps?.ncm || "",
+      cest: defaultValuesFromProps?.cest || "",
+      origem_mercadoria: defaultValuesFromProps?.origem_mercadoria || "0",
       embalagem_tipo: "",
       embalagem_primaria: "",
       embalagem_secundaria: "",
@@ -135,7 +145,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
-    const { error } = await supabase.from('produtos').insert({
+    const { data, error } = await supabase.from('produtos').insert({
       ...values,
       categoria_id: values.categoria_id || null,
       grupo_produto_id: values.grupo_produto_id || null,
@@ -143,7 +153,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       fase_animal_id: values.fase_animal_id || null,
       integrado_id: integradoId,
       criado_por: userId,
-    } as any);
+    } as any).select('id').single();
 
     setLoading(false);
 
@@ -152,7 +162,7 @@ const ProdutoForm = ({ integradoId, userId, categorias, gruposProduto, gruposAni
       return;
     }
 
-    onSuccess();
+    onSuccess(data?.id);
   };
 
   return (
