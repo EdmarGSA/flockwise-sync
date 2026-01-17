@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Factory, RefreshCw, Loader2, Plus } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Factory, RefreshCw, Loader2, Plus, ExternalLink, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import DemandaProducaoCard from './DemandaProducaoCard';
 import RacoesCriticasCard from './RacoesCriticasCard';
-import OrdensProducaoTable from './OrdensProducaoTable';
 import GerarOPDialog from './GerarOPDialog';
 import NovaOrdemProducaoDialog from './NovaOrdemProducaoDialog';
 import SolicitacoesAbertoDialog from './SolicitacoesAbertoDialog';
@@ -30,6 +31,7 @@ interface GestaoProducaoTabProps {
 const MARGEM_SEGURANCA = 500; // kg - safety stock margin
 
 export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [totalSolicitado, setTotalSolicitado] = useState(0);
   const [previsaoConsumo3d, setPrevisaoConsumo3d] = useState(0);
@@ -42,6 +44,7 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
   const [showPrevisao, setShowPrevisao] = useState(false);
   const [showEstoque, setShowEstoque] = useState(false);
   const [showCobertura, setShowCobertura] = useState(false);
+  const [ordensCount, setOrdensCount] = useState(0);
 
   useEffect(() => {
     if (integradoId) {
@@ -231,11 +234,28 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
         onGerarOP={handleGerarOP}
       />
 
-      {/* Production Orders Table */}
-      <OrdensProducaoTable
-        integradoId={integradoId}
-        onRefresh={fetchDemandaData}
-      />
+      {/* Production Orders Navigation Card */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <ClipboardList className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Ordens de Produção</h3>
+                <p className="text-sm text-muted-foreground">
+                  Gerencie as ordens de produção de ração
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => navigate('/ordens-producao')}>
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Abrir Ordens de Produção
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Generate OP Dialog (from critical) */}
       <GerarOPDialog
