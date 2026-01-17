@@ -262,8 +262,6 @@ export function useLoteAnalytics() {
           // peso_liquido_g é armazenado em kg por compatibilidade
           pesoAtual = totalAves > 0 ? totalPeso / totalAves : 0;
         }
-        const caAtual = ultimaPesagem?.conversao_alimentar || 0;
-        const consumoRealKg = ultimaPesagem?.consumo_real_kg || 0;
 
         // Peso de referência para a linhagem/sexo/dia
         const desempenhoRef = desempenhoData.find(
@@ -272,9 +270,32 @@ export function useLoteAnalytics() {
                d.sexo === lote.sexo
         );
         const pesoReferencia = desempenhoRef?.peso_g ? desempenhoRef.peso_g / 1000 : 0;
-        const consumoEsperadoKg = desempenhoRef?.consumo_acumulado_racao_g 
+        
+        // Consumo estimado baseado na tabela de referência
+        const consumoEstimadoKg = desempenhoRef?.consumo_acumulado_racao_g 
           ? (desempenhoRef.consumo_acumulado_racao_g / 1000) * avesVivas 
           : 0;
+        
+        // Usar consumo real da pesagem ou estimado
+        const consumoRealKg = ultimaPesagem?.consumo_real_kg || consumoEstimadoKg;
+        
+        // Calcular CA em tempo real se não houver valor salvo na pesagem
+        // Fórmula: CA = Consumo Total (kg) / (Peso Médio (kg) × Aves Vivas)
+        let caAtual = ultimaPesagem?.conversao_alimentar || 0;
+        if (caAtual === 0 && pesoAtual > 0 && avesVivas > 0) {
+          const massaTotalKg = pesoAtual * avesVivas;
+          if (massaTotalKg > 0 && consumoRealKg > 0) {
+            caAtual = consumoRealKg / massaTotalKg;
+          }
+        }
+        
+        // Se ainda não temos peso real, usar CA de referência
+        if (caAtual === 0 && desempenhoRef?.conversao_alimentar_acumulada) {
+          caAtual = desempenhoRef.conversao_alimentar_acumulada;
+        }
+        
+        // Consumo esperado para cálculo de desvio
+        const consumoEsperadoKg = consumoEstimadoKg;
 
         // Desvios
         const pesoVsMeta = pesoReferencia > 0 
