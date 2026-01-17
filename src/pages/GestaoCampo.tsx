@@ -108,7 +108,7 @@ export default function GestaoCampo() {
   const [desempenhoData, setDesempenhoData] = useState<DesempenhoAve[]>([]);
   const [gruposAnimal, setGruposAnimal] = useState<GrupoAnimal[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [activeTab, setActiveTab] = useState('lotes');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [showForm, setShowForm] = useState(false);
   const [loteDialogOpen, setLoteDialogOpen] = useState(false);
   const [editingGalpao, setEditingGalpao] = useState<Galpao | null>(null);
@@ -296,7 +296,11 @@ export default function GestaoCampo() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex w-auto min-w-full sm:w-auto sm:grid sm:grid-cols-5">
+              <TabsList className="inline-flex w-auto min-w-full sm:w-auto sm:grid sm:grid-cols-6">
+                <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </TabsTrigger>
                 <TabsTrigger value="lotes" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
                   <Bird className="h-4 w-4" />
                   <span className="hidden sm:inline">Lotes</span>
@@ -320,7 +324,7 @@ export default function GestaoCampo() {
               </TabsList>
             </div>
 
-            {activeTab === 'lotes' ? (
+            {activeTab === 'dashboard' ? null : activeTab === 'lotes' ? (
               <Dialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
@@ -346,18 +350,22 @@ export default function GestaoCampo() {
                   </Tabs>
                 </DialogContent>
               </Dialog>
-            ) : activeTab !== 'desempenho' ? (
-              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
-              </Button>
-            ) : (
+            ) : activeTab === 'desempenho' ? (
               <Button onClick={() => setShowForm(!showForm)} className="gap-2">
                 <Plus className="w-4 h-4" />
                 {showForm ? 'Fechar Formulário' : 'Novo Registro'}
               </Button>
+            ) : (
+              <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {showForm ? 'Fechar Formulário' : 'Novo Cadastro'}
+              </Button>
             )}
           </div>
+
+          <TabsContent value="dashboard">
+            {integradoId && <GestorDashboard integradoId={integradoId} />}
+          </TabsContent>
 
           <TabsContent value="lotes" className="space-y-6">
             {/* Stats */}
