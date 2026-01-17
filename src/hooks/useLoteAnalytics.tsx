@@ -218,7 +218,7 @@ export function useLoteAnalytics() {
           .in('lote_id', loteIds),
         supabase
           .from('pesagens')
-          .select('lote_id, peso_medio_kg, consumo_real_kg, conversao_alimentar, data_pesagem')
+          .select('lote_id, consumo_real_kg, conversao_alimentar, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_g)')
           .in('lote_id', loteIds)
           .order('data_pesagem', { ascending: false }),
         supabase
@@ -252,9 +252,16 @@ export function useLoteAnalytics() {
         const metasMort = getMetasForDia(metas, idadeDias, 'mortalidade');
         const metasCA = getMetasForDia(metas, idadeDias, 'ca');
 
-        // Última pesagem
+        // Última pesagem - calcular peso médio a partir dos itens
         const ultimaPesagem = pesagensData.find(p => p.lote_id === lote.id);
-        const pesoAtual = ultimaPesagem?.peso_medio_kg || 0;
+        let pesoAtual = 0;
+        if (ultimaPesagem?.pesagem_itens) {
+          const itens = ultimaPesagem.pesagem_itens as { quantidade_aves: number; peso_liquido_g: number }[];
+          const totalAves = itens.reduce((acc, i) => acc + (i.quantidade_aves || 0), 0);
+          const totalPeso = itens.reduce((acc, i) => acc + (i.peso_liquido_g || 0), 0);
+          // peso_liquido_g é armazenado em kg por compatibilidade
+          pesoAtual = totalAves > 0 ? totalPeso / totalAves : 0;
+        }
         const caAtual = ultimaPesagem?.conversao_alimentar || 0;
         const consumoRealKg = ultimaPesagem?.consumo_real_kg || 0;
 
