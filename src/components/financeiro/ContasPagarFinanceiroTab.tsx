@@ -1,16 +1,46 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, isPast, isToday } from "date-fns";
-import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, DollarSign, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 interface ContasPagarFinanceiroTabProps {
   userId: string;
 }
 
+interface ContaPagar {
+  id: string;
+  descricao: string;
+  valor: number;
+  valor_pago: number | null;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  status: string;
+  conta_bancaria_id: string | null;
+  parceiros: { razao_social_nome: string } | null;
+  plano_contas: { nome: string } | null;
+  centro_custos: { nome: string } | null;
+}
+
 const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => {
+  const queryClient = useQueryClient();
+  const [selectedConta, setSelectedConta] = useState<ContaPagar | null>(null);
+  const [showPagamentoDialog, setShowPagamentoDialog] = useState(false);
+  const [valorPago, setValorPago] = useState("");
+  const [dataPagamento, setDataPagamento] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [contaBancariaId, setContaBancariaId] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const { data: contas, isLoading } = useQuery({
     queryKey: ['contas-pagar-financeiro', userId],
     queryFn: async () => {
@@ -26,6 +56,20 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
         .order('data_vencimento', { ascending: true });
       
       if (error) throw error;
+      return (data || []) as ContaPagar[];
+    }
+  });
+
+  const { data: contasBancarias } = useQuery({
+    queryKey: ['contas-bancarias', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contas_bancarias')
+        .select('id, banco_nome, conta, agencia')
+        .eq('integrado_id', userId)
+        .eq('ativo', true);
+      
+      if (error) throw error;
       return data || [];
     }
   });
@@ -37,7 +81,7 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
     }).format(value);
   };
 
-  const getStatusBadge = (conta: any) => {
+  const getStatusBadge = (conta: ContaPagar) => {
     if (conta.status === 'pago') {
       return <Badge variant="default" className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Pago</Badge>;
     }
@@ -48,7 +92,45 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
     if (isToday(vencimento)) {
       return <Badge variant="secondary" className="bg-amber-500 text-white"><Clock className="h-3 w-3 mr-1" />Vence Hoje</Badge>;
     }
-    return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
+    // Pendente = "A Pagar"
+    return <Badge variant="outline"><DollarSign className="h-3 w-3 mr-1" />A Pagar</Badge>;
+  };
+
+  const handleRegistrarPagamento = (conta: ContaPagar) => {
+    setSelectedConta(conta);
+    setValorPago(conta.valor.toString());
+    setDataPagamento(format(new Date(), "yyyy-MM-dd"));
+    setContaBancariaId(conta.conta_bancaria_id || "");
+    setShowPagamentoDialog(true);
+  };
+
+  const handleConfirmarPagamento = async () => {
+    if (!selectedConta) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('contas_pagar')
+        .update({
+          status: 'pago',
+          valor_pago: parseFloat(valorPago),
+          data_pagamento: dataPagamento,
+          conta_bancaria_id: contaBancariaId || null
+        })
+        .eq('id', selectedConta.id);
+
+      if (error) throw error;
+
+      toast.success('Pagamento registrado com sucesso!');
+      setShowPagamentoDialog(false);
+      setSelectedConta(null);
+      queryClient.invalidateQueries({ queryKey: ['contas-pagar-financeiro'] });
+    } catch (error) {
+      console.error('Erro ao registrar pagamento:', error);
+      toast.error('Erro ao registrar pagamento');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totalPendente = contas?.filter(c => c.status !== 'pago').reduce((acc, c) => acc + Number(c.valor), 0) || 0;
@@ -64,7 +146,7 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Pendente</CardTitle>
+            <CardTitle className="text-sm">Total A Pagar</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-amber-500">{formatCurrency(totalPendente)}</p>
@@ -102,6 +184,7 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
                 <TableHead>Centro Custo</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -113,11 +196,28 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
                   <TableCell>{conta.centro_custos?.nome || '-'}</TableCell>
                   <TableCell className="text-right font-medium">{formatCurrency(Number(conta.valor))}</TableCell>
                   <TableCell>{getStatusBadge(conta)}</TableCell>
+                  <TableCell>
+                    {conta.status !== 'pago' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleRegistrarPagamento(conta)}>
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Registrar Pagamento
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               {(!contas || contas.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Nenhuma conta a pagar cadastrada
                   </TableCell>
                 </TableRow>
@@ -126,6 +226,71 @@ const ContasPagarFinanceiroTab = ({ userId }: ContasPagarFinanceiroTabProps) => 
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog de Pagamento */}
+      <Dialog open={showPagamentoDialog} onOpenChange={setShowPagamentoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+            <DialogDescription>
+              {selectedConta?.descricao}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Valor Original</Label>
+              <p className="text-lg font-semibold">{selectedConta && formatCurrency(selectedConta.valor)}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="valorPago">Valor Pago</Label>
+              <Input
+                id="valorPago"
+                type="number"
+                step="0.01"
+                value={valorPago}
+                onChange={(e) => setValorPago(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dataPagamento">Data do Pagamento</Label>
+              <Input
+                id="dataPagamento"
+                type="date"
+                value={dataPagamento}
+                onChange={(e) => setDataPagamento(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Conta Bancária</Label>
+              <Select value={contaBancariaId} onValueChange={setContaBancariaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma conta (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias?.map((cb) => (
+                    <SelectItem key={cb.id} value={cb.id}>
+                      {cb.banco_nome} - Ag: {cb.agencia} / Conta: {cb.conta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPagamentoDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmarPagamento} disabled={loading || !valorPago}>
+              {loading ? 'Salvando...' : 'Confirmar Pagamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
