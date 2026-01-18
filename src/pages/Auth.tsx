@@ -10,6 +10,31 @@ import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react
 import logoGSA from "@/assets/logo-gsa.png";
 import { z } from 'zod';
 
+// Tradutor de erros do Supabase Auth
+const translateAuthError = (message: string): string => {
+  const errorMap: Record<string, string> = {
+    "Password should contain at least one character of each": "A senha deve conter letras minúsculas, maiúsculas e números",
+    "Password is known to be weak and easy to guess": "Esta senha é muito fraca e fácil de adivinhar",
+    "password should be at least 6 characters": "Senha deve ter no mínimo 6 caracteres",
+    "already registered": "Este email já está cadastrado",
+    "user already registered": "Usuário já cadastrado",
+    "invalid email": "Email inválido",
+    "email rate limit exceeded": "Limite de tentativas excedido. Aguarde alguns minutos",
+    "signup requires a valid password": "É necessário informar uma senha válida",
+    "unable to validate email address": "Não foi possível validar o email",
+    "email not confirmed": "Email não confirmado",
+    "Invalid login credentials": "Email ou senha incorretos",
+  };
+  
+  const lowerMessage = message.toLowerCase();
+  for (const [key, value] of Object.entries(errorMap)) {
+    if (lowerMessage.includes(key.toLowerCase())) {
+      return value;
+    }
+  }
+  return message;
+};
+
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }),
   password: z.string().min(6, { message: "Senha deve ter no mínimo 6 caracteres" }),
@@ -17,7 +42,11 @@ const loginSchema = z.object({
 
 const signUpSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }),
-  password: z.string().min(6, { message: "Senha deve ter no mínimo 6 caracteres" }),
+  password: z.string()
+    .min(8, { message: "Senha deve ter no mínimo 8 caracteres" })
+    .regex(/[a-z]/, { message: "Senha deve conter pelo menos uma letra minúscula" })
+    .regex(/[A-Z]/, { message: "Senha deve conter pelo menos uma letra maiúscula" })
+    .regex(/[0-9]/, { message: "Senha deve conter pelo menos um número" }),
   confirmPassword: z.string(),
   fullName: z.string().trim().min(2, { message: "Nome deve ter no mínimo 2 caracteres" }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -25,19 +54,24 @@ const signUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
-// Password strength checker
-const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
-  let score = 0;
+// Password strength checker with requirements
+const getPasswordStrength = (password: string): { 
+  score: number; 
+  label: string; 
+  color: string;
+  requirements: { met: boolean; text: string }[];
+} => {
+  const requirements = [
+    { met: password.length >= 8, text: 'Mínimo 8 caracteres' },
+    { met: /[a-z]/.test(password), text: 'Letra minúscula (a-z)' },
+    { met: /[A-Z]/.test(password), text: 'Letra maiúscula (A-Z)' },
+    { met: /[0-9]/.test(password), text: 'Número (0-9)' },
+  ];
   
-  if (password.length >= 6) score++;
-  if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
+  const metCount = requirements.filter(r => r.met).length;
   
-  if (score <= 2) return { score, label: 'Fraca', color: 'bg-destructive' };
-  if (score <= 3) return { score, label: 'Média', color: 'bg-yellow-500' };
-  return { score, label: 'Forte', color: 'bg-green-500' };
+  if (metCount < 4) return { score: metCount, label: 'Incompleta', color: 'bg-destructive', requirements };
+  return { score: 5, label: 'Forte', color: 'bg-green-500', requirements };
 };
 
 const Auth = () => {
@@ -166,19 +200,11 @@ const Auth = () => {
 
         const { error } = await signUp(email, password, fullName);
         if (error) {
-          if (error.message.includes('User already registered')) {
-            toast({
-              title: "Erro no cadastro",
-              description: "Este email já está cadastrado. Tente fazer login.",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Erro no cadastro",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
+          toast({
+            title: "Erro no cadastro",
+            description: translateAuthError(error.message),
+            variant: "destructive",
+          });
         } else {
           toast({
             title: "Conta criada!",
@@ -371,11 +397,20 @@ const Auth = () => {
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
               
-              {/* Password strength indicator - only on signup */}
+              {/* Password requirements indicator - only on signup */}
               {!isLogin && password && (
-                <div className="space-y-1">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((level) => (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Requisitos da senha:</p>
+                  <ul className="text-xs space-y-1">
+                    {passwordStrength.requirements.map((req, i) => (
+                      <li key={i} className={`flex items-center gap-1.5 ${req.met ? 'text-green-500' : 'text-muted-foreground'}`}>
+                        <span>{req.met ? '✓' : '○'}</span>
+                        <span>{req.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-1 pt-1">
+                    {[1, 2, 3, 4].map((level) => (
                       <div
                         key={level}
                         className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -387,10 +422,9 @@ const Auth = () => {
                     ))}
                   </div>
                   <p className={`text-xs ${
-                    passwordStrength.score <= 2 ? 'text-destructive' : 
-                    passwordStrength.score <= 3 ? 'text-yellow-500' : 'text-green-500'
+                    passwordStrength.score < 4 ? 'text-destructive' : 'text-green-500'
                   }`}>
-                    Força da senha: {passwordStrength.label}
+                    Força: {passwordStrength.label}
                   </p>
                 </div>
               )}
