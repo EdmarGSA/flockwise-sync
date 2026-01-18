@@ -363,13 +363,14 @@ export function NivelSiloCard({
   );
 }
 
-// Export a simplified hook for listing
+// Export a simplified hook for listing - now supports historico_nivel_silo
 export function useSiloLevel(
   loteId: string, 
   linhagem: 'cobb_500' | 'ross_308' | 'hubbard', 
   sexo: 'macho' | 'femea' | 'misto', 
   diasDesdeAlojamento: number, 
-  avesVivas: number
+  avesVivas: number,
+  galpaoId?: string
 ) {
   const [siloData, setSiloData] = useState<{
     nivelSilo: number;
@@ -389,7 +390,7 @@ export function useSiloLevel(
         // Fetch total received feed
         const { data: solicitacoes } = await supabase
           .from('solicitacoes_racao')
-          .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status')
+          .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status, data_recebimento')
           .eq('lote_id', loteId);
 
         const totalRecebido = (solicitacoes || []).reduce((total, s) => {
@@ -412,16 +413,49 @@ export function useSiloLevel(
           .limit(1)
           .maybeSingle();
 
-        if (desempenho) {
-          const consumoEstimadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-          const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-          const nivel = totalRecebido - consumoEstimadoKg;
-          const dias = consumoDiarioKg > 0 ? Math.floor(nivel / consumoDiarioKg) : 0;
-          
-          setSiloData({ nivelSilo: nivel, diasRestantes: dias, consumoDiarioEstimado: consumoDiarioKg, loading: false });
-        } else {
+        if (!desempenho) {
           setSiloData({ nivelSilo: totalRecebido, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
+          return;
         }
+
+        const consumoEstimadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
+        const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
+        
+        let nivel = totalRecebido - consumoEstimadoKg;
+
+        // If galpaoId is provided, check for historico_nivel_silo
+        if (galpaoId) {
+          const { data: historico } = await supabase
+            .from('historico_nivel_silo')
+            .select('nivel_estimado_kg, created_at')
+            .eq('galpao_id', galpaoId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (historico) {
+            const historicoDate = new Date(historico.created_at);
+            const now = new Date();
+            const horasDecorridas = differenceInHours(now, historicoDate);
+            const diasDecorridos = horasDecorridas / 24;
+            const consumoDesdeHistorico = consumoDiarioKg * diasDecorridos;
+
+            // Fetch ração recebida APÓS o último registro de nível
+            const racaoRecebidaDesdeHistorico = (solicitacoes || [])
+              .filter(s => 
+                (s.status === 'recebido' || s.status === 'parcialmente_devolvido') && 
+                s.data_recebimento && 
+                new Date(s.data_recebimento) > historicoDate
+              )
+              .reduce((sum, s) => sum + (s.quantidade_recebida_kg || 0), 0);
+
+            // Nível baseado no histórico: último nível informado + ração recebida depois - consumo desde então
+            nivel = Math.max(0, historico.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico);
+          }
+        }
+
+        const dias = consumoDiarioKg > 0 ? Math.floor(nivel / consumoDiarioKg) : 0;
+        setSiloData({ nivelSilo: nivel, diasRestantes: dias, consumoDiarioEstimado: consumoDiarioKg, loading: false });
       } catch (error) {
         console.error('Erro ao calcular nível do silo:', error);
         setSiloData({ nivelSilo: 0, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
@@ -429,7 +463,7 @@ export function useSiloLevel(
     };
 
     fetchData();
-  }, [loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas]);
+  }, [loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId]);
 
   return siloData;
 }

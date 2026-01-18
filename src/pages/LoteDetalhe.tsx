@@ -301,6 +301,7 @@ export default function LoteDetalhe() {
                     sexo={lote.sexo}
                     diasDesdeAlojamento={diasDesdeAlojamento}
                     avesVivas={avesVivas}
+                    galpaoId={lote.galpao_id}
                   />
                 </div>
               )}

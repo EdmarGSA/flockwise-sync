@@ -15,16 +15,18 @@ interface SiloBadgeProps {
   sexo: 'macho' | 'femea' | 'misto';
   diasDesdeAlojamento: number;
   avesVivas: number;
+  galpaoId?: string;
 }
 
-export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas }: SiloBadgeProps) {
+export function SiloBadge({ loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId }: SiloBadgeProps) {
   const { config } = useConfigSilo();
   const { diasRestantes, nivelSilo, consumoDiarioEstimado, loading } = useSiloLevel(
     loteId,
     linhagem,
     sexo,
     diasDesdeAlojamento,
-    avesVivas
+    avesVivas,
+    galpaoId
   );
 
   if (loading) {
