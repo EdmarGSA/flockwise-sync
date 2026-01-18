@@ -13,6 +13,8 @@ import { toast } from "sonner";
 
 const translateAuthError = (message: string): string => {
   const errorMap: Record<string, string> = {
+    "Password should contain at least one character of each": "A senha deve conter letras minúsculas, maiúsculas e números",
+    "Password is known to be weak and easy to guess": "Esta senha é muito fraca e fácil de adivinhar",
     "already registered": "Este email já está cadastrado",
     "user already registered": "Usuário já cadastrado",
     "invalid email": "Email inválido",
@@ -32,9 +34,28 @@ const translateAuthError = (message: string): string => {
   return "Erro ao cadastrar. Tente novamente.";
 };
 
+// Password strength checker with requirements
+const getPasswordStrength = (password: string): { 
+  requirements: { met: boolean; text: string }[];
+  allMet: boolean;
+} => {
+  const requirements = [
+    { met: password.length >= 8, text: 'Mínimo 8 caracteres' },
+    { met: /[a-z]/.test(password), text: 'Letra minúscula (a-z)' },
+    { met: /[A-Z]/.test(password), text: 'Letra maiúscula (A-Z)' },
+    { met: /[0-9]/.test(password), text: 'Número (0-9)' },
+  ];
+  
+  return { requirements, allMet: requirements.every(r => r.met) };
+};
+
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  password: z.string()
+    .min(8, "Senha deve ter no mínimo 8 caracteres")
+    .regex(/[a-z]/, "Senha deve conter pelo menos uma letra minúscula")
+    .regex(/[A-Z]/, "Senha deve conter pelo menos uma letra maiúscula")
+    .regex(/[0-9]/, "Senha deve conter pelo menos um número"),
   full_name: z.string().min(1, "Nome é obrigatório"),
   company_name: z.string().optional(),
   phone: z.string().optional(),
@@ -60,6 +81,9 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [adminIntegradoId, setAdminIntegradoId] = useState<string | null>(null);
+  const [passwordValue, setPasswordValue] = useState("");
+  
+  const passwordStrength = getPasswordStrength(passwordValue);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -196,9 +220,13 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
                   <div className="relative">
                     <Input 
                       type={showPassword ? "text" : "password"} 
-                      placeholder="Mínimo 6 caracteres" 
+                      placeholder="Mínimo 8 caracteres" 
                       className="pr-10"
                       {...field} 
+                      onChange={(e) => {
+                        field.onChange(e);
+                        setPasswordValue(e.target.value);
+                      }}
                     />
                     <button
                       type="button"
@@ -209,6 +237,18 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
                     </button>
                   </div>
                 </FormControl>
+                {passwordValue && (
+                  <div className="space-y-1.5 pt-1">
+                    <ul className="text-xs space-y-0.5">
+                      {passwordStrength.requirements.map((req, i) => (
+                        <li key={i} className={`flex items-center gap-1 ${req.met ? 'text-green-500' : 'text-muted-foreground'}`}>
+                          <span>{req.met ? '✓' : '○'}</span>
+                          <span>{req.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <FormMessage />
               </FormItem>
             )}
