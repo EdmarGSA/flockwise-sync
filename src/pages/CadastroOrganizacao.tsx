@@ -4,10 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Building2, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Building2, Pencil, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import OrganizacaoForm from "@/components/cadastro/OrganizacaoForm";
@@ -59,6 +58,18 @@ const CadastroOrganizacao = () => {
     toast({ title: "Organização salva com sucesso!" });
   };
 
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingOrg(null);
+  };
+
+  const formatCNPJ = (cnpj: string | null) => {
+    if (!cnpj) return '-';
+    const cleaned = cnpj.replace(/\D/g, '');
+    if (cleaned.length !== 14) return cnpj;
+    return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -72,41 +83,70 @@ const CadastroOrganizacao = () => {
     return null;
   }
 
+  // Show form in full page mode
+  if (showForm || editingOrg) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                {editingOrg ? "Editar Organização" : "Nova Organização"}
+              </h1>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <OrganizacaoForm 
+                integradoId={profile?.id} 
+                organizacao={editingOrg}
+                onSuccess={handleSuccess}
+                onCancel={handleCancel}
+              />
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-6 pt-24 pb-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+      <main className="container mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-12">
+        {/* Header Responsivo */}
+        <div className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Cadastro de Organização</h1>
-              <p className="text-muted-foreground">Gerencie dados da empresa</p>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-3xl font-bold text-foreground">Organizações</h1>
+                <p className="text-sm text-muted-foreground hidden sm:block">Gerencie dados da empresa</p>
+              </div>
             </div>
           </div>
+          <Button onClick={() => setShowForm(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nova Organização</span>
+          </Button>
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Organizações</CardTitle>
-            <Dialog open={showForm} onOpenChange={setShowForm}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="w-4 h-4" /> Nova Organização
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Nova Organização</DialogTitle>
-                </DialogHeader>
-                <OrganizacaoForm integradoId={profile?.id} onSuccess={handleSuccess} />
-              </DialogContent>
-            </Dialog>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-lg sm:text-xl">Organizações Cadastradas</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingData ? (
@@ -114,63 +154,88 @@ const CadastroOrganizacao = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : organizacoes.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhuma organização cadastrada</p>
+              <div className="text-center py-8">
+                <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Nenhuma organização cadastrada</p>
+                <Button onClick={() => setShowForm(true)} variant="outline" className="mt-4">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Cadastrar primeira organização
+                </Button>
+              </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>Cidade/UF</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile Cards */}
+                <div className="space-y-3 md:hidden">
                   {organizacoes.map((org) => (
-                    <TableRow key={org.id}>
-                      <TableCell className="font-medium">{org.nome}</TableCell>
-                      <TableCell>{org.cnpj || '-'}</TableCell>
-                      <TableCell>{org.cidade ? `${org.cidade}/${org.estado}` : '-'}</TableCell>
-                      <TableCell>{org.telefone || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={org.ativo ? "default" : "secondary"}>
-                          {org.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => setEditingOrg(org)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <div
+                      key={org.id}
+                      onClick={() => setEditingOrg(org)}
+                      className="p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors cursor-pointer active:scale-[0.98]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-foreground truncate">{org.nome}</h3>
+                            <Badge variant={org.ativo ? "default" : "secondary"} className="shrink-0">
+                              {org.ativo ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{formatCNPJ(org.cnpj)}</p>
+                          {org.cidade && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {org.cidade}{org.estado ? `/${org.estado}` : ''}
+                            </p>
+                          )}
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>CNPJ</TableHead>
+                        <TableHead>Cidade/UF</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {organizacoes.map((org) => (
+                        <TableRow key={org.id}>
+                          <TableCell className="font-medium">{org.nome}</TableCell>
+                          <TableCell>{formatCNPJ(org.cnpj)}</TableCell>
+                          <TableCell>{org.cidade ? `${org.cidade}/${org.estado}` : '-'}</TableCell>
+                          <TableCell>{org.telefone || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant={org.ativo ? "default" : "secondary"}>
+                              {org.ativo ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => setEditingOrg(org)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
-
-        {/* Edit Dialog */}
-        <Dialog open={!!editingOrg} onOpenChange={() => setEditingOrg(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Organização</DialogTitle>
-            </DialogHeader>
-            {editingOrg && (
-              <OrganizacaoForm 
-                integradoId={profile?.id} 
-                organizacao={editingOrg}
-                onSuccess={handleSuccess} 
-              />
-            )}
-          </DialogContent>
-        </Dialog>
       </main>
     </div>
   );
