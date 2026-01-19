@@ -132,6 +132,15 @@ const modules: ModuleCard[] = [
     color: 'from-slate-600 to-slate-800',
     systemAvailable: true,
   },
+  {
+    id: 'portal-fornecedor',
+    title: 'Portal do Fornecedor',
+    description: 'Estoque, pedidos e histórico de preços',
+    icon: Truck,
+    path: '/portal-fornecedor',
+    color: 'from-cyan-500 to-cyan-700',
+    systemAvailable: true,
+  },
 ];
 
 export default function Home() {
