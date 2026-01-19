@@ -24,17 +24,8 @@ interface CreateSupplierResponse {
   };
 }
 
-// Generate a secure random password
-function generatePassword(length: number = 12): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!';
-  let password = '';
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  for (let i = 0; i < length; i++) {
-    password += chars[array[i] % chars.length];
-  }
-  return password;
-}
+// Senha padrão para fornecedores - usuário deve alterar no primeiro acesso
+const DEFAULT_SUPPLIER_PASSWORD = 'For123#';
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -96,17 +87,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Supplier doesn't exist - create new user and supplier
+    // Create auth user with default password
     console.log('Creating new supplier user...');
-
-    // Generate password for new user
-    const generatedPassword = generatePassword(12);
-
-    // Create auth user
+    
     const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
-      password: generatedPassword,
-      email_confirm: true, // Auto-confirm email
+      password: DEFAULT_SUPPLIER_PASSWORD,
+      email_confirm: true,
       user_metadata: {
         full_name: razao_social_nome,
         is_supplier: true,
@@ -155,12 +142,13 @@ Deno.serve(async (req: Request) => {
 
     console.log('Supplier created:', newSupplier.id);
 
-    // Update profile with fornecedor_global_id
+    // Update profile with fornecedor_global_id and mark password as not changed
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
         fornecedor_global_id: newSupplier.id,
         full_name: razao_social_nome,
+        senha_alterada: false, // Precisa trocar a senha padrão
       })
       .eq('id', newUser.user.id);
 
@@ -192,7 +180,7 @@ Deno.serve(async (req: Request) => {
         message: 'Fornecedor criado com sucesso',
         credentials: {
           email,
-          password: generatedPassword,
+          password: DEFAULT_SUPPLIER_PASSWORD,
         },
       } as CreateSupplierResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

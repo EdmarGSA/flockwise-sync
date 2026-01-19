@@ -18,13 +18,6 @@ interface MembroEditDialogProps {
   membro: any;
   onSuccess: () => void;
 }
-
-interface Parceiro {
-  id: string;
-  razao_social_nome: string;
-  cpf_cnpj: string | null;
-}
-
 const rolesOptions = [
   { value: "admin", label: "Administrador" },
   { value: "integrado", label: "Integrado" },
@@ -33,7 +26,6 @@ const rolesOptions = [
   { value: "comprador", label: "Comprador" },
   { value: "conferente", label: "Conferente" },
   { value: "criador", label: "Criador" },
-  { value: "fornecedor", label: "Fornecedor" },
 ];
 
 const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditDialogProps) => {
@@ -46,11 +38,6 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [moduloChanges, setModuloChanges] = useState<{ modulo_id: string; permitido: boolean; nivel_acesso: NivelAcesso }[]>([]);
   const [integradoId, setIntegradoId] = useState<string>("");
-  const [parceiroId, setParceiroId] = useState<string>("");
-  const [parceiros, setParceiros] = useState<Parceiro[]>([]);
-  const [loadingParceiros, setLoadingParceiros] = useState(false);
-
-  const roleIncludesFornecedor = selectedRoles.includes("fornecedor");
 
   useEffect(() => {
     if (membro) {
@@ -59,7 +46,6 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
       setPhone(membro.phone || "");
       setRole(membro.role || "integrado");
       setSelectedRoles(membro.roles || []);
-      setParceiroId(membro.parceiro_id || "");
       setModuloChanges([]);
     }
   }, [membro]);
@@ -79,32 +65,6 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
     fetchIntegradoId();
   }, [user?.id]);
 
-  // Buscar parceiros fornecedores quando role incluir fornecedor
-  useEffect(() => {
-    const fetchParceiros = async () => {
-      if (!roleIncludesFornecedor || !integradoId) {
-        setParceiros([]);
-        return;
-      }
-      
-      setLoadingParceiros(true);
-      const { data, error } = await supabase
-        .from('parceiros')
-        .select('id, razao_social_nome, cpf_cnpj')
-        .in('tipo_cadastro', ['fornecedor', 'ambos'])
-        .eq('ativo', true)
-        .eq('integrado_id', integradoId)
-        .order('razao_social_nome');
-      
-      if (!error && data) {
-        setParceiros(data);
-      }
-      setLoadingParceiros(false);
-    };
-    
-    fetchParceiros();
-  }, [roleIncludesFornecedor, integradoId]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!membro) return;
@@ -119,13 +79,6 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
         phone: phone || null,
         role: role,
       };
-      
-      // Vincular ou desvincular parceiro baseado na role
-      if (roleIncludesFornecedor && parceiroId) {
-        profileUpdate.parceiro_id = parceiroId;
-      } else if (!roleIncludesFornecedor) {
-        profileUpdate.parceiro_id = null;
-      }
       
       const { error: profileError } = await supabase
         .from("profiles")
@@ -280,31 +233,6 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
             </div>
           </div>
 
-          {roleIncludesFornecedor && (
-            <div>
-              <Label>Vincular ao Parceiro (Fornecedor)</Label>
-              <Select value={parceiroId} onValueChange={setParceiroId}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder={loadingParceiros ? "Carregando..." : "Selecione o parceiro"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {parceiros.length === 0 && !loadingParceiros && (
-                    <SelectItem value="" disabled>
-                      Nenhum fornecedor cadastrado
-                    </SelectItem>
-                  )}
-                  {parceiros.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.razao_social_nome} {p.cpf_cnpj ? `- ${p.cpf_cnpj}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Vincule este usuário a um parceiro cadastrado como fornecedor para que ele possa acessar o Portal do Fornecedor.
-              </p>
-            </div>
-          )}
 
           <Separator />
 
