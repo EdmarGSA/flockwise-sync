@@ -41,6 +41,7 @@ import CadastroProdutosOvos from "./pages/CadastroProdutosOvos";
 import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
+import PortalFornecedor from "./pages/PortalFornecedor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -312,6 +313,15 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <CadastroProdutosOvos />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    
+    {/* Portal do Fornecedor */}
+    <Route path="/portal-fornecedor" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="portal-fornecedor">
+          <PortalFornecedor />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />

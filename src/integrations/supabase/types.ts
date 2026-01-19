@@ -1448,6 +1448,44 @@ export type Database = {
           },
         ]
       }
+      historico_precos_fornecedor: {
+        Row: {
+          criado_por: string | null
+          data_alteracao: string
+          id: string
+          motivo: string | null
+          preco_anterior: number | null
+          preco_novo: number
+          produto_fornecedor_id: string
+        }
+        Insert: {
+          criado_por?: string | null
+          data_alteracao?: string
+          id?: string
+          motivo?: string | null
+          preco_anterior?: number | null
+          preco_novo: number
+          produto_fornecedor_id: string
+        }
+        Update: {
+          criado_por?: string | null
+          data_alteracao?: string
+          id?: string
+          motivo?: string | null
+          preco_anterior?: number | null
+          preco_novo?: number
+          produto_fornecedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_precos_fornecedor_produto_fornecedor_id_fkey"
+            columns: ["produto_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "produto_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kardex: {
         Row: {
           created_at: string
@@ -2273,6 +2311,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      notificacoes_fornecedor: {
+        Row: {
+          created_at: string
+          data_leitura: string | null
+          fornecedor_id: string
+          id: string
+          integrado_id: string
+          lida: boolean
+          mensagem: string
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          data_leitura?: string | null
+          fornecedor_id: string
+          id?: string
+          integrado_id: string
+          lida?: boolean
+          mensagem: string
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          data_leitura?: string | null
+          fornecedor_id?: string
+          id?: string
+          integrado_id?: string
+          lida?: boolean
+          mensagem?: string
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_fornecedor_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nucleos: {
         Row: {
@@ -3174,6 +3256,107 @@ export type Database = {
           },
         ]
       }
+      pedidos_fornecedor: {
+        Row: {
+          created_at: string
+          data_entrega_prevista: string | null
+          data_entrega_real: string | null
+          data_pedido: string
+          fornecedor_id: string
+          id: string
+          integrado_id: string
+          numero_pedido: string
+          observacoes: string | null
+          status: string
+          updated_at: string
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
+          data_pedido?: string
+          fornecedor_id: string
+          id?: string
+          integrado_id: string
+          numero_pedido: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_total?: number
+        }
+        Update: {
+          created_at?: string
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
+          data_pedido?: string
+          fornecedor_id?: string
+          id?: string
+          integrado_id?: string
+          numero_pedido?: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_fornecedor_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_fornecedor_itens: {
+        Row: {
+          created_at: string
+          id: string
+          pedido_id: string
+          preco_unitario: number
+          produto_id: string
+          quantidade: number
+          unidade: string
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pedido_id: string
+          preco_unitario: number
+          produto_id: string
+          quantidade: number
+          unidade: string
+          valor_total: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pedido_id?: string
+          preco_unitario?: number
+          produto_id?: string
+          quantidade?: number
+          unidade?: string
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_fornecedor_itens_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_fornecedor_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pesagem_itens: {
         Row: {
           created_at: string
@@ -3877,6 +4060,7 @@ export type Database = {
           id: string
           integrado_id: string | null
           is_demo: boolean | null
+          parceiro_id: string | null
           phone: string | null
           role: string | null
           updated_at: string
@@ -3888,6 +4072,7 @@ export type Database = {
           id: string
           integrado_id?: string | null
           is_demo?: boolean | null
+          parceiro_id?: string | null
           phone?: string | null
           role?: string | null
           updated_at?: string
@@ -3899,11 +4084,80 @@ export type Database = {
           id?: string
           integrado_id?: string | null
           is_demo?: boolean | null
+          parceiro_id?: string | null
           phone?: string | null
           role?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promocoes_fornecedor: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_fim: string
+          data_inicio: string
+          descricao: string | null
+          fornecedor_id: string
+          id: string
+          percentual_desconto: number | null
+          preco_promocional: number | null
+          produto_id: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_fim: string
+          data_inicio: string
+          descricao?: string | null
+          fornecedor_id: string
+          id?: string
+          percentual_desconto?: number | null
+          preco_promocional?: number | null
+          produto_id?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_fim?: string
+          data_inicio?: string
+          descricao?: string | null
+          fornecedor_id?: string
+          id?: string
+          percentual_desconto?: number | null
+          preco_promocional?: number | null
+          produto_id?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promocoes_fornecedor_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promocoes_fornecedor_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recebimento_itens: {
         Row: {
@@ -4789,6 +5043,7 @@ export type Database = {
         }[]
       }
       get_my_integrado_id: { Args: never; Returns: string }
+      get_my_parceiro_id: { Args: never; Returns: string }
       get_user_accessible_modules: {
         Args: { _user_id: string }
         Returns: {
