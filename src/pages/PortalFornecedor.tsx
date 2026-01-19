@@ -234,7 +234,10 @@ const PortalFornecedor = () => {
           <TabsContent value="dashboard" className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
+              <Card 
+                className="cursor-pointer transition-shadow hover:shadow-lg"
+                onClick={() => setActiveTab('estoque')}
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Clientes Ativos
@@ -249,7 +252,10 @@ const PortalFornecedor = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card 
+                className="cursor-pointer transition-shadow hover:shadow-lg"
+                onClick={() => setActiveTab('estoque')}
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Produtos Vinculados
@@ -264,7 +270,10 @@ const PortalFornecedor = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card 
+                className="cursor-pointer transition-shadow hover:shadow-lg"
+                onClick={() => setActiveTab('pedidos')}
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Pedidos Pendentes
@@ -279,7 +288,10 @@ const PortalFornecedor = () => {
                 </CardContent>
               </Card>
 
-              <Card className={stats.alertasEstoque > 0 ? 'border-destructive' : ''}>
+              <Card 
+                className={`cursor-pointer transition-shadow hover:shadow-lg ${stats.alertasEstoque > 0 ? 'border-destructive' : ''}`}
+                onClick={() => setActiveTab('estoque')}
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Alertas de Estoque

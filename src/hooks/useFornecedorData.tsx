@@ -148,7 +148,7 @@ export const useFornecedorData = () => {
           nome,
           estoque_atual,
           estoque_minimo,
-          unidade
+          unidade_medida
         ),
         parceiros:parceiro_id (
           integrado_id
@@ -174,7 +174,7 @@ export const useFornecedorData = () => {
         codigo_fornecedor: pf.codigo_produto_fornecedor || '',
         estoque_atual: estoqueAtual,
         estoque_minimo: estoqueMinimo,
-        unidade: produto?.unidade || 'un',
+        unidade: produto?.unidade_medida || 'un',
         preco_compra: pf.preco_compra || 0,
         ultimo_recebimento: null,
         consumo_medio_diario: consumoMedio,
