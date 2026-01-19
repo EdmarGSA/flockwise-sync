@@ -25,8 +25,12 @@ export interface PedidoFornecedor {
   data_pedido: string;
   data_entrega_prevista: string | null;
   status: string;
+  status_fornecedor: 'pendente_confirmacao' | 'confirmado' | 'enviado';
   valor_total: number;
   itens_count: number;
+  fornecedor_confirmado_em: string | null;
+  fornecedor_enviado_em: string | null;
+  fornecedor_nf_numero: string | null;
 }
 
 export interface HistoricoPreco {
@@ -141,24 +145,29 @@ export const useFornecedorData = () => {
   }, []);
 
   const fetchPedidos = useCallback(async (pId: string) => {
+    // Buscar ordens de compra aprovadas pelo cliente que foram destinadas a este fornecedor
     const { data } = await supabase
-      .from('pedidos_fornecedor')
+      .from('ordens_compra')
       .select(`
         id,
-        numero_pedido,
+        numero_oc,
         integrado_id,
-        data_pedido,
-        data_entrega_prevista,
+        data_emissao,
+        data_prevista_entrega,
         status,
-        valor_total
+        valor_total,
+        fornecedor_confirmado_em,
+        fornecedor_enviado_em,
+        fornecedor_nf_numero
       `)
-      .eq('fornecedor_id', pId)
-      .order('data_pedido', { ascending: false })
+      .eq('parceiro_id', pId)
+      .in('status', ['aprovada', 'parcial_recebida', 'recebida'])
+      .order('data_emissao', { ascending: false })
       .limit(50);
 
-    if (!data) return [];
+    if (!data || data.length === 0) return [];
 
-    // Buscar nomes dos integrados
+    // Buscar nomes dos integrados (clientes)
     const integradoIds = [...new Set(data.map(p => p.integrado_id))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -169,25 +178,36 @@ export const useFornecedorData = () => {
 
     // Buscar contagem de itens
     const { data: itens } = await supabase
-      .from('pedidos_fornecedor_itens')
-      .select('pedido_id')
-      .in('pedido_id', data.map(p => p.id));
+      .from('ordens_compra_itens')
+      .select('ordem_compra_id')
+      .in('ordem_compra_id', data.map(p => p.id));
 
     const itensCount = new Map<string, number>();
     itens?.forEach(item => {
-      itensCount.set(item.pedido_id, (itensCount.get(item.pedido_id) || 0) + 1);
+      itensCount.set(item.ordem_compra_id, (itensCount.get(item.ordem_compra_id) || 0) + 1);
     });
+
+    // Determinar status do fornecedor baseado nos campos
+    const getStatusFornecedor = (oc: any): 'pendente_confirmacao' | 'confirmado' | 'enviado' => {
+      if (oc.fornecedor_enviado_em) return 'enviado';
+      if (oc.fornecedor_confirmado_em) return 'confirmado';
+      return 'pendente_confirmacao';
+    };
 
     return data.map(p => ({
       id: p.id,
-      numero_pedido: p.numero_pedido,
+      numero_pedido: String(p.numero_oc),
       integrado_id: p.integrado_id,
       integrado_nome: profilesMap.get(p.integrado_id) || 'Cliente',
-      data_pedido: p.data_pedido,
-      data_entrega_prevista: p.data_entrega_prevista,
+      data_pedido: p.data_emissao,
+      data_entrega_prevista: p.data_prevista_entrega,
       status: p.status,
-      valor_total: p.valor_total,
+      status_fornecedor: getStatusFornecedor(p),
+      valor_total: p.valor_total || 0,
       itens_count: itensCount.get(p.id) || 0,
+      fornecedor_confirmado_em: p.fornecedor_confirmado_em,
+      fornecedor_enviado_em: p.fornecedor_enviado_em,
+      fornecedor_nf_numero: p.fornecedor_nf_numero,
     }));
   }, []);
 
@@ -263,15 +283,43 @@ export const useFornecedorData = () => {
     );
   }, []);
 
-  const atualizarStatusPedido = useCallback(async (pedidoId: string, novoStatus: string) => {
+  const confirmarPedido = useCallback(async (pedidoId: string) => {
     const { error } = await supabase
-      .from('pedidos_fornecedor')
-      .update({ status: novoStatus })
+      .from('ordens_compra')
+      .update({ fornecedor_confirmado_em: new Date().toISOString() })
       .eq('id', pedidoId);
 
     if (!error) {
       setPedidos(prev =>
-        prev.map(p => p.id === pedidoId ? { ...p, status: novoStatus } : p)
+        prev.map(p => p.id === pedidoId ? { 
+          ...p, 
+          status_fornecedor: 'confirmado' as const,
+          fornecedor_confirmado_em: new Date().toISOString()
+        } : p)
+      );
+    }
+
+    return { error };
+  }, []);
+
+  const informarEnvio = useCallback(async (pedidoId: string, nfNumero: string, observacoes?: string) => {
+    const { error } = await supabase
+      .from('ordens_compra')
+      .update({ 
+        fornecedor_enviado_em: new Date().toISOString(),
+        fornecedor_nf_numero: nfNumero,
+        fornecedor_observacoes: observacoes || null
+      })
+      .eq('id', pedidoId);
+
+    if (!error) {
+      setPedidos(prev =>
+        prev.map(p => p.id === pedidoId ? { 
+          ...p, 
+          status_fornecedor: 'enviado' as const,
+          fornecedor_enviado_em: new Date().toISOString(),
+          fornecedor_nf_numero: nfNumero
+        } : p)
       );
     }
 
@@ -303,8 +351,9 @@ export const useFornecedorData = () => {
 
     // Calcular stats
     const clientesUnicos = new Set(estoque.map(e => e.integrado_id));
+    // Pedidos pendentes = não confirmados ou não enviados ainda
     const pedidosPendentes = pedidosData.filter(p => 
-      ['pendente', 'confirmado', 'em_separacao'].includes(p.status)
+      p.status_fornecedor === 'pendente_confirmacao' || p.status_fornecedor === 'confirmado'
     );
     const alertasEstoque = estoque.filter(e => e.estoque_atual <= e.estoque_minimo).length;
 
@@ -332,7 +381,8 @@ export const useFornecedorData = () => {
     historicoPrecos,
     notificacoes,
     marcarNotificacaoLida,
-    atualizarStatusPedido,
+    confirmarPedido,
+    informarEnvio,
     refetch: fetchAllData,
   };
 };
