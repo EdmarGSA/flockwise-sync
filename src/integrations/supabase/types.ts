@@ -4937,6 +4937,106 @@ export type Database = {
           },
         ]
       }
+      termos_aceites: {
+        Row: {
+          aceito_em: string | null
+          conteudo_hash: string | null
+          created_at: string | null
+          fornecedor_global_id: string | null
+          id: string
+          ip_address: string | null
+          parceiro_id: string | null
+          termo_versao_id: string
+          tipo_termo: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          aceito_em?: string | null
+          conteudo_hash?: string | null
+          created_at?: string | null
+          fornecedor_global_id?: string | null
+          id?: string
+          ip_address?: string | null
+          parceiro_id?: string | null
+          termo_versao_id: string
+          tipo_termo: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          aceito_em?: string | null
+          conteudo_hash?: string | null
+          created_at?: string | null
+          fornecedor_global_id?: string | null
+          id?: string
+          ip_address?: string | null
+          parceiro_id?: string | null
+          termo_versao_id?: string
+          tipo_termo?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "termos_aceites_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "termos_aceites_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "termos_aceites_termo_versao_id_fkey"
+            columns: ["termo_versao_id"]
+            isOneToOne: false
+            referencedRelation: "termos_versoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      termos_versoes: {
+        Row: {
+          ativo: boolean | null
+          checkbox_texto: string
+          conteudo_html: string
+          created_at: string | null
+          data_vigencia: string | null
+          id: string
+          tipo: string
+          titulo: string
+          versao: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          checkbox_texto: string
+          conteudo_html: string
+          created_at?: string | null
+          data_vigencia?: string | null
+          id?: string
+          tipo: string
+          titulo: string
+          versao: string
+        }
+        Update: {
+          ativo?: boolean | null
+          checkbox_texto?: string
+          conteudo_html?: string
+          created_at?: string | null
+          data_vigencia?: string | null
+          id?: string
+          tipo?: string
+          titulo?: string
+          versao?: string
+        }
+        Relationships: []
+      }
       tratamentos_lote: {
         Row: {
           aplicacao_confirmada: boolean | null
@@ -5177,6 +5277,14 @@ export type Database = {
           _module_code: string
           _required_level?: Database["public"]["Enums"]["nivel_acesso"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      verificar_aceite_termo: {
+        Args: {
+          p_parceiro_id?: string
+          p_tipo_termo: string
+          p_user_id: string
         }
         Returns: boolean
       }

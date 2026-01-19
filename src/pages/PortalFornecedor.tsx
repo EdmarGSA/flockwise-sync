@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useFornecedorData } from '@/hooks/useFornecedorData';
+import { useTermoAceite } from '@/hooks/useTermoAceite';
+import { TermoBloqueante } from '@/components/termos/TermoBloqueante';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,6 +52,10 @@ const PortalFornecedor = () => {
     refetch 
   } = useFornecedorData();
   
+  // Verificar aceite do termo de fornecedor
+  const { jaAceitou, loading: loadingTermo } = useTermoAceite({ tipo: 'fornecedor_adesao' });
+  const [termoAceito, setTermoAceito] = useState(false);
+  
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -65,7 +71,8 @@ const PortalFornecedor = () => {
 
   const notificacoesNaoLidas = notificacoes.filter(n => !n.lida).length;
 
-  if (loading) {
+  // Loading state
+  if (loading || loadingTermo) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -81,6 +88,16 @@ const PortalFornecedor = () => {
           <Skeleton className="h-[400px]" />
         </div>
       </div>
+    );
+  }
+
+  // Verificar se precisa aceitar termo (bloqueante)
+  if (!jaAceitou && !termoAceito) {
+    return (
+      <TermoBloqueante 
+        tipo="fornecedor_adesao" 
+        onAceite={() => setTermoAceito(true)} 
+      />
     );
   }
 

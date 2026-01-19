@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import ParceiroForm from "@/components/cadastro/ParceiroForm";
 import ParceiroEditDialog from "@/components/cadastro/ParceiroEditDialog";
 import VincularProdutosDialog from "@/components/cadastro/VincularProdutosDialog";
+import { TermoAceiteDialog } from "@/components/termos/TermoAceiteDialog";
 
 interface Parceiro {
   id: string;
@@ -52,6 +53,10 @@ const CadastroParceiros = () => {
   const [generatingAccess, setGeneratingAccess] = useState<string | null>(null);
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+
+  // Termo de aceite state
+  const [showTermoDialog, setShowTermoDialog] = useState(false);
+  const [parceiroParaTermo, setParceiroParaTermo] = useState<Parceiro | null>(null);
 
   useEffect(() => {
     if (integradoId) {
@@ -98,12 +103,19 @@ const CadastroParceiros = () => {
     }
   };
 
-  const handleGenerateAccess = async (parceiro: Parceiro) => {
+  // Inicia o fluxo de gerar acesso - primeiro mostra o termo
+  const handleGenerateAccessClick = (parceiro: Parceiro) => {
     if (!parceiro.email) {
       toast.error('O fornecedor precisa ter um email cadastrado para gerar acesso');
       return;
     }
+    // Mostrar termo de aceite antes de gerar acesso
+    setParceiroParaTermo(parceiro);
+    setShowTermoDialog(true);
+  };
 
+  // Executa a geração de acesso após aceite do termo
+  const handleGenerateAccess = async (parceiro: Parceiro) => {
     setGeneratingAccess(parceiro.id);
     try {
       const cnpjLimpo = parceiro.cpf_cnpj.replace(/\D/g, '');
@@ -357,9 +369,9 @@ const CadastroParceiros = () => {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => handleGenerateAccess(parceiro)}
+                                      onClick={() => handleGenerateAccessClick(parceiro)}
                                       disabled={generatingAccess === parceiro.id}
-                                      className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                      className="text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950"
                                       title="Gerar Acesso ao Portal"
                                     >
                                       {generatingAccess === parceiro.id ? (
@@ -492,6 +504,25 @@ const CadastroParceiros = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog de Termo de Aceite para autorizar fornecedor */}
+        <TermoAceiteDialog
+          tipo="cliente_autorizacao"
+          parceiroId={parceiroParaTermo?.id}
+          parceiroNome={parceiroParaTermo?.nome_fantasia || parceiroParaTermo?.razao_social_nome}
+          open={showTermoDialog}
+          onAceite={() => {
+            setShowTermoDialog(false);
+            if (parceiroParaTermo) {
+              handleGenerateAccess(parceiroParaTermo);
+            }
+            setParceiroParaTermo(null);
+          }}
+          onRecusar={() => {
+            setShowTermoDialog(false);
+            setParceiroParaTermo(null);
+          }}
+        />
       </main>
     </div>
   );
