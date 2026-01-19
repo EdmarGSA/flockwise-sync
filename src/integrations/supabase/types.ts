@@ -2593,6 +2593,10 @@ export type Database = {
           data_vencimento: string | null
           desconto: number | null
           forma_pagamento: string | null
+          fornecedor_confirmado_em: string | null
+          fornecedor_enviado_em: string | null
+          fornecedor_nf_numero: string | null
+          fornecedor_observacoes: string | null
           id: string
           integrado_id: string
           numero_oc: number
@@ -2615,6 +2619,10 @@ export type Database = {
           data_vencimento?: string | null
           desconto?: number | null
           forma_pagamento?: string | null
+          fornecedor_confirmado_em?: string | null
+          fornecedor_enviado_em?: string | null
+          fornecedor_nf_numero?: string | null
+          fornecedor_observacoes?: string | null
           id?: string
           integrado_id: string
           numero_oc?: number
@@ -2637,6 +2645,10 @@ export type Database = {
           data_vencimento?: string | null
           desconto?: number | null
           forma_pagamento?: string | null
+          fornecedor_confirmado_em?: string | null
+          fornecedor_enviado_em?: string | null
+          fornecedor_nf_numero?: string | null
+          fornecedor_observacoes?: string | null
           id?: string
           integrado_id?: string
           numero_oc?: number

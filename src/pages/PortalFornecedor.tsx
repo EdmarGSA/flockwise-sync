@@ -38,7 +38,8 @@ const PortalFornecedor = () => {
     historicoPrecos, 
     notificacoes,
     marcarNotificacaoLida,
-    atualizarStatusPedido,
+    confirmarPedido,
+    informarEnvio,
     refetch 
   } = useFornecedorData();
   
@@ -259,11 +260,12 @@ const PortalFornecedor = () => {
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{pedido.numero_pedido}</span>
                             <Badge variant={
-                              pedido.status === 'pendente' ? 'destructive' :
-                              pedido.status === 'confirmado' ? 'default' :
-                              pedido.status === 'entregue' ? 'secondary' : 'outline'
+                              pedido.status_fornecedor === 'pendente_confirmacao' ? 'destructive' :
+                              pedido.status_fornecedor === 'confirmado' ? 'default' :
+                              pedido.status_fornecedor === 'enviado' ? 'secondary' : 'outline'
                             }>
-                              {pedido.status}
+                              {pedido.status_fornecedor === 'pendente_confirmacao' ? 'Aguardando Confirmação' :
+                               pedido.status_fornecedor === 'confirmado' ? 'Confirmado' : 'Enviado'}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -336,7 +338,8 @@ const PortalFornecedor = () => {
           <TabsContent value="pedidos">
             <FornecedorPedidosTab 
               pedidos={pedidos} 
-              onUpdateStatus={atualizarStatusPedido}
+              onConfirmar={confirmarPedido}
+              onEnviar={informarEnvio}
             />
           </TabsContent>
 
