@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -61,10 +61,17 @@ const formSchema = z.object({
   phone: z.string().optional(),
   role: z.string().default("integrado"),
   roles: z.array(z.string()).default([]),
+  parceiro_id: z.string().optional(),
 });
 
 interface MembroFormProps {
   onSuccess: () => void;
+}
+
+interface Parceiro {
+  id: string;
+  razao_social_nome: string;
+  cpf_cnpj: string | null;
 }
 
 const rolesOptions = [
@@ -83,6 +90,8 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [adminIntegradoId, setAdminIntegradoId] = useState<string | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
+  const [parceiros, setParceiros] = useState<Parceiro[]>([]);
+  const [loadingParceiros, setLoadingParceiros] = useState(false);
   
   const passwordStrength = getPasswordStrength(passwordValue);
 
@@ -96,11 +105,12 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
       phone: "",
       role: "integrado",
       roles: ["integrado"],
+      parceiro_id: "",
     },
   });
 
   // Buscar integrado_id do admin atual
-  useState(() => {
+  useEffect(() => {
     const fetchAdminIntegradoId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -113,7 +123,36 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
       }
     };
     fetchAdminIntegradoId();
-  });
+  }, []);
+
+  const selectedRoles = form.watch("roles");
+  const roleIncludesFornecedor = selectedRoles.includes("fornecedor");
+
+  // Buscar parceiros fornecedores quando role incluir fornecedor
+  useEffect(() => {
+    const fetchParceiros = async () => {
+      if (!roleIncludesFornecedor || !adminIntegradoId) {
+        setParceiros([]);
+        return;
+      }
+      
+      setLoadingParceiros(true);
+      const { data, error } = await supabase
+        .from('parceiros')
+        .select('id, razao_social_nome, cpf_cnpj')
+        .in('tipo_cadastro', ['fornecedor', 'ambos'])
+        .eq('ativo', true)
+        .eq('integrado_id', adminIntegradoId)
+        .order('razao_social_nome');
+      
+      if (!error && data) {
+        setParceiros(data);
+      }
+      setLoadingParceiros(false);
+    };
+    
+    fetchParceiros();
+  }, [roleIncludesFornecedor, adminIntegradoId]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
@@ -152,14 +191,21 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
       }
 
       // Update profile with additional data
+      const profileUpdate: Record<string, any> = {
+        full_name: values.full_name,
+        company_name: values.company_name || null,
+        phone: values.phone || null,
+        role: values.role,
+      };
+      
+      // Vincular parceiro se role for fornecedor
+      if (values.roles.includes("fornecedor") && values.parceiro_id) {
+        profileUpdate.parceiro_id = values.parceiro_id;
+      }
+      
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({
-          full_name: values.full_name,
-          company_name: values.company_name || null,
-          phone: values.phone || null,
-          role: values.role,
-        })
+        .update(profileUpdate)
         .eq("id", newUserId);
 
       if (profileError) {
@@ -191,8 +237,6 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
 
     setLoading(false);
   };
-
-  const selectedRoles = form.watch("roles");
 
   return (
     <Form {...form}>
@@ -364,6 +408,41 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
             </FormItem>
           )}
         />
+
+        {roleIncludesFornecedor && (
+          <FormField
+            control={form.control}
+            name="parceiro_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vincular ao Parceiro (Fornecedor) *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingParceiros ? "Carregando..." : "Selecione o parceiro"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {parceiros.length === 0 && !loadingParceiros && (
+                      <SelectItem value="no-partner" disabled>
+                        Nenhum fornecedor cadastrado
+                      </SelectItem>
+                    )}
+                    {parceiros.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.razao_social_nome} {p.cpf_cnpj ? `- ${p.cpf_cnpj}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Vincule este usuário a um parceiro cadastrado como fornecedor para que ele possa acessar o Portal do Fornecedor.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="flex justify-end gap-2 pt-4">
           <Button type="submit" disabled={loading}>
