@@ -82,6 +82,7 @@ const PortalFornecedor = () => {
     );
   }
 
+  // Verifica se tem fornecedor configurado
   if (!fornecedorGlobalId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -96,6 +97,32 @@ const PortalFornecedor = () => {
             <p className="text-muted-foreground">
               Sua conta ainda não está vinculada a um cadastro de fornecedor global. 
               Entre em contato com o administrador do sistema para configurar seu acesso.
+            </p>
+            <Button onClick={handleSignOut} variant="outline" className="w-full">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Verifica se tem clientes ativos
+  if (clientes.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Acesso Bloqueado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Seu acesso ao portal foi suspenso. Nenhum cliente ativo está vinculado à sua conta.
+              Entre em contato com seu cliente para reativar o acesso.
             </p>
             <Button onClick={handleSignOut} variant="outline" className="w-full">
               <LogOut className="h-4 w-4 mr-2" />

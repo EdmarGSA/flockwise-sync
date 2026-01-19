@@ -94,11 +94,7 @@ const Auth = () => {
 
   const passwordStrength = getPasswordStrength(password);
 
-  useEffect(() => {
-    if (!loading && user) {
-      navigate('/');
-    }
-  }, [user, loading, navigate]);
+  // Redirecionamento é feito após login bem-sucedido em handleSubmit
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,10 +175,60 @@ const Auth = () => {
             });
           }
         } else {
-          toast({
-            title: "Bem-vindo!",
-            description: "Login realizado com sucesso.",
-          });
+          // Login bem-sucedido - verificar se é fornecedor
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          
+          if (currentUser) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('fornecedor_global_id, senha_alterada')
+              .eq('id', currentUser.id)
+              .single();
+            
+            if (profile?.fornecedor_global_id) {
+              // É fornecedor - verificar se tem pelo menos um cliente ativo
+              const { data: clientesAtivos } = await supabase
+                .from('parceiros')
+                .select('id')
+                .eq('fornecedor_global_id', profile.fornecedor_global_id)
+                .eq('ativo', true)
+                .limit(1);
+              
+              if (!clientesAtivos?.length) {
+                // Nenhum cliente ativo - bloquear acesso
+                toast({
+                  title: "Acesso bloqueado",
+                  description: "Seu acesso ao portal foi suspenso. Entre em contato com seu cliente.",
+                  variant: "destructive",
+                });
+                await supabase.auth.signOut();
+                setIsLoading(false);
+                return;
+              }
+              
+              // Redirecionar para portal do fornecedor
+              if (profile.senha_alterada === false) {
+                toast({
+                  title: "Atenção",
+                  description: "Recomendamos alterar sua senha padrão nas configurações.",
+                  variant: "default",
+                });
+              }
+              
+              toast({
+                title: "Bem-vindo!",
+                description: "Acesso ao Portal do Fornecedor.",
+              });
+              navigate('/portal-fornecedor');
+            } else {
+              // Usuário normal - redirecionar para home
+              toast({
+                title: "Bem-vindo!",
+                description: "Login realizado com sucesso.",
+              });
+              navigate('/home');
+            }
+          }
         }
       } else {
         const validation = signUpSchema.safeParse({ email, password, confirmPassword, fullName });
@@ -210,6 +256,7 @@ const Auth = () => {
             title: "Conta criada!",
             description: "Cadastro realizado com sucesso.",
           });
+          navigate('/home');
         }
       }
     } catch (error) {

@@ -4126,6 +4126,7 @@ export type Database = {
           parceiro_id: string | null
           phone: string | null
           role: string | null
+          senha_alterada: boolean | null
           updated_at: string
         }
         Insert: {
@@ -4139,6 +4140,7 @@ export type Database = {
           parceiro_id?: string | null
           phone?: string | null
           role?: string | null
+          senha_alterada?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -4152,6 +4154,7 @@ export type Database = {
           parceiro_id?: string | null
           phone?: string | null
           role?: string | null
+          senha_alterada?: boolean | null
           updated_at?: string
         }
         Relationships: [
