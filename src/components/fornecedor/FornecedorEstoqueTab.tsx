@@ -29,8 +29,16 @@ export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabPr
   const [filterCliente, setFilterCliente] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
 
-  // Clientes únicos para o filtro
-  const clientesUnicos = [...new Set(clientesEstoque.map(e => e.integrado_nome))];
+  // Clientes únicos para o filtro (usando integrado_id como chave estável)
+  const clientesUnicos = (() => {
+    const map = new Map<string, string>();
+    clientesEstoque.forEach(e => {
+      if (e.integrado_id && !map.has(e.integrado_id)) {
+        map.set(e.integrado_id, e.integrado_nome);
+      }
+    });
+    return Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
+  })();
 
   // Aplicar filtros
   const estoquesFiltrados = clientesEstoque.filter(item => {
@@ -38,7 +46,7 @@ export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabPr
       item.produto_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.codigo_fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchCliente = filterCliente === 'todos' || item.integrado_nome === filterCliente;
+    const matchCliente = filterCliente === 'todos' || item.integrado_id === filterCliente;
     
     const matchStatus = 
       filterStatus === 'todos' ||
@@ -87,7 +95,7 @@ export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabPr
             <SelectContent>
               <SelectItem value="todos">Todos os clientes</SelectItem>
               {clientesUnicos.map(cliente => (
-                <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
+                <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
