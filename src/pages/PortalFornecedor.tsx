@@ -19,7 +19,8 @@ import {
   History,
   LogOut,
   RefreshCw,
-  Building2
+  Building2,
+  Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,6 +29,7 @@ import { FornecedorEstoqueTab } from '@/components/fornecedor/FornecedorEstoqueT
 import { FornecedorPedidosTab } from '@/components/fornecedor/FornecedorPedidosTab';
 import { FornecedorHistoricoTab } from '@/components/fornecedor/FornecedorHistoricoTab';
 import { FornecedorNotificacoesTab } from '@/components/fornecedor/FornecedorNotificacoesTab';
+import { FornecedorConfigTab } from '@/components/fornecedor/FornecedorConfigTab';
 
 const PortalFornecedor = () => {
   const { signOut } = useAuth();
@@ -205,7 +207,7 @@ const PortalFornecedor = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:w-[500px]">
+          <TabsList className="grid grid-cols-5 lg:w-[600px]">
             <TabsTrigger value="dashboard" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -221,6 +223,10 @@ const PortalFornecedor = () => {
             <TabsTrigger value="historico" className="gap-2">
               <History className="h-4 w-4" />
               <span className="hidden sm:inline">Preços</span>
+            </TabsTrigger>
+            <TabsTrigger value="configuracoes" className="gap-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
           </TabsList>
 
@@ -407,6 +413,11 @@ const PortalFornecedor = () => {
               notificacoes={notificacoes}
               onMarcarLida={marcarNotificacaoLida}
             />
+          </TabsContent>
+
+          {/* Configurações Tab */}
+          <TabsContent value="configuracoes">
+            <FornecedorConfigTab />
           </TabsContent>
         </Tabs>
       </main>
