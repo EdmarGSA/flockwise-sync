@@ -1235,6 +1235,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fornecedores_globais: {
+        Row: {
+          ativo: boolean | null
+          cpf_cnpj: string
+          created_at: string | null
+          email: string | null
+          id: string
+          nome_fantasia: string | null
+          razao_social_nome: string
+          telefone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cpf_cnpj: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social_nome: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cpf_cnpj?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social_nome?: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       galpoes: {
         Row: {
           altura: number
@@ -2955,6 +2994,7 @@ export type Database = {
           created_at: string
           email: string | null
           estado: string | null
+          fornecedor_global_id: string | null
           id: string
           inscricao_estadual: string | null
           inscricao_municipal: string | null
@@ -2983,6 +3023,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           estado?: string | null
+          fornecedor_global_id?: string | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
@@ -3011,6 +3052,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           estado?: string | null
+          fornecedor_global_id?: string | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
@@ -3027,7 +3069,15 @@ export type Database = {
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parceiros_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pedido_itens: {
         Row: {
@@ -4068,6 +4118,7 @@ export type Database = {
         Row: {
           company_name: string | null
           created_at: string
+          fornecedor_global_id: string | null
           full_name: string | null
           id: string
           integrado_id: string | null
@@ -4080,6 +4131,7 @@ export type Database = {
         Insert: {
           company_name?: string | null
           created_at?: string
+          fornecedor_global_id?: string | null
           full_name?: string | null
           id: string
           integrado_id?: string | null
@@ -4092,6 +4144,7 @@ export type Database = {
         Update: {
           company_name?: string | null
           created_at?: string
+          fornecedor_global_id?: string | null
           full_name?: string | null
           id?: string
           integrado_id?: string | null
@@ -4102,6 +4155,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_parceiro_id_fkey"
             columns: ["parceiro_id"]
@@ -5054,6 +5114,7 @@ export type Database = {
           id: string
         }[]
       }
+      get_my_fornecedor_global_id: { Args: never; Returns: string }
       get_my_integrado_id: { Args: never; Returns: string }
       get_my_parceiro_id: { Args: never; Returns: string }
       get_user_accessible_modules: {
