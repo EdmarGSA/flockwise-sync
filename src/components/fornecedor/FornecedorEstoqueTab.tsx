@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { 
   Table, 
   TableBody, 
@@ -27,7 +29,7 @@ interface FornecedorEstoqueTabProps {
 export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCliente, setFilterCliente] = useState<string>('todos');
-  const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [apenasAbaixoMinimo, setApenasAbaixoMinimo] = useState(false);
 
   // Clientes únicos para o filtro (usando integrado_id como chave estável)
   const clientesUnicos = (() => {
@@ -48,13 +50,9 @@ export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabPr
     
     const matchCliente = filterCliente === 'todos' || item.integrado_id === filterCliente;
     
-    const matchStatus = 
-      filterStatus === 'todos' ||
-      (filterStatus === 'critico' && item.estoque_atual <= item.estoque_minimo) ||
-      (filterStatus === 'baixo' && item.dias_estoque <= 7 && item.estoque_atual > item.estoque_minimo) ||
-      (filterStatus === 'normal' && item.dias_estoque > 7);
+    const matchEstoqueMinimo = !apenasAbaixoMinimo || item.estoque_atual <= item.estoque_minimo;
 
-    return matchSearch && matchCliente && matchStatus;
+    return matchSearch && matchCliente && matchEstoqueMinimo;
   });
 
   const getStatusBadge = (item: ClienteEstoque) => {
@@ -77,40 +75,44 @@ export const FornecedorEstoqueTab = ({ clientesEstoque }: FornecedorEstoqueTabPr
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar produto ou código..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar produto ou código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <Select value={filterCliente} onValueChange={setFilterCliente}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os clientes</SelectItem>
+                {clientesUnicos.map(cliente => (
+                  <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          
-          <Select value={filterCliente} onValueChange={setFilterCliente}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os clientes</SelectItem>
-              {clientesUnicos.map(cliente => (
-                <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="critico">Crítico</SelectItem>
-              <SelectItem value="baixo">Baixo</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="abaixo-minimo" 
+              checked={apenasAbaixoMinimo}
+              onCheckedChange={(checked) => setApenasAbaixoMinimo(checked === true)}
+            />
+            <Label 
+              htmlFor="abaixo-minimo" 
+              className="text-sm font-medium leading-none cursor-pointer"
+            >
+              Apenas abaixo do estoque mínimo
+            </Label>
+          </div>
         </div>
 
         {/* Tabela */}
