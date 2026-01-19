@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, Plus, Search, Pencil, Building2, User, Tractor, Link2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, Users, Plus, Search, Pencil, Building2, User, Tractor, Link2, Key, Copy, CheckCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ParceiroForm from "@/components/cadastro/ParceiroForm";
@@ -30,6 +33,7 @@ interface Parceiro {
   estado: string | null;
   ativo: boolean;
   produtos_vinculados?: number;
+  fornecedor_global_id?: string | null;
 }
 
 const CadastroParceiros = () => {
@@ -43,6 +47,11 @@ const CadastroParceiros = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingParceiro, setEditingParceiro] = useState<Parceiro | null>(null);
   const [vincularParceiro, setVincularParceiro] = useState<Parceiro | null>(null);
+
+  // Generate access state
+  const [generatingAccess, setGeneratingAccess] = useState<string | null>(null);
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {
     if (integradoId) {
@@ -87,6 +96,69 @@ const CadastroParceiros = () => {
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const handleGenerateAccess = async (parceiro: Parceiro) => {
+    if (!parceiro.email) {
+      toast.error('O fornecedor precisa ter um email cadastrado para gerar acesso');
+      return;
+    }
+
+    setGeneratingAccess(parceiro.id);
+    try {
+      const cnpjLimpo = parceiro.cpf_cnpj.replace(/\D/g, '');
+
+      // Call edge function to create/find global supplier and user
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('create-supplier-user', {
+        body: {
+          cpf_cnpj: cnpjLimpo,
+          razao_social_nome: parceiro.razao_social_nome,
+          nome_fantasia: parceiro.nome_fantasia || null,
+          email: parceiro.email.toLowerCase(),
+          telefone: parceiro.telefone?.replace(/\D/g, '') || null,
+        },
+      });
+
+      if (fnError) {
+        console.error('Edge function error:', fnError);
+        throw new Error('Erro ao criar acesso do fornecedor');
+      }
+
+      if (!fnData?.success) {
+        throw new Error(fnData?.message || 'Erro ao criar acesso do fornecedor');
+      }
+
+      const fornecedorGlobalId = fnData.fornecedor_global_id;
+
+      // Update parceiro with fornecedor_global_id
+      const { error: updateError } = await supabase
+        .from('parceiros')
+        .update({ fornecedor_global_id: fornecedorGlobalId })
+        .eq('id', parceiro.id);
+
+      if (updateError) throw updateError;
+
+      // If new user was created, show credentials
+      if (fnData.is_new_user && fnData.credentials) {
+        setCredentials(fnData.credentials);
+        setShowCredentialsDialog(true);
+      } else {
+        toast.success('Acesso do fornecedor já existia. Vínculo atualizado!');
+      }
+
+      // Refresh list
+      fetchParceiros();
+    } catch (error: any) {
+      console.error('Erro ao gerar acesso:', error);
+      toast.error(error.message || 'Erro ao gerar acesso do fornecedor');
+    } finally {
+      setGeneratingAccess(null);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado!`);
   };
 
   if (loading || loadingIntegrado) {
@@ -148,6 +220,9 @@ const CadastroParceiros = () => {
     }
     return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
   };
+
+  const isFornecedor = (p: Parceiro) => p.tipo_cadastro === 'fornecedor' || p.tipo_cadastro === 'ambos';
+  const needsAccess = (p: Parceiro) => isFornecedor(p) && !p.fornecedor_global_id;
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,6 +352,23 @@ const CadastroParceiros = () => {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
+                                  {/* Generate Access Button - for suppliers without fornecedor_global_id */}
+                                  {needsAccess(parceiro) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleGenerateAccess(parceiro)}
+                                      disabled={generatingAccess === parceiro.id}
+                                      className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                      title="Gerar Acesso ao Portal"
+                                    >
+                                      {generatingAccess === parceiro.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Key className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
                                   {(parceiro.tipo_cadastro === 'fornecedor' || parceiro.tipo_cadastro === 'ambos') && (
                                     <Button
                                       variant="ghost"
@@ -336,6 +428,70 @@ const CadastroParceiros = () => {
           integradoId={integradoId}
           onSuccess={fetchParceiros}
         />
+
+        {/* Credentials Dialog */}
+        <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-600">
+                <Key className="w-5 h-5" />
+                Acesso do Fornecedor Criado
+              </DialogTitle>
+              <DialogDescription>
+                Anote ou copie as credenciais abaixo para informar ao fornecedor. 
+                A senha deverá ser alterada no primeiro acesso.
+              </DialogDescription>
+            </DialogHeader>
+
+            <Alert className="border-green-500/50 bg-green-500/10">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700">
+                Acesso ao Portal criado com sucesso!
+              </AlertDescription>
+            </Alert>
+
+            {credentials && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Email de acesso</Label>
+                  <div className="flex gap-2">
+                    <Input value={credentials.email} readOnly className="bg-muted" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(credentials.email, 'Email')}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Senha provisória</Label>
+                  <div className="flex gap-2">
+                    <Input value={credentials.password} readOnly className="bg-muted font-mono" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(credentials.password, 'Senha')}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button onClick={() => { setShowCredentialsDialog(false); setCredentials(null); }} className="w-full">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Entendi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

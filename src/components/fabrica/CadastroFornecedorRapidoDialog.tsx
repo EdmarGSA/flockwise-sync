@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, AlertCircle, CheckCircle, Search, Loader2 } from 'lucide-react';
+import { Building2, AlertCircle, CheckCircle, Search, Loader2, Copy, Key } from 'lucide-react';
 
 interface CadastroFornecedorRapidoDialogProps {
   open: boolean;
@@ -66,6 +66,10 @@ export default function CadastroFornecedorRapidoDialog({
   const [cidade, setCidade] = useState('');
   const [estado, setEstado] = useState('');
   const [codigoIbge, setCodigoIbge] = useState('');
+
+  // Credentials dialog
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
   const formatCnpj = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -146,10 +150,43 @@ export default function CadastroFornecedorRapidoDialog({
       return;
     }
 
+    if (!email.trim()) {
+      toast.error('Email é obrigatório para criar acesso do fornecedor ao portal');
+      return;
+    }
+
     setLoading(true);
     try {
       const cnpjLimpo = cnpj.replace(/\D/g, '');
 
+      // Call edge function to create/find global supplier and user
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('create-supplier-user', {
+        body: {
+          cpf_cnpj: cnpjLimpo,
+          razao_social_nome: razaoSocialEdit.trim(),
+          nome_fantasia: nomeFantasia.trim() || null,
+          email: email.trim().toLowerCase(),
+          telefone: telefone.replace(/\D/g, '') || null,
+        },
+      });
+
+      if (fnError) {
+        console.error('Edge function error:', fnError);
+        throw new Error('Erro ao criar acesso do fornecedor');
+      }
+
+      if (!fnData?.success) {
+        throw new Error(fnData?.message || 'Erro ao criar acesso do fornecedor');
+      }
+
+      const fornecedorGlobalId = fnData.fornecedor_global_id;
+
+      // If new user was created, save credentials to show
+      if (fnData.is_new_user && fnData.credentials) {
+        setCredentials(fnData.credentials);
+      }
+
+      // Insert into parceiros WITH fornecedor_global_id
       const { data, error } = await supabase
         .from('parceiros')
         .insert([{
@@ -168,6 +205,7 @@ export default function CadastroFornecedorRapidoDialog({
           cidade: cidade.trim() || null,
           estado: estado.trim() || null,
           codigo_ibge: codigoIbge || null,
+          fornecedor_global_id: fornecedorGlobalId,
           ativo: true
         }])
         .select('id, razao_social_nome')
@@ -175,14 +213,19 @@ export default function CadastroFornecedorRapidoDialog({
 
       if (error) throw error;
 
-      toast.success('Fornecedor cadastrado com sucesso!');
-      onSuccess(data.id, data.razao_social_nome);
+      // Show credentials dialog if new user was created
+      if (fnData.is_new_user && fnData.credentials) {
+        setShowCredentialsDialog(true);
+      } else {
+        toast.success('Fornecedor cadastrado com sucesso!');
+        onSuccess(data.id, data.razao_social_nome);
+      }
     } catch (error: any) {
       console.error('Erro ao cadastrar fornecedor:', error);
       if (error.code === '23505') {
-        toast.error('CNPJ já cadastrado');
+        toast.error('CNPJ já cadastrado nesta organização');
       } else {
-        toast.error('Erro ao cadastrar fornecedor');
+        toast.error(error.message || 'Erro ao cadastrar fornecedor');
       }
     } finally {
       setLoading(false);
@@ -193,6 +236,96 @@ export default function CadastroFornecedorRapidoDialog({
     onCancel();
     onOpenChange(false);
   };
+
+  const handleCredentialsClose = () => {
+    setShowCredentialsDialog(false);
+    setCredentials(null);
+    toast.success('Fornecedor cadastrado com sucesso!');
+    // Need to call onSuccess after closing credentials dialog
+    // We'll refetch the parceiro to get the id
+    supabase
+      .from('parceiros')
+      .select('id, razao_social_nome')
+      .eq('integrado_id', integradoId)
+      .eq('cpf_cnpj', cnpj.replace(/\D/g, ''))
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          onSuccess(data.id, data.razao_social_nome);
+        }
+      });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado!`);
+  };
+
+  // Credentials Dialog
+  if (showCredentialsDialog && credentials) {
+    return (
+      <Dialog open={true} onOpenChange={() => handleCredentialsClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Key className="w-5 h-5" />
+              Acesso do Fornecedor Criado
+            </DialogTitle>
+            <DialogDescription>
+              Anote ou copie as credenciais abaixo para informar ao fornecedor. 
+              A senha deverá ser alterada no primeiro acesso.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert className="border-green-500/50 bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-700">
+              Fornecedor cadastrado com acesso ao Portal!
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Email de acesso</Label>
+              <div className="flex gap-2">
+                <Input value={credentials.email} readOnly className="bg-muted" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(credentials.email, 'Email')}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Senha provisória</Label>
+              <div className="flex gap-2">
+                <Input value={credentials.password} readOnly className="bg-muted font-mono" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(credentials.password, 'Senha')}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={handleCredentialsClose} className="w-full">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Entendi, Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -276,12 +409,13 @@ export default function CadastroFornecedorRapidoDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>E-mail</Label>
+              <Label>E-mail *</Label>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@empresa.com"
+                required
               />
             </div>
           </div>
@@ -352,7 +486,7 @@ export default function CadastroFornecedorRapidoDialog({
           <Button variant="outline" onClick={handleCancelar}>
             Cancelar Recebimento
           </Button>
-          <Button onClick={handleCadastrar} disabled={loading || !razaoSocialEdit.trim()}>
+          <Button onClick={handleCadastrar} disabled={loading || !razaoSocialEdit.trim() || !email.trim()}>
             <CheckCircle className="w-4 h-4 mr-2" />
             {loading ? 'Cadastrando...' : 'Cadastrar e Continuar'}
           </Button>
