@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Truck, 
   Package, 
@@ -17,7 +18,8 @@ import {
   ClipboardList,
   History,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,7 +33,10 @@ const PortalFornecedor = () => {
   const { signOut } = useAuth();
   const { 
     loading, 
-    parceiroId, 
+    fornecedorGlobalId,
+    clientes,
+    clienteSelecionado,
+    setClienteSelecionado,
     stats, 
     clientesEstoque, 
     pedidos, 
@@ -77,7 +82,7 @@ const PortalFornecedor = () => {
     );
   }
 
-  if (!parceiroId) {
+  if (!fornecedorGlobalId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Card className="max-w-md">
@@ -89,7 +94,7 @@ const PortalFornecedor = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              Sua conta ainda não está vinculada a um cadastro de fornecedor. 
+              Sua conta ainda não está vinculada a um cadastro de fornecedor global. 
               Entre em contato com o administrador do sistema para configurar seu acesso.
             </p>
             <Button onClick={handleSignOut} variant="outline" className="w-full">
@@ -117,6 +122,27 @@ const PortalFornecedor = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Client filter */}
+              {clientes.length > 1 && (
+                <Select 
+                  value={clienteSelecionado || 'all'} 
+                  onValueChange={(v) => setClienteSelecionado(v === 'all' ? null : v)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Todos os clientes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os clientes</SelectItem>
+                    {clientes.map(c => (
+                      <SelectItem key={c.integrado_id} value={c.integrado_id}>
+                        {c.razao_social}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
               <Button 
                 variant="ghost" 
                 size="icon"
