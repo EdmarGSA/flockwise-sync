@@ -4859,6 +4859,7 @@ export type Database = {
         | "comprador"
         | "conferente"
         | "criador"
+        | "fornecedor"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo: "medio" | "grande" | "extra" | "jumbo"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
@@ -5081,6 +5082,7 @@ export const Constants = {
         "comprador",
         "conferente",
         "criador",
+        "fornecedor",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo"],
