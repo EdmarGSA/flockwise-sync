@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useSupplierCheck } from "@/hooks/useSupplierCheck";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { DemoProvider } from "@/contexts/DemoContext";
@@ -46,16 +47,21 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Loading component
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <p className="text-foreground">Carregando...</p>
+    </div>
+  );
+}
+
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-foreground">Carregando...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) {
@@ -65,20 +71,50 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Public route - redirects to home if already logged in
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+// Wrapper that redirects suppliers away from regular routes to portal
+function SupplierRedirectWrapper({ children }: { children: React.ReactNode }) {
+  const { isSupplier, loading } = useSupplierCheck();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-foreground">Carregando...</p>
-      </div>
-    );
+    return <LoadingScreen />;
+  }
+
+  // If user is a supplier, redirect to portal
+  if (isSupplier) {
+    return <Navigate to="/portal-fornecedor" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Wrapper that ensures only suppliers can access the portal
+function SupplierOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { isSupplier, loading } = useSupplierCheck();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  // If user is NOT a supplier, redirect to home
+  if (isSupplier === false) {
+    return <Navigate to="/home" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Public route - redirects to appropriate page based on user type
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  const { isSupplier, loading: supplierLoading } = useSupplierCheck();
+
+  if (authLoading || (user && supplierLoading)) {
+    return <LoadingScreen />;
   }
 
   if (user) {
-    return <Navigate to="/home" replace />;
+    // Redirect suppliers to portal, others to home
+    return <Navigate to={isSupplier ? "/portal-fornecedor" : "/home"} replace />;
   }
 
   return <>{children}</>;
@@ -98,15 +134,19 @@ const AppRoutes = () => (
       </PublicRoute>
     } />
     
-    {/* Protected routes - Home (no module restriction) */}
+    {/* Protected routes - Home (blocks suppliers) */}
     <Route path="/home" element={
       <ProtectedRoute>
-        <Home />
+        <SupplierRedirectWrapper>
+          <Home />
+        </SupplierRedirectWrapper>
       </ProtectedRoute>
     } />
     <Route path="/dashboard" element={
       <ProtectedRoute>
-        <Dashboard />
+        <SupplierRedirectWrapper>
+          <Dashboard />
+        </SupplierRedirectWrapper>
       </ProtectedRoute>
     } />
 
@@ -317,12 +357,12 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
     
-    {/* Portal do Fornecedor */}
+    {/* Portal do Fornecedor - apenas fornecedores */}
     <Route path="/portal-fornecedor" element={
       <ProtectedRoute>
-        <ModuleProtectedRoute moduleCode="portal-fornecedor">
+        <SupplierOnlyRoute>
           <PortalFornecedor />
-        </ModuleProtectedRoute>
+        </SupplierOnlyRoute>
       </ProtectedRoute>
     } />
     
