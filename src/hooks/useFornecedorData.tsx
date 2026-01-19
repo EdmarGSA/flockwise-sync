@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+export interface ClienteOrg {
+  integrado_id: string;
+  parceiro_id: string;
+  razao_social: string;
+}
+
 export interface ClienteEstoque {
   integrado_id: string;
   integrado_nome: string;
@@ -62,7 +68,9 @@ export interface DashboardStats {
 export const useFornecedorData = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [parceiroId, setParceiroId] = useState<string | null>(null);
+  const [fornecedorGlobalId, setFornecedorGlobalId] = useState<string | null>(null);
+  const [clientes, setClientes] = useState<ClienteOrg[]>([]);
+  const [clienteSelecionado, setClienteSelecionado] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalClientes: 0,
     produtosVinculados: 0,
@@ -75,26 +83,65 @@ export const useFornecedorData = () => {
   const [historicoPrecos, setHistoricoPrecos] = useState<HistoricoPreco[]>([]);
   const [notificacoes, setNotificacoes] = useState<NotificacaoFornecedor[]>([]);
 
-  const fetchParceiroId = useCallback(async () => {
+  // Fetch fornecedor_global_id from profile
+  const fetchFornecedorGlobalId = useCallback(async () => {
     if (!user?.id) return null;
     
     const { data } = await supabase
       .from('profiles')
-      .select('parceiro_id')
+      .select('fornecedor_global_id')
       .eq('id', user.id)
       .single();
     
-    return data?.parceiro_id || null;
+    return data?.fornecedor_global_id || null;
   }, [user?.id]);
 
-  const fetchClientesEstoque = useCallback(async (pId: string) => {
-    // Buscar produtos vinculados a este fornecedor
+  // Fetch all client organizations linked to this supplier
+  const fetchClientes = useCallback(async (globalId: string) => {
+    const { data: parceiros } = await supabase
+      .from('parceiros')
+      .select('id, integrado_id, razao_social_nome')
+      .eq('fornecedor_global_id', globalId)
+      .eq('ativo', true);
+
+    if (!parceiros) return [];
+
+    return parceiros.map(p => ({
+      parceiro_id: p.id,
+      integrado_id: p.integrado_id,
+      razao_social: p.razao_social_nome,
+    }));
+  }, []);
+
+  // Get parceiro IDs based on global supplier and optional filter
+  const getParceiroIds = useCallback(async (globalId: string, integradoFilter?: string | null) => {
+    let query = supabase
+      .from('parceiros')
+      .select('id, integrado_id, razao_social_nome')
+      .eq('fornecedor_global_id', globalId)
+      .eq('ativo', true);
+    
+    if (integradoFilter) {
+      query = query.eq('integrado_id', integradoFilter);
+    }
+
+    const { data } = await query;
+    return data || [];
+  }, []);
+
+  const fetchClientesEstoque = useCallback(async (globalId: string, integradoFilter?: string | null) => {
+    const parceiros = await getParceiroIds(globalId, integradoFilter);
+    if (!parceiros.length) return [];
+
+    const parceiroIds = parceiros.map(p => p.id);
+    const parceiroMap = new Map(parceiros.map(p => [p.id, p.razao_social_nome]));
+
     const { data: produtosFornecedor } = await supabase
       .from('produto_fornecedor')
       .select(`
         id,
         produto_id,
-        integrado_id,
+        parceiro_id,
         codigo_produto_fornecedor,
         preco_compra,
         produtos:produto_id (
@@ -102,32 +149,26 @@ export const useFornecedorData = () => {
           estoque_atual,
           estoque_minimo,
           unidade
+        ),
+        parceiros:parceiro_id (
+          integrado_id
         )
       `)
-      .eq('parceiro_id', pId);
+      .in('parceiro_id', parceiroIds);
 
     if (!produtosFornecedor) return [];
 
-    // Buscar nomes dos integrados
-    const integradoIds = [...new Set(produtosFornecedor.map(p => p.integrado_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', integradoIds);
-
-    const profilesMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-
-    // Calcular consumo médio (últimos 30 dias de movimentações)
     const estoqueData: ClienteEstoque[] = produtosFornecedor.map(pf => {
       const produto = pf.produtos as any;
+      const parceiro = pf.parceiros as any;
       const estoqueAtual = produto?.estoque_atual || 0;
       const estoqueMinimo = produto?.estoque_minimo || 0;
-      const consumoMedio = 10; // TODO: calcular real baseado no kardex
+      const consumoMedio = 10; // TODO: calcular real
       const diasEstoque = consumoMedio > 0 ? Math.floor(estoqueAtual / consumoMedio) : 999;
 
       return {
-        integrado_id: pf.integrado_id,
-        integrado_nome: profilesMap.get(pf.integrado_id) || 'Cliente',
+        integrado_id: parceiro?.integrado_id || '',
+        integrado_nome: parceiroMap.get(pf.parceiro_id) || 'Cliente',
         produto_id: pf.produto_id,
         produto_nome: produto?.nome || 'Produto',
         codigo_fornecedor: pf.codigo_produto_fornecedor || '',
@@ -142,16 +183,22 @@ export const useFornecedorData = () => {
     });
 
     return estoqueData;
-  }, []);
+  }, [getParceiroIds]);
 
-  const fetchPedidos = useCallback(async (pId: string) => {
-    // Buscar ordens de compra aprovadas pelo cliente que foram destinadas a este fornecedor
+  const fetchPedidos = useCallback(async (globalId: string, integradoFilter?: string | null) => {
+    const parceiros = await getParceiroIds(globalId, integradoFilter);
+    if (!parceiros.length) return [];
+
+    const parceiroIds = parceiros.map(p => p.id);
+    const parceiroMap = new Map(parceiros.map(p => [p.id, p.razao_social_nome]));
+
     const { data } = await supabase
       .from('ordens_compra')
       .select(`
         id,
         numero_oc,
         integrado_id,
+        parceiro_id,
         data_emissao,
         data_prevista_entrega,
         status,
@@ -160,21 +207,12 @@ export const useFornecedorData = () => {
         fornecedor_enviado_em,
         fornecedor_nf_numero
       `)
-      .eq('parceiro_id', pId)
+      .in('parceiro_id', parceiroIds)
       .in('status', ['aprovada', 'parcial_recebida', 'recebida'])
       .order('data_emissao', { ascending: false })
       .limit(50);
 
     if (!data || data.length === 0) return [];
-
-    // Buscar nomes dos integrados (clientes)
-    const integradoIds = [...new Set(data.map(p => p.integrado_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', integradoIds);
-
-    const profilesMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
 
     // Buscar contagem de itens
     const { data: itens } = await supabase
@@ -187,7 +225,6 @@ export const useFornecedorData = () => {
       itensCount.set(item.ordem_compra_id, (itensCount.get(item.ordem_compra_id) || 0) + 1);
     });
 
-    // Determinar status do fornecedor baseado nos campos
     const getStatusFornecedor = (oc: any): 'pendente_confirmacao' | 'confirmado' | 'enviado' => {
       if (oc.fornecedor_enviado_em) return 'enviado';
       if (oc.fornecedor_confirmado_em) return 'confirmado';
@@ -198,7 +235,7 @@ export const useFornecedorData = () => {
       id: p.id,
       numero_pedido: String(p.numero_oc),
       integrado_id: p.integrado_id,
-      integrado_nome: profilesMap.get(p.integrado_id) || 'Cliente',
+      integrado_nome: parceiroMap.get(p.parceiro_id) || 'Cliente',
       data_pedido: p.data_emissao,
       data_entrega_prevista: p.data_prevista_entrega,
       status: p.status,
@@ -209,13 +246,18 @@ export const useFornecedorData = () => {
       fornecedor_enviado_em: p.fornecedor_enviado_em,
       fornecedor_nf_numero: p.fornecedor_nf_numero,
     }));
-  }, []);
+  }, [getParceiroIds]);
 
-  const fetchHistoricoPrecos = useCallback(async (pId: string) => {
+  const fetchHistoricoPrecos = useCallback(async (globalId: string, integradoFilter?: string | null) => {
+    const parceiros = await getParceiroIds(globalId, integradoFilter);
+    if (!parceiros.length) return [];
+
+    const parceiroIds = parceiros.map(p => p.id);
+
     const { data: produtosFornecedor } = await supabase
       .from('produto_fornecedor')
-      .select('id, produto_id, integrado_id')
-      .eq('parceiro_id', pId);
+      .select('id, produto_id, parceiro_id')
+      .in('parceiro_id', parceiroIds);
 
     if (!produtosFornecedor || produtosFornecedor.length === 0) return [];
 
@@ -230,22 +272,15 @@ export const useFornecedorData = () => {
 
     if (!data) return [];
 
-    // Map para nomes
     const produtoIds = [...new Set(produtosFornecedor.map(pf => pf.produto_id))];
-    const integradoIds = [...new Set(produtosFornecedor.map(pf => pf.integrado_id))];
 
     const { data: produtos } = await supabase
       .from('produtos')
       .select('id, nome')
       .in('id', produtoIds);
 
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', integradoIds);
-
     const produtosMap = new Map(produtos?.map(p => [p.id, p.nome]) || []);
-    const profilesMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+    const parceiroMap = new Map(parceiros.map(p => [p.id, p.razao_social_nome]));
     const pfMap = new Map(produtosFornecedor.map(pf => [pf.id, pf]));
 
     return data.map(h => {
@@ -253,31 +288,42 @@ export const useFornecedorData = () => {
       return {
         id: h.id,
         produto_nome: pf ? produtosMap.get(pf.produto_id) || 'Produto' : 'Produto',
-        integrado_nome: pf ? profilesMap.get(pf.integrado_id) || 'Cliente' : 'Cliente',
+        integrado_nome: pf ? parceiroMap.get(pf.parceiro_id) || 'Cliente' : 'Cliente',
         preco_anterior: h.preco_anterior,
         preco_novo: h.preco_novo,
         data_alteracao: h.data_alteracao,
       };
     });
-  }, []);
+  }, [getParceiroIds]);
 
-  const fetchNotificacoes = useCallback(async (pId: string) => {
-    const { data } = await supabase
-      .from('notificacoes_fornecedor')
-      .select('*')
-      .eq('fornecedor_id', pId)
-      .order('created_at', { ascending: false })
-      .limit(20);
+  const fetchNotificacoes = useCallback(async (globalId: string) => {
+    // Generate notifications from pending orders
+    const parceiros = await getParceiroIds(globalId);
+    if (!parceiros.length) return [];
 
-    return data || [];
-  }, []);
+    const parceiroIds = parceiros.map(p => p.id);
+    const parceiroMap = new Map(parceiros.map(p => [p.id, p.razao_social_nome]));
+
+    const { data: pendingOrders } = await supabase
+      .from('ordens_compra')
+      .select('id, numero_oc, parceiro_id, data_emissao')
+      .in('parceiro_id', parceiroIds)
+      .is('fornecedor_confirmado_em', null)
+      .in('status', ['aprovada'])
+      .order('data_emissao', { ascending: false })
+      .limit(10);
+
+    return (pendingOrders || []).map(oc => ({
+      id: `notif-${oc.id}`,
+      tipo: 'pedido_novo',
+      titulo: 'Novo Pedido',
+      mensagem: `OC #${oc.numero_oc} de ${parceiroMap.get(oc.parceiro_id) || 'Cliente'} aguardando confirmação`,
+      lida: false,
+      created_at: oc.data_emissao,
+    }));
+  }, [getParceiroIds]);
 
   const marcarNotificacaoLida = useCallback(async (notificacaoId: string) => {
-    await supabase
-      .from('notificacoes_fornecedor')
-      .update({ lida: true, data_leitura: new Date().toISOString() })
-      .eq('id', notificacaoId);
-    
     setNotificacoes(prev => 
       prev.map(n => n.id === notificacaoId ? { ...n, lida: true } : n)
     );
@@ -329,19 +375,25 @@ export const useFornecedorData = () => {
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     
-    const pId = await fetchParceiroId();
-    setParceiroId(pId);
+    const globalId = await fetchFornecedorGlobalId();
+    setFornecedorGlobalId(globalId);
     
-    if (!pId) {
+    if (!globalId) {
       setLoading(false);
       return;
     }
 
+    // Fetch clients list
+    const clientesData = await fetchClientes(globalId);
+    setClientes(clientesData);
+
+    const filter = clienteSelecionado;
+
     const [estoque, pedidosData, historico, notifs] = await Promise.all([
-      fetchClientesEstoque(pId),
-      fetchPedidos(pId),
-      fetchHistoricoPrecos(pId),
-      fetchNotificacoes(pId),
+      fetchClientesEstoque(globalId, filter),
+      fetchPedidos(globalId, filter),
+      fetchHistoricoPrecos(globalId, filter),
+      fetchNotificacoes(globalId),
     ]);
 
     setClientesEstoque(estoque);
@@ -351,14 +403,13 @@ export const useFornecedorData = () => {
 
     // Calcular stats
     const clientesUnicos = new Set(estoque.map(e => e.integrado_id));
-    // Pedidos pendentes = não confirmados ou não enviados ainda
     const pedidosPendentes = pedidosData.filter(p => 
       p.status_fornecedor === 'pendente_confirmacao' || p.status_fornecedor === 'confirmado'
     );
     const alertasEstoque = estoque.filter(e => e.estoque_atual <= e.estoque_minimo).length;
 
     setStats({
-      totalClientes: clientesUnicos.size,
+      totalClientes: clientesUnicos.size || clientesData.length,
       produtosVinculados: estoque.length,
       pedidosPendentes: pedidosPendentes.length,
       valorPedidosPendentes: pedidosPendentes.reduce((sum, p) => sum + p.valor_total, 0),
@@ -366,15 +417,25 @@ export const useFornecedorData = () => {
     });
 
     setLoading(false);
-  }, [fetchParceiroId, fetchClientesEstoque, fetchPedidos, fetchHistoricoPrecos, fetchNotificacoes]);
+  }, [fetchFornecedorGlobalId, fetchClientes, fetchClientesEstoque, fetchPedidos, fetchHistoricoPrecos, fetchNotificacoes, clienteSelecionado]);
+
+  // Refetch when client filter changes
+  useEffect(() => {
+    if (fornecedorGlobalId) {
+      fetchAllData();
+    }
+  }, [clienteSelecionado]);
 
   useEffect(() => {
     fetchAllData();
-  }, [fetchAllData]);
+  }, []);
 
   return {
     loading,
-    parceiroId,
+    fornecedorGlobalId,
+    clientes,
+    clienteSelecionado,
+    setClienteSelecionado,
     stats,
     clientesEstoque,
     pedidos,
