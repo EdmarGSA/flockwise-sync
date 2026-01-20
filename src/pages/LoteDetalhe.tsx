@@ -33,6 +33,7 @@ import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
 
 import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
+import { AlertasProducaoCard } from '@/components/lotes/postura/AlertasProducaoCard';
 import { SiloBadge } from '@/components/lotes/SiloBadge';
 
 interface LoteData {
@@ -308,6 +309,13 @@ export default function LoteDetalhe() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Alertas de Produção para lotes de postura */}
+        {isPostura && lote.status === 'alojado' && semanasVida >= 19 && (
+          <div className="mb-6">
+            <AlertasProducaoCard loteId={lote.id} integradoId={lote.integrado_id} />
+          </div>
+        )}
 
         {/* Botões de Ação - Grid responsivo */}
         <div className="grid grid-cols-2 gap-3">

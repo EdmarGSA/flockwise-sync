@@ -106,13 +106,15 @@ export default function SeparacaoDialog({ open, onOpenChange, pedido, integradoI
 
       for (const item of pedidoItensOvos || []) {
         // Get available stock sorted by production date (FIFO)
+        // PRIORIDADE 2: Filtrar ovos bloqueados por carência sanitária
         const { data: estoqueDisponivel } = await supabase
           .from('estoque_ovos')
-          .select('id, lote_interno, data_producao, data_validade, quantidade_atual, quantidade_reservada, tipo_ovo, classificacao_peso')
+          .select('id, lote_interno, data_producao, data_validade, quantidade_atual, quantidade_reservada, tipo_ovo, classificacao_peso, bloqueado_carencia')
           .eq('integrado_id', integradoId)
           .eq('tipo_ovo', item.produto_ovo?.tipo_ovo)
           .eq('classificacao_peso', item.produto_ovo?.classificacao_peso)
           .eq('ativo', true)
+          .eq('bloqueado_carencia', false) // Não incluir ovos em carência sanitária
           .gt('quantidade_atual', 0)
           .order('data_producao', { ascending: true });
 

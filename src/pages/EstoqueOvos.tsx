@@ -30,6 +30,8 @@ interface EstoqueOvo {
   custo_unitario: number;
   lote_producao_id: string | null;
   observacoes: string | null;
+  bloqueado_carencia?: boolean;
+  data_liberacao_carencia?: string | null;
   lote?: { galpao?: { nome: string; nucleo?: { nome: string } } };
 }
 
@@ -432,16 +434,39 @@ export default function EstoqueOvos() {
                       </TableHeader>
                       <TableBody>
                         {filteredEstoque.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-mono text-sm font-medium">{item.lote_interno}</TableCell>
+                          <TableRow key={item.id} className={item.bloqueado_carencia ? 'bg-destructive/5' : ''}>
+                            <TableCell className="font-mono text-sm font-medium">
+                              <div className="flex items-center gap-2">
+                                {item.lote_interno}
+                                {item.bloqueado_carencia && (
+                                  <Badge variant="destructive" className="text-xs gap-1">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Carência
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <Badge variant="outline">{getTipoLabel(item.tipo_ovo)}</Badge>
                             </TableCell>
                             <TableCell>{getClassificacaoLabel(item.classificacao_peso)}</TableCell>
                             <TableCell>{format(new Date(item.data_producao), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell>{getValidadeBadge(item.data_validade)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {getValidadeBadge(item.data_validade)}
+                                {item.bloqueado_carencia && item.data_liberacao_carencia && (
+                                  <span className="text-xs text-destructive">
+                                    Liberação: {format(new Date(item.data_liberacao_carencia), 'dd/MM')}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right font-medium">
-                              {(item.quantidade_atual - item.quantidade_reservada).toLocaleString()}
+                              {item.bloqueado_carencia ? (
+                                <span className="text-muted-foreground">Bloqueado</span>
+                              ) : (
+                                (item.quantidade_atual - item.quantidade_reservada).toLocaleString()
+                              )}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {item.quantidade_reservada.toLocaleString()}

@@ -270,6 +270,36 @@ export type Database = {
           },
         ]
       }
+      config_custo_postura: {
+        Row: {
+          created_at: string | null
+          custo_ave_dia: number | null
+          custo_mao_obra_dia: number | null
+          id: string
+          integrado_id: string
+          outros_custos_dia: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          custo_ave_dia?: number | null
+          custo_mao_obra_dia?: number | null
+          id?: string
+          integrado_id: string
+          outros_custos_dia?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          custo_ave_dia?: number | null
+          custo_mao_obra_dia?: number | null
+          id?: string
+          integrado_id?: string
+          outros_custos_dia?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       config_fechamento: {
         Row: {
           constante_ajuste_ca: number
@@ -967,9 +997,11 @@ export type Database = {
       estoque_ovos: {
         Row: {
           ativo: boolean
+          bloqueado_carencia: boolean | null
           classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
           created_at: string
           custo_unitario: number | null
+          data_liberacao_carencia: string | null
           data_producao: string
           data_validade: string
           id: string
@@ -981,13 +1013,16 @@ export type Database = {
           quantidade_inicial: number
           quantidade_reservada: number
           tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          tratamento_lote_id: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          bloqueado_carencia?: boolean | null
           classificacao_peso: Database["public"]["Enums"]["classificacao_peso_ovo"]
           created_at?: string
           custo_unitario?: number | null
+          data_liberacao_carencia?: string | null
           data_producao: string
           data_validade: string
           id?: string
@@ -999,13 +1034,16 @@ export type Database = {
           quantidade_inicial: number
           quantidade_reservada?: number
           tipo_ovo: Database["public"]["Enums"]["tipo_ovo"]
+          tratamento_lote_id?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          bloqueado_carencia?: boolean | null
           classificacao_peso?: Database["public"]["Enums"]["classificacao_peso_ovo"]
           created_at?: string
           custo_unitario?: number | null
+          data_liberacao_carencia?: string | null
           data_producao?: string
           data_validade?: string
           id?: string
@@ -1017,6 +1055,7 @@ export type Database = {
           quantidade_inicial?: number
           quantidade_reservada?: number
           tipo_ovo?: Database["public"]["Enums"]["tipo_ovo"]
+          tratamento_lote_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1025,6 +1064,13 @@ export type Database = {
             columns: ["lote_producao_id"]
             isOneToOne: false
             referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estoque_ovos_tratamento_lote_id_fkey"
+            columns: ["tratamento_lote_id"]
+            isOneToOne: false
+            referencedRelation: "tratamentos_lote"
             referencedColumns: ["id"]
           },
         ]
