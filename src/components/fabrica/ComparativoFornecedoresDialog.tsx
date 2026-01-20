@@ -163,6 +163,17 @@ export default function ComparativoFornecedoresDialog({
 
     setSaving(true);
     try {
+      // Get next OC number
+      const { data: maxOC } = await supabase
+        .from('ordens_compra')
+        .select('numero_oc')
+        .eq('integrado_id', integradoId)
+        .order('numero_oc', { ascending: false })
+        .limit(1)
+        .single();
+
+      let nextNumero = (maxOC?.numero_oc || 0) + 1;
+
       // Create one OC per supplier
       for (const grupo of ocsAgrupadas) {
         // Calculate total value
@@ -170,24 +181,28 @@ export default function ComparativoFornecedoresDialog({
         const itens = grupo.produtos.map(produto => {
           const fornecedor = produto.fornecedores.find(f => f.parceiro_id === grupo.fornecedor.parceiro_id);
           const precoUnitario = fornecedor?.preco_compra || 0;
-          const subtotal = precoUnitario * produto.quantidade;
-          valorTotal += subtotal;
+          const precoTotal = precoUnitario * produto.quantidade;
+          valorTotal += precoTotal;
 
           return {
             produto_id: produto.id,
             quantidade: produto.quantidade,
-            unidade_compra: produto.unidade_compra,
+            unidade_medida: produto.unidade_compra || 'UN',
+            unidade_compra: produto.unidade_compra || 'UN',
+            fator_conversao: produto.fator_conversao || 1,
             preco_unitario: precoUnitario,
-            subtotal
+            preco_total: precoTotal
           };
         });
 
-        // Create OC
+        // Create OC with required fields
         const { data: oc, error: ocError } = await supabase
           .from('ordens_compra')
           .insert([{
             integrado_id: integradoId,
+            numero_oc: nextNumero,
             parceiro_id: grupo.fornecedor.parceiro_id,
+            data_emissao: new Date().toISOString().split('T')[0],
             status: 'rascunho',
             valor_total: valorTotal,
             observacoes: 'OC criada via compra manual'
@@ -196,6 +211,8 @@ export default function ComparativoFornecedoresDialog({
           .single();
 
         if (ocError) throw ocError;
+
+        nextNumero++;
 
         // Create OC items
         const itensParaInserir = itens.map(item => ({
