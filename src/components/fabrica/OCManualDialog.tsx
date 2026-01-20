@@ -10,9 +10,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Search, ArrowRight, Loader2 } from 'lucide-react';
+import { Package, Search, ArrowRight, Loader2, TrendingUp, Clock } from 'lucide-react';
+
+interface GrupoProduto {
+  id: string;
+  nome: string;
+}
 
 interface Produto {
   id: string;
@@ -23,6 +35,7 @@ interface Produto {
   unidade_medida: string;
   unidade_compra: string;
   fator_conversao: number;
+  grupo_produto_id: string | null;
 }
 
 interface ProdutoSelecionado extends Produto {
@@ -44,11 +57,16 @@ export default function OCManualDialog({
 }: OCManualDialogProps) {
   const [loading, setLoading] = useState(false);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [grupos, setGrupos] = useState<GrupoProduto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [grupoFiltro, setGrupoFiltro] = useState<string>('todos');
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
+  const [precosTabela, setPrecosTabela] = useState<Map<string, number>>(new Map());
+  const [ultimosPrecos, setUltimosPrecos] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (open && integradoId) {
+      fetchGrupos();
       fetchProdutos();
     }
   }, [open, integradoId]);
@@ -56,9 +74,26 @@ export default function OCManualDialog({
   useEffect(() => {
     if (!open) {
       setSearchTerm('');
+      setGrupoFiltro('todos');
       setSelectedProducts(new Map());
     }
   }, [open]);
+
+  const fetchGrupos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('grupos_produto')
+        .select('id, nome')
+        .eq('integrado_id', integradoId)
+        .eq('ativo', true)
+        .order('nome');
+
+      if (error) throw error;
+      setGrupos(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar grupos:', error);
+    }
+  };
 
   const fetchProdutos = async () => {
     setLoading(true);
@@ -66,7 +101,7 @@ export default function OCManualDialog({
       // Fetch products with "terceiros" category (purchasable items)
       const { data, error } = await supabase
         .from('produtos')
-        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, unidade_compra, fator_conversao, categorias!inner(tipo_origem)')
+        .select('id, nome, sku, estoque_atual, estoque_minimo, unidade_medida, unidade_compra, fator_conversao, grupo_produto_id, categorias!inner(tipo_origem)')
         .eq('integrado_id', integradoId)
         .eq('ativo', true)
         .eq('categorias.tipo_origem', 'terceiros')
@@ -74,7 +109,7 @@ export default function OCManualDialog({
 
       if (error) throw error;
 
-      setProdutos((data || []).map(p => ({
+      const produtosList = (data || []).map(p => ({
         id: p.id,
         nome: p.nome,
         sku: p.sku,
@@ -82,8 +117,20 @@ export default function OCManualDialog({
         estoque_minimo: p.estoque_minimo,
         unidade_medida: p.unidade_medida,
         unidade_compra: p.unidade_compra || 'UN',
-        fator_conversao: p.fator_conversao || 1
-      })));
+        fator_conversao: p.fator_conversao || 1,
+        grupo_produto_id: p.grupo_produto_id
+      }));
+
+      setProdutos(produtosList);
+
+      // Fetch price data after products are loaded
+      if (produtosList.length > 0) {
+        const produtoIds = produtosList.map(p => p.id);
+        await Promise.all([
+          fetchPrecosTabela(produtoIds),
+          fetchUltimosPrecos(produtoIds)
+        ]);
+      }
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
       toast.error('Erro ao carregar produtos');
@@ -92,14 +139,78 @@ export default function OCManualDialog({
     }
   };
 
+  const fetchPrecosTabela = async (produtoIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('produto_fornecedor')
+        .select('produto_id, preco_compra')
+        .in('produto_id', produtoIds)
+        .eq('ativo', true);
+
+      if (error) throw error;
+
+      // Group by product and get minimum price
+      const precosPorProduto = new Map<string, number>();
+      (data || []).forEach(pf => {
+        const current = precosPorProduto.get(pf.produto_id);
+        if (current === undefined || pf.preco_compra < current) {
+          precosPorProduto.set(pf.produto_id, pf.preco_compra);
+        }
+      });
+      setPrecosTabela(precosPorProduto);
+    } catch (error) {
+      console.error('Erro ao buscar preços de tabela:', error);
+    }
+  };
+
+  const fetchUltimosPrecos = async (produtoIds: string[]) => {
+    try {
+      // Get last approved/received OC price for each product
+      const { data, error } = await supabase
+        .from('ordens_compra_itens')
+        .select(`
+          produto_id,
+          preco_unitario,
+          ordens_compra!inner(status, created_at)
+        `)
+        .in('produto_id', produtoIds)
+        .in('ordens_compra.status', ['aprovada', 'recebida'])
+        .order('ordens_compra(created_at)', { ascending: false });
+
+      if (error) throw error;
+
+      // Get the most recent price for each product
+      const ultimosPorProduto = new Map<string, number>();
+      (data || []).forEach(item => {
+        if (!ultimosPorProduto.has(item.produto_id)) {
+          ultimosPorProduto.set(item.produto_id, item.preco_unitario);
+        }
+      });
+      setUltimosPrecos(ultimosPorProduto);
+    } catch (error) {
+      console.error('Erro ao buscar últimos preços:', error);
+    }
+  };
+
   const filteredProdutos = useMemo(() => {
-    if (!searchTerm) return produtos;
-    const term = searchTerm.toLowerCase();
-    return produtos.filter(p => 
-      p.nome.toLowerCase().includes(term) || 
-      p.sku.toLowerCase().includes(term)
-    );
-  }, [produtos, searchTerm]);
+    let filtered = produtos;
+    
+    // Filter by group
+    if (grupoFiltro !== 'todos') {
+      filtered = filtered.filter(p => p.grupo_produto_id === grupoFiltro);
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.nome.toLowerCase().includes(term) || 
+        p.sku.toLowerCase().includes(term)
+      );
+    }
+    
+    return filtered;
+  }, [produtos, searchTerm, grupoFiltro]);
 
   const toggleProduct = (productId: string) => {
     setSelectedProducts(prev => {
@@ -159,15 +270,30 @@ export default function OCManualDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome ou SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          {/* Filters */}
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou SKU..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={grupoFiltro} onValueChange={setGrupoFiltro}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Grupo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os grupos</SelectItem>
+                {grupos.map((grupo) => (
+                  <SelectItem key={grupo.id} value={grupo.id}>
+                    {grupo.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Selected count */}
@@ -223,6 +349,31 @@ export default function OCManualDialog({
                         <span>SKU: {produto.sku}</span>
                         <span>Estoque: {produto.estoque_atual} {produto.unidade_medida}</span>
                         <span>Mín: {produto.estoque_minimo} {produto.unidade_medida}</span>
+                      </div>
+                      {/* Price info */}
+                      <div className="flex items-center gap-4 mt-1 text-xs">
+                        {precosTabela.has(produto.id) ? (
+                          <span className="flex items-center gap-1 text-primary">
+                            <TrendingUp className="w-3 h-3" />
+                            Tabela: R$ {precosTabela.get(produto.id)?.toFixed(2)}/{produto.unidade_compra}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-muted-foreground/60">
+                            <TrendingUp className="w-3 h-3" />
+                            Sem fornecedor
+                          </span>
+                        )}
+                        {ultimosPrecos.has(produto.id) ? (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            Última: R$ {ultimosPrecos.get(produto.id)?.toFixed(2)}/{produto.unidade_compra}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-muted-foreground/60">
+                            <Clock className="w-3 h-3" />
+                            Sem compras
+                          </span>
+                        )}
                       </div>
                     </div>
                     {isSelected && (
