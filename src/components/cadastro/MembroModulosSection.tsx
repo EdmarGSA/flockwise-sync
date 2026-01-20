@@ -64,6 +64,7 @@ const MembroModulosSection = ({
           .from('modulos' as any)
           .select('id, codigo, nome')
           .eq('ativo', true)
+          .neq('codigo', 'portal-fornecedor')
           .order('ordem');
 
         const { data: userModulosData } = await supabase
