@@ -137,11 +137,90 @@ export function ProducaoOvosDialog({
     setExistingRecord(!!data);
   };
 
+  // PRIORIDADE 3: Calcular custo por ovo
+  const calcularCustoOvo = async (ovosTotais: number): Promise<number> => {
+    try {
+      // Buscar configuração de custos
+      const { data: configCusto } = await supabase
+        .from('config_custo_postura')
+        .select('custo_ave_dia, custo_mao_obra_dia, outros_custos_dia')
+        .eq('integrado_id', integradoId)
+        .maybeSingle();
+
+      const custoAveDia = configCusto?.custo_ave_dia || 0.15;
+      const custoMaoObraDia = configCusto?.custo_mao_obra_dia || 0;
+      const outrosCustosDia = configCusto?.outros_custos_dia || 0;
+
+      // Custo diário total (baseado nas aves vivas)
+      const custoDiarioTotal = (avesVivas * custoAveDia) + custoMaoObraDia + outrosCustosDia;
+      
+      // Custo por ovo = custo diário / ovos produzidos
+      return ovosTotais > 0 ? custoDiarioTotal / ovosTotais : 0;
+    } catch (error) {
+      console.error('Erro ao calcular custo:', error);
+      return 0;
+    }
+  };
+
+  // PRIORIDADE 2: Verificar tratamentos com carência
+  const verificarCarenciaTratamento = async (): Promise<{
+    bloqueado: boolean;
+    tratamentoId: string | null;
+    dataLiberacao: string | null;
+  }> => {
+    try {
+      const { data: tratamentosAtivos } = await supabase
+        .from('tratamentos_lote')
+        .select('id, carencia_dias, data_liberacao_abate')
+        .eq('lote_id', loteId)
+        .eq('status', 'ativo');
+
+      const hoje = new Date();
+
+      for (const tratamento of tratamentosAtivos || []) {
+        const carenciaDias = tratamento.carencia_dias || 0;
+        
+        if (carenciaDias > 0) {
+          // Se tem data_liberacao_abate, usa ela; senão, está em carência ativa
+          if (tratamento.data_liberacao_abate) {
+            const dataLiberacao = new Date(tratamento.data_liberacao_abate);
+            if (dataLiberacao > hoje) {
+              return {
+                bloqueado: true,
+                tratamentoId: tratamento.id,
+                dataLiberacao: tratamento.data_liberacao_abate,
+              };
+            }
+          } else {
+            // Tratamento ativo sem data de liberação = em carência
+            return {
+              bloqueado: true,
+              tratamentoId: tratamento.id,
+              dataLiberacao: format(addDays(hoje, carenciaDias), 'yyyy-MM-dd'),
+            };
+          }
+        }
+      }
+
+      return { bloqueado: false, tratamentoId: null, dataLiberacao: null };
+    } catch (error) {
+      console.error('Erro ao verificar carência:', error);
+      return { bloqueado: false, tratamentoId: null, dataLiberacao: null };
+    }
+  };
+
   const transferirParaEstoque = async (producaoId: string, data: ProducaoFormData) => {
     const tipoOvo = inferirTipoOvo(linhagem);
     const dataProducao = format(new Date(), 'yyyy-MM-dd');
     const dataValidade = format(addDays(new Date(), 30), 'yyyy-MM-dd');
     
+    // Verificar carência de tratamento
+    const carenciaInfo = await verificarCarenciaTratamento();
+    
+    // Calcular custo por ovo
+    const ovosTotais = parseInt(data.ovos_totais) || 0;
+    const custoUnitario = await calcularCustoOvo(ovosTotais);
+
     // Mapear classificações com quantidades
     const classificacoesBase: { classificacao: ClassificacaoPesoOvo; quantidade: number }[] = [
       { classificacao: 'medio' as ClassificacaoPesoOvo, quantidade: parseInt(data.ovos_medio || '0') || 0 },
@@ -154,7 +233,6 @@ export function ProducaoOvosDialog({
 
     // Se não houver classificação específica, usar "grande" como padrão
     if (classificacoes.length === 0) {
-      const ovosTotais = parseInt(data.ovos_totais) || 0;
       const perdas = (parseInt(data.ovos_trincados || '0') || 0) +
                     (parseInt(data.ovos_sujos || '0') || 0) +
                     (parseInt(data.ovos_quebrados || '0') || 0) +
@@ -167,13 +245,20 @@ export function ProducaoOvosDialog({
       }
     }
 
+    // Notificar se ovos estão bloqueados por carência
+    if (carenciaInfo.bloqueado) {
+      toast.warning(`Ovos bloqueados por carência sanitária até ${format(new Date(carenciaInfo.dataLiberacao!), 'dd/MM/yyyy')}`, {
+        duration: 5000,
+      });
+    }
+
     // Criar entradas de estoque para cada classificação
     for (const { classificacao, quantidade } of classificacoes) {
       // Gerar lote interno
       const { data: loteInterno } = await supabase
         .rpc('gerar_lote_interno_ovos', { p_integrado_id: integradoId });
 
-      // Criar entrada no estoque
+      // Criar entrada no estoque com informações de carência e custo
       const { data: estoqueData, error: estoqueError } = await supabase
         .from('estoque_ovos')
         .insert({
@@ -187,6 +272,10 @@ export function ProducaoOvosDialog({
           quantidade_atual: quantidade,
           lote_interno: loteInterno || `OV-${Date.now()}`,
           observacoes: `Produção do dia ${format(new Date(), 'dd/MM/yyyy')}`,
+          custo_unitario: custoUnitario > 0 ? custoUnitario : null,
+          bloqueado_carencia: carenciaInfo.bloqueado,
+          tratamento_lote_id: carenciaInfo.tratamentoId,
+          data_liberacao_carencia: carenciaInfo.dataLiberacao,
         })
         .select('id')
         .single();
@@ -205,7 +294,7 @@ export function ProducaoOvosDialog({
         quantidade: quantidade,
         saldo_anterior: 0,
         saldo_atual: quantidade,
-        observacao: `Produção registrada - Lote ${loteInterno}`,
+        observacao: `Produção registrada - Lote ${loteInterno}${carenciaInfo.bloqueado ? ' (em carência)' : ''}`,
       });
     }
   };

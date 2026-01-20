@@ -57,6 +57,61 @@ export default function FaturamentoDialog({ open, onOpenChange, pedido, integrad
 
       if (crError) throw crError;
 
+      // === PRIORIDADE 1: BAIXA DEFINITIVA DE ESTOQUE DE OVOS ===
+      // Buscar itens de ovos do pedido
+      const { data: pedidoItensOvos } = await supabase
+        .from('pedido_itens_ovos')
+        .select('id')
+        .eq('pedido_id', pedido.id);
+
+      if (pedidoItensOvos && pedidoItensOvos.length > 0) {
+        // Para cada item de ovo, buscar as reservas
+        for (const itemOvo of pedidoItensOvos) {
+          const { data: reservas } = await supabase
+            .from('reserva_estoque_ovos')
+            .select('*, estoque_ovos:estoque_ovo_id(id, quantidade_atual, quantidade_reservada, lote_interno)')
+            .eq('pedido_item_ovo_id', itemOvo.id);
+
+          // Para cada reserva, baixar do estoque definitivamente
+          for (const reserva of reservas || []) {
+            if (!reserva.estoque_ovos) continue;
+            
+            const estoqueAtual = reserva.estoque_ovos.quantidade_atual || 0;
+            const quantidadeReservada = reserva.quantidade_reservada || 0;
+            const novoSaldo = estoqueAtual - quantidadeReservada;
+
+            // Atualizar estoque_ovos (quantidade_atual e zerar reserva)
+            const { error: updateError } = await supabase
+              .from('estoque_ovos')
+              .update({ 
+                quantidade_atual: Math.max(0, novoSaldo),
+                quantidade_reservada: Math.max(0, (reserva.estoque_ovos.quantidade_reservada || 0) - quantidadeReservada)
+              })
+              .eq('id', reserva.estoque_ovo_id);
+
+            if (updateError) {
+              console.error('Erro ao atualizar estoque:', updateError);
+              continue;
+            }
+
+            // Registrar no kardex_ovos
+            await supabase
+              .from('kardex_ovos')
+              .insert({
+                integrado_id: integradoId,
+                estoque_ovo_id: reserva.estoque_ovo_id,
+                pedido_id: pedido.id,
+                tipo_movimento: 'saida_venda',
+                quantidade: quantidadeReservada,
+                saldo_anterior: estoqueAtual,
+                saldo_atual: Math.max(0, novoSaldo),
+                documento_ref: `NF-e ${formData.numero_nfe}`,
+                observacao: `Venda pedido #${pedido.numero_pedido} - Lote ${reserva.estoque_ovos.lote_interno}`,
+              });
+          }
+        }
+      }
+
       toast.success(`Pedido #${pedido.numero_pedido} faturado com sucesso!`);
       onSuccess();
       onOpenChange(false);
