@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useIntegradoId } from "@/hooks/useIntegradoId";
@@ -9,8 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical, RotateCcw, Truck } from "lucide-react";
+import { ArrowLeft, Plus, Package, History, Pencil, FolderTree, Layers, FlaskConical, RotateCcw, Truck, Search, Filter } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import ProdutoForm from "@/components/cadastro/ProdutoForm";
@@ -38,6 +40,29 @@ const CadastroProdutos = () => {
   const [selectedProdutoKardex, setSelectedProdutoKardex] = useState<any>(null);
   const [formulacaoProduto, setFormulacaoProduto] = useState<any>(null);
   const [fornecedoresProduto, setFornecedoresProduto] = useState<any>(null);
+  
+  // Filtros
+  const [filtroCategoria, setFiltroCategoria] = useState<string>("todos");
+  const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
+  const [filtroBusca, setFiltroBusca] = useState<string>("");
+
+  // Produtos filtrados
+  const produtosFiltrados = useMemo(() => {
+    return produtos.filter(produto => {
+      // Filtro de busca
+      const matchBusca = filtroBusca === "" || 
+        produto.nome?.toLowerCase().includes(filtroBusca.toLowerCase()) ||
+        produto.sku?.toLowerCase().includes(filtroBusca.toLowerCase());
+      
+      // Filtro de categoria
+      const matchCategoria = filtroCategoria === "todos" || produto.categoria_id === filtroCategoria;
+      
+      // Filtro de grupo
+      const matchGrupo = filtroGrupo === "todos" || produto.grupo_produto_id === filtroGrupo;
+      
+      return matchBusca && matchCategoria && matchGrupo;
+    });
+  }, [produtos, filtroBusca, filtroCategoria, filtroGrupo]);
 
   useEffect(() => {
     if (integradoId) {
@@ -280,13 +305,66 @@ const CadastroProdutos = () => {
                   </DialogContent>
                 </Dialog>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Filtros */}
+                <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nome ou SKU..."
+                      value={filtroBusca}
+                      onChange={(e) => setFiltroBusca(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todas Categorias</SelectItem>
+                        {categorias.filter(c => c.ativo).map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Grupo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos Grupos</SelectItem>
+                        {gruposProduto.filter(g => g.ativo).map(grupo => (
+                          <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(filtroCategoria !== "todos" || filtroGrupo !== "todos" || filtroBusca !== "") && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setFiltroCategoria("todos");
+                          setFiltroGrupo("todos");
+                          setFiltroBusca("");
+                        }}
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 {loadingData ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : produtos.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">Nenhum produto cadastrado</p>
+                ) : produtosFiltrados.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">Nenhum produto encontrado com os filtros aplicados</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -302,7 +380,7 @@ const CadastroProdutos = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {produtos.map((produto) => (
+                      {produtosFiltrados.map((produto) => (
                         <TableRow key={produto.id}>
                           <TableCell className="font-mono">{produto.sku}</TableCell>
                           <TableCell className="font-medium">{produto.nome}</TableCell>
