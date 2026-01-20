@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
@@ -27,6 +28,8 @@ import GestaoProducaoTab from '@/components/fabrica/producao/GestaoProducaoTab';
 import EstoqueRacaoDialog, { RacaoDetalhe } from '@/components/fabrica/EstoqueRacaoDialog';
 import PrevisaoConsumoDialog from '@/components/fabrica/PrevisaoConsumoDialog';
 import AlertasDetalheDialog from '@/components/fabrica/AlertasDetalheDialog';
+import OCManualDialog from '@/components/fabrica/OCManualDialog';
+import ComparativoFornecedoresDialog from '@/components/fabrica/ComparativoFornecedoresDialog';
 
 interface ProdutoCritico {
   id: string;
@@ -68,6 +71,12 @@ const [stats, setStats] = useState({
   const [showPrevisaoConsumo, setShowPrevisaoConsumo] = useState(false);
   const [showAlertasCriticos, setShowAlertasCriticos] = useState(false);
   const [showAlertasAtencao, setShowAlertasAtencao] = useState(false);
+  
+  // States for OC Manual flow
+  const [showOCManual, setShowOCManual] = useState(false);
+  const [showComparativo, setShowComparativo] = useState(false);
+  const [produtosParaComparativo, setProdutosParaComparativo] = useState<any[]>([]);
+  const [produtosEmOC, setProdutosEmOC] = useState<Set<string>>(new Set());
   const [racoesDetalhadas, setRacoesDetalhadas] = useState<RacaoDetalhe[]>([]);
 
   useEffect(() => {
@@ -227,6 +236,19 @@ const [stats, setStats] = useState({
 
       if (produtosError) throw produtosError;
 
+      // Fetch products that already have approved/pending OCs - these should be filtered out
+      const { data: produtosEmOCData } = await supabase
+        .from('ordens_compra_itens')
+        .select(`
+          produto_id,
+          ordens_compra!inner(status, integrado_id)
+        `)
+        .eq('ordens_compra.integrado_id', integradoId)
+        .in('ordens_compra.status', ['pendente', 'aprovada']);
+
+      const produtosJaEmOC = new Set((produtosEmOCData || []).map(item => item.produto_id));
+      setProdutosEmOC(produtosJaEmOC);
+
       // Fetch OPs em aberto com seus insumos para calcular estoque comprometido
       const { data: opsItens, error: opsError } = await supabase
         .from('ordens_producao_itens')
@@ -324,7 +346,9 @@ const [stats, setStats] = useState({
           estoque_disponivel: estoqueDisponivel,
           ops_vinculadas: opsVinculadas
         };
-      }).filter(p => p.nivel_critico !== 'ok')
+      })
+        .filter(p => p.nivel_critico !== 'ok')
+        .filter(p => !produtosJaEmOC.has(p.id)) // Filter out products already in approved/pending OCs
         .sort((a, b) => a.dias_restantes - b.dias_restantes);
 
       setProdutosCriticos(produtosAnalisados);
@@ -550,16 +574,29 @@ const [stats, setStats] = useState({
                   Gestão de Compras
                 </CardTitle>
                 <CardDescription>
-                  Inicie uma nova compra selecionando produtos críticos
+                  Inicie uma nova compra por alerta de estoque ou manualmente
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={() => setShowProdutosCriticos(true)}
                   className="bg-primary hover:bg-primary/90"
+                  disabled={produtosCriticos.length === 0}
                 >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Iniciar Nova Compra
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Compra por Alerta
+                  {produtosCriticos.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {produtosCriticos.length}
+                    </Badge>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowOCManual(true)}
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  OC Manual
                 </Button>
               </CardContent>
             </Card>
@@ -621,6 +658,32 @@ const [stats, setStats] = useState({
         onOpenChange={setShowAlertasAtencao}
         produtos={produtosCriticos}
         tipo="atencao"
+      />
+
+      {/* OC Manual Dialogs */}
+      <OCManualDialog
+        open={showOCManual}
+        onOpenChange={setShowOCManual}
+        integradoId={integradoId || ''}
+        onContinue={(produtos) => {
+          setProdutosParaComparativo(produtos);
+          setShowOCManual(false);
+          setShowComparativo(true);
+        }}
+      />
+
+      <ComparativoFornecedoresDialog
+        open={showComparativo}
+        onOpenChange={setShowComparativo}
+        produtos={produtosParaComparativo}
+        integradoId={integradoId || ''}
+        onSuccess={() => {
+          setShowComparativo(false);
+          setProdutosParaComparativo([]);
+          fetchProdutosCriticos();
+          fetchStats();
+          setActiveTab('ordens');
+        }}
       />
     </div>
   );
