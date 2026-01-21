@@ -11,11 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Plus, Egg, AlertTriangle, Package, History, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Egg, AlertTriangle, Package, History, Search, Settings2, Tag, BarChart3, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import KardexOvosView from '@/components/ovos/KardexOvosView';
+import AjusteInventarioOvosDialog from '@/components/ovos/AjusteInventarioOvosDialog';
+import DashboardProducaoDemanda from '@/components/ovos/DashboardProducaoDemanda';
+import EtiquetaCaixaOvosDialog from '@/components/ovos/EtiquetaCaixaOvosDialog';
 
 interface EstoqueOvo {
   id: string;
@@ -59,6 +62,10 @@ export default function EstoqueOvos() {
   const [filterTipo, setFilterTipo] = useState<string>('');
   const [filterClassificacao, setFilterClassificacao] = useState<string>('');
   const [activeTab, setActiveTab] = useState('estoque');
+  const [ajusteDialogOpen, setAjusteDialogOpen] = useState(false);
+  const [etiquetaDialogOpen, setEtiquetaDialogOpen] = useState(false);
+  const [selectedEstoqueItem, setSelectedEstoqueItem] = useState<EstoqueOvo | null>(null);
+  const [liberandoCarencia, setLiberandoCarencia] = useState(false);
   const [formData, setFormData] = useState({
     tipo_ovo: '',
     classificacao_peso: '',
@@ -200,6 +207,39 @@ export default function EstoqueOvos() {
   // Alertas de validade
   const alertasValidade = estoque.filter(e => differenceInDays(new Date(e.data_validade), new Date()) <= 7);
 
+  // Lotes em carência que podem ser liberados
+  const lotesCarenciaLiberaveis = estoque.filter(e => 
+    e.bloqueado_carencia && 
+    e.data_liberacao_carencia && 
+    differenceInDays(new Date(e.data_liberacao_carencia), new Date()) <= 0
+  );
+
+  const handleAbrirAjuste = (item: EstoqueOvo) => {
+    setSelectedEstoqueItem(item);
+    setAjusteDialogOpen(true);
+  };
+
+  const liberarCarencias = async () => {
+    if (lotesCarenciaLiberaveis.length === 0) return;
+    
+    setLiberandoCarencia(true);
+    try {
+      const ids = lotesCarenciaLiberaveis.map(l => l.id);
+      const { error } = await supabase
+        .from('estoque_ovos')
+        .update({ bloqueado_carencia: false })
+        .in('id', ids);
+
+      if (error) throw error;
+      toast.success(`${ids.length} lote(s) liberado(s) da carência`);
+      fetchEstoque();
+    } catch (error: any) {
+      toast.error('Erro ao liberar carências: ' + error.message);
+    } finally {
+      setLiberandoCarencia(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -257,21 +297,49 @@ export default function EstoqueOvos() {
             <TabsTrigger value="kardex" className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none">
               <History className="w-4 h-4" /> <span className="hidden sm:inline">Movimentação</span><span className="sm:hidden">Movim.</span>
             </TabsTrigger>
+            <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none">
+              <BarChart3 className="w-4 h-4" /> <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="estoque">
+            {/* Ações Rápidas */}
+            {lotesCarenciaLiberaveis.length > 0 && (
+              <Card className="mb-4 border-green-500/50 bg-green-500/10">
+                <CardContent className="flex items-center justify-between py-4">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-green-600" />
+                    <span className="text-green-700 dark:text-green-400">
+                      {lotesCarenciaLiberaveis.length} lote(s) com carência vencida podem ser liberados
+                    </span>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    onClick={liberarCarencias}
+                    disabled={liberandoCarencia}
+                  >
+                    {liberandoCarencia ? 'Liberando...' : 'Liberar Agora'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                 <CardTitle>Lotes em Estoque (FIFO)</CardTitle>
-                <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" /> Entrada Manual
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Nova Entrada de Ovos</DialogTitle>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEtiquetaDialogOpen(true)}>
+                    <Tag className="w-4 h-4 mr-2" /> Etiquetas
+                  </Button>
+                  <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" /> Entrada Manual
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Nova Entrada de Ovos</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
@@ -372,6 +440,7 @@ export default function EstoqueOvos() {
                     </form>
                   </DialogContent>
                 </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 {/* Filtros */}
@@ -487,7 +556,26 @@ export default function EstoqueOvos() {
           <TabsContent value="kardex">
             <KardexOvosView integradoId={user.id} />
           </TabsContent>
+
+          <TabsContent value="dashboard">
+            <DashboardProducaoDemanda integradoId={user.id} />
+          </TabsContent>
         </Tabs>
+
+        {/* Dialogs */}
+        <AjusteInventarioOvosDialog
+          open={ajusteDialogOpen}
+          onOpenChange={setAjusteDialogOpen}
+          estoqueItem={selectedEstoqueItem}
+          integradoId={user.id}
+          onSuccess={fetchEstoque}
+        />
+
+        <EtiquetaCaixaOvosDialog
+          open={etiquetaDialogOpen}
+          onOpenChange={setEtiquetaDialogOpen}
+          integradoId={user.id}
+        />
       </main>
     </div>
   );

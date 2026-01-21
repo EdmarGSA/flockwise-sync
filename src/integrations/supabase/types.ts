@@ -4113,6 +4113,7 @@ export type Database = {
           codigo: string
           created_at: string
           descricao: string | null
+          estoque_alerta: number | null
           estoque_minimo: number | null
           fator_conversao: number
           id: string
@@ -4130,6 +4131,7 @@ export type Database = {
           codigo: string
           created_at?: string
           descricao?: string | null
+          estoque_alerta?: number | null
           estoque_minimo?: number | null
           fator_conversao?: number
           id?: string
@@ -4147,6 +4149,7 @@ export type Database = {
           codigo?: string
           created_at?: string
           descricao?: string | null
+          estoque_alerta?: number | null
           estoque_minimo?: number | null
           fator_conversao?: number
           id?: string
