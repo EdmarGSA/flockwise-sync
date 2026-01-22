@@ -48,27 +48,30 @@ export default function RomaneioEntregaDialog({
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Buscar itens de produtos regulares com separação
-      const { data: itensProdutos, error: errorProdutos } = await supabase
+      // Buscar itens de produtos regulares com separação (tipagem explícita)
+      const responseProdutos = await supabase
         .from('separacao_pedidos')
-        .select('quantidade_separada, produto:produtos(nome, unidade_medida)')
+        .select('quantidade_separada, produto_id')
         .eq('pedido_id', pedido.id);
 
-      if (errorProdutos) throw errorProdutos;
+      if (responseProdutos.error) throw responseProdutos.error;
+      const itensProdutos = responseProdutos.data || [];
 
-      // Buscar reservas de ovos com rastreabilidade
-      const { data: reservasOvos, error: errorOvos } = await supabase
+      // Buscar reservas de ovos (cast para evitar erro de tipo profundo do Supabase)
+      const responseOvos = await (supabase as any)
         .from('reserva_estoque_ovos')
-        .select('quantidade_reservada, estoque_ovo:estoque_ovos(lote_interno, data_producao, data_validade, tipo_ovo, classificacao_peso), pedido_item_ovo:pedido_itens_ovos(produto_ovo:produtos_ovos(nome, unidade_venda))')
+        .select('quantidade_reservada, lote_interno, data_producao, data_validade')
         .eq('pedido_id', pedido.id);
-      if (errorOvos) throw errorOvos;
+      
+      if (responseOvos.error) throw responseOvos.error;
+      const reservasOvos: any[] = responseOvos.data || [];
 
       // Buscar dados da organização
       const { data: org } = await supabase
         .from('organizacoes')
         .select('*')
         .eq('integrado_id', integradoId)
-        .single();
+        .maybeSingle();
 
       setOrganizacao(org);
 
@@ -76,22 +79,24 @@ export default function RomaneioEntregaDialog({
       const listaItens: ItemRomaneio[] = [];
 
       // Produtos regulares (simplificado)
-      (itensProdutos || []).forEach((item: any) => {
+      itensProdutos.forEach((item) => {
         listaItens.push({
           produto_nome: 'Produto',
-          quantidade: item.quantidade_separada,
+          quantidade: item.quantidade_separada || 0,
           unidade: 'UN',
           is_ovo: false,
         });
       });
 
-      // Ovos (simplificado)
-      (reservasOvos || []).forEach((reserva: any) => {
+      // Ovos com rastreabilidade
+      reservasOvos.forEach((reserva) => {
         listaItens.push({
           produto_nome: 'Ovos',
-          quantidade: reserva.quantidade_reservada,
+          quantidade: reserva.quantidade_reservada || 0,
           unidade: 'UN',
-          lote_interno: reserva.estoque_ovo_id?.substring(0, 8),
+          lote_interno: reserva.lote_interno || undefined,
+          data_producao: reserva.data_producao || undefined,
+          data_validade: reserva.data_validade || undefined,
           is_ovo: true,
         });
       });
@@ -262,7 +267,7 @@ export default function RomaneioEntregaDialog({
                     <TableRow key={idx}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {item.is_ovo && <Egg className="w-4 h-4 text-amber-500" />}
+                          {item.is_ovo && <Egg className="w-4 h-4 text-warning" />}
                           {item.produto_nome}
                         </div>
                       </TableCell>
