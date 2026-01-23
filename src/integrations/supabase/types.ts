@@ -3034,6 +3034,7 @@ export type Database = {
           celular: string | null
           cep: string | null
           cidade: string | null
+          codigo_erp: string | null
           codigo_ibge: string | null
           complemento: string | null
           cpf_cnpj: string
@@ -3063,6 +3064,7 @@ export type Database = {
           celular?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo_erp?: string | null
           codigo_ibge?: string | null
           complemento?: string | null
           cpf_cnpj: string
@@ -3092,6 +3094,7 @@ export type Database = {
           celular?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo_erp?: string | null
           codigo_ibge?: string | null
           complemento?: string | null
           cpf_cnpj?: string
@@ -3838,6 +3841,7 @@ export type Database = {
       produto_fornecedor: {
         Row: {
           ativo: boolean | null
+          codigo_erp: string | null
           codigo_produto_fornecedor: string | null
           created_at: string
           descricao_produto_fornecedor: string | null
@@ -3856,6 +3860,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          codigo_erp?: string | null
           codigo_produto_fornecedor?: string | null
           created_at?: string
           descricao_produto_fornecedor?: string | null
@@ -3874,6 +3879,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          codigo_erp?: string | null
           codigo_produto_fornecedor?: string | null
           created_at?: string
           descricao_produto_fornecedor?: string | null
@@ -4837,6 +4843,129 @@ export type Database = {
           urgente?: boolean | null
         }
         Relationships: []
+      }
+      sync_erp_api_keys: {
+        Row: {
+          api_key_hash: string
+          ativo: boolean | null
+          created_at: string
+          fornecedor_global_id: string
+          id: string
+          nome: string
+          ultimo_uso: string | null
+        }
+        Insert: {
+          api_key_hash: string
+          ativo?: boolean | null
+          created_at?: string
+          fornecedor_global_id: string
+          id?: string
+          nome: string
+          ultimo_uso?: string | null
+        }
+        Update: {
+          api_key_hash?: string
+          ativo?: boolean | null
+          created_at?: string
+          fornecedor_global_id?: string
+          id?: string
+          nome?: string
+          ultimo_uso?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_erp_api_keys_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_erp_log: {
+        Row: {
+          created_at: string
+          detalhes: Json | null
+          direcao: string
+          erros: Json | null
+          fornecedor_global_id: string
+          id: string
+          registros_enviados: number | null
+          registros_erro: number | null
+          registros_processados: number | null
+          tipo_entidade: string
+        }
+        Insert: {
+          created_at?: string
+          detalhes?: Json | null
+          direcao: string
+          erros?: Json | null
+          fornecedor_global_id: string
+          id?: string
+          registros_enviados?: number | null
+          registros_erro?: number | null
+          registros_processados?: number | null
+          tipo_entidade: string
+        }
+        Update: {
+          created_at?: string
+          detalhes?: Json | null
+          direcao?: string
+          erros?: Json | null
+          fornecedor_global_id?: string
+          id?: string
+          registros_enviados?: number | null
+          registros_erro?: number | null
+          registros_processados?: number | null
+          tipo_entidade?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_erp_log_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_erp_mapeamento: {
+        Row: {
+          created_at: string
+          fornecedor_global_id: string
+          id: string
+          id_cloud: string
+          id_erp: string
+          tipo_entidade: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fornecedor_global_id: string
+          id?: string
+          id_cloud: string
+          id_erp: string
+          tipo_entidade: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fornecedor_global_id?: string
+          id?: string
+          id_cloud?: string
+          id_erp?: string
+          tipo_entidade?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_erp_mapeamento_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tabelas_preco: {
         Row: {
