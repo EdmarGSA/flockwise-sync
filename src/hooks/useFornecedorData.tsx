@@ -63,6 +63,55 @@ export interface DashboardStats {
   pedidosPendentes: number;
   valorPedidosPendentes: number;
   alertasEstoque: number;
+  meusCatalogoProdutos: number;
+  meusClientes: number;
+}
+
+export interface ClienteFornecedor {
+  id: string;
+  fornecedor_global_id: string;
+  tipo_pessoa: string;
+  cpf_cnpj: string;
+  razao_social_nome: string;
+  nome_fantasia: string | null;
+  inscricao_estadual: string | null;
+  telefone: string | null;
+  celular: string | null;
+  email: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  codigo_ibge: string | null;
+  limite_credito: number;
+  saldo_credito: number;
+  observacoes: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProdutoCatalogo {
+  id: string;
+  fornecedor_global_id: string;
+  codigo_interno: string;
+  nome: string;
+  descricao: string | null;
+  categoria: string | null;
+  marca: string | null;
+  unidade_venda: string;
+  preco_tabela: number;
+  custo: number | null;
+  codigo_barras: string | null;
+  ncm: string | null;
+  estoque_proprio: number;
+  estoque_minimo: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export const useFornecedorData = () => {
@@ -77,11 +126,15 @@ export const useFornecedorData = () => {
     pedidosPendentes: 0,
     valorPedidosPendentes: 0,
     alertasEstoque: 0,
+    meusCatalogoProdutos: 0,
+    meusClientes: 0,
   });
   const [clientesEstoque, setClientesEstoque] = useState<ClienteEstoque[]>([]);
   const [pedidos, setPedidos] = useState<PedidoFornecedor[]>([]);
   const [historicoPrecos, setHistoricoPrecos] = useState<HistoricoPreco[]>([]);
   const [notificacoes, setNotificacoes] = useState<NotificacaoFornecedor[]>([]);
+  const [meusClientes, setMeusClientes] = useState<ClienteFornecedor[]>([]);
+  const [produtosCatalogo, setProdutosCatalogo] = useState<ProdutoCatalogo[]>([]);
 
   // Fetch fornecedor_global_id from profile
   const fetchFornecedorGlobalId = useCallback(async () => {
@@ -372,6 +425,38 @@ export const useFornecedorData = () => {
     return { error };
   }, []);
 
+  // Fetch supplier's own clients (virtual)
+  const fetchMeusClientes = useCallback(async (globalId: string) => {
+    const { data, error } = await supabase
+      .from('clientes_fornecedor')
+      .select('*')
+      .eq('fornecedor_global_id', globalId)
+      .order('razao_social_nome');
+
+    if (error) {
+      console.error('Error fetching clientes_fornecedor:', error);
+      return [];
+    }
+
+    return (data || []) as ClienteFornecedor[];
+  }, []);
+
+  // Fetch supplier's own product catalog
+  const fetchProdutosCatalogo = useCallback(async (globalId: string) => {
+    const { data, error } = await supabase
+      .from('produtos_catalogo_fornecedor')
+      .select('*')
+      .eq('fornecedor_global_id', globalId)
+      .order('nome');
+
+    if (error) {
+      console.error('Error fetching produtos_catalogo_fornecedor:', error);
+      return [];
+    }
+
+    return (data || []) as ProdutoCatalogo[];
+  }, []);
+
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     
@@ -389,17 +474,21 @@ export const useFornecedorData = () => {
 
     const filter = clienteSelecionado;
 
-    const [estoque, pedidosData, historico, notifs] = await Promise.all([
+    const [estoque, pedidosData, historico, notifs, meusCli, meusProd] = await Promise.all([
       fetchClientesEstoque(globalId, filter),
       fetchPedidos(globalId, filter),
       fetchHistoricoPrecos(globalId, filter),
       fetchNotificacoes(globalId),
+      fetchMeusClientes(globalId),
+      fetchProdutosCatalogo(globalId),
     ]);
 
     setClientesEstoque(estoque);
     setPedidos(pedidosData);
     setHistoricoPrecos(historico);
     setNotificacoes(notifs);
+    setMeusClientes(meusCli);
+    setProdutosCatalogo(meusProd);
 
     // Calcular stats
     const clientesUnicos = new Set(estoque.map(e => e.integrado_id));
@@ -414,10 +503,12 @@ export const useFornecedorData = () => {
       pedidosPendentes: pedidosPendentes.length,
       valorPedidosPendentes: pedidosPendentes.reduce((sum, p) => sum + p.valor_total, 0),
       alertasEstoque,
+      meusCatalogoProdutos: meusProd.filter(p => p.ativo).length,
+      meusClientes: meusCli.filter(c => c.ativo).length,
     });
 
     setLoading(false);
-  }, [fetchFornecedorGlobalId, fetchClientes, fetchClientesEstoque, fetchPedidos, fetchHistoricoPrecos, fetchNotificacoes, clienteSelecionado]);
+  }, [fetchFornecedorGlobalId, fetchClientes, fetchClientesEstoque, fetchPedidos, fetchHistoricoPrecos, fetchNotificacoes, fetchMeusClientes, fetchProdutosCatalogo, clienteSelecionado]);
 
   // Refetch when client filter changes
   useEffect(() => {
@@ -441,6 +532,8 @@ export const useFornecedorData = () => {
     pedidos,
     historicoPrecos,
     notificacoes,
+    meusClientes,
+    produtosCatalogo,
     marcarNotificacaoLida,
     confirmarPedido,
     informarEnvio,

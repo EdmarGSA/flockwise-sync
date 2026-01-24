@@ -22,7 +22,9 @@ import {
   LogOut,
   RefreshCw,
   Building2,
-  Settings
+  Settings,
+  ShoppingBag,
+  Contact
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -32,6 +34,8 @@ import { FornecedorPedidosTab } from '@/components/fornecedor/FornecedorPedidosT
 import { FornecedorHistoricoTab } from '@/components/fornecedor/FornecedorHistoricoTab';
 import { FornecedorNotificacoesTab } from '@/components/fornecedor/FornecedorNotificacoesTab';
 import { FornecedorConfigTab } from '@/components/fornecedor/FornecedorConfigTab';
+import { FornecedorCatalogoTab } from '@/components/fornecedor/FornecedorCatalogoTab';
+import { FornecedorClientesTab } from '@/components/fornecedor/FornecedorClientesTab';
 
 const PortalFornecedor = () => {
   const { signOut } = useAuth();
@@ -46,6 +50,8 @@ const PortalFornecedor = () => {
     pedidos, 
     historicoPrecos, 
     notificacoes,
+    meusClientes,
+    produtosCatalogo,
     marcarNotificacaoLida,
     confirmarPedido,
     informarEnvio,
@@ -224,7 +230,7 @@ const PortalFornecedor = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-5 lg:w-[600px]">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-7 lg:w-[800px]">
             <TabsTrigger value="dashboard" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -240,6 +246,14 @@ const PortalFornecedor = () => {
             <TabsTrigger value="historico" className="gap-2">
               <History className="h-4 w-4" />
               <span className="hidden sm:inline">Preços</span>
+            </TabsTrigger>
+            <TabsTrigger value="catalogo" className="gap-2">
+              <ShoppingBag className="h-4 w-4" />
+              <span className="hidden sm:inline">Catálogo</span>
+            </TabsTrigger>
+            <TabsTrigger value="meusclientes" className="gap-2">
+              <Contact className="h-4 w-4" />
+              <span className="hidden sm:inline">Clientes</span>
             </TabsTrigger>
             <TabsTrigger value="configuracoes" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -441,6 +455,24 @@ const PortalFornecedor = () => {
             <FornecedorNotificacoesTab 
               notificacoes={notificacoes}
               onMarcarLida={marcarNotificacaoLida}
+            />
+          </TabsContent>
+
+          {/* Catálogo Tab */}
+          <TabsContent value="catalogo">
+            <FornecedorCatalogoTab 
+              produtos={produtosCatalogo}
+              fornecedorGlobalId={fornecedorGlobalId!}
+              onRefresh={refetch}
+            />
+          </TabsContent>
+
+          {/* Meus Clientes Tab */}
+          <TabsContent value="meusclientes">
+            <FornecedorClientesTab 
+              clientes={meusClientes}
+              fornecedorGlobalId={fornecedorGlobalId!}
+              onRefresh={refetch}
             />
           </TabsContent>
 
