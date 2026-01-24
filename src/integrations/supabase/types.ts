@@ -270,6 +270,95 @@ export type Database = {
           },
         ]
       }
+      clientes_fornecedor: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          celular: string | null
+          cep: string | null
+          cidade: string | null
+          codigo_ibge: string | null
+          complemento: string | null
+          cpf_cnpj: string
+          created_at: string
+          email: string | null
+          estado: string | null
+          fornecedor_global_id: string
+          id: string
+          inscricao_estadual: string | null
+          limite_credito: number | null
+          logradouro: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          observacoes: string | null
+          razao_social_nome: string
+          saldo_credito: number | null
+          telefone: string | null
+          tipo_pessoa: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_ibge?: string | null
+          complemento?: string | null
+          cpf_cnpj: string
+          created_at?: string
+          email?: string | null
+          estado?: string | null
+          fornecedor_global_id: string
+          id?: string
+          inscricao_estadual?: string | null
+          limite_credito?: number | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social_nome: string
+          saldo_credito?: number | null
+          telefone?: string | null
+          tipo_pessoa?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_ibge?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string
+          created_at?: string
+          email?: string | null
+          estado?: string | null
+          fornecedor_global_id?: string
+          id?: string
+          inscricao_estadual?: string | null
+          limite_credito?: number | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social_nome?: string
+          saldo_credito?: number | null
+          telefone?: string | null
+          tipo_pessoa?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_custo_postura: {
         Row: {
           created_at: string | null
@@ -4108,6 +4197,74 @@ export type Database = {
             columns: ["grupo_animal_id"]
             isOneToOne: false
             referencedRelation: "grupos_animal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos_catalogo_fornecedor: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          codigo_barras: string | null
+          codigo_interno: string
+          created_at: string
+          custo: number | null
+          descricao: string | null
+          estoque_minimo: number | null
+          estoque_proprio: number | null
+          fornecedor_global_id: string
+          id: string
+          marca: string | null
+          ncm: string | null
+          nome: string
+          preco_tabela: number | null
+          unidade_venda: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          codigo_barras?: string | null
+          codigo_interno: string
+          created_at?: string
+          custo?: number | null
+          descricao?: string | null
+          estoque_minimo?: number | null
+          estoque_proprio?: number | null
+          fornecedor_global_id: string
+          id?: string
+          marca?: string | null
+          ncm?: string | null
+          nome: string
+          preco_tabela?: number | null
+          unidade_venda?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          codigo_barras?: string | null
+          codigo_interno?: string
+          created_at?: string
+          custo?: number | null
+          descricao?: string | null
+          estoque_minimo?: number | null
+          estoque_proprio?: number | null
+          fornecedor_global_id?: string
+          id?: string
+          marca?: string | null
+          ncm?: string | null
+          nome?: string
+          preco_tabela?: number | null
+          unidade_venda?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_catalogo_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
             referencedColumns: ["id"]
           },
         ]
