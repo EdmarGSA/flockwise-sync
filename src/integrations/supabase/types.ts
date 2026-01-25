@@ -1499,6 +1499,63 @@ export type Database = {
           },
         ]
       }
+      galpoes_fornecedor: {
+        Row: {
+          ativo: boolean
+          capacidade_aves: number
+          comprimento: number | null
+          created_at: string
+          fornecedor_global_id: string
+          id: string
+          largura: number | null
+          nome: string
+          nucleo_fornecedor_id: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          capacidade_aves?: number
+          comprimento?: number | null
+          created_at?: string
+          fornecedor_global_id: string
+          id?: string
+          largura?: number | null
+          nome: string
+          nucleo_fornecedor_id: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          capacidade_aves?: number
+          comprimento?: number | null
+          created_at?: string
+          fornecedor_global_id?: string
+          id?: string
+          largura?: number | null
+          nome?: string
+          nucleo_fornecedor_id?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "galpoes_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "galpoes_fornecedor_nucleo_fornecedor_id_fkey"
+            columns: ["nucleo_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grupos_animal: {
         Row: {
           ativo: boolean
@@ -1919,6 +1976,89 @@ export type Database = {
             columns: ["nucleo_id"]
             isOneToOne: false
             referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lotes_fornecedor: {
+        Row: {
+          codigo_lote: string | null
+          created_at: string
+          data_alojamento: string | null
+          data_prevista_saida: string | null
+          fornecedor_global_id: string
+          galpao_fornecedor_id: string
+          id: string
+          linhagem: string | null
+          nucleo_fornecedor_id: string
+          observacoes: string | null
+          quantidade_aves: number
+          sexo: string | null
+          status: string
+          updated_at: string
+          vendedor_fornecedor_id: string | null
+        }
+        Insert: {
+          codigo_lote?: string | null
+          created_at?: string
+          data_alojamento?: string | null
+          data_prevista_saida?: string | null
+          fornecedor_global_id: string
+          galpao_fornecedor_id: string
+          id?: string
+          linhagem?: string | null
+          nucleo_fornecedor_id: string
+          observacoes?: string | null
+          quantidade_aves: number
+          sexo?: string | null
+          status?: string
+          updated_at?: string
+          vendedor_fornecedor_id?: string | null
+        }
+        Update: {
+          codigo_lote?: string | null
+          created_at?: string
+          data_alojamento?: string | null
+          data_prevista_saida?: string | null
+          fornecedor_global_id?: string
+          galpao_fornecedor_id?: string
+          id?: string
+          linhagem?: string | null
+          nucleo_fornecedor_id?: string
+          observacoes?: string | null
+          quantidade_aves?: number
+          sexo?: string | null
+          status?: string
+          updated_at?: string
+          vendedor_fornecedor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lotes_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_fornecedor_galpao_fornecedor_id_fkey"
+            columns: ["galpao_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_fornecedor_nucleo_fornecedor_id_fkey"
+            columns: ["nucleo_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_fornecedor_vendedor_fornecedor_id_fkey"
+            columns: ["vendedor_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores_fornecedor"
             referencedColumns: ["id"]
           },
         ]
@@ -2604,6 +2744,66 @@ export type Database = {
             columns: ["integrado_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nucleos_fornecedor: {
+        Row: {
+          ativo: boolean
+          cep: string | null
+          cidade: string | null
+          cliente_fornecedor_id: string
+          created_at: string
+          estado: string | null
+          fornecedor_global_id: string
+          id: string
+          nome: string
+          observacoes: string | null
+          tipo_producao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cliente_fornecedor_id: string
+          created_at?: string
+          estado?: string | null
+          fornecedor_global_id: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          tipo_producao?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cliente_fornecedor_id?: string
+          created_at?: string
+          estado?: string | null
+          fornecedor_global_id?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          tipo_producao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nucleos_fornecedor_cliente_fornecedor_id_fkey"
+            columns: ["cliente_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nucleos_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
             referencedColumns: ["id"]
           },
         ]
@@ -5529,6 +5729,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vendedores_fornecedor: {
+        Row: {
+          ativo: boolean
+          codigo_vendedor: string | null
+          created_at: string
+          email: string | null
+          fornecedor_global_id: string
+          id: string
+          nome: string
+          observacoes: string | null
+          regiao: string | null
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_vendedor?: string | null
+          created_at?: string
+          email?: string | null
+          fornecedor_global_id: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          regiao?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_vendedor?: string | null
+          created_at?: string
+          email?: string | null
+          fornecedor_global_id?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          regiao?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
