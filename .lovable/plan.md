@@ -1,139 +1,175 @@
 
-# Plano: Cadastro de Produtos e Clientes Exclusivos do Fornecedor
+# Plano: Mini-ERP de Gestão de Campo para Fornecedor
 
 ## Resumo
-Implementar funcionalidade para que fornecedores cadastrem seus próprios produtos (catálogo) e clientes (virtuais) no Portal do Fornecedor. Esses dados serão **exclusivos** do fornecedor e **não serão visíveis** para as organizações clientes nem serão usuários do sistema.
+Implementar estrutura completa de gestão de campo no Portal do Fornecedor, espelhando a estrutura da integradora, onde:
+- **Fornecedor** = Integradora
+- **Clientes do Fornecedor** = Integrados (produtores)
+- **Vendedores do Fornecedor** = Veterinários (responsáveis técnicos)
 
----
-
-## Contexto Atual
-
-### O que existe hoje:
-- Fornecedores veem **produtos das organizações** via tabela `produto_fornecedor` (de-para)
-- Fornecedores veem **parceiros das organizações** que os cadastraram como fornecedor
-- Não existe catálogo próprio de produtos do fornecedor
-- Não existem clientes virtuais exclusivos do fornecedor
-
-### O que será criado:
-- **Catálogo de Produtos do Fornecedor** - Produtos que o fornecedor vende
-- **Clientes do Fornecedor** - Clientes externos que não são usuários do sistema
+Isso permitirá ao fornecedor cadastrar e acompanhar núcleos, galpões e lotes de seus clientes virtuais.
 
 ---
 
 ## Arquitetura de Dados
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                    PORTAL DO FORNECEDOR                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────┐    ┌─────────────────────────────┐│
-│  │ produtos_catalogo_  │    │   clientes_fornecedor       ││
-│  │ fornecedor          │    │                             ││
-│  │                     │    │ • CNPJ/CPF                  ││
-│  │ • nome              │    │ • Razão Social              ││
-│  │ • SKU interno       │    │ • Endereço                  ││
-│  │ • preço sugerido    │    │ • Contato                   ││
-│  │ • unidade           │    │ • Limite crédito            ││
-│  │ • categoria         │    │ • Status (ativo/inativo)    ││
-│  └─────────────────────┘    └─────────────────────────────┘│
-│                                                             │
-│  Isolamento: fornecedor_global_id + RLS                     │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                        PORTAL DO FORNECEDOR - GESTÃO CAMPO                    │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌─────────────────────────┐                                                  │
+│  │ vendedores_fornecedor   │ ← Funcionários/Representantes do fornecedor      │
+│  │ • nome                  │                                                  │
+│  │ • email / telefone      │                                                  │
+│  │ • região                │                                                  │
+│  │ • ativo                 │                                                  │
+│  └─────────────────────────┘                                                  │
+│             │                                                                 │
+│             ▼                                                                 │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐                  │
+│  │ nucleos_fornecedor      │────▶│ galpoes_fornecedor      │                  │
+│  │ • cliente_fornecedor_id │     │ • nucleo_fornecedor_id  │                  │
+│  │ • nome                  │     │ • nome                  │                  │
+│  │ • cidade / estado       │     │ • capacidade_aves       │                  │
+│  │ • tipo_producao         │     │ • ativo                 │                  │
+│  └─────────────────────────┘     └───────────┬─────────────┘                  │
+│                                              │                                │
+│                                              ▼                                │
+│                               ┌─────────────────────────────┐                 │
+│                               │ lotes_fornecedor            │                 │
+│                               │ • galpao_fornecedor_id      │                 │
+│                               │ • vendedor_fornecedor_id    │ ← Responsável   │
+│                               │ • quantidade_aves           │                 │
+│                               │ • linhagem                  │                 │
+│                               │ • data_alojamento           │                 │
+│                               │ • status                    │                 │
+│                               │ • semana_atual              │ ← Calculado     │
+│                               └─────────────────────────────┘                 │
+│                                                                               │
+│  Isolamento: fornecedor_global_id + RLS em todas as tabelas                   │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Fase 1: Migração de Banco de Dados
 
-### Tabela: `clientes_fornecedor`
-Armazena clientes virtuais do fornecedor (não são usuários do sistema).
+### Tabela 1: `vendedores_fornecedor`
+Cadastro de vendedores/representantes do fornecedor (equivalente a veterinários).
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | id | UUID | Chave primária |
 | fornecedor_global_id | UUID | FK para fornecedores_globais |
-| tipo_pessoa | ENUM | fisica / juridica |
-| cpf_cnpj | TEXT | Documento único por fornecedor |
-| razao_social_nome | TEXT | Nome/Razão Social |
-| nome_fantasia | TEXT | Nome fantasia (opcional) |
-| inscricao_estadual | TEXT | IE (opcional) |
-| telefone | TEXT | Telefone principal |
-| celular | TEXT | Celular/WhatsApp |
-| email | TEXT | E-mail de contato |
-| cep | TEXT | CEP |
-| logradouro | TEXT | Endereço |
-| numero | TEXT | Número |
-| complemento | TEXT | Complemento |
-| bairro | TEXT | Bairro |
+| nome | TEXT | Nome completo |
+| email | TEXT | E-mail (opcional) |
+| telefone | TEXT | Telefone/WhatsApp |
+| regiao | TEXT | Região de atuação |
+| codigo_vendedor | TEXT | Código interno |
+| ativo | BOOLEAN | Status |
+| observacoes | TEXT | Observações |
+| created_at / updated_at | TIMESTAMPTZ | Timestamps |
+
+### Tabela 2: `nucleos_fornecedor`
+Unidades de produção dos clientes do fornecedor.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | UUID | Chave primária |
+| fornecedor_global_id | UUID | FK para fornecedores_globais |
+| cliente_fornecedor_id | UUID | FK para clientes_fornecedor |
+| nome | TEXT | Nome do núcleo |
 | cidade | TEXT | Cidade |
 | estado | TEXT | UF |
-| codigo_ibge | TEXT | Código IBGE da cidade |
-| limite_credito | NUMERIC | Limite de crédito em R$ |
-| saldo_credito | NUMERIC | Saldo disponível |
-| observacoes | TEXT | Observações gerais |
-| ativo | BOOLEAN | Status ativo/inativo |
-| created_at | TIMESTAMPTZ | Data criação |
-| updated_at | TIMESTAMPTZ | Data atualização |
+| cep | TEXT | CEP |
+| tipo_producao | TEXT | 'corte' ou 'postura' |
+| ativo | BOOLEAN | Status |
+| observacoes | TEXT | Observações |
+| created_at / updated_at | TIMESTAMPTZ | Timestamps |
 
-### Tabela: `produtos_catalogo_fornecedor`
-Catálogo de produtos do fornecedor.
+### Tabela 3: `galpoes_fornecedor`
+Galpões dentro dos núcleos.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | id | UUID | Chave primária |
 | fornecedor_global_id | UUID | FK para fornecedores_globais |
-| codigo_interno | TEXT | SKU/código do fornecedor |
-| nome | TEXT | Nome do produto |
-| descricao | TEXT | Descrição detalhada |
-| categoria | TEXT | Categoria livre |
-| marca | TEXT | Marca do produto |
-| unidade_venda | TEXT | UN, KG, SC, CX, etc. |
-| preco_tabela | NUMERIC | Preço sugerido de venda |
-| custo | NUMERIC | Custo interno (opcional) |
-| codigo_barras | TEXT | EAN/GTIN (opcional) |
-| ncm | TEXT | NCM fiscal (opcional) |
-| estoque_proprio | NUMERIC | Estoque disponível |
-| estoque_minimo | NUMERIC | Estoque mínimo para alerta |
-| ativo | BOOLEAN | Status ativo/inativo |
-| created_at | TIMESTAMPTZ | Data criação |
-| updated_at | TIMESTAMPTZ | Data atualização |
+| nucleo_fornecedor_id | UUID | FK para nucleos_fornecedor |
+| nome | TEXT | Nome/número do galpão |
+| capacidade_aves | INTEGER | Capacidade máxima |
+| comprimento | DECIMAL | Metros |
+| largura | DECIMAL | Metros |
+| ativo | BOOLEAN | Status |
+| observacoes | TEXT | Observações |
+| created_at / updated_at | TIMESTAMPTZ | Timestamps |
+
+### Tabela 4: `lotes_fornecedor`
+Lotes de aves nos galpões dos clientes.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | UUID | Chave primária |
+| fornecedor_global_id | UUID | FK para fornecedores_globais |
+| nucleo_fornecedor_id | UUID | FK para nucleos_fornecedor |
+| galpao_fornecedor_id | UUID | FK para galpoes_fornecedor |
+| vendedor_fornecedor_id | UUID | FK para vendedores_fornecedor (responsável) |
+| quantidade_aves | INTEGER | Quantidade inicial |
+| linhagem | TEXT | Linhagem das aves |
+| data_alojamento | DATE | Data de alojamento |
+| data_prevista_saida | DATE | Previsão de abate/fim |
+| status | TEXT | 'previsao', 'alojado', 'fechado' |
+| semana_atual | INTEGER | Semana de vida (calculado) |
+| sexo | TEXT | 'macho', 'femea', 'misto' |
+| observacoes | TEXT | Observações |
+| created_at / updated_at | TIMESTAMPTZ | Timestamps |
 
 ### Políticas RLS
-- **SELECT/INSERT/UPDATE/DELETE**: Apenas registros onde `fornecedor_global_id = get_my_fornecedor_global_id()`
-- Isolamento total entre fornecedores
+Todas as tabelas terão RLS com:
+```sql
+USING (fornecedor_global_id = get_my_fornecedor_global_id())
+```
 
 ---
 
 ## Fase 2: Componentes do Frontend
 
-### 2.1 Nova Tab: "Meus Produtos"
-Adicionar ao PortalFornecedor uma aba para gerenciar o catálogo próprio.
+### 2.1 Nova Tab: "Gestão de Campo"
+Adicionar tab principal com sub-navegação interna.
 
-**Componente:** `FornecedorCatalogoTab.tsx`
+**Componente:** `FornecedorGestaoCampoTab.tsx`
 
-**Funcionalidades:**
-- Listar produtos do catálogo com busca e filtros
-- Botão "Novo Produto" abre formulário
-- Edição inline ou em dialog
-- Indicador de estoque baixo
-- Exportar catálogo (futuro)
+**Sub-tabs internas:**
+- **Vendedores** - CRUD de vendedores
+- **Núcleos** - CRUD de núcleos por cliente
+- **Galpões** - CRUD de galpões por núcleo
+- **Lotes** - CRUD de lotes com vendedor responsável
 
-### 2.2 Nova Tab: "Meus Clientes"
-Adicionar ao PortalFornecedor uma aba para gerenciar clientes virtuais.
+### 2.2 Formulários de Cadastro
 
-**Componente:** `FornecedorClientesTab.tsx`
+| Componente | Função |
+|------------|--------|
+| `VendedorFornecedorForm.tsx` | Cadastro de vendedores |
+| `NucleoFornecedorForm.tsx` | Cadastro de núcleos |
+| `GalpaoFornecedorForm.tsx` | Cadastro de galpões |
+| `LoteFornecedorForm.tsx` | Cadastro de lotes |
 
-**Funcionalidades:**
-- Listar clientes com busca por nome/CNPJ
-- Botão "Novo Cliente" com formulário completo
-- Edição de cliente existente
-- Visualização de limite/saldo de crédito
-- Consulta automática CNPJ via BrasilAPI
+### 2.3 Tabelas de Listagem
 
-### 2.3 Atualização do Portal
-- Adicionar tabs "Catálogo" e "Meus Clientes" ao menu
-- Atualizar contadores no dashboard
+| Componente | Função |
+|------------|--------|
+| `VendedoresFornecedorTable.tsx` | Lista vendedores |
+| `NucleosFornecedorTable.tsx` | Lista núcleos com filtro por cliente |
+| `GalpoesFornecedorTable.tsx` | Lista galpões com filtro por núcleo |
+| `LotesFornecedorTable.tsx` | Lista lotes com indicadores |
+
+### 2.4 Dashboard de Gestão
+Cards resumo mostrando:
+- Total de clientes ativos
+- Total de núcleos
+- Total de lotes ativos
+- Lotes por fase (previsão/alojado)
+- Vendedores ativos
 
 ---
 
@@ -141,35 +177,54 @@ Adicionar ao PortalFornecedor uma aba para gerenciar clientes virtuais.
 
 ### Atualizar `useFornecedorData.tsx`
 
-Adicionar:
+Adicionar estados:
 ```typescript
-// Novos estados
-const [produtosCatalogo, setProdutosCatalogo] = useState([]);
-const [meusClientes, setMeusClientes] = useState([]);
+const [vendedores, setVendedores] = useState([]);
+const [nucleosFornecedor, setNucleosFornecedor] = useState([]);
+const [galpoesFornecedor, setGalpoesFornecedor] = useState([]);
+const [lotesFornecedor, setLotesFornecedor] = useState([]);
+```
 
-// Novas funções
-const fetchCatalogoProdutos = async (globalId) => {...}
-const fetchMeusClientes = async (globalId) => {...}
-const criarProdutoCatalogo = async (produto) => {...}
-const criarCliente = async (cliente) => {...}
-const atualizarCliente = async (id, dados) => {...}
+Adicionar funções:
+```typescript
+// Vendedores
+fetchVendedores(globalId)
+criarVendedor(vendedor)
+atualizarVendedor(id, dados)
+
+// Núcleos
+fetchNucleosFornecedor(globalId, clienteFilter?)
+criarNucleoFornecedor(nucleo)
+
+// Galpões
+fetchGalpoesFornecedor(globalId, nucleoFilter?)
+criarGalpaoFornecedor(galpao)
+
+// Lotes
+fetchLotesFornecedor(globalId, filtros?)
+criarLoteFornecedor(lote)
+atualizarLoteFornecedor(id, dados)
 ```
 
 ---
 
 ## Arquivos a Criar/Modificar
 
-### Novos Arquivos:
-1. `supabase/migrations/XXXX_clientes_produtos_fornecedor.sql`
-2. `src/components/fornecedor/FornecedorCatalogoTab.tsx`
-3. `src/components/fornecedor/FornecedorClientesTab.tsx`
-4. `src/components/fornecedor/ClienteFornecedorForm.tsx`
-5. `src/components/fornecedor/ProdutoCatalogoForm.tsx`
+### Novos Arquivos (10 arquivos):
+1. `supabase/migrations/XXXX_gestao_campo_fornecedor.sql`
+2. `src/components/fornecedor/FornecedorGestaoCampoTab.tsx`
+3. `src/components/fornecedor/VendedorFornecedorForm.tsx`
+4. `src/components/fornecedor/NucleoFornecedorForm.tsx`
+5. `src/components/fornecedor/GalpaoFornecedorForm.tsx`
+6. `src/components/fornecedor/LoteFornecedorForm.tsx`
+7. `src/components/fornecedor/VendedoresFornecedorTable.tsx`
+8. `src/components/fornecedor/NucleosFornecedorTable.tsx`
+9. `src/components/fornecedor/GalpoesFornecedorTable.tsx`
+10. `src/components/fornecedor/LotesFornecedorTable.tsx`
 
-### Arquivos a Modificar:
-1. `src/pages/PortalFornecedor.tsx` - Adicionar novas tabs
-2. `src/hooks/useFornecedorData.tsx` - Adicionar funções para novas entidades
-3. `src/integrations/supabase/types.ts` - Atualizado automaticamente
+### Arquivos a Modificar (2 arquivos):
+1. `src/pages/PortalFornecedor.tsx` - Adicionar tab "Gestão Campo"
+2. `src/hooks/useFornecedorData.tsx` - Adicionar funções e estados
 
 ---
 
@@ -178,56 +233,110 @@ const atualizarCliente = async (id, dados) => {...}
 ### SQL da Migração (Resumo)
 
 ```sql
--- Tabela de Clientes do Fornecedor
-CREATE TABLE public.clientes_fornecedor (
+-- Vendedores do Fornecedor
+CREATE TABLE public.vendedores_fornecedor (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
-  tipo_pessoa TEXT NOT NULL DEFAULT 'juridica',
-  cpf_cnpj TEXT NOT NULL,
-  razao_social_nome TEXT NOT NULL,
-  ...
-  UNIQUE(fornecedor_global_id, cpf_cnpj)
-);
-
--- Tabela de Catálogo de Produtos
-CREATE TABLE public.produtos_catalogo_fornecedor (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
-  codigo_interno TEXT NOT NULL,
   nome TEXT NOT NULL,
-  ...
-  UNIQUE(fornecedor_global_id, codigo_interno)
+  email TEXT,
+  telefone TEXT,
+  regiao TEXT,
+  codigo_vendedor TEXT,
+  ativo BOOLEAN DEFAULT true,
+  observacoes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(fornecedor_global_id, codigo_vendedor)
 );
 
--- RLS para isolamento total
-ALTER TABLE clientes_fornecedor ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Fornecedor vê próprios clientes"
-  ON clientes_fornecedor FOR ALL
-  USING (fornecedor_global_id = get_my_fornecedor_global_id());
+-- Núcleos do Fornecedor
+CREATE TABLE public.nucleos_fornecedor (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
+  cliente_fornecedor_id UUID NOT NULL REFERENCES clientes_fornecedor(id),
+  nome TEXT NOT NULL,
+  cidade TEXT,
+  estado TEXT,
+  cep TEXT,
+  tipo_producao TEXT DEFAULT 'corte',
+  ativo BOOLEAN DEFAULT true,
+  observacoes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Galpões do Fornecedor
+CREATE TABLE public.galpoes_fornecedor (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
+  nucleo_fornecedor_id UUID NOT NULL REFERENCES nucleos_fornecedor(id),
+  nome TEXT NOT NULL,
+  capacidade_aves INTEGER DEFAULT 0,
+  comprimento DECIMAL(10,2),
+  largura DECIMAL(10,2),
+  ativo BOOLEAN DEFAULT true,
+  observacoes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Lotes do Fornecedor
+CREATE TABLE public.lotes_fornecedor (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
+  nucleo_fornecedor_id UUID NOT NULL REFERENCES nucleos_fornecedor(id),
+  galpao_fornecedor_id UUID NOT NULL REFERENCES galpoes_fornecedor(id),
+  vendedor_fornecedor_id UUID REFERENCES vendedores_fornecedor(id),
+  quantidade_aves INTEGER NOT NULL,
+  linhagem TEXT,
+  data_alojamento DATE,
+  data_prevista_saida DATE,
+  status TEXT DEFAULT 'previsao',
+  sexo TEXT DEFAULT 'misto',
+  observacoes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS em todas as tabelas
+ALTER TABLE vendedores_fornecedor ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Fornecedor CRUD vendedores" ON vendedores_fornecedor
+  FOR ALL USING (fornecedor_global_id = get_my_fornecedor_global_id());
+
+-- (repetir para as demais tabelas)
 ```
-
----
-
-## Benefícios
-
-1. **Isolamento Total**: Dados exclusivos do fornecedor, invisíveis para organizações
-2. **Sem Conflito**: Clientes virtuais não interferem com parceiros das organizações
-3. **Catálogo Próprio**: Fornecedor gerencia seus produtos independentemente
-4. **Preparação ERP**: Estrutura pronta para sincronização com ERP local
-5. **Gestão de Crédito**: Controle de limite/saldo por cliente
 
 ---
 
 ## Resultado Esperado
 
-Após implementação, o fornecedor terá no portal:
+Após implementação, o Portal do Fornecedor terá:
 
 | Tab | Funcionalidade |
 |-----|----------------|
-| Dashboard | Estatísticas gerais |
+| Dashboard | Estatísticas gerais + gestão campo |
 | Estoque | Estoque nos clientes (organizações) |
-| Pedidos | OCs recebidas das organizações |
+| Pedidos | OCs recebidas |
 | Preços | Histórico de alterações |
-| **Catálogo** | 🆕 Meus produtos para venda |
-| **Meus Clientes** | 🆕 Clientes virtuais externos |
+| Catálogo | Meus produtos |
+| Clientes | Clientes virtuais |
+| **Gestão Campo** | **Vendedores + Núcleos + Galpões + Lotes** |
 | Configurações | Senha e dados |
+
+### Fluxo de Uso
+
+1. Fornecedor cadastra **Vendedores** (equipe de vendas/técnica)
+2. Para cada **Cliente** cadastrado, cria **Núcleos** (granjas)
+3. Para cada **Núcleo**, cadastra **Galpões** (aviários)
+4. Para cada **Galpão**, registra **Lotes** com vendedor responsável
+5. Acompanha indicadores de semana, status e performance
+
+---
+
+## Benefícios
+
+1. **Visão completa**: Fornecedor gerencia toda cadeia produtiva dos clientes
+2. **Previsão de vendas**: Lotes em andamento indicam demanda futura
+3. **Responsabilidade**: Cada lote tem vendedor responsável
+4. **Independência**: Dados isolados, sem interferir no sistema principal
+5. **Escalabilidade**: Estrutura preparada para métricas e desempenho
