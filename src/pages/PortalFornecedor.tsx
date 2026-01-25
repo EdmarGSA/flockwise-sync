@@ -24,7 +24,8 @@ import {
   Building2,
   Settings,
   ShoppingBag,
-  Contact
+  Contact,
+  Map
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -36,6 +37,7 @@ import { FornecedorNotificacoesTab } from '@/components/fornecedor/FornecedorNot
 import { FornecedorConfigTab } from '@/components/fornecedor/FornecedorConfigTab';
 import { FornecedorCatalogoTab } from '@/components/fornecedor/FornecedorCatalogoTab';
 import { FornecedorClientesTab } from '@/components/fornecedor/FornecedorClientesTab';
+import { FornecedorGestaoCampoTab } from '@/components/fornecedor/FornecedorGestaoCampoTab';
 
 const PortalFornecedor = () => {
   const { signOut } = useAuth();
@@ -230,7 +232,7 @@ const PortalFornecedor = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-7 lg:w-[800px]">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-8 lg:w-[900px]">
             <TabsTrigger value="dashboard" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -254,6 +256,10 @@ const PortalFornecedor = () => {
             <TabsTrigger value="meusclientes" className="gap-2">
               <Contact className="h-4 w-4" />
               <span className="hidden sm:inline">Clientes</span>
+            </TabsTrigger>
+            <TabsTrigger value="campo" className="gap-2">
+              <Map className="h-4 w-4" />
+              <span className="hidden sm:inline">Campo</span>
             </TabsTrigger>
             <TabsTrigger value="configuracoes" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -473,6 +479,14 @@ const PortalFornecedor = () => {
               clientes={meusClientes}
               fornecedorGlobalId={fornecedorGlobalId!}
               onRefresh={refetch}
+            />
+          </TabsContent>
+
+          {/* Gestão de Campo Tab */}
+          <TabsContent value="campo">
+            <FornecedorGestaoCampoTab 
+              fornecedorGlobalId={fornecedorGlobalId!}
+              clientes={meusClientes}
             />
           </TabsContent>
 
