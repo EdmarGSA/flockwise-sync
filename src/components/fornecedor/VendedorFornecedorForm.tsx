@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { KeyRound, Loader2 } from 'lucide-react';
 
 const vendedorSchema = z.object({
   nome: z.string().min(2, 'Nome é obrigatório'),
@@ -19,6 +21,7 @@ const vendedorSchema = z.object({
   codigo_vendedor: z.string().optional(),
   ativo: z.boolean().default(true),
   observacoes: z.string().optional(),
+  gerarAcesso: z.boolean().default(false),
 });
 
 type VendedorFormData = z.infer<typeof vendedorSchema>;
@@ -39,7 +42,9 @@ export function VendedorFornecedorForm({
   onSuccess,
 }: VendedorFornecedorFormProps) {
   const [loading, setLoading] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
   const isEditing = !!vendedor;
+  const hasAccess = !!vendedor?.user_id;
 
   const form = useForm<VendedorFormData>({
     resolver: zodResolver(vendedorSchema),
@@ -51,8 +56,12 @@ export function VendedorFornecedorForm({
       codigo_vendedor: '',
       ativo: true,
       observacoes: '',
+      gerarAcesso: false,
     },
   });
+
+  const gerarAcesso = form.watch('gerarAcesso');
+  const emailValue = form.watch('email');
 
   useEffect(() => {
     if (vendedor) {
@@ -64,6 +73,7 @@ export function VendedorFornecedorForm({
         codigo_vendedor: vendedor.codigo_vendedor || '',
         ativo: vendedor.ativo ?? true,
         observacoes: vendedor.observacoes || '',
+        gerarAcesso: false,
       });
     } else {
       form.reset({
@@ -74,11 +84,47 @@ export function VendedorFornecedorForm({
         codigo_vendedor: '',
         ativo: true,
         observacoes: '',
+        gerarAcesso: false,
       });
     }
   }, [vendedor, form, open]);
 
+  const createUserAccess = async (vendedorId: string, email: string, nome: string) => {
+    setCreatingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-salesperson-user', {
+        body: {
+          vendedor_fornecedor_id: vendedorId,
+          email: email,
+          nome: nome,
+          fornecedor_global_id: fornecedorGlobalId,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(
+        `Acesso criado! Email: ${email} | Senha: Vend123#`,
+        { duration: 10000 }
+      );
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao criar acesso:', error);
+      toast.error(error.message || 'Erro ao criar acesso ao portal');
+      return false;
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   const onSubmit = async (data: VendedorFormData) => {
+    // Validar email se gerar acesso estiver ativo
+    if (data.gerarAcesso && !data.email) {
+      form.setError('email', { message: 'Email é obrigatório para gerar acesso ao portal' });
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -92,6 +138,8 @@ export function VendedorFornecedorForm({
         fornecedor_global_id: fornecedorGlobalId,
       };
 
+      let vendedorId = vendedor?.id;
+
       if (isEditing) {
         const { error } = await supabase
           .from('vendedores_fornecedor')
@@ -100,11 +148,19 @@ export function VendedorFornecedorForm({
         if (error) throw error;
         toast.success('Vendedor atualizado com sucesso!');
       } else {
-        const { error } = await supabase
+        const { data: insertData, error } = await supabase
           .from('vendedores_fornecedor')
-          .insert([payload]);
+          .insert([payload])
+          .select('id')
+          .single();
         if (error) throw error;
+        vendedorId = insertData.id;
         toast.success('Vendedor cadastrado com sucesso!');
+      }
+
+      // Se gerar acesso estiver ativo, criar usuário
+      if (data.gerarAcesso && vendedorId && data.email) {
+        await createUserAccess(vendedorId, data.email, data.nome);
       }
 
       onSuccess();
@@ -121,7 +177,15 @@ export function VendedorFornecedorForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Vendedor' : 'Novo Vendedor'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {isEditing ? 'Editar Vendedor' : 'Novo Vendedor'}
+            {hasAccess && (
+              <Badge variant="default" className="text-xs">
+                <KeyRound className="h-3 w-3 mr-1" />
+                Com Acesso
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -146,7 +210,9 @@ export function VendedorFornecedorForm({
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel>
+                      E-mail {gerarAcesso && <span className="text-destructive">*</span>}
+                    </FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="email@exemplo.com" {...field} />
                     </FormControl>
@@ -227,12 +293,52 @@ export function VendedorFornecedorForm({
               )}
             />
 
+            {/* Switch para gerar acesso ao portal - apenas se não tem acesso ainda */}
+            {!hasAccess && (
+              <FormField
+                control={form.control}
+                name="gerarAcesso"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel className="cursor-pointer flex items-center gap-2">
+                        <KeyRound className="h-4 w-4" />
+                        Gerar Acesso ao Portal
+                      </FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Cria login com senha padrão Vend123#
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {hasAccess && (
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
+                <p className="text-sm text-primary flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  Este vendedor já possui acesso ao portal
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Salvando...' : isEditing ? 'Salvar' : 'Cadastrar'}
+              <Button type="submit" disabled={loading || creatingUser}>
+                {(loading || creatingUser) ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {creatingUser ? 'Criando acesso...' : 'Salvando...'}
+                  </>
+                ) : (
+                  isEditing ? 'Salvar' : 'Cadastrar'
+                )}
               </Button>
             </div>
           </form>
