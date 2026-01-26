@@ -4540,6 +4540,7 @@ export type Database = {
           role: string | null
           senha_alterada: boolean | null
           updated_at: string
+          vendedor_fornecedor_id: string | null
         }
         Insert: {
           company_name?: string | null
@@ -4554,6 +4555,7 @@ export type Database = {
           role?: string | null
           senha_alterada?: boolean | null
           updated_at?: string
+          vendedor_fornecedor_id?: string | null
         }
         Update: {
           company_name?: string | null
@@ -4568,6 +4570,7 @@ export type Database = {
           role?: string | null
           senha_alterada?: boolean | null
           updated_at?: string
+          vendedor_fornecedor_id?: string | null
         }
         Relationships: [
           {
@@ -5743,6 +5746,7 @@ export type Database = {
           regiao: string | null
           telefone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           ativo?: boolean
@@ -5756,6 +5760,7 @@ export type Database = {
           regiao?: string | null
           telefone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           ativo?: boolean
@@ -5769,6 +5774,7 @@ export type Database = {
           regiao?: string | null
           telefone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -5884,6 +5890,7 @@ export type Database = {
         | "conferente"
         | "criador"
         | "fornecedor"
+        | "vendedor_fornecedor"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo: "medio" | "grande" | "extra" | "jumbo"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
@@ -6107,6 +6114,7 @@ export const Constants = {
         "conferente",
         "criador",
         "fornecedor",
+        "vendedor_fornecedor",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo"],

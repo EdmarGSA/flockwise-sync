@@ -181,10 +181,58 @@ const Auth = () => {
           if (currentUser) {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('fornecedor_global_id, senha_alterada')
+              .select('fornecedor_global_id, vendedor_fornecedor_id, senha_alterada')
               .eq('id', currentUser.id)
               .single();
             
+            // Verificar se é vendedor do fornecedor
+            if (profile?.vendedor_fornecedor_id) {
+              // Buscar o fornecedor_global_id do vendedor
+              const { data: vendedor } = await supabase
+                .from('vendedores_fornecedor')
+                .select('fornecedor_global_id')
+                .eq('id', profile.vendedor_fornecedor_id)
+                .single();
+              
+              if (vendedor?.fornecedor_global_id) {
+                // Verificar se tem pelo menos um cliente ativo
+                const { data: clientesAtivos } = await supabase
+                  .from('parceiros')
+                  .select('id')
+                  .eq('fornecedor_global_id', vendedor.fornecedor_global_id)
+                  .eq('ativo', true)
+                  .limit(1);
+                
+                if (!clientesAtivos?.length) {
+                  toast({
+                    title: "Acesso bloqueado",
+                    description: "Seu acesso ao portal foi suspenso. Entre em contato com seu fornecedor.",
+                    variant: "destructive",
+                  });
+                  await supabase.auth.signOut();
+                  setIsLoading(false);
+                  return;
+                }
+                
+                // Aviso para trocar senha se necessário
+                if (profile.senha_alterada === false) {
+                  toast({
+                    title: "Atenção",
+                    description: "Recomendamos alterar sua senha padrão nas configurações.",
+                    variant: "default",
+                  });
+                }
+                
+                toast({
+                  title: "Bem-vindo!",
+                  description: "Acesso ao Portal do Fornecedor.",
+                });
+                navigate('/portal-fornecedor');
+                return;
+              }
+            }
+            
+            // Verificar se é fornecedor
             if (profile?.fornecedor_global_id) {
               // É fornecedor - verificar se tem pelo menos um cliente ativo
               const { data: clientesAtivos } = await supabase

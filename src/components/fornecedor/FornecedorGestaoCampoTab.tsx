@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Users, Building2, Warehouse, Package, Plus, Search, Edit2, Trash2, MapPin, AlertTriangle } from 'lucide-react';
+import { Users, Building2, Warehouse, Package, Plus, Search, Edit2, Trash2, MapPin, AlertTriangle, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VendedorFornecedorForm } from './VendedorFornecedorForm';
@@ -52,7 +52,7 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
     setLoading(true);
     try {
       const [vendedoresRes, nucleosRes, galpoesRes, lotesRes] = await Promise.all([
-        supabase.from('vendedores_fornecedor').select('*').order('nome'),
+        supabase.from('vendedores_fornecedor').select('*, user_id').order('nome'),
         supabase.from('nucleos_fornecedor').select('*, cliente_fornecedor:clientes_fornecedor(id, razao_social_nome, nome_fantasia)').order('nome'),
         supabase.from('galpoes_fornecedor').select('*, nucleo_fornecedor:nucleos_fornecedor(id, nome, cliente_fornecedor:clientes_fornecedor(razao_social_nome, nome_fantasia))').order('nome'),
         supabase.from('lotes_fornecedor').select('*, galpao_fornecedor:galpoes_fornecedor(id, nome, nucleo_fornecedor:nucleos_fornecedor(nome, cliente_fornecedor:clientes_fornecedor(razao_social_nome, nome_fantasia))), vendedor_fornecedor:vendedores_fornecedor(nome)').order('created_at', { ascending: false }),
@@ -266,7 +266,17 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
                   .filter(v => v.nome.toLowerCase().includes(searchTerm.toLowerCase()))
                   .map((vendedor) => (
                     <TableRow key={vendedor.id}>
-                      <TableCell className="font-medium">{vendedor.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {vendedor.nome}
+                          {vendedor.user_id && (
+                            <Badge variant="outline" className="text-xs">
+                              <KeyRound className="h-3 w-3 mr-1" />
+                              Portal
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{vendedor.codigo_vendedor || '-'}</TableCell>
                       <TableCell>{vendedor.telefone || '-'}</TableCell>
                       <TableCell>{vendedor.regiao || '-'}</TableCell>
