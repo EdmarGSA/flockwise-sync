@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Users, Building2, Warehouse, Package, Plus, Search, Edit2, Trash2, MapPin } from 'lucide-react';
+import { Users, Building2, Warehouse, Package, Plus, Search, Edit2, Trash2, MapPin, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VendedorFornecedorForm } from './VendedorFornecedorForm';
@@ -139,6 +139,8 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
   };
 
   const clientesAtivos = clientes.filter(c => c.ativo);
+  const nucleosAtivos = nucleos.filter(n => n.ativo);
+  const galpoesAtivos = galpoes.filter(g => g.ativo);
 
   return (
     <div className="space-y-6">
@@ -200,6 +202,26 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
           </CardContent>
         </Card>
       </div>
+
+      {/* Card de orientação quando não há clientes */}
+      {clientesAtivos.length === 0 && (
+        <Card className="border-destructive/30 bg-destructive/10">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">
+                  Configure seus clientes primeiro
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Para criar núcleos, galpões e lotes, você precisa ter pelo menos um cliente cadastrado. 
+                  Acesse a aba "Clientes" para cadastrar seu primeiro cliente.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -371,15 +393,15 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
                 className="pl-10"
               />
             </div>
-            <Button onClick={() => { setSelectedGalpao(null); setGalpaoFormOpen(true); }} disabled={nucleos.length === 0}>
+            <Button onClick={() => { setSelectedGalpao(null); setGalpaoFormOpen(true); }} disabled={nucleosAtivos.length === 0}>
               <Plus className="h-4 w-4 mr-2" /> Novo Galpão
             </Button>
           </div>
 
-          {nucleos.length === 0 && (
+          {nucleosAtivos.length === 0 && (
             <Card className="border-border bg-muted">
               <CardContent className="p-4 text-muted-foreground text-sm">
-                Cadastre pelo menos um núcleo para criar galpões.
+                Cadastre pelo menos um núcleo ativo para criar galpões.
               </CardContent>
             </Card>
           )}
@@ -452,15 +474,15 @@ export function FornecedorGestaoCampoTab({ fornecedorGlobalId, clientes }: Forne
                 className="pl-10"
               />
             </div>
-            <Button onClick={() => { setSelectedLote(null); setLoteFormOpen(true); }} disabled={galpoes.length === 0}>
+            <Button onClick={() => { setSelectedLote(null); setLoteFormOpen(true); }} disabled={galpoesAtivos.length === 0}>
               <Plus className="h-4 w-4 mr-2" /> Novo Lote
             </Button>
           </div>
 
-          {galpoes.length === 0 && (
+          {galpoesAtivos.length === 0 && (
             <Card className="border-border bg-muted">
               <CardContent className="p-4 text-muted-foreground text-sm">
-                Cadastre pelo menos um galpão para criar lotes.
+                Cadastre pelo menos um galpão ativo para criar lotes.
               </CardContent>
             </Card>
           )}
