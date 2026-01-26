@@ -145,7 +145,7 @@ export function LoteFornecedorForm({
       const payload = {
         galpao_fornecedor_id: data.galpao_fornecedor_id,
         nucleo_fornecedor_id: galpaoData.nucleo_fornecedor_id,
-        vendedor_fornecedor_id: data.vendedor_fornecedor_id || null,
+        vendedor_fornecedor_id: data.vendedor_fornecedor_id && data.vendedor_fornecedor_id !== 'none' ? data.vendedor_fornecedor_id : null,
         codigo_lote: data.codigo_lote || null,
         quantidade_aves: data.quantidade_aves,
         linhagem: data.linhagem || null,
@@ -417,7 +417,7 @@ export function LoteFornecedorForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="none">Nenhum</SelectItem>
                       {vendedores.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.nome} {v.codigo_vendedor ? `(${v.codigo_vendedor})` : ''}
