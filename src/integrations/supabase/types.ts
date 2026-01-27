@@ -1995,6 +1995,7 @@ export type Database = {
           quantidade_aves: number
           sexo: string | null
           status: string
+          tipo_producao: string | null
           updated_at: string
           vendedor_fornecedor_id: string | null
         }
@@ -2012,6 +2013,7 @@ export type Database = {
           quantidade_aves: number
           sexo?: string | null
           status?: string
+          tipo_producao?: string | null
           updated_at?: string
           vendedor_fornecedor_id?: string | null
         }
@@ -2029,6 +2031,7 @@ export type Database = {
           quantidade_aves?: number
           sexo?: string | null
           status?: string
+          tipo_producao?: string | null
           updated_at?: string
           vendedor_fornecedor_id?: string | null
         }
