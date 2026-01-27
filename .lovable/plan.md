@@ -1,271 +1,243 @@
 
-# Plano: Cadastro de Acesso Usuário Vendedor do Portal do Fornecedor
+
+# Plano: Puxar Linhagem e Sexo das Tabelas de Desempenho
 
 ## Resumo
-Implementar criação automática de usuário quando um vendedor for cadastrado no Portal do Fornecedor. O vendedor terá senha padrão `Vend123#` e será notificado para trocar a senha no primeiro login.
+
+Atualizar o formulário de novo lote no Portal do Fornecedor para buscar dinamicamente as opções de **Linhagem** e **Sexo** a partir das tabelas de referência `desempenho_aves` (aves de corte) e `desempenho_postura` (aves de postura), ao invés de usar listas fixas no código.
+
+---
+
+## Dados Disponíveis no Banco
+
+### Tabela `desempenho_aves` (Corte)
+
+| Linhagem | Sexo |
+|----------|------|
+| cobb_500 | macho, femea, misto |
+| ross_308 | macho, femea, misto |
+
+### Tabela `desempenho_postura` (Postura)
+
+| Linhagem |
+|----------|
+| lohmann_brown_lite |
+| lohmann_lsl_lite |
+
+Para postura, o sexo é sempre **fêmea**.
 
 ---
 
 ## Arquitetura da Solução
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      FLUXO DE CADASTRO DO VENDEDOR                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  1. Formulário VendedorFornecedorForm                                       │
-│     └── Email obrigatório para gerar acesso                                 │
-│     └── Switch "Gerar Acesso ao Portal"                                     │
-│                                                                             │
-│  2. Edge Function create-salesperson-user                                   │
-│     └── Cria usuário com senha Vend123#                                     │
-│     └── Atualiza profile.senha_alterada = false                             │
-│     └── Atualiza profile.vendedor_fornecedor_id (vínculo)                   │
-│     └── Adiciona role 'vendedor_fornecedor' em user_roles                   │
-│     └── Atualiza vendedores_fornecedor.user_id                              │
-│                                                                             │
-│  3. Login do Vendedor                                                       │
-│     └── Auth.tsx detecta role 'vendedor_fornecedor'                         │
-│     └── Redireciona para PortalVendedor                                     │
-│     └── Toast aviso para trocar senha (se senha_alterada = false)           │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FORMULÁRIO NOVO LOTE                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. Select "Tipo de Produção"                                       │
+│     └── Corte | Postura                                             │
+│                                                                     │
+│  2. Select "Linhagem" (dinâmico)                                    │
+│     └── Se Corte → busca de desempenho_aves                         │
+│     └── Se Postura → busca de desempenho_postura                    │
+│                                                                     │
+│  3. Select "Sexo" (dinâmico)                                        │
+│     └── Se Corte → busca de desempenho_aves                         │
+│     └── Se Postura → fixo "fêmea" (desabilitado)                    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Fase 1: Alterações no Banco de Dados
+## Mudanças Necessárias
 
-### 1.1 Adicionar coluna `user_id` na tabela `vendedores_fornecedor`
-Para vincular o vendedor ao usuário autenticado:
+### 1. Adicionar campo `tipo_producao` na tabela `lotes_fornecedor`
+
+Para diferenciar lotes de corte e postura:
 
 ```sql
-ALTER TABLE public.vendedores_fornecedor
-  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_vendedores_fornecedor_user_id 
-  ON public.vendedores_fornecedor(user_id) WHERE user_id IS NOT NULL;
+ALTER TABLE public.lotes_fornecedor
+  ADD COLUMN IF NOT EXISTS tipo_producao TEXT DEFAULT 'corte';
 ```
 
-### 1.2 Adicionar coluna `vendedor_fornecedor_id` na tabela `profiles`
-Para identificar vendedores no login:
+### 2. Atualizar `LoteFornecedorForm.tsx`
 
-```sql
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS vendedor_fornecedor_id UUID REFERENCES vendedores_fornecedor(id) ON DELETE SET NULL;
-```
-
-### 1.3 Adicionar role 'vendedor_fornecedor' ao enum `app_role`
-Se necessário, adicionar o novo papel:
-
-```sql
--- Verificar se o enum já possui o valor
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'vendedor_fornecedor' 
-                 AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'app_role')) THEN
-    ALTER TYPE public.app_role ADD VALUE 'vendedor_fornecedor';
-  END IF;
-END$$;
-```
-
----
-
-## Fase 2: Edge Function para Criar Usuário Vendedor
-
-### Arquivo: `supabase/functions/create-salesperson-user/index.ts`
-
-A função receberá:
-- `vendedor_fornecedor_id`: ID do vendedor
-- `email`: E-mail do vendedor
-- `nome`: Nome do vendedor
-- `fornecedor_global_id`: ID do fornecedor
-
-Ações:
-1. Verificar se já existe usuário com este email
-2. Criar usuário com senha padrão `Vend123#`
-3. Atualizar `profiles`:
-   - `vendedor_fornecedor_id` → vínculo ao vendedor
-   - `fornecedor_global_id` → herda do fornecedor
-   - `senha_alterada = false` → força troca de senha
-4. Inserir role `vendedor_fornecedor` em `user_roles`
-5. Atualizar `vendedores_fornecedor.user_id` com o novo user_id
-6. Retornar credenciais geradas
-
----
-
-## Fase 3: Atualização do Formulário de Vendedor
-
-### Arquivo: `src/components/fornecedor/VendedorFornecedorForm.tsx`
-
-Alterações:
-
-| Campo/Componente | Descrição |
-|------------------|-----------|
-| Email | Tornar obrigatório quando "Gerar Acesso" ativo |
-| Switch "Gerar Acesso" | Novo campo para habilitar criação de usuário |
-| Badge informativo | Mostrar se vendedor já possui acesso |
-
-Lógica no `onSubmit`:
-1. Salvar o vendedor normalmente
-2. Se "Gerar Acesso" ativo e email preenchido:
-   - Chamar edge function `create-salesperson-user`
-   - Exibir toast com credenciais
-3. Se editando e já tem `user_id`, desabilitar switch
-
----
-
-## Fase 4: Detecção e Redirecionamento no Login
-
-### Arquivo: `src/pages/Auth.tsx`
-
-Adicionar verificação após login bem-sucedido:
-
-```typescript
-// Verificar se é vendedor do fornecedor
-if (profile.vendedor_fornecedor_id) {
-  // Redirecionar para portal do vendedor (ou fornecedor com visão limitada)
-  if (profile.senha_alterada === false) {
-    toast({
-      title: "Atenção",
-      description: "Recomendamos alterar sua senha padrão nas configurações.",
-      variant: "default",
-    });
-  }
-  navigate('/portal-vendedor'); // ou rota específica
-}
-```
-
----
-
-## Fase 5: Interface do Vendedor (Opcional - Futuro)
-
-Se necessário, criar página `PortalVendedor.tsx` com visão limitada:
-- Ver apenas os lotes que ele é responsável
-- Visualizar clientes associados
-- Alterar senha
-
-Por ora, pode redirecionar para o `PortalFornecedor` com restrições via RLS.
-
----
-
-## Arquivos a Criar
-
-| # | Arquivo | Descrição |
-|---|---------|-----------|
-| 1 | `supabase/migrations/XXXX_vendedor_user_access.sql` | Migração de banco de dados |
-| 2 | `supabase/functions/create-salesperson-user/index.ts` | Edge function para criar usuário |
-
-## Arquivos a Modificar
-
-| # | Arquivo | Descrição |
-|---|---------|-----------|
-| 1 | `src/components/fornecedor/VendedorFornecedorForm.tsx` | Adicionar switch "Gerar Acesso" e lógica |
-| 2 | `src/pages/Auth.tsx` | Detectar vendedor_fornecedor_id e redirecionar |
-| 3 | `src/components/fornecedor/FornecedorGestaoCampoTab.tsx` | Mostrar ícone/badge de usuário com acesso |
+| Mudança | Descrição |
+|---------|-----------|
+| Novo estado `tipoProducao` | Controla se é 'corte' ou 'postura' |
+| Novo estado `linhagensBanco` | Lista de linhagens do banco |
+| Novo estado `sexosBanco` | Lista de sexos do banco |
+| Hook `useEffect` para buscar dados | Ao mudar tipo de produção, busca linhagens/sexos |
+| Remover constante `LINHAGENS` | Substituir por dados dinâmicos |
+| Select de Tipo de Produção | Novo campo antes de Linhagem |
+| Desabilitar Sexo se Postura | Fixar como 'femea' automaticamente |
 
 ---
 
 ## Detalhes Técnicos
 
-### SQL da Migração
-
-```sql
--- 1. Adicionar user_id na tabela de vendedores
-ALTER TABLE public.vendedores_fornecedor
-  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- 2. Índice único para garantir 1:1
-CREATE UNIQUE INDEX IF NOT EXISTS idx_vendedores_fornecedor_user_id 
-  ON public.vendedores_fornecedor(user_id) WHERE user_id IS NOT NULL;
-
--- 3. Adicionar vendedor_fornecedor_id no profile
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS vendedor_fornecedor_id UUID;
-
--- 4. Adicionar role ao enum (se não existir)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_enum 
-                 WHERE enumlabel = 'vendedor_fornecedor' 
-                 AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'app_role')) THEN
-    ALTER TYPE public.app_role ADD VALUE 'vendedor_fornecedor';
-  END IF;
-END$$;
-```
-
-### Edge Function (Estrutura Principal)
+### Queries para buscar dados
 
 ```typescript
-// Constantes
-const DEFAULT_SALESPERSON_PASSWORD = 'Vend123#';
+// Para Corte
+const { data: corteData } = await supabase
+  .from('desempenho_aves')
+  .select('linhagem, sexo')
+  .order('linhagem');
 
-// Fluxo
-1. Validar campos obrigatórios
-2. Verificar se vendedor já tem user_id (já tem acesso)
-3. Verificar se email já existe no auth.users
-4. Criar usuário via admin.createUser()
-5. Atualizar profile com vendedor_fornecedor_id e fornecedor_global_id
-6. Inserir role 'vendedor_fornecedor'
-7. Atualizar vendedores_fornecedor.user_id
-8. Retornar sucesso com credenciais
+// Extrair valores únicos
+const linhagens = [...new Set(corteData.map(d => d.linhagem))];
+const sexos = [...new Set(corteData.map(d => d.sexo))];
 ```
 
-### Formulário Atualizado (Snippet Principal)
+```typescript
+// Para Postura
+const { data: posturaData } = await supabase
+  .from('desempenho_postura')
+  .select('linhagem')
+  .order('linhagem');
+
+// Extrair valores únicos
+const linhagens = [...new Set(posturaData.map(d => d.linhagem))];
+// Sexo fixo: 'femea'
+```
+
+### Mapeamento de Labels
+
+```typescript
+const LINHAGEM_LABELS: Record<string, string> = {
+  // Corte
+  cobb_500: 'Cobb 500',
+  ross_308: 'Ross 308',
+  hubbard: 'Hubbard',
+  // Postura
+  lohmann_brown_lite: 'Lohmann Brown-Lite',
+  lohmann_lsl_lite: 'Lohmann LSL-Lite',
+  hy_line_brown: 'Hy-Line Brown',
+  hy_line_w36: 'Hy-Line W-36',
+  isa_brown: 'ISA Brown',
+  novogen_brown: 'Novogen Brown',
+  dekalb_white: 'Dekalb White',
+  bovans_brown: 'Bovans Brown',
+  hisex_white: 'Hisex White',
+};
+
+const SEXO_LABELS: Record<string, string> = {
+  macho: 'Macho',
+  femea: 'Fêmea',
+  misto: 'Misto',
+};
+```
+
+### Novo layout do formulário
 
 ```tsx
-// Novo campo: gerar acesso
-<FormField
-  name="gerarAcesso"
-  render={({ field }) => (
-    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-      <div>
-        <FormLabel>Gerar Acesso ao Portal</FormLabel>
-        <p className="text-xs text-muted-foreground">
-          Cria login para o vendedor com senha padrão Vend123#
-        </p>
-      </div>
-      <FormControl>
-        <Switch 
-          checked={field.value} 
-          onCheckedChange={field.onChange}
-          disabled={!!vendedor?.user_id} // Desabilitar se já tem acesso
-        />
-      </FormControl>
-    </FormItem>
-  )}
-/>
+<div className="grid grid-cols-3 gap-4">
+  {/* Tipo de Produção */}
+  <FormField
+    name="tipo_producao"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Tipo de Produção</FormLabel>
+        <Select onValueChange={(value) => {
+          field.onChange(value);
+          // Resetar linhagem e sexo ao mudar tipo
+          form.setValue('linhagem', '');
+          form.setValue('sexo', value === 'postura' ? 'femea' : 'misto');
+        }} value={field.value}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="corte">Corte</SelectItem>
+            <SelectItem value="postura">Postura</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormItem>
+    )}
+  />
 
-// Validação condicional
-email: z.string()
-  .refine((val) => {
-    if (gerarAcesso && !val) return false;
-    return true;
-  }, { message: 'Email é obrigatório para gerar acesso' })
+  {/* Linhagem - dinâmico */}
+  <FormField
+    name="linhagem"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Linhagem</FormLabel>
+        <Select onValueChange={field.onChange} value={field.value}>
+          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+          <SelectContent>
+            {linhagensBanco.map((l) => (
+              <SelectItem key={l} value={l}>
+                {LINHAGEM_LABELS[l] || l}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FormItem>
+    )}
+  />
+
+  {/* Sexo - dinâmico/fixo */}
+  <FormField
+    name="sexo"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Sexo</FormLabel>
+        <Select 
+          onValueChange={field.onChange} 
+          value={field.value}
+          disabled={tipoProducao === 'postura'}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {sexosBanco.map((s) => (
+              <SelectItem key={s} value={s}>
+                {SEXO_LABELS[s] || s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {tipoProducao === 'postura' && (
+          <p className="text-xs text-muted-foreground">
+            Lotes de postura são sempre fêmea
+          </p>
+        )}
+      </FormItem>
+    )}
+  />
+</div>
 ```
+
+---
+
+## Arquivos a Modificar
+
+| # | Arquivo | Descrição |
+|---|---------|-----------|
+| 1 | `supabase/migrations/` | Adicionar coluna `tipo_producao` em `lotes_fornecedor` |
+| 2 | `src/components/fornecedor/LoteFornecedorForm.tsx` | Busca dinâmica de linhagens/sexos + novo campo tipo |
+| 3 | `src/components/fornecedor/FornecedorGestaoCampoTab.tsx` | Exibir tipo de produção na listagem (opcional) |
 
 ---
 
 ## Fluxo de Uso
 
-1. **Fornecedor** acessa aba "Campo" > "Vendedores"
-2. Clica em "Novo Vendedor"
-3. Preenche dados e ativa "Gerar Acesso ao Portal"
-4. Informa e-mail obrigatório
-5. Sistema cria vendedor + usuário
-6. Toast exibe: "Acesso criado! Email: X | Senha: Vend123#"
-7. **Vendedor** faz login
-8. Sistema redireciona e exibe aviso para trocar senha
-9. Vendedor acessa aba "Configurações" e altera senha
+1. Usuário abre formulário "Novo Lote"
+2. Seleciona **Tipo de Produção**: Corte ou Postura
+3. Sistema busca linhagens disponíveis no banco
+4. Seleciona **Linhagem** (opções filtradas pelo tipo)
+5. Se Corte: seleciona **Sexo** (macho, fêmea, misto)
+6. Se Postura: **Sexo** já está fixado como fêmea (desabilitado)
+7. Preenche demais campos e salva
 
 ---
 
-## Resultado Esperado
+## Benefícios
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Cadastro integrado | Criar vendedor já gera acesso automaticamente |
-| Senha padrão | `Vend123#` para todos os novos vendedores |
-| Aviso de troca | Toast no login recomendando alteração |
-| Aba Configurações | Já existente para trocar senha |
-| Badge visual | Indicar na tabela quais vendedores têm acesso |
+| Benefício | Descrição |
+|-----------|-----------|
+| Dados centralizados | Linhagens vêm do banco, não do código |
+| Escalabilidade | Novas linhagens adicionadas ao banco aparecem automaticamente |
+| Consistência | Mesmos valores usados para cálculos de desempenho |
+| UX intuitiva | Sexo fixo para postura evita erros |
+
