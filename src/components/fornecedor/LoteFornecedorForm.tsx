@@ -22,6 +22,7 @@ const loteSchema = z.object({
   vendedor_fornecedor_id: z.string().optional(),
   codigo_lote: z.string().optional(),
   quantidade_aves: z.coerce.number().min(1, 'Quantidade de aves é obrigatória'),
+  tipo_producao: z.enum(['corte', 'postura']).default('corte'),
   linhagem: z.string().optional(),
   data_alojamento: z.date().optional(),
   data_prevista_saida: z.date().optional(),
@@ -61,15 +62,30 @@ interface LoteFornecedorFormProps {
   onSuccess: () => void;
 }
 
-const LINHAGENS = [
-  { value: 'cobb_500', label: 'Cobb 500' },
-  { value: 'ross_308', label: 'Ross 308' },
-  { value: 'hubbard', label: 'Hubbard' },
-  { value: 'hy_line', label: 'Hy-Line' },
-  { value: 'lohmann', label: 'Lohmann' },
-  { value: 'dekalb', label: 'Dekalb' },
-  { value: 'outro', label: 'Outro' },
-];
+// Mapeamento de labels para linhagens
+const LINHAGEM_LABELS: Record<string, string> = {
+  // Corte
+  cobb_500: 'Cobb 500',
+  ross_308: 'Ross 308',
+  hubbard: 'Hubbard',
+  // Postura
+  lohmann_brown_lite: 'Lohmann Brown-Lite',
+  lohmann_lsl_lite: 'Lohmann LSL-Lite',
+  hy_line_brown: 'Hy-Line Brown',
+  hy_line_w36: 'Hy-Line W-36',
+  isa_brown: 'ISA Brown',
+  novogen_brown: 'Novogen Brown',
+  dekalb_white: 'Dekalb White',
+  bovans_brown: 'Bovans Brown',
+  hisex_white: 'Hisex White',
+};
+
+// Mapeamento de labels para sexo
+const SEXO_LABELS: Record<string, string> = {
+  macho: 'Macho',
+  femea: 'Fêmea',
+  misto: 'Misto',
+};
 
 export function LoteFornecedorForm({
   open,
@@ -81,6 +97,9 @@ export function LoteFornecedorForm({
   onSuccess,
 }: LoteFornecedorFormProps) {
   const [loading, setLoading] = useState(false);
+  const [linhagensBanco, setLinhagensBanco] = useState<string[]>([]);
+  const [sexosBanco, setSexosBanco] = useState<string[]>(['misto', 'macho', 'femea']);
+  const [loadingLinhagens, setLoadingLinhagens] = useState(false);
   const isEditing = !!lote;
 
   const form = useForm<LoteFormData>({
@@ -90,12 +109,70 @@ export function LoteFornecedorForm({
       vendedor_fornecedor_id: '',
       codigo_lote: '',
       quantidade_aves: 0,
+      tipo_producao: 'corte',
       linhagem: '',
       status: 'previsao',
       sexo: 'misto',
       observacoes: '',
     },
   });
+
+  const tipoProducao = form.watch('tipo_producao');
+
+  // Buscar linhagens e sexos do banco quando o tipo de produção mudar
+  useEffect(() => {
+    async function fetchLinhagensSexos() {
+      setLoadingLinhagens(true);
+      try {
+        if (tipoProducao === 'corte') {
+          // Buscar de desempenho_aves
+          const { data, error } = await supabase
+            .from('desempenho_aves')
+            .select('linhagem, sexo')
+            .order('linhagem');
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            const linhagensUnicas = [...new Set(data.map(d => d.linhagem))];
+            const sexosUnicos = [...new Set(data.map(d => d.sexo))];
+            setLinhagensBanco(linhagensUnicas);
+            setSexosBanco(sexosUnicos);
+          }
+        } else {
+          // Buscar de desempenho_postura
+          const { data, error } = await supabase
+            .from('desempenho_postura')
+            .select('linhagem')
+            .order('linhagem');
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            const linhagensUnicas = [...new Set(data.map(d => d.linhagem))];
+            setLinhagensBanco(linhagensUnicas);
+          }
+          // Para postura, sexo é sempre fêmea
+          setSexosBanco(['femea']);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar linhagens:', error);
+      } finally {
+        setLoadingLinhagens(false);
+      }
+    }
+
+    if (open) {
+      fetchLinhagensSexos();
+    }
+  }, [tipoProducao, open]);
+
+  // Quando tipo de produção mudar para postura, fixar sexo como femea
+  useEffect(() => {
+    if (tipoProducao === 'postura') {
+      form.setValue('sexo', 'femea');
+    }
+  }, [tipoProducao, form]);
 
   useEffect(() => {
     if (lote) {
@@ -104,6 +181,7 @@ export function LoteFornecedorForm({
         vendedor_fornecedor_id: lote.vendedor_fornecedor_id || '',
         codigo_lote: lote.codigo_lote || '',
         quantidade_aves: lote.quantidade_aves || 0,
+        tipo_producao: lote.tipo_producao || 'corte',
         linhagem: lote.linhagem || '',
         data_alojamento: lote.data_alojamento ? new Date(lote.data_alojamento) : undefined,
         data_prevista_saida: lote.data_prevista_saida ? new Date(lote.data_prevista_saida) : undefined,
@@ -117,6 +195,7 @@ export function LoteFornecedorForm({
         vendedor_fornecedor_id: '',
         codigo_lote: '',
         quantidade_aves: 0,
+        tipo_producao: 'corte',
         linhagem: '',
         status: 'previsao',
         sexo: 'misto',
@@ -148,6 +227,7 @@ export function LoteFornecedorForm({
         vendedor_fornecedor_id: data.vendedor_fornecedor_id && data.vendedor_fornecedor_id !== 'none' ? data.vendedor_fornecedor_id : null,
         codigo_lote: data.codigo_lote || null,
         quantidade_aves: data.quantidade_aves,
+        tipo_producao: data.tipo_producao,
         linhagem: data.linhagem || null,
         data_alojamento: data.data_alojamento ? format(data.data_alojamento, 'yyyy-MM-dd') : null,
         data_prevista_saida: data.data_prevista_saida ? format(data.data_prevista_saida, 'yyyy-MM-dd') : null,
@@ -183,6 +263,16 @@ export function LoteFornecedorForm({
   };
 
   const galpaoSelecionado = galpoes.find(g => g.id === form.watch('galpao_fornecedor_id'));
+
+  const handleTipoProducaoChange = (value: 'corte' | 'postura') => {
+    form.setValue('tipo_producao', value);
+    form.setValue('linhagem', ''); // Reset linhagem ao mudar tipo
+    if (value === 'postura') {
+      form.setValue('sexo', 'femea');
+    } else {
+      form.setValue('sexo', 'misto');
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -253,22 +343,54 @@ export function LoteFornecedorForm({
               />
             </div>
 
+            {/* Tipo de Produção, Linhagem e Sexo */}
             <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="tipo_producao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Produção</FormLabel>
+                    <Select 
+                      onValueChange={(value: 'corte' | 'postura') => handleTipoProducaoChange(value)} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="corte">Corte</SelectItem>
+                        <SelectItem value="postura">Postura</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="linhagem"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Linhagem</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={loadingLinhagens}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
+                          <SelectValue placeholder={loadingLinhagens ? "Carregando..." : "Selecione"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {LINHAGENS.map((l) => (
-                          <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                        {linhagensBanco.map((l) => (
+                          <SelectItem key={l} value={l}>
+                            {LINHAGEM_LABELS[l] || l}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -283,46 +405,57 @@ export function LoteFornecedorForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sexo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={tipoProducao === 'postura'}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="misto">Misto</SelectItem>
-                        <SelectItem value="macho">Macho</SelectItem>
-                        <SelectItem value="femea">Fêmea</SelectItem>
+                        {sexosBanco.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {SEXO_LABELS[s] || s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="previsao">Previsão</SelectItem>
-                        <SelectItem value="alojado">Alojado</SelectItem>
-                        <SelectItem value="fechado">Fechado</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {tipoProducao === 'postura' && (
+                      <p className="text-xs text-muted-foreground">
+                        Lotes de postura são sempre fêmea
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="previsao">Previsão</SelectItem>
+                      <SelectItem value="alojado">Alojado</SelectItem>
+                      <SelectItem value="fechado">Fechado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
