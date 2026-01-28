@@ -43,6 +43,7 @@ import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import PortalFornecedor from "./pages/PortalFornecedor";
+import VitrineFornecedor from "./pages/VitrineFornecedor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -365,6 +366,9 @@ const AppRoutes = () => (
         </SupplierOnlyRoute>
       </ProtectedRoute>
     } />
+    
+    {/* Vitrine pública do fornecedor */}
+    <Route path="/vitrine/:id" element={<VitrineFornecedor />} />
     
     {/* Catch-all */}
     <Route path="*" element={<NotFound />} />
