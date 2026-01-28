@@ -4417,6 +4417,7 @@ export type Database = {
           estoque_proprio: number | null
           fornecedor_global_id: string
           id: string
+          imagem_url: string | null
           marca: string | null
           ncm: string | null
           nome: string
@@ -4436,6 +4437,7 @@ export type Database = {
           estoque_proprio?: number | null
           fornecedor_global_id: string
           id?: string
+          imagem_url?: string | null
           marca?: string | null
           ncm?: string | null
           nome: string
@@ -4455,6 +4457,7 @@ export type Database = {
           estoque_proprio?: number | null
           fornecedor_global_id?: string
           id?: string
+          imagem_url?: string | null
           marca?: string | null
           ncm?: string | null
           nome?: string

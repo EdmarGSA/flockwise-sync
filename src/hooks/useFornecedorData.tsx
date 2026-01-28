@@ -110,6 +110,7 @@ export interface ProdutoCatalogo {
   estoque_proprio: number;
   estoque_minimo: number;
   ativo: boolean;
+  imagem_url: string | null;
   created_at: string;
   updated_at: string;
 }

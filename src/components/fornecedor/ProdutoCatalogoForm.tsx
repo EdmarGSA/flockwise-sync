@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { ImageUpload } from './ImageUpload';
 
 const UNIDADES = ['UN', 'KG', 'G', 'L', 'ML', 'SC', 'CX', 'PCT', 'FD', 'TON'];
 
@@ -68,6 +69,7 @@ export interface ProdutoCatalogo {
   estoque_proprio: number;
   estoque_minimo: number;
   ativo: boolean;
+  imagem_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +90,7 @@ export function ProdutoCatalogoForm({
   onSuccess,
 }: ProdutoCatalogoFormProps) {
   const [loading, setLoading] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
   const isEditing = !!produto;
 
   const form = useForm<FormValues>({
@@ -126,6 +129,7 @@ export function ProdutoCatalogoForm({
         estoque_minimo: produto.estoque_minimo || 0,
         ativo: produto.ativo,
       });
+      setPendingImageUrl(produto.imagem_url || null);
     } else {
       form.reset({
         codigo_interno: '',
@@ -142,8 +146,41 @@ export function ProdutoCatalogoForm({
         estoque_minimo: 0,
         ativo: true,
       });
+      setPendingImageUrl(null);
     }
   }, [produto, open, form]);
+
+  const uploadPendingImage = async (produtoId: string): Promise<string | null> => {
+    // Se é uma URL de base64 (imagem pendente), fazer upload
+    if (pendingImageUrl?.startsWith('data:image/')) {
+      try {
+        // Converter base64 para blob
+        const response = await fetch(pendingImageUrl);
+        const blob = await response.blob();
+        const fileType = blob.type;
+        const fileExt = fileType === 'image/png' ? 'png' : fileType === 'image/webp' ? 'webp' : 'jpg';
+        const path = `${fornecedorGlobalId}/${produtoId}.${fileExt}`;
+
+        const { error } = await supabase.storage
+          .from('catalogo-fornecedor')
+          .upload(path, blob, { upsert: true });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('catalogo-fornecedor')
+          .getPublicUrl(path);
+
+        return `${publicUrl}?t=${Date.now()}`;
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        return null;
+      }
+    }
+    
+    // Se é uma URL normal ou null, retornar como está
+    return pendingImageUrl;
+  };
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
@@ -163,20 +200,27 @@ export function ProdutoCatalogoForm({
         estoque_proprio: data.estoque_proprio || 0,
         estoque_minimo: data.estoque_minimo || 0,
         ativo: data.ativo,
+        imagem_url: pendingImageUrl?.startsWith('data:image/') ? null : pendingImageUrl,
       };
 
       if (isEditing && produto) {
+        // Atualizar imagem se necessário
+        const imageUrl = await uploadPendingImage(produto.id);
+        
         const { error } = await supabase
           .from('produtos_catalogo_fornecedor')
-          .update(payload)
+          .update({ ...payload, imagem_url: imageUrl })
           .eq('id', produto.id);
 
         if (error) throw error;
         toast.success('Produto atualizado com sucesso!');
       } else {
-        const { error } = await supabase
+        // Criar produto primeiro
+        const { data: newProduct, error } = await supabase
           .from('produtos_catalogo_fornecedor')
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
 
         if (error) {
           if (error.code === '23505') {
@@ -185,6 +229,18 @@ export function ProdutoCatalogoForm({
           }
           throw error;
         }
+
+        // Fazer upload da imagem se houver
+        if (newProduct && pendingImageUrl) {
+          const imageUrl = await uploadPendingImage(newProduct.id);
+          if (imageUrl) {
+            await supabase
+              .from('produtos_catalogo_fornecedor')
+              .update({ imagem_url: imageUrl })
+              .eq('id', newProduct.id);
+          }
+        }
+        
         toast.success('Produto cadastrado com sucesso!');
       }
 
@@ -253,34 +309,47 @@ export function ProdutoCatalogoForm({
               )}
             />
 
-            {/* Categoria e Marca */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="categoria"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: Ração, Insumo" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="marca"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Marca</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Opcional" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Upload de Imagem */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1">
+                <ImageUpload
+                  currentImageUrl={produto?.imagem_url}
+                  fornecedorGlobalId={fornecedorGlobalId}
+                  produtoId={produto?.id}
+                  onImageChange={setPendingImageUrl}
+                  disabled={loading}
+                />
+              </div>
+              
+              {/* Categoria e Marca */}
+              <div className="md:col-span-2 space-y-4">
+                <FormField
+                  control={form.control}
+                  name="categoria"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: Ração, Insumo" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="marca"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Marca</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Opcional" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             {/* Unidade e Preços */}

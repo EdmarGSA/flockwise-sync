@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, AlertTriangle, Package, LayoutGrid, List, Eye, Share2, Link as LinkIcon, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Table,
   TableBody,
@@ -24,7 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ProdutoCatalogoForm, ProdutoCatalogo } from './ProdutoCatalogoForm';
+import { ProdutoCard } from './ProdutoCard';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FornecedorCatalogoTabProps {
@@ -32,6 +39,8 @@ interface FornecedorCatalogoTabProps {
   fornecedorGlobalId: string;
   onRefresh: () => void;
 }
+
+type ViewMode = 'grid' | 'table' | 'vitrine';
 
 export function FornecedorCatalogoTab({ 
   produtos, 
@@ -45,6 +54,8 @@ export function FornecedorCatalogoTab({
   const [selectedProduto, setSelectedProduto] = useState<ProdutoCatalogo | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [produtoToDelete, setProdutoToDelete] = useState<ProdutoCatalogo | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const filteredProdutos = produtos.filter((p) => {
     const matchesSearch = 
@@ -97,34 +108,95 @@ export function FornecedorCatalogoTab({
       return <Badge variant="destructive">Sem Estoque</Badge>;
     }
     if (produto.estoque_proprio <= produto.estoque_minimo) {
-      return <Badge variant="secondary" className="bg-amber-100 text-amber-800">Baixo</Badge>;
+      return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Baixo</Badge>;
     }
-    return <Badge variant="default" className="bg-green-100 text-green-800">OK</Badge>;
+    return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">OK</Badge>;
   };
 
   const produtosAtivos = produtos.filter(p => p.ativo).length;
   const produtosBaixoEstoque = produtos.filter(p => p.estoque_proprio <= p.estoque_minimo && p.ativo).length;
   const valorEstoque = produtos.reduce((sum, p) => sum + (p.estoque_proprio * (p.custo || p.preco_tabela)), 0);
 
+  const vitrineUrl = `${window.location.origin}/vitrine/${fornecedorGlobalId}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(vitrineUrl);
+      setLinkCopied(true);
+      toast.success('Link copiado!');
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      toast.error('Erro ao copiar link');
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const message = encodeURIComponent(`Confira nosso catálogo de produtos: ${vitrineUrl}`);
+    window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
   return (
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-xl">Meu Catálogo de Produtos</CardTitle>
               <CardDescription>
                 Produtos do seu portfólio (exclusivo para você)
               </CardDescription>
             </div>
-            <Button onClick={handleNew}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Produto
-            </Button>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Compartilhar
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Compartilhar Catálogo</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Envie o link da sua vitrine para seus clientes
+                    </p>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={vitrineUrl} 
+                        readOnly 
+                        className="text-xs"
+                      />
+                      <Button size="sm" onClick={handleCopyLink}>
+                        {linkCopied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={handleShareWhatsApp}
+                    >
+                      Enviar via WhatsApp
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full" 
+                      onClick={() => window.open(vitrineUrl, '_blank')}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Visualizar Vitrine
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button onClick={handleNew}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Produto
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filtros */}
+          {/* Filtros e Toggle de Visualização */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -136,6 +208,21 @@ export function FornecedorCatalogoTab({
               />
             </div>
             <div className="flex items-center gap-4">
+              <ToggleGroup 
+                type="single" 
+                value={viewMode} 
+                onValueChange={(value) => value && setViewMode(value as ViewMode)}
+              >
+                <ToggleGroupItem value="grid" aria-label="Grid">
+                  <LayoutGrid className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="table" aria-label="Tabela">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="vitrine" aria-label="Vitrine">
+                  <Eye className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="show-inactive-products"
@@ -183,14 +270,31 @@ export function FornecedorCatalogoTab({
             </div>
           </div>
 
-          {/* Tabela */}
+          {/* Lista de Produtos */}
           {filteredProdutos.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
               {produtos.length === 0 
                 ? 'Nenhum produto cadastrado ainda. Clique em "Novo Produto" para começar.'
                 : 'Nenhum produto encontrado com os filtros aplicados.'}
             </div>
+          ) : viewMode === 'grid' || viewMode === 'vitrine' ? (
+            /* Grid View */
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {filteredProdutos.map((produto) => (
+                <ProdutoCard
+                  key={produto.id}
+                  produto={produto}
+                  onEdit={() => handleEdit(produto)}
+                  onDelete={() => confirmDelete(produto)}
+                  showActions={viewMode === 'grid'}
+                  showStock={viewMode === 'grid'}
+                  showCost={viewMode === 'grid'}
+                />
+              ))}
+            </div>
           ) : (
+            /* Table View */
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -212,11 +316,24 @@ export function FornecedorCatalogoTab({
                         {produto.codigo_interno}
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{produto.nome}</p>
-                          {produto.marca && (
-                            <p className="text-sm text-muted-foreground">{produto.marca}</p>
+                        <div className="flex items-center gap-3">
+                          {produto.imagem_url ? (
+                            <img 
+                              src={produto.imagem_url} 
+                              alt={produto.nome}
+                              className="h-10 w-10 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                              <Package className="h-5 w-5 text-muted-foreground" />
+                            </div>
                           )}
+                          <div>
+                            <p className="font-medium">{produto.nome}</p>
+                            {produto.marca && (
+                              <p className="text-sm text-muted-foreground">{produto.marca}</p>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
