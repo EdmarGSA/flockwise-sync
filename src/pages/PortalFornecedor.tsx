@@ -38,6 +38,7 @@ import { FornecedorConfigTab } from '@/components/fornecedor/FornecedorConfigTab
 import { FornecedorCatalogoTab } from '@/components/fornecedor/FornecedorCatalogoTab';
 import { FornecedorClientesTab } from '@/components/fornecedor/FornecedorClientesTab';
 import { FornecedorGestaoCampoTab } from '@/components/fornecedor/FornecedorGestaoCampoTab';
+import { VendasTab } from '@/components/fornecedor/vendas/VendasTab';
 
 const PortalFornecedor = () => {
   const { signOut } = useAuth();
@@ -232,10 +233,14 @@ const PortalFornecedor = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-8 lg:w-[900px]">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-9 lg:w-[1000px]">
             <TabsTrigger value="dashboard" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="vendas" className="gap-2">
+              <ShoppingBag className="h-4 w-4" />
+              <span className="hidden sm:inline">Vendas</span>
             </TabsTrigger>
             <TabsTrigger value="estoque" className="gap-2">
               <Package className="h-4 w-4" />
@@ -250,7 +255,7 @@ const PortalFornecedor = () => {
               <span className="hidden sm:inline">Preços</span>
             </TabsTrigger>
             <TabsTrigger value="catalogo" className="gap-2">
-              <ShoppingBag className="h-4 w-4" />
+              <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Catálogo</span>
             </TabsTrigger>
             <TabsTrigger value="meusclientes" className="gap-2">
@@ -435,6 +440,16 @@ const PortalFornecedor = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Vendas Tab */}
+          <TabsContent value="vendas">
+            <VendasTab 
+              produtos={produtosCatalogo}
+              clientes={meusClientes}
+              fornecedorGlobalId={fornecedorGlobalId}
+              loading={loading}
+            />
           </TabsContent>
 
           {/* Estoque Tab */}
