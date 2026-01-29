@@ -1,360 +1,334 @@
 
+# Plano Corrigido: App de Vendas E-commerce para Vendedores do Fornecedor
 
-# Plano: Catálogo Visual Estilo Marketplace
+## Problema Identificado no Plano Anterior
 
-## Resumo
+O plano original fazia referência incorreta a produtos do sistema interno ("Ração Inicial", etc.). O correto é usar as tabelas exclusivas do Portal do Fornecedor:
 
-Transformar o catálogo de produtos do Portal do Fornecedor de uma tabela simples para uma interface visual estilo marketplace (Mercado Livre), com:
-- Cards visuais com foto do produto
-- Preço em destaque
-- Informações do produto
-- Modo "vitrine" para compartilhar com clientes
+| Tabela Correta | Uso |
+|----------------|-----|
+| `produtos_catalogo_fornecedor` | Produtos do catálogo próprio do fornecedor |
+| `clientes_fornecedor` | Clientes virtuais do fornecedor |
+| `vendedores_fornecedor` | Vendedores/representantes do fornecedor |
+| `promocoes_fornecedor` | Promoções dos produtos do catálogo |
 
----
+## Problema de Schema Atual
 
-## Arquitetura da Solução
+A tabela `pedidos_fornecedor` existente referencia `parceiros` (sistema interno) e `produtos` (também interno). 
+
+Para o App de Vendas do Portal do Fornecedor, precisamos de tabelas que referenciem as entidades corretas:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                      CATÁLOGO VISUAL                                │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ARMAZENAMENTO                                                      │
-│  └── Bucket: catalogo-fornecedor (Lovable Cloud Storage)            │
-│  └── Caminho: {fornecedor_id}/{produto_id}.jpg                      │
-│                                                                     │
-│  BANCO DE DADOS                                                     │
-│  └── Nova coluna: imagem_url (TEXT) em produtos_catalogo_fornecedor │
-│                                                                     │
-│  INTERFACE - 3 MODOS DE VISUALIZAÇÃO                                │
-│  ├── Grid de Cards (padrão) - Visual estilo marketplace            │
-│  ├── Tabela (existente) - Para gestão rápida                        │
-│  └── Vitrine (novo) - Modo leitura para compartilhar                │
-│                                                                     │
-│  COMPARTILHAMENTO                                                   │
-│  └── Gerar link público da vitrine                                  │
-│  └── Exportar PDF do catálogo                                       │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+TABELAS DO PORTAL DO FORNECEDOR (Independentes)
+================================================
+
+produtos_catalogo_fornecedor ←──┐
+                                │
+clientes_fornecedor ←───────────┼── pedidos_catalogo_fornecedor (NOVA)
+                                │
+vendedores_fornecedor ←─────────┘
+                                │
+promocoes_fornecedor ───────────┘
 ```
 
 ---
 
-## Fase 1: Infraestrutura de Imagens
+## Fase 1: Criar Nova Estrutura de Pedidos do Catálogo
 
-### 1.1 Criar bucket de armazenamento
+### 1.1 Nova tabela: `pedidos_catalogo_fornecedor`
 
 ```sql
--- Criar bucket público para imagens do catálogo
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('catalogo-fornecedor', 'catalogo-fornecedor', true);
-
--- Política: fornecedor pode gerenciar suas próprias imagens
-CREATE POLICY "Fornecedor gerencia imagens próprias"
-ON storage.objects FOR ALL
-USING (
-  bucket_id = 'catalogo-fornecedor' AND
-  auth.uid() IS NOT NULL AND
-  (storage.foldername(name))[1] = (
-    SELECT fornecedor_global_id::text FROM profiles WHERE id = auth.uid()
-  )
+CREATE TABLE public.pedidos_catalogo_fornecedor (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
+  cliente_fornecedor_id UUID NOT NULL REFERENCES clientes_fornecedor(id),
+  vendedor_fornecedor_id UUID REFERENCES vendedores_fornecedor(id),
+  
+  numero_pedido TEXT NOT NULL,
+  data_pedido TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  
+  -- Valores
+  valor_bruto NUMERIC DEFAULT 0,
+  desconto_percentual NUMERIC DEFAULT 0,
+  valor_desconto NUMERIC DEFAULT 0,
+  valor_total NUMERIC DEFAULT 0,
+  
+  -- Pagamento e entrega
+  condicao_pagamento TEXT,
+  data_entrega_prevista DATE,
+  data_entrega_real DATE,
+  
+  -- Status: rascunho → pendente → aprovado → separado → faturado → entregue → cancelado
+  status TEXT DEFAULT 'rascunho',
+  
+  observacoes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Política: leitura pública (para vitrine)
-CREATE POLICY "Leitura pública catálogo"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'catalogo-fornecedor');
+-- RLS: Fornecedor ve apenas seus pedidos
+CREATE POLICY "Fornecedor acessa seus pedidos"
+ON pedidos_catalogo_fornecedor FOR ALL
+USING (
+  fornecedor_global_id = (
+    SELECT fornecedor_global_id FROM profiles WHERE id = auth.uid()
+  )
+);
 ```
 
-### 1.2 Adicionar coluna de imagem na tabela
+### 1.2 Nova tabela: `pedidos_catalogo_fornecedor_itens`
 
 ```sql
-ALTER TABLE public.produtos_catalogo_fornecedor
-  ADD COLUMN IF NOT EXISTS imagem_url TEXT;
+CREATE TABLE public.pedidos_catalogo_fornecedor_itens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pedido_id UUID NOT NULL REFERENCES pedidos_catalogo_fornecedor(id) ON DELETE CASCADE,
+  produto_catalogo_id UUID NOT NULL REFERENCES produtos_catalogo_fornecedor(id),
+  
+  quantidade NUMERIC NOT NULL,
+  preco_unitario NUMERIC NOT NULL,
+  desconto_item NUMERIC DEFAULT 0,
+  valor_total NUMERIC NOT NULL,
+  
+  promocao_id UUID REFERENCES promocoes_fornecedor(id),
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- RLS via pedido pai
+CREATE POLICY "Acesso via pedido"
+ON pedidos_catalogo_fornecedor_itens FOR ALL
+USING (
+  pedido_id IN (
+    SELECT id FROM pedidos_catalogo_fornecedor 
+    WHERE fornecedor_global_id = (
+      SELECT fornecedor_global_id FROM profiles WHERE id = auth.uid()
+    )
+  )
+);
 ```
 
 ---
 
-## Fase 2: Formulário com Upload de Imagem
+## Fase 2: Arquitetura da Interface
 
-### Arquivo: `src/components/fornecedor/ProdutoCatalogoForm.tsx`
-
-Adicionar seção de upload de imagem:
-
-| Componente | Descrição |
-|------------|-----------|
-| Preview da imagem | Mostra imagem atual ou placeholder |
-| Input file | Aceita JPG, PNG, WebP (max 2MB) |
-| Botão remover | Permite excluir imagem existente |
-| Validação | Tamanho e tipo de arquivo |
-
-Lógica de upload:
-1. Usuário seleciona arquivo
-2. Validar tamanho (max 2MB) e tipo
-3. Upload para bucket: `catalogo-fornecedor/{fornecedor_id}/{produto_id}.jpg`
-4. Salvar URL pública na coluna `imagem_url`
-
----
-
-## Fase 3: Nova Interface Visual do Catálogo
-
-### Arquivo: `src/components/fornecedor/FornecedorCatalogoTab.tsx`
-
-### 3.1 Seletor de Modo de Visualização
+### Layout do App de Vendas
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│  [Grid ■] [Tabela ≡] [Vitrine 👁]           🔍 Buscar...    │
-└──────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------+
+|  [Logo]  VENDAS                    [🔍 Busca]  [🛒 Carrinho (3)] |
++------------------------------------------------------------------+
+|                                                                  |
+|  SIDEBAR              AREA PRINCIPAL                             |
+|  +--------------+    +----------------------------------------+  |
+|  |              |    | CLIENTE: [Selecionar Cliente ▼]        |  |
+|  | CATEGORIAS   |    | Limite: R$ 10.000 | Saldo: R$ 7.500    |  |
+|  | ──────────── |    +----------------------------------------+  |
+|  |              |    |                                        |  |
+|  | > Todos (45) |    |  +--------+  +--------+  +--------+    |  |
+|  |              |    |  | [FOTO] |  | [FOTO] |  | [FOTO] |    |  |
+|  | Racoes       |    |  | Prod A |  | Prod B |  | Prod C |    |  |
+|  |   Inicial    |    |  | R$ 185 |  | R$ 72  |  | R$ 320 |    |  |
+|  |   Engorda    |    |  | [+ADD] |  | [+ADD] |  | [+ADD] |    |  |
+|  |              |    |  +--------+  +--------+  +--------+    |  |
+|  | Suplementos  |    |                                        |  |
+|  |              |    |  +--------+  +--------+  +--------+    |  |
+|  | Medicamentos |    |  | [FOTO] |  | [FOTO] |  | [FOTO] |    |  |
+|  |              |    |  | Prod D |  | Prod E |  | Prod F |    |  |
+|  +--------------+    +----------------------------------------+  |
+|                                                                  |
++------------------------------------------------------------------+
 ```
 
-### 3.2 Modo Grid (Cards Visuais)
+### Drawer do Carrinho (lateral direita)
 
 ```text
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│    [IMAGEM]     │  │    [IMAGEM]     │  │    [IMAGEM]     │
-│                 │  │                 │  │                 │
-│  Ração Inicial  │  │  Milho Grão     │  │  Núcleo Postura │
-│  Marca ABC      │  │  Safra 24/25    │  │  Premium        │
-│                 │  │                 │  │                 │
-│  R$ 185,00 /SC  │  │  R$ 72,50 /SC   │  │  R$ 320,00 /SC  │
-│                 │  │                 │  │                 │
-│  ✓ 45 em estoque│  │  ⚠ 8 (baixo)   │  │  ✗ Sem estoque  │
-│                 │  │                 │  │                 │
-│  [✏️] [🗑️]      │  │  [✏️] [🗑️]      │  │  [✏️] [🗑️]      │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
++------------------------------------------+
+|  CARRINHO                     [X Fechar] |
++------------------------------------------+
+|                                          |
+|  CLIENTE SELECIONADO:                    |
+|  Fazenda Boa Vista                       |
+|  ──────────────────────────────────────  |
+|  Limite: R$ 10.000                       |
+|  Saldo Disponivel: R$ 7.500              |
+|  [✓] Credito suficiente                  |
+|                                          |
++------------------------------------------+
+|                                          |
+|  [Img] Produto A                         |
+|        R$ 185,00 x [10] = R$ 1.850,00    |
+|        [Remover]                         |
+|                                          |
+|  [Img] Produto B                         |
+|        R$ 72,50 x [20] = R$ 1.450,00     |
+|        [Remover]                         |
+|                                          |
++------------------------------------------+
+|  Subtotal:              R$ 3.300,00      |
+|  ──────────────────────────────────────  |
+|  Desconto (5%):         - R$ 165,00      |
+|  TOTAL:                 R$ 3.135,00      |
++------------------------------------------+
+|                                          |
+|  [Finalizar Pedido]                      |
+|  [Limpar Carrinho]                       |
+|                                          |
++------------------------------------------+
 ```
 
-Características do card:
-- Imagem com aspect ratio 1:1 (quadrada)
-- Placeholder se sem imagem (ícone de pacote)
-- Nome do produto em destaque
-- Marca/categoria em texto secundário
-- Preço grande e visível
-- Badge de status do estoque (cores)
-- Botões de ação no hover
-
-### 3.3 Modo Tabela (Existente)
-
-Manter a tabela atual como opção para quem prefere gestão rápida em lista.
-
-### 3.4 Modo Vitrine (Novo)
-
-Versão simplificada para compartilhar:
-- Remove botões de editar/excluir
-- Remove informações de custo
-- Remove estoque (opcional: mostrar "Disponível" ou "Sob consulta")
-- Layout otimizado para impressão/PDF
-
 ---
 
-## Fase 4: Compartilhamento com Clientes
+## Fase 3: Componentes a Criar
 
-### 4.1 Gerar Link da Vitrine
+### Novos Arquivos
 
-Criar rota pública: `/vitrine/{fornecedor_id}`
-
-| Elemento | Descrição |
-|----------|-----------|
-| URL amigável | Sem necessidade de login |
-| Logo do fornecedor | Se tiver cadastrado |
-| Grid de produtos | Apenas ativos com estoque |
-| Contato | WhatsApp/Email do fornecedor |
-
-### 4.2 Exportar PDF (Opcional - Fase Futura)
-
-Usar jsPDF (já instalado) para gerar catálogo impresso.
-
----
-
-## Arquivos a Criar
-
-| # | Arquivo | Descrição |
+| # | Arquivo | Descricao |
 |---|---------|-----------|
-| 1 | `supabase/migrations/XXXX_catalogo_imagens.sql` | Bucket + coluna imagem_url |
-| 2 | `src/components/fornecedor/ProdutoCard.tsx` | Card visual do produto |
-| 3 | `src/components/fornecedor/ImageUpload.tsx` | Componente de upload |
-| 4 | `src/pages/VitrineFornecedor.tsx` | Página pública da vitrine |
+| 1 | `src/pages/AppVendasFornecedor.tsx` | Pagina principal do e-commerce |
+| 2 | `src/pages/MeusPedidosFornecedor.tsx` | Lista de pedidos do vendedor |
+| 3 | `src/components/fornecedor/vendas/CategoriasSidebar.tsx` | Filtro por categoria (extraido de `produtos_catalogo_fornecedor.categoria`) |
+| 4 | `src/components/fornecedor/vendas/ProdutoVendaCard.tsx` | Card do produto com botao ADD |
+| 5 | `src/components/fornecedor/vendas/CarrinhoDrawer.tsx` | Drawer lateral com carrinho |
+| 6 | `src/components/fornecedor/vendas/FinalizarPedidoDialog.tsx` | Checkout final |
+| 7 | `src/components/fornecedor/vendas/PedidoDetalheDialog.tsx` | Visualizacao do pedido com timeline |
+| 8 | `src/hooks/useVendedorFornecedor.tsx` | Identifica vendedor logado via `vendedores_fornecedor.user_id` |
+| 9 | `src/hooks/useCarrinhoVendas.tsx` | Context do carrinho com persistencia localStorage |
+| 10 | `src/hooks/usePromocoesFornecedor.tsx` | Busca promocoes ativas |
 
-## Arquivos a Modificar
+### Arquivos a Modificar
 
-| # | Arquivo | Descrição |
-|---|---------|-----------|
-| 1 | `src/components/fornecedor/FornecedorCatalogoTab.tsx` | Adicionar grid view + toggle |
-| 2 | `src/components/fornecedor/ProdutoCatalogoForm.tsx` | Upload de imagem |
-| 3 | `src/App.tsx` | Adicionar rota /vitrine/:id |
-| 4 | `src/hooks/useFornecedorData.tsx` | Incluir imagem_url na query |
+| # | Arquivo | Modificacao |
+|---|---------|-------------|
+| 1 | `src/pages/PortalFornecedor.tsx` | Adicionar tab "Vendas" |
+| 2 | `src/App.tsx` | Adicionar rotas `/app-vendas` e `/meus-pedidos-fornecedor` |
+| 3 | `src/hooks/useFornecedorData.tsx` | Adicionar fetch de promocoes |
 
 ---
 
-## Detalhes Técnicos
+## Fase 4: Fluxos de Uso
 
-### Componente ProdutoCard
+### Vendedor Tirando Pedido
+
+1. Acessa tab "Vendas" no Portal do Fornecedor
+2. Seleciona cliente do dropdown (busca em `clientes_fornecedor`)
+3. Sistema exibe limite e saldo de credito do cliente
+4. Navega por categorias ou busca produto
+5. Clica em "Adicionar" nos produtos do catalogo
+6. Abre carrinho lateral
+7. Ajusta quantidades
+8. Sistema valida: `saldo_credito >= valor_total`
+9. Clica em "Finalizar Pedido"
+10. Pedido salvo em `pedidos_catalogo_fornecedor`
+11. Saldo do cliente atualizado
+
+### Acompanhamento de Pedidos
+
+```text
+TIMELINE DO PEDIDO
+==================
+[✓] Pedido criado - 15/01 10:30
+    Vendedor: Joao Silva
+    
+[✓] Aprovado - 15/01 14:00
+    
+[✓] Separado - 16/01 09:00
+    
+[✓] Faturado - 16/01 10:00
+    NF: 12345
+    
+[ ] Em transito
+    
+[ ] Entregue
+```
+
+---
+
+## Fase 5: Validacoes de Negocio
+
+### Credito do Cliente
 
 ```tsx
-interface ProdutoCardProps {
-  produto: ProdutoCatalogo;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  showActions?: boolean; // false no modo vitrine
-}
+// Validar antes de finalizar
+const validarCredito = (cliente: ClienteFornecedor, valorPedido: number) => {
+  if (valorPedido > cliente.saldo_credito) {
+    return {
+      valido: false,
+      mensagem: `Saldo insuficiente. Disponivel: R$ ${cliente.saldo_credito.toFixed(2)}`
+    };
+  }
+  return { valido: true };
+};
+```
 
-function ProdutoCard({ produto, onEdit, onDelete, showActions = true }: ProdutoCardProps) {
-  return (
-    <Card className="group overflow-hidden">
-      {/* Imagem */}
-      <AspectRatio ratio={1}>
-        {produto.imagem_url ? (
-          <img 
-            src={produto.imagem_url} 
-            alt={produto.nome}
-            className="object-cover w-full h-full"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center">
-            <Package className="h-12 w-12 text-muted-foreground" />
-          </div>
-        )}
-      </AspectRatio>
-      
-      {/* Conteúdo */}
-      <CardContent className="p-4">
-        <h3 className="font-semibold truncate">{produto.nome}</h3>
-        {produto.marca && (
-          <p className="text-sm text-muted-foreground">{produto.marca}</p>
-        )}
-        
-        {/* Preço */}
-        <p className="text-2xl font-bold text-primary mt-2">
-          R$ {produto.preco_tabela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          <span className="text-sm font-normal text-muted-foreground">
-            /{produto.unidade_venda}
-          </span>
-        </p>
-        
-        {/* Badge de Estoque */}
-        {produto.estoque_proprio <= 0 ? (
-          <Badge variant="destructive">Sem Estoque</Badge>
-        ) : produto.estoque_proprio <= produto.estoque_minimo ? (
-          <Badge className="bg-amber-100 text-amber-800">Estoque Baixo</Badge>
-        ) : (
-          <Badge className="bg-green-100 text-green-800">
-            {produto.estoque_proprio} disponíveis
-          </Badge>
-        )}
-      </CardContent>
-      
-      {/* Ações (visíveis no hover) */}
-      {showActions && (
-        <CardFooter className="opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="sm" onClick={onEdit}>
-            <Edit className="h-4 w-4 mr-1" /> Editar
-          </Button>
-          <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}>
-            <Trash2 className="h-4 w-4 mr-1" /> Excluir
-          </Button>
-        </CardFooter>
-      )}
-    </Card>
+### Estoque do Produto
+
+```tsx
+// Verificar estoque ao adicionar
+const validarEstoque = (produto: ProdutoCatalogo, quantidade: number) => {
+  if (quantidade > produto.estoque_proprio) {
+    return {
+      valido: false,
+      mensagem: `Estoque insuficiente. Disponivel: ${produto.estoque_proprio}`
+    };
+  }
+  return { valido: true };
+};
+```
+
+### Promocao Ativa
+
+```tsx
+// Aplicar preco promocional se houver
+const getPrecoFinal = (produto: ProdutoCatalogo, promocoes: PromocaoFornecedor[]) => {
+  const promo = promocoes.find(p => 
+    p.produto_id === produto.id &&
+    p.ativo &&
+    new Date(p.data_inicio) <= new Date() &&
+    new Date(p.data_fim) >= new Date()
   );
-}
-```
-
-### Upload de Imagem
-
-```tsx
-async function handleImageUpload(file: File, produtoId: string) {
-  // Validar
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error('Imagem deve ter no máximo 2MB');
-    return null;
+  
+  if (promo?.preco_promocional) {
+    return promo.preco_promocional;
   }
-  
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    toast.error('Formato inválido. Use JPG, PNG ou WebP');
-    return null;
+  if (promo?.percentual_desconto) {
+    return produto.preco_tabela * (1 - promo.percentual_desconto / 100);
   }
-  
-  // Upload
-  const path = `${fornecedorGlobalId}/${produtoId}.jpg`;
-  const { error } = await supabase.storage
-    .from('catalogo-fornecedor')
-    .upload(path, file, { upsert: true });
-  
-  if (error) throw error;
-  
-  // Retornar URL pública
-  const { data: { publicUrl } } = supabase.storage
-    .from('catalogo-fornecedor')
-    .getPublicUrl(path);
-  
-  return publicUrl;
-}
-```
-
-### Toggle de Visualização
-
-```tsx
-const [viewMode, setViewMode] = useState<'grid' | 'table' | 'vitrine'>('grid');
-
-<ToggleGroup type="single" value={viewMode} onValueChange={setViewMode}>
-  <ToggleGroupItem value="grid" aria-label="Grid">
-    <LayoutGrid className="h-4 w-4" />
-  </ToggleGroupItem>
-  <ToggleGroupItem value="table" aria-label="Tabela">
-    <List className="h-4 w-4" />
-  </ToggleGroupItem>
-  <ToggleGroupItem value="vitrine" aria-label="Vitrine">
-    <Eye className="h-4 w-4" />
-  </ToggleGroupItem>
-</ToggleGroup>
+  return produto.preco_tabela;
+};
 ```
 
 ---
 
-## Performance - Por que NÃO ficará pesado
+## Fase 6: Performance
 
-| Técnica | Benefício |
+| Tecnica | Beneficio |
 |---------|-----------|
-| **CDN do Storage** | Imagens servidas de edge, não do banco |
-| **Lazy Loading** | `loading="lazy"` carrega imagens sob demanda |
-| **Aspect Ratio fixo** | Evita layout shift durante carregamento |
-| **Limite de 2MB** | Imagens otimizadas |
-| **Placeholder** | UI responsiva mesmo sem imagem |
+| Lazy loading de imagens | Usa `loading="lazy"` no `imagem_url` |
+| Context do carrinho | Evita prop drilling |
+| localStorage | Carrinho persiste entre sessoes |
+| Debounce na busca | Evita queries excessivas |
+| Categorias dinamicas | Extraidas de `DISTINCT categoria` |
 
 ---
 
-## Fluxo de Uso
+## Resumo da Correcao
 
-### Fornecedor cadastrando produto:
-1. Abre formulário "Novo Produto"
-2. Preenche dados e clica em "Adicionar Foto"
-3. Seleciona imagem do dispositivo
-4. Sistema faz upload e mostra preview
-5. Salva produto com imagem
-
-### Fornecedor compartilhando catálogo:
-1. Acessa aba "Catálogo"
-2. Clica em "Modo Vitrine" ou "Compartilhar"
-3. Sistema gera link: `https://app.../vitrine/abc123`
-4. Fornecedor envia link para cliente via WhatsApp
-
-### Cliente visualizando:
-1. Acessa link recebido
-2. Vê grid de produtos com fotos e preços
-3. Pode entrar em contato pelo WhatsApp do fornecedor
+| Antes (Incorreto) | Depois (Correto) |
+|-------------------|------------------|
+| Referencia a tabela `produtos` | Usa `produtos_catalogo_fornecedor` |
+| Referencia a `parceiros` | Usa `clientes_fornecedor` |
+| Tabela `pedidos_fornecedor` | Nova tabela `pedidos_catalogo_fornecedor` |
+| Sem vinculo com vendedor | Vincula via `vendedor_fornecedor_id` |
 
 ---
 
 ## Resultado Esperado
 
-| Funcionalidade | Descrição |
+| Funcionalidade | Descricao |
 |----------------|-----------|
-| Upload de foto | Uma imagem por produto (2MB max) |
-| Visualização Grid | Cards visuais estilo marketplace |
-| Visualização Tabela | Mantém opção existente |
-| Modo Vitrine | Versão limpa para clientes |
-| Link compartilhável | URL pública da vitrine |
-| Performance | Lazy loading + CDN = rápido |
-
+| E-commerce visual | Grid de produtos com fotos do catalogo do fornecedor |
+| Categorias laterais | Filtro dinamico por `categoria` |
+| Carrinho intuitivo | Drawer lateral com validacao de credito |
+| Promocoes | Precos promocionais em destaque |
+| Meus Pedidos | Lista com timeline de status |
+| Isolamento de dados | 100% separado do sistema interno |
