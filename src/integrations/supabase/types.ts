@@ -3659,6 +3659,146 @@ export type Database = {
           },
         ]
       }
+      pedidos_catalogo_fornecedor: {
+        Row: {
+          cliente_fornecedor_id: string
+          condicao_pagamento: string | null
+          created_at: string | null
+          data_entrega_prevista: string | null
+          data_entrega_real: string | null
+          data_pedido: string | null
+          desconto_percentual: number | null
+          fornecedor_global_id: string
+          id: string
+          numero_pedido: string
+          observacoes: string | null
+          status: string | null
+          updated_at: string | null
+          valor_bruto: number | null
+          valor_desconto: number | null
+          valor_total: number | null
+          vendedor_fornecedor_id: string | null
+        }
+        Insert: {
+          cliente_fornecedor_id: string
+          condicao_pagamento?: string | null
+          created_at?: string | null
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
+          data_pedido?: string | null
+          desconto_percentual?: number | null
+          fornecedor_global_id: string
+          id?: string
+          numero_pedido: string
+          observacoes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor_bruto?: number | null
+          valor_desconto?: number | null
+          valor_total?: number | null
+          vendedor_fornecedor_id?: string | null
+        }
+        Update: {
+          cliente_fornecedor_id?: string
+          condicao_pagamento?: string | null
+          created_at?: string | null
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
+          data_pedido?: string | null
+          desconto_percentual?: number | null
+          fornecedor_global_id?: string
+          id?: string
+          numero_pedido?: string
+          observacoes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor_bruto?: number | null
+          valor_desconto?: number | null
+          valor_total?: number | null
+          vendedor_fornecedor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_cliente_fornecedor_id_fkey"
+            columns: ["cliente_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_vendedor_fornecedor_id_fkey"
+            columns: ["vendedor_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_catalogo_fornecedor_itens: {
+        Row: {
+          created_at: string | null
+          desconto_item: number | null
+          id: string
+          pedido_id: string
+          preco_unitario: number
+          produto_catalogo_id: string
+          promocao_id: string | null
+          quantidade: number
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string | null
+          desconto_item?: number | null
+          id?: string
+          pedido_id: string
+          preco_unitario: number
+          produto_catalogo_id: string
+          promocao_id?: string | null
+          quantidade: number
+          valor_total: number
+        }
+        Update: {
+          created_at?: string | null
+          desconto_item?: number | null
+          id?: string
+          pedido_id?: string
+          preco_unitario?: number
+          produto_catalogo_id?: string
+          promocao_id?: string | null
+          quantidade?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_itens_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_catalogo_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_itens_produto_catalogo_id_fkey"
+            columns: ["produto_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_catalogo_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_catalogo_fornecedor_itens_promocao_id_fkey"
+            columns: ["promocao_id"]
+            isOneToOne: false
+            referencedRelation: "promocoes_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_fornecedor: {
         Row: {
           created_at: string

@@ -43,6 +43,7 @@ import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import PortalFornecedor from "./pages/PortalFornecedor";
+import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
 import NotFound from "./pages/NotFound";
 
@@ -363,6 +364,15 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <SupplierOnlyRoute>
           <PortalFornecedor />
+        </SupplierOnlyRoute>
+      </ProtectedRoute>
+    } />
+    
+    {/* Meus Pedidos do Fornecedor */}
+    <Route path="/meus-pedidos-fornecedor" element={
+      <ProtectedRoute>
+        <SupplierOnlyRoute>
+          <MeusPedidosFornecedor />
         </SupplierOnlyRoute>
       </ProtectedRoute>
     } />
