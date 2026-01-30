@@ -4,17 +4,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Package, ChevronRight } from 'lucide-react';
 import { ProdutoCatalogo } from '@/hooks/useFornecedorData';
+import { cn } from '@/lib/utils';
 
 interface CategoriasSidebarProps {
   produtos: ProdutoCatalogo[];
   categoriaAtiva: string | null;
   onSelectCategoria: (categoria: string | null) => void;
+  isInsideSheet?: boolean;
 }
 
 export const CategoriasSidebar = ({
   produtos,
   categoriaAtiva,
-  onSelectCategoria
+  onSelectCategoria,
+  isInsideSheet = false
 }: CategoriasSidebarProps) => {
   const categorias = useMemo(() => {
     const catMap = new Map<string, number>();
@@ -32,12 +35,17 @@ export const CategoriasSidebar = ({
   const totalProdutos = produtos.length;
 
   return (
-    <div className="w-full h-full bg-card rounded-lg border p-4">
-      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-4">
-        Categorias
-      </h3>
+    <div className={cn(
+      "w-full bg-card rounded-lg",
+      !isInsideSheet && "h-full border p-4"
+    )}>
+      {!isInsideSheet && (
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-4">
+          Categorias
+        </h3>
+      )}
       
-      <ScrollArea className="h-[calc(100vh-300px)]">
+      <ScrollArea className={isInsideSheet ? "h-[calc(100vh-150px)]" : "h-[calc(100vh-300px)]"}>
         <div className="space-y-1">
           {/* Todos */}
           <Button
