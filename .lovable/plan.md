@@ -1,334 +1,143 @@
 
-# Plano Corrigido: App de Vendas E-commerce para Vendedores do Fornecedor
 
-## Problema Identificado no Plano Anterior
+# Plano: Melhorar UX Mobile da Aba de Vendas
 
-O plano original fazia referência incorreta a produtos do sistema interno ("Ração Inicial", etc.). O correto é usar as tabelas exclusivas do Portal do Fornecedor:
+## Analise Realizada
 
-| Tabela Correta | Uso |
-|----------------|-----|
-| `produtos_catalogo_fornecedor` | Produtos do catálogo próprio do fornecedor |
-| `clientes_fornecedor` | Clientes virtuais do fornecedor |
-| `vendedores_fornecedor` | Vendedores/representantes do fornecedor |
-| `promocoes_fornecedor` | Promoções dos produtos do catálogo |
+Verifiquei o codigo atual e confirmei que:
 
-## Problema de Schema Atual
+1. **As categorias estao corretas**: O componente `CategoriasSidebar` extrai categorias de `produtos_catalogo_fornecedor` (tabela exclusiva do fornecedor)
+2. **Os dados estao corretos**: VendasTab recebe `produtos={produtosCatalogo}` que vem do hook `useFornecedorData`, que busca de `produtos_catalogo_fornecedor` filtrado por `fornecedor_global_id`
+3. **Nao ha erro de query**: Os produtos do catalogo do fornecedor estao sendo buscados corretamente
 
-A tabela `pedidos_fornecedor` existente referencia `parceiros` (sistema interno) e `produtos` (também interno). 
-
-Para o App de Vendas do Portal do Fornecedor, precisamos de tabelas que referenciem as entidades corretas:
-
-```text
-TABELAS DO PORTAL DO FORNECEDOR (Independentes)
-================================================
-
-produtos_catalogo_fornecedor ←──┐
-                                │
-clientes_fornecedor ←───────────┼── pedidos_catalogo_fornecedor (NOVA)
-                                │
-vendedores_fornecedor ←─────────┘
-                                │
-promocoes_fornecedor ───────────┘
-```
+A confusao pode ter sido causada pela imagem de exemplo do plano anterior que mostrava "Racao Inicial" como exemplo generico.
 
 ---
 
-## Fase 1: Criar Nova Estrutura de Pedidos do Catálogo
+## O que sera implementado
 
-### 1.1 Nova tabela: `pedidos_catalogo_fornecedor`
+Transformar a interface de vendas em um layout otimizado para mobile, estilo aplicativo:
 
-```sql
-CREATE TABLE public.pedidos_catalogo_fornecedor (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
-  cliente_fornecedor_id UUID NOT NULL REFERENCES clientes_fornecedor(id),
-  vendedor_fornecedor_id UUID REFERENCES vendedores_fornecedor(id),
-  
-  numero_pedido TEXT NOT NULL,
-  data_pedido TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  
-  -- Valores
-  valor_bruto NUMERIC DEFAULT 0,
-  desconto_percentual NUMERIC DEFAULT 0,
-  valor_desconto NUMERIC DEFAULT 0,
-  valor_total NUMERIC DEFAULT 0,
-  
-  -- Pagamento e entrega
-  condicao_pagamento TEXT,
-  data_entrega_prevista DATE,
-  data_entrega_real DATE,
-  
-  -- Status: rascunho → pendente → aprovado → separado → faturado → entregue → cancelado
-  status TEXT DEFAULT 'rascunho',
-  
-  observacoes TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- RLS: Fornecedor ve apenas seus pedidos
-CREATE POLICY "Fornecedor acessa seus pedidos"
-ON pedidos_catalogo_fornecedor FOR ALL
-USING (
-  fornecedor_global_id = (
-    SELECT fornecedor_global_id FROM profiles WHERE id = auth.uid()
-  )
-);
-```
-
-### 1.2 Nova tabela: `pedidos_catalogo_fornecedor_itens`
-
-```sql
-CREATE TABLE public.pedidos_catalogo_fornecedor_itens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pedido_id UUID NOT NULL REFERENCES pedidos_catalogo_fornecedor(id) ON DELETE CASCADE,
-  produto_catalogo_id UUID NOT NULL REFERENCES produtos_catalogo_fornecedor(id),
-  
-  quantidade NUMERIC NOT NULL,
-  preco_unitario NUMERIC NOT NULL,
-  desconto_item NUMERIC DEFAULT 0,
-  valor_total NUMERIC NOT NULL,
-  
-  promocao_id UUID REFERENCES promocoes_fornecedor(id),
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- RLS via pedido pai
-CREATE POLICY "Acesso via pedido"
-ON pedidos_catalogo_fornecedor_itens FOR ALL
-USING (
-  pedido_id IN (
-    SELECT id FROM pedidos_catalogo_fornecedor 
-    WHERE fornecedor_global_id = (
-      SELECT fornecedor_global_id FROM profiles WHERE id = auth.uid()
-    )
-  )
-);
-```
-
----
-
-## Fase 2: Arquitetura da Interface
-
-### Layout do App de Vendas
-
-```text
-+------------------------------------------------------------------+
-|  [Logo]  VENDAS                    [🔍 Busca]  [🛒 Carrinho (3)] |
-+------------------------------------------------------------------+
-|                                                                  |
-|  SIDEBAR              AREA PRINCIPAL                             |
-|  +--------------+    +----------------------------------------+  |
-|  |              |    | CLIENTE: [Selecionar Cliente ▼]        |  |
-|  | CATEGORIAS   |    | Limite: R$ 10.000 | Saldo: R$ 7.500    |  |
-|  | ──────────── |    +----------------------------------------+  |
-|  |              |    |                                        |  |
-|  | > Todos (45) |    |  +--------+  +--------+  +--------+    |  |
-|  |              |    |  | [FOTO] |  | [FOTO] |  | [FOTO] |    |  |
-|  | Racoes       |    |  | Prod A |  | Prod B |  | Prod C |    |  |
-|  |   Inicial    |    |  | R$ 185 |  | R$ 72  |  | R$ 320 |    |  |
-|  |   Engorda    |    |  | [+ADD] |  | [+ADD] |  | [+ADD] |    |  |
-|  |              |    |  +--------+  +--------+  +--------+    |  |
-|  | Suplementos  |    |                                        |  |
-|  |              |    |  +--------+  +--------+  +--------+    |  |
-|  | Medicamentos |    |  | [FOTO] |  | [FOTO] |  | [FOTO] |    |  |
-|  |              |    |  | Prod D |  | Prod E |  | Prod F |    |  |
-|  +--------------+    +----------------------------------------+  |
-|                                                                  |
-+------------------------------------------------------------------+
-```
-
-### Drawer do Carrinho (lateral direita)
+### Layout Mobile Proposto
 
 ```text
 +------------------------------------------+
-|  CARRINHO                     [X Fechar] |
+|  [Busca...]                              |
 +------------------------------------------+
-|                                          |
-|  CLIENTE SELECIONADO:                    |
-|  Fazenda Boa Vista                       |
-|  ──────────────────────────────────────  |
-|  Limite: R$ 10.000                       |
-|  Saldo Disponivel: R$ 7.500              |
-|  [✓] Credito suficiente                  |
-|                                          |
-+------------------------------------------+
-|                                          |
-|  [Img] Produto A                         |
-|        R$ 185,00 x [10] = R$ 1.850,00    |
-|        [Remover]                         |
-|                                          |
-|  [Img] Produto B                         |
-|        R$ 72,50 x [20] = R$ 1.450,00     |
-|        [Remover]                         |
+|    +--------+  +--------+  +--------+    |
+|    | [FOTO] |  | [FOTO] |  | [FOTO] |    |
+|    | Prod A |  | Prod B |  | Prod C |    |
+|    | R$ 185 |  | R$ 72  |  | R$ 320 |    |
+|    | [+ADD] |  | [+ADD] |  | [+ADD] |    |
+|    +--------+  +--------+  +--------+    |
 |                                          |
 +------------------------------------------+
-|  Subtotal:              R$ 3.300,00      |
-|  ──────────────────────────────────────  |
-|  Desconto (5%):         - R$ 165,00      |
-|  TOTAL:                 R$ 3.135,00      |
-+------------------------------------------+
-|                                          |
-|  [Finalizar Pedido]                      |
-|  [Limpar Carrinho]                       |
-|                                          |
+|  [Home]  [Categorias]  [Carrinho]  [Menu]|
+|    🏠        📂          🛒(3)       ☰   |
 +------------------------------------------+
 ```
 
----
-
-## Fase 3: Componentes a Criar
-
-### Novos Arquivos
-
-| # | Arquivo | Descricao |
-|---|---------|-----------|
-| 1 | `src/pages/AppVendasFornecedor.tsx` | Pagina principal do e-commerce |
-| 2 | `src/pages/MeusPedidosFornecedor.tsx` | Lista de pedidos do vendedor |
-| 3 | `src/components/fornecedor/vendas/CategoriasSidebar.tsx` | Filtro por categoria (extraido de `produtos_catalogo_fornecedor.categoria`) |
-| 4 | `src/components/fornecedor/vendas/ProdutoVendaCard.tsx` | Card do produto com botao ADD |
-| 5 | `src/components/fornecedor/vendas/CarrinhoDrawer.tsx` | Drawer lateral com carrinho |
-| 6 | `src/components/fornecedor/vendas/FinalizarPedidoDialog.tsx` | Checkout final |
-| 7 | `src/components/fornecedor/vendas/PedidoDetalheDialog.tsx` | Visualizacao do pedido com timeline |
-| 8 | `src/hooks/useVendedorFornecedor.tsx` | Identifica vendedor logado via `vendedores_fornecedor.user_id` |
-| 9 | `src/hooks/useCarrinhoVendas.tsx` | Context do carrinho com persistencia localStorage |
-| 10 | `src/hooks/usePromocoesFornecedor.tsx` | Busca promocoes ativas |
-
-### Arquivos a Modificar
-
-| # | Arquivo | Modificacao |
-|---|---------|-------------|
-| 1 | `src/pages/PortalFornecedor.tsx` | Adicionar tab "Vendas" |
-| 2 | `src/App.tsx` | Adicionar rotas `/app-vendas` e `/meus-pedidos-fornecedor` |
-| 3 | `src/hooks/useFornecedorData.tsx` | Adicionar fetch de promocoes |
-
----
-
-## Fase 4: Fluxos de Uso
-
-### Vendedor Tirando Pedido
-
-1. Acessa tab "Vendas" no Portal do Fornecedor
-2. Seleciona cliente do dropdown (busca em `clientes_fornecedor`)
-3. Sistema exibe limite e saldo de credito do cliente
-4. Navega por categorias ou busca produto
-5. Clica em "Adicionar" nos produtos do catalogo
-6. Abre carrinho lateral
-7. Ajusta quantidades
-8. Sistema valida: `saldo_credito >= valor_total`
-9. Clica em "Finalizar Pedido"
-10. Pedido salvo em `pedidos_catalogo_fornecedor`
-11. Saldo do cliente atualizado
-
-### Acompanhamento de Pedidos
+### Sheet de Categorias (abre da esquerda)
 
 ```text
-TIMELINE DO PEDIDO
-==================
-[✓] Pedido criado - 15/01 10:30
-    Vendedor: Joao Silva
-    
-[✓] Aprovado - 15/01 14:00
-    
-[✓] Separado - 16/01 09:00
-    
-[✓] Faturado - 16/01 10:00
-    NF: 12345
-    
-[ ] Em transito
-    
-[ ] Entregue
++---------------------------+
+|  CATEGORIAS        [X]    |
++---------------------------+
+|  [Todos]            (45)  |
+|  [>] Medicamento    (2)   |
+|  [>] Suplementos    (5)   |
+|  [>] Sem categoria  (10)  |
++---------------------------+
 ```
 
 ---
 
-## Fase 5: Validacoes de Negocio
+## Componentes a Criar
 
-### Credito do Cliente
-
-```tsx
-// Validar antes de finalizar
-const validarCredito = (cliente: ClienteFornecedor, valorPedido: number) => {
-  if (valorPedido > cliente.saldo_credito) {
-    return {
-      valido: false,
-      mensagem: `Saldo insuficiente. Disponivel: R$ ${cliente.saldo_credito.toFixed(2)}`
-    };
-  }
-  return { valido: true };
-};
-```
-
-### Estoque do Produto
-
-```tsx
-// Verificar estoque ao adicionar
-const validarEstoque = (produto: ProdutoCatalogo, quantidade: number) => {
-  if (quantidade > produto.estoque_proprio) {
-    return {
-      valido: false,
-      mensagem: `Estoque insuficiente. Disponivel: ${produto.estoque_proprio}`
-    };
-  }
-  return { valido: true };
-};
-```
-
-### Promocao Ativa
-
-```tsx
-// Aplicar preco promocional se houver
-const getPrecoFinal = (produto: ProdutoCatalogo, promocoes: PromocaoFornecedor[]) => {
-  const promo = promocoes.find(p => 
-    p.produto_id === produto.id &&
-    p.ativo &&
-    new Date(p.data_inicio) <= new Date() &&
-    new Date(p.data_fim) >= new Date()
-  );
-  
-  if (promo?.preco_promocional) {
-    return promo.preco_promocional;
-  }
-  if (promo?.percentual_desconto) {
-    return produto.preco_tabela * (1 - promo.percentual_desconto / 100);
-  }
-  return produto.preco_tabela;
-};
-```
-
----
-
-## Fase 6: Performance
-
-| Tecnica | Beneficio |
+| Arquivo | Descricao |
 |---------|-----------|
-| Lazy loading de imagens | Usa `loading="lazy"` no `imagem_url` |
-| Context do carrinho | Evita prop drilling |
-| localStorage | Carrinho persiste entre sessoes |
-| Debounce na busca | Evita queries excessivas |
-| Categorias dinamicas | Extraidas de `DISTINCT categoria` |
+| `src/components/fornecedor/vendas/BottomNavVendas.tsx` | Barra de navegacao inferior fixa com 4 botoes |
+| `src/components/fornecedor/vendas/CategoriasSheet.tsx` | Sheet lateral que encapsula CategoriasSidebar |
+| `src/components/fornecedor/vendas/MenuVendasSheet.tsx` | Sheet com opcoes extras (Meus Pedidos, Config) |
+
+## Componentes a Modificar
+
+| Arquivo | Modificacao |
+|---------|-------------|
+| `src/components/fornecedor/vendas/VendasTab.tsx` | Integrar barra inferior, detectar mobile, padding inferior |
+| `src/components/fornecedor/vendas/CategoriasSidebar.tsx` | Ajustar altura para funcionar dentro do Sheet |
 
 ---
 
-## Resumo da Correcao
+## Detalhes Tecnicos
 
-| Antes (Incorreto) | Depois (Correto) |
-|-------------------|------------------|
-| Referencia a tabela `produtos` | Usa `produtos_catalogo_fornecedor` |
-| Referencia a `parceiros` | Usa `clientes_fornecedor` |
-| Tabela `pedidos_fornecedor` | Nova tabela `pedidos_catalogo_fornecedor` |
-| Sem vinculo com vendedor | Vincula via `vendedor_fornecedor_id` |
+### 1. BottomNavVendas.tsx
+
+Barra fixa no rodape (somente mobile) com 4 botoes:
+
+| Botao | Icone | Acao |
+|-------|-------|------|
+| Inicio | Home | Scroll para topo / limpar filtros |
+| Categorias | LayoutGrid | Abre Sheet lateral de categorias |
+| Carrinho | ShoppingCart | Abre Drawer do carrinho (badge com quantidade) |
+| Menu | Menu | Abre opcoes (Meus Pedidos, etc) |
+
+Estilizacao:
+- Posicao: `fixed bottom-0 left-0 right-0`
+- Altura: `h-16` (64px) - area de toque adequada
+- Z-index: `z-50` para ficar acima do conteudo
+- Background: `bg-card border-t`
+
+### 2. CategoriasSheet.tsx
+
+Sheet que abre pela esquerda contendo a lista de categorias:
+- Side: `left`
+- Width: `w-[280px]`
+- Fecha automaticamente ao selecionar categoria
+
+### 3. MenuVendasSheet.tsx
+
+Opcoes secundarias:
+- Meus Pedidos (navega para `/meus-pedidos-fornecedor`)
+- Selecionar Cliente
+- Atualizar Produtos
+
+### 4. VendasTab.tsx Modificado
+
+Logica condicional baseada no hook `useIsMobile()`:
+
+| Elemento | Desktop (>768px) | Mobile (<768px) |
+|----------|-----------------|-----------------|
+| Sidebar categorias | Visivel lateral | Oculta (via Sheet) |
+| Grid produtos | 4 colunas | 2 colunas |
+| Botao carrinho | No header | Na barra inferior |
+| Barra inferior | Nao exibe | Fixa no rodape |
+| Padding inferior | Normal | `pb-20` para nao ficar atras da barra |
+
+---
+
+## Fluxo de Uso Mobile
+
+1. Vendedor abre aba "Vendas"
+2. Ve grid de produtos em 2 colunas
+3. Usa busca no topo para filtrar
+4. Toca em "Categorias" na barra inferior
+5. Sheet abre pela esquerda com lista de categorias
+6. Seleciona categoria, sheet fecha automaticamente
+7. Grid atualiza com produtos filtrados
+8. Toca em "+ Add" nos produtos desejados
+9. Badge no icone Carrinho mostra quantidade
+10. Toca em "Carrinho" para ver itens e finalizar
 
 ---
 
 ## Resultado Esperado
 
-| Funcionalidade | Descricao |
+| Funcionalidade | Beneficio |
 |----------------|-----------|
-| E-commerce visual | Grid de produtos com fotos do catalogo do fornecedor |
-| Categorias laterais | Filtro dinamico por `categoria` |
-| Carrinho intuitivo | Drawer lateral com validacao de credito |
-| Promocoes | Precos promocionais em destaque |
-| Meus Pedidos | Lista com timeline de status |
-| Isolamento de dados | 100% separado do sistema interno |
+| Barra inferior fixa | Navegacao rapida com polegar, padrao de apps nativos |
+| Categorias em Sheet | Economiza espaco, facil de abrir/fechar |
+| Grid 2 colunas | Cards maiores, mais faceis de tocar |
+| Badge no carrinho | Feedback visual imediato |
+| Padding inferior | Conteudo nao fica escondido atras da barra |
+
