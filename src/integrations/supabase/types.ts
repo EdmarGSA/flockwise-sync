@@ -277,6 +277,7 @@ export type Database = {
           celular: string | null
           cep: string | null
           cidade: string | null
+          codigo_erp: string | null
           codigo_ibge: string | null
           complemento: string | null
           cpf_cnpj: string
@@ -303,6 +304,7 @@ export type Database = {
           celular?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo_erp?: string | null
           codigo_ibge?: string | null
           complemento?: string | null
           cpf_cnpj: string
@@ -329,6 +331,7 @@ export type Database = {
           celular?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo_erp?: string | null
           codigo_ibge?: string | null
           complemento?: string | null
           cpf_cnpj?: string
@@ -1369,6 +1372,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      formas_pagamento_fornecedor: {
+        Row: {
+          ativo: boolean | null
+          codigo: string
+          codigo_erp: string | null
+          created_at: string | null
+          fornecedor_global_id: string
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo: string
+          codigo_erp?: string | null
+          created_at?: string | null
+          fornecedor_global_id: string
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo?: string
+          codigo_erp?: string | null
+          created_at?: string | null
+          fornecedor_global_id?: string
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formas_pagamento_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fornecedores_globais: {
         Row: {
@@ -3661,15 +3705,21 @@ export type Database = {
       }
       pedidos_catalogo_fornecedor: {
         Row: {
+          chave_nfe: string | null
           cliente_fornecedor_id: string
+          codigo_erp: string | null
           condicao_pagamento: string | null
           created_at: string | null
           data_entrega_prevista: string | null
           data_entrega_real: string | null
+          data_faturamento: string | null
           data_pedido: string | null
           desconto_percentual: number | null
+          erp_error_at: string | null
+          erp_error_message: string | null
           fornecedor_global_id: string
           id: string
+          numero_nfe: string | null
           numero_pedido: string
           observacoes: string | null
           status: string | null
@@ -3680,15 +3730,21 @@ export type Database = {
           vendedor_fornecedor_id: string | null
         }
         Insert: {
+          chave_nfe?: string | null
           cliente_fornecedor_id: string
+          codigo_erp?: string | null
           condicao_pagamento?: string | null
           created_at?: string | null
           data_entrega_prevista?: string | null
           data_entrega_real?: string | null
+          data_faturamento?: string | null
           data_pedido?: string | null
           desconto_percentual?: number | null
+          erp_error_at?: string | null
+          erp_error_message?: string | null
           fornecedor_global_id: string
           id?: string
+          numero_nfe?: string | null
           numero_pedido: string
           observacoes?: string | null
           status?: string | null
@@ -3699,15 +3755,21 @@ export type Database = {
           vendedor_fornecedor_id?: string | null
         }
         Update: {
+          chave_nfe?: string | null
           cliente_fornecedor_id?: string
+          codigo_erp?: string | null
           condicao_pagamento?: string | null
           created_at?: string | null
           data_entrega_prevista?: string | null
           data_entrega_real?: string | null
+          data_faturamento?: string | null
           data_pedido?: string | null
           desconto_percentual?: number | null
+          erp_error_at?: string | null
+          erp_error_message?: string | null
           fornecedor_global_id?: string
           id?: string
+          numero_nfe?: string | null
           numero_pedido?: string
           observacoes?: string | null
           status?: string | null
@@ -4081,6 +4143,63 @@ export type Database = {
             columns: ["forma_pagamento_id"]
             isOneToOne: false
             referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prazos_pagamento_fornecedor: {
+        Row: {
+          ativo: boolean | null
+          codigo_erp: string | null
+          created_at: string | null
+          dias_parcelas: number[]
+          forma_pagamento_id: string
+          fornecedor_global_id: string
+          id: string
+          nome: string
+          padrao: boolean | null
+          quantidade_parcelas: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo_erp?: string | null
+          created_at?: string | null
+          dias_parcelas?: number[]
+          forma_pagamento_id: string
+          fornecedor_global_id: string
+          id?: string
+          nome: string
+          padrao?: boolean | null
+          quantidade_parcelas?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo_erp?: string | null
+          created_at?: string | null
+          dias_parcelas?: number[]
+          forma_pagamento_id?: string
+          fornecedor_global_id?: string
+          id?: string
+          nome?: string
+          padrao?: boolean | null
+          quantidade_parcelas?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prazos_pagamento_fornecedor_forma_pagamento_id_fkey"
+            columns: ["forma_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento_fornecedor"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prazos_pagamento_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
             referencedColumns: ["id"]
           },
         ]
@@ -4549,6 +4668,7 @@ export type Database = {
           ativo: boolean
           categoria: string | null
           codigo_barras: string | null
+          codigo_erp: string | null
           codigo_interno: string
           created_at: string
           custo: number | null
@@ -4569,6 +4689,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string | null
           codigo_barras?: string | null
+          codigo_erp?: string | null
           codigo_interno: string
           created_at?: string
           custo?: number | null
@@ -4589,6 +4710,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string | null
           codigo_barras?: string | null
+          codigo_erp?: string | null
           codigo_interno?: string
           created_at?: string
           custo?: number | null

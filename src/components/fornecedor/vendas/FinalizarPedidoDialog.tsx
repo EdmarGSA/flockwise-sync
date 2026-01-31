@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
@@ -34,7 +33,22 @@ interface FinalizarPedidoDialogProps {
   onSuccess: () => void;
 }
 
-const CONDICOES_PAGAMENTO = [
+interface FormaPagamento {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+interface PrazoPagamento {
+  id: string;
+  forma_pagamento_id: string;
+  nome: string;
+  dias_parcelas: number[];
+  padrao: boolean;
+}
+
+// Fallback para quando não há formas/prazos cadastrados
+const CONDICOES_PAGAMENTO_FALLBACK = [
   { value: 'a_vista', label: 'À Vista' },
   { value: '7_dias', label: '7 Dias' },
   { value: '14_dias', label: '14 Dias' },
@@ -52,10 +66,73 @@ export const FinalizarPedidoDialog = ({
   const { vendedor, fornecedorGlobalId } = useVendedorFornecedor();
   
   const [loading, setLoading] = useState(false);
-  const [condicaoPagamento, setCondicaoPagamento] = useState('a_vista');
+  const [condicaoPagamento, setCondicaoPagamento] = useState('');
   const [dataEntrega, setDataEntrega] = useState<Date>(addDays(new Date(), 3));
   const [observacoes, setObservacoes] = useState('');
   const [pedidoCriado, setPedidoCriado] = useState<string | null>(null);
+  
+  // Formas e prazos dinâmicos
+  const [formas, setFormas] = useState<FormaPagamento[]>([]);
+  const [prazos, setPrazos] = useState<PrazoPagamento[]>([]);
+  const [formaSelecionada, setFormaSelecionada] = useState<string>('');
+  const [prazoSelecionado, setPrazoSelecionado] = useState<string>('');
+  const [usarFallback, setUsarFallback] = useState(false);
+
+  // Carregar formas e prazos do fornecedor
+  useEffect(() => {
+    const fetchFormasPrazos = async () => {
+      if (!fornecedorGlobalId || !open) return;
+
+      const [formasRes, prazosRes] = await Promise.all([
+        supabase
+          .from('formas_pagamento_fornecedor')
+          .select('id, codigo, nome')
+          .eq('fornecedor_global_id', fornecedorGlobalId)
+          .eq('ativo', true)
+          .order('nome'),
+        supabase
+          .from('prazos_pagamento_fornecedor')
+          .select('id, forma_pagamento_id, nome, dias_parcelas, padrao')
+          .eq('fornecedor_global_id', fornecedorGlobalId)
+          .eq('ativo', true)
+          .order('nome')
+      ]);
+
+      const formasData = (formasRes.data || []) as FormaPagamento[];
+      const prazosData = (prazosRes.data || []) as PrazoPagamento[];
+
+      setFormas(formasData);
+      setPrazos(prazosData);
+
+      // Se não há formas cadastradas, usar fallback
+      if (formasData.length === 0) {
+        setUsarFallback(true);
+        setCondicaoPagamento('a_vista');
+      } else {
+        setUsarFallback(false);
+        // Selecionar primeira forma por padrão
+        if (formasData.length > 0) {
+          setFormaSelecionada(formasData[0].id);
+        }
+      }
+    };
+
+    fetchFormasPrazos();
+  }, [fornecedorGlobalId, open]);
+
+  // Atualizar prazo quando forma muda
+  useEffect(() => {
+    if (!formaSelecionada) return;
+    
+    const prazosDaForma = prazos.filter(p => p.forma_pagamento_id === formaSelecionada);
+    const prazoPadrao = prazosDaForma.find(p => p.padrao) || prazosDaForma[0];
+    
+    if (prazoPadrao) {
+      setPrazoSelecionado(prazoPadrao.id);
+    } else {
+      setPrazoSelecionado('');
+    }
+  }, [formaSelecionada, prazos]);
 
   const gerarNumeroPedido = () => {
     const ano = new Date().getFullYear();
@@ -75,6 +152,14 @@ export const FinalizarPedidoDialog = ({
       const numeroPedido = gerarNumeroPedido();
       const valorBruto = total;
 
+      // Montar condicao_pagamento
+      let condicaoFinal = condicaoPagamento;
+      if (!usarFallback && formaSelecionada) {
+        const forma = formas.find(f => f.id === formaSelecionada);
+        const prazo = prazos.find(p => p.id === prazoSelecionado);
+        condicaoFinal = prazo ? `${forma?.nome || ''} - ${prazo.nome}` : forma?.nome || '';
+      }
+
       // Criar pedido
       const { data: pedido, error: pedidoError } = await supabase
         .from('pedidos_catalogo_fornecedor')
@@ -85,7 +170,7 @@ export const FinalizarPedidoDialog = ({
           numero_pedido: numeroPedido,
           valor_bruto: valorBruto,
           valor_total: total,
-          condicao_pagamento: condicaoPagamento,
+          condicao_pagamento: condicaoFinal,
           data_entrega_prevista: format(dataEntrega, 'yyyy-MM-dd'),
           status: 'pendente',
           observacoes: observacoes || null,
@@ -193,21 +278,59 @@ export const FinalizarPedidoDialog = ({
           <Separator />
 
           {/* Condição de Pagamento */}
-          <div className="space-y-2">
-            <Label>Condição de Pagamento</Label>
-            <Select value={condicaoPagamento} onValueChange={setCondicaoPagamento}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CONDICOES_PAGAMENTO.map(c => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {usarFallback ? (
+            <div className="space-y-2">
+              <Label>Condição de Pagamento</Label>
+              <Select value={condicaoPagamento} onValueChange={setCondicaoPagamento}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDICOES_PAGAMENTO_FALLBACK.map(c => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Forma de Pagamento</Label>
+                <Select value={formaSelecionada} onValueChange={setFormaSelecionada}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formas.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {formaSelecionada && prazos.filter(p => p.forma_pagamento_id === formaSelecionada).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Prazo</Label>
+                  <Select value={prazoSelecionado} onValueChange={setPrazoSelecionado}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {prazos.filter(p => p.forma_pagamento_id === formaSelecionada).map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome} ({p.dias_parcelas.join('/')})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Data de Entrega */}
           <div className="space-y-2">
