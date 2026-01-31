@@ -25,7 +25,9 @@ import {
   Settings,
   ShoppingBag,
   Contact,
-  Map
+  Map,
+  Link2,
+  CreditCard
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -38,6 +40,8 @@ import { FornecedorConfigTab } from '@/components/fornecedor/FornecedorConfigTab
 import { FornecedorCatalogoTab } from '@/components/fornecedor/FornecedorCatalogoTab';
 import { FornecedorClientesTab } from '@/components/fornecedor/FornecedorClientesTab';
 import { FornecedorGestaoCampoTab } from '@/components/fornecedor/FornecedorGestaoCampoTab';
+import { FornecedorIntegracaoERPTab } from '@/components/fornecedor/FornecedorIntegracaoERPTab';
+import { FormasPagamentoFornecedorTab } from '@/components/fornecedor/FormasPagamentoFornecedorTab';
 import { VendasTab } from '@/components/fornecedor/vendas/VendasTab';
 
 const PortalFornecedor = () => {
@@ -233,7 +237,7 @@ const PortalFornecedor = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-9 lg:w-[1000px]">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-11 lg:w-[1200px]">
             <TabsTrigger value="dashboard" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -265,6 +269,14 @@ const PortalFornecedor = () => {
             <TabsTrigger value="campo" className="gap-2">
               <Map className="h-4 w-4" />
               <span className="hidden sm:inline">Campo</span>
+            </TabsTrigger>
+            <TabsTrigger value="comercial" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Comercial</span>
+            </TabsTrigger>
+            <TabsTrigger value="integracao" className="gap-2">
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline">ERP</span>
             </TabsTrigger>
             <TabsTrigger value="configuracoes" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -503,6 +515,16 @@ const PortalFornecedor = () => {
               fornecedorGlobalId={fornecedorGlobalId!}
               clientes={meusClientes}
             />
+          </TabsContent>
+
+          {/* Comercial Tab */}
+          <TabsContent value="comercial">
+            <FormasPagamentoFornecedorTab fornecedorGlobalId={fornecedorGlobalId!} />
+          </TabsContent>
+
+          {/* Integração ERP Tab */}
+          <TabsContent value="integracao">
+            <FornecedorIntegracaoERPTab fornecedorGlobalId={fornecedorGlobalId!} />
           </TabsContent>
 
           {/* Configurações Tab */}

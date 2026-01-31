@@ -39,7 +39,7 @@ Componentes modificados:
 
 ## Parte 2: Formas e Prazos de Pagamento
 
-### Status: A Implementar
+### Status: IMPLEMENTADO ✅
 
 ### 2.1 Problema Atual
 
@@ -96,7 +96,7 @@ Nova aba "Comercial" no Portal com:
 
 ## Parte 3: Integracao ERP - Padrao GSA Tibiri
 
-### Status: A Implementar
+### Status: IMPLEMENTADO ✅
 
 ### 3.1 Arquitetura
 
@@ -335,14 +335,14 @@ Content-Type: application/json
 
 ## Ordem de Implementacao
 
-| Fase | Descricao | Prioridade |
-|------|-----------|------------|
-| 1 | Migracao SQL (tabelas + campos) | Alta |
-| 2 | Edge Function sync-erp | Alta |
-| 3 | Aba Integracao ERP (API Keys + Logs) | Alta |
-| 4 | Formas/Prazos de Pagamento | Media |
-| 5 | Exibicao de erros ERP no PWA | Media |
-| 6 | Documentacao para Bridge Agent | Baixa |
+| Fase | Descricao | Status |
+|------|-----------|--------|
+| 1 | Migracao SQL (tabelas + campos) | ✅ CONCLUÍDO |
+| 2 | Edge Function sync-erp | ✅ CONCLUÍDO |
+| 3 | Aba Integracao ERP (API Keys + Logs) | ✅ CONCLUÍDO |
+| 4 | Formas/Prazos de Pagamento | ✅ CONCLUÍDO |
+| 5 | Exibicao de erros ERP no PWA | ⏳ A FAZER |
+| 6 | Documentacao para Bridge Agent | ⏳ A FAZER |
 
 ---
 
