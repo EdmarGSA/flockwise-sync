@@ -1,360 +1,147 @@
 
 
-# Plano Consolidado: Portal do Fornecedor - Automacao de Vendas e Integracao ERP
+# Plano: Documentacao Swagger/OpenAPI para API sync-erp
 
-## Visao Geral
+## Objetivo
 
-Este plano consolida todas as melhorias planejadas para o modulo de Automacao de Vendas do Portal do Fornecedor, incluindo:
+Criar uma interface interativa Swagger UI para documentar a API de integracao ERP (GSA Tibiri), permitindo que desenvolvedores testem endpoints diretamente pelo navegador.
 
-1. **UX Mobile** - Interface otimizada para vendedores em campo (IMPLEMENTADO)
-2. **Formas e Prazos de Pagamento** - Cadastro dinamico por fornecedor
-3. **Integracao ERP (Padrao GSA Tibiri)** - Sincronizacao bidirecional com sistemas locais
-
----
-
-## Parte 1: UX Mobile da Aba de Vendas (CONCLUIDO)
-
-### Status: Implementado
-
-Componentes criados:
-- `BottomNavVendas.tsx` - Barra de navegacao inferior fixa
-- `CategoriasSheet.tsx` - Sheet lateral com categorias
-- `MenuVendasSheet.tsx` - Menu de opcoes secundarias
-
-Componentes modificados:
-- `VendasTab.tsx` - Logica responsiva mobile/desktop
-- `CategoriasSidebar.tsx` - Suporte para uso dentro de Sheet
-
-### Funcionalidades Entregues
-
-| Funcionalidade | Descricao |
-|----------------|-----------|
-| Barra inferior fixa | Navegacao rapida com polegar (Home, Categorias, Carrinho, Menu) |
-| Categorias em Sheet | Abre pela esquerda, fecha ao selecionar |
-| Grid responsivo | 2 colunas mobile, 4 colunas desktop |
-| Badge no carrinho | Contador de itens em tempo real |
-| Safe area | Padding para iPhones com notch |
-
----
-
-## Parte 2: Formas e Prazos de Pagamento
-
-### Status: IMPLEMENTADO ✅
-
-### 2.1 Problema Atual
-
-O `FinalizarPedidoDialog` usa constante fixa:
-
-```javascript
-const CONDICOES_PAGAMENTO = [
-  { value: 'a_vista', label: 'A Vista' },
-  { value: '7_dias', label: '7 Dias' },
-  // ... hardcoded
-];
-```
-
-### 2.2 Solucao: Tabelas Dinamicas
+## Arquitetura
 
 ```text
-formas_pagamento_fornecedor
-+--------------------+---------------------------+
-| Campo              | Descricao                 |
-+--------------------+---------------------------+
-| id                 | UUID                      |
-| fornecedor_global_id | FK fornecedores_globais |
-| codigo             | 'boleto', 'pix', 'cartao' |
-| nome               | 'Boleto Bancario'         |
-| codigo_erp         | Codigo no ERP local       |
-| ativo              | Boolean                   |
-+--------------------+---------------------------+
-
-prazos_pagamento_fornecedor
-+--------------------+---------------------------+
-| Campo              | Descricao                 |
-+--------------------+---------------------------+
-| id                 | UUID                      |
-| fornecedor_global_id | FK fornecedores_globais |
-| forma_pagamento_id | FK formas_pagamento       |
-| nome               | 'A Vista', '7/14/21'      |
-| dias_parcelas      | [0] ou [7,14,21]          |
-| quantidade_parcelas| 1, 3, etc                 |
-| codigo_erp         | Codigo no ERP local       |
-| padrao             | Boolean                   |
-| ativo              | Boolean                   |
-+--------------------+---------------------------+
++------------------------------------------+
+|          SWAGGER DOCUMENTATION           |
++------------------------------------------+
+|                                          |
+|  /sync-erp-docs                          |
+|    |                                     |
+|    +-- GET /           -> Swagger UI     |
+|    +-- GET /openapi    -> OpenAPI JSON   |
+|                                          |
++------------------------------------------+
+|                                          |
+|  /sync-erp  (API existente)              |
+|    |                                     |
+|    +-- POST /  -> Processar acoes        |
+|                                          |
++------------------------------------------+
 ```
 
-### 2.3 Interface de Configuracao
+## Tecnologias
 
-Nova aba "Comercial" no Portal com:
-- Cadastro de formas de pagamento
-- Configuracao de prazos por forma
-- Toggle ativo/inativo
-- Campo codigo_erp para mapeamento
+| Tecnologia | Uso |
+|------------|-----|
+| Hono | Framework HTTP para Edge Functions |
+| @hono/swagger-ui | Renderizacao da interface Swagger |
+| OpenAPI 3.0 | Especificacao da API |
 
----
+## Implementacao
 
-## Parte 3: Integracao ERP - Padrao GSA Tibiri
+### Fase 1: Criar Edge Function sync-erp-docs
 
-### Status: IMPLEMENTADO ✅
+Nova edge function dedicada para servir a documentacao:
 
-### 3.1 Arquitetura
+**Arquivo:** `supabase/functions/sync-erp-docs/index.ts`
 
-```text
-+-------------------+         +------------------+         +-------------------+
-|    ERP LOCAL      |         |   BRIDGE AGENT   |         |   CLOUD (Lovable) |
-|  (Firebird, SQL)  |         |   (GSA Tibiri)   |         |                   |
-+-------------------+         +------------------+         +-------------------+
-        |                            |                            |
-        |  1. Extrai dados          |                            |
-        |-------------------------->|                            |
-        |                           |  2. POST /sync-erp         |
-        |                           |     (API Key + JSON)       |
-        |                           |--------------------------->|
-        |                           |                            |  3. Valida API Key
-        |                           |                            |  4. Processa dados
-        |                           |  5. Response               |
-        |                           |<---------------------------|
-        |  6. Atualiza ERP         |                            |
-        |<--------------------------|                            |
+```typescript
+import { Hono } from "https://deno.land/x/hono@v4.0.0/mod.ts";
+import { swaggerUI } from "npm:@hono/swagger-ui";
+
+const app = new Hono();
+
+// OpenAPI Specification completa
+const openApiDoc = {
+  openapi: "3.0.0",
+  info: {
+    title: "GSA Tibiri - API de Integracao ERP",
+    version: "1.0.0",
+    description: "API para sincronizacao bidirecional entre ERP local e Cloud",
+    contact: { name: "Suporte GSA", email: "suporte@gsa.com" }
+  },
+  servers: [
+    { url: "https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1" }
+  ],
+  // ... paths, schemas, security definitions
+};
+
+// Rota principal - Swagger UI
+app.get("/", swaggerUI({ url: "/sync-erp-docs/openapi" }));
+
+// Rota do OpenAPI JSON
+app.get("/openapi", (c) => c.json(openApiDoc));
+
+Deno.serve(app.fetch);
 ```
 
-### 3.2 Seguranca via API Key
+### Fase 2: Especificacao OpenAPI Completa
 
-| Aspecto | Implementacao |
-|---------|---------------|
-| Armazenamento | Apenas hash SHA-256 no banco |
-| Geracao | Chave exibida UMA VEZ para o usuario |
-| Validacao | Compara hash antes de processar |
-| Isolamento | `fornecedor_global_id` vinculado a API Key |
-| Revogacao | Toggle `ativo = false` invalida imediatamente |
+Documentar todas as 8 acoes da API:
 
-### 3.3 Acoes da Edge Function
+| Acao | Metodo | Descricao |
+|------|--------|-----------|
+| sync_produtos | POST | Sincronizar catalogo de produtos |
+| sync_clientes | POST | Sincronizar cadastro de clientes |
+| sync_credito | POST | Atualizar limite/saldo de credito |
+| buscar_pedidos | POST | Listar pedidos para importacao |
+| confirmar_pedido_erp | POST | Confirmar importacao no ERP |
+| atualizar_status | POST | Atualizar status do pedido |
+| confirmar_nfe | POST | Registrar NF-e emitida |
+| registrar_erro_pedido | POST | Registrar erro visivel ao vendedor |
 
-```text
-+------------------------------------------------------------------+
-|                    EDGE FUNCTION: sync-erp                       |
-+------------------------------------------------------------------+
-| ACAO                  | DIRECAO        | DESCRICAO               |
-|-----------------------|----------------|-------------------------|
-| sync_produtos         | ERP -> Cloud   | Atualiza estoque/preco  |
-| sync_clientes         | ERP -> Cloud   | Sincroniza cadastro     |
-| sync_credito          | ERP -> Cloud   | Atualiza limite/saldo   |
-| buscar_pedidos        | Cloud -> ERP   | Lista pedidos novos     |
-| confirmar_pedido_erp  | ERP -> Cloud   | Marca como exportado    |
-| atualizar_status      | ERP -> Cloud   | Transicao de status     |
-| confirmar_nfe         | ERP -> Cloud   | Registra NF-e emitida   |
-| registrar_erro_pedido | ERP -> Cloud   | Registra erro (vendedor ve)|
-+------------------------------------------------------------------+
+**Schemas definidos:**
+- ProdutoSync
+- ClienteSync
+- CreditoSync
+- Pedido (com nested Cliente e Itens)
+- ErroResponse
+- SuccessResponse
+
+**Seguranca:**
+- apiKey via header X-API-Key
+
+### Fase 3: Configuracao
+
+Adicionar ao `supabase/config.toml`:
+
+```toml
+[functions.sync-erp-docs]
+verify_jwt = false
 ```
 
-### 3.4 Ciclo de Vida do Pedido
+## Resultado Final
 
-```text
-[PWA Vendas]                     [Bridge/ERP]
-     |                                |
-     |-- Cria pedido (pendente) ----->|
-     |                                |
-     |                    GET buscar_pedidos
-     |                                |
-     |<---- confirmar_pedido_erp -----|  (exportado)
-     |                                |
-     |<---- atualizar_status ---------|  (aprovado)
-     |                                |
-     |<---- atualizar_status ---------|  (separado)
-     |                                |
-     |<---- confirmar_nfe ------------|  (faturado + NF-e)
-     |                                |
-     |<---- atualizar_status ---------|  (entregue)
-     |                                |
-
-FLUXO DE ERRO:
-     |                                |
-     |<---- registrar_erro_pedido ----|  (erro + mensagem)
-     |                                |
-[Vendedor ve erro no PWA imediatamente]
+**URL da Documentacao:**
+```
+https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
 ```
 
-### 3.5 Transicoes de Status Validas
-
-```text
-pendente -> exportado -> aprovado -> separado -> faturado -> entregue
-                  |           |           |
-                  v           v           v
-                erro        erro        erro
-```
-
----
-
-## Migracao SQL Consolidada
-
-### Novas Tabelas
-
-```sql
--- Formas de pagamento do fornecedor
-CREATE TABLE formas_pagamento_fornecedor (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
-  codigo TEXT NOT NULL,
-  nome TEXT NOT NULL,
-  codigo_erp TEXT,
-  ativo BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(fornecedor_global_id, codigo)
-);
-
--- Prazos vinculados as formas
-CREATE TABLE prazos_pagamento_fornecedor (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  fornecedor_global_id UUID NOT NULL REFERENCES fornecedores_globais(id),
-  forma_pagamento_id UUID NOT NULL REFERENCES formas_pagamento_fornecedor(id),
-  nome TEXT NOT NULL,
-  dias_parcelas INTEGER[] NOT NULL DEFAULT '{0}',
-  quantidade_parcelas INTEGER DEFAULT 1,
-  codigo_erp TEXT,
-  padrao BOOLEAN DEFAULT false,
-  ativo BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### Campos ERP nas Tabelas Existentes
-
-```sql
--- Pedidos
-ALTER TABLE pedidos_catalogo_fornecedor 
-ADD COLUMN codigo_erp TEXT,
-ADD COLUMN numero_nfe TEXT,
-ADD COLUMN chave_nfe TEXT,
-ADD COLUMN data_faturamento TIMESTAMPTZ,
-ADD COLUMN erp_error_message TEXT,
-ADD COLUMN erp_error_at TIMESTAMPTZ;
-
--- Clientes
-ALTER TABLE clientes_fornecedor 
-ADD COLUMN codigo_erp TEXT;
-
--- Produtos
-ALTER TABLE produtos_catalogo_fornecedor 
-ADD COLUMN codigo_erp TEXT;
-
--- Indices
-CREATE INDEX idx_pedidos_catalogo_codigo_erp ON pedidos_catalogo_fornecedor(codigo_erp);
-CREATE INDEX idx_clientes_fornecedor_codigo_erp ON clientes_fornecedor(codigo_erp);
-CREATE INDEX idx_produtos_catalogo_codigo_erp ON produtos_catalogo_fornecedor(codigo_erp);
-```
-
----
+**Funcionalidades:**
+- Interface interativa para testar endpoints
+- Schemas de request/response com exemplos
+- Autenticacao via API Key integrada
+- Visualizacao do fluxo de status dos pedidos
+- Codigos de erro documentados
 
 ## Arquivos a Criar
 
-| # | Arquivo | Descricao |
-|---|---------|-----------|
-| 1 | `supabase/functions/sync-erp/index.ts` | Edge Function de integracao |
-| 2 | `src/components/fornecedor/FornecedorIntegracaoERPTab.tsx` | Aba de gerenciamento ERP |
-| 3 | `src/components/fornecedor/FormasPagamentoFornecedorTab.tsx` | Cadastro formas/prazos |
-| 4 | `src/components/fornecedor/ApiKeyDialog.tsx` | Dialog geracao API Key |
-| 5 | `src/hooks/useSyncErpLogs.tsx` | Hook para logs de sincronizacao |
+| Arquivo | Descricao |
+|---------|-----------|
+| `supabase/functions/sync-erp-docs/index.ts` | Edge Function com Swagger UI |
 
 ## Arquivos a Modificar
 
-| # | Arquivo | Modificacao |
-|---|---------|-------------|
-| 1 | `src/pages/PortalFornecedor.tsx` | Adicionar abas "Comercial" e "Integracao ERP" |
-| 2 | `src/components/fornecedor/vendas/FinalizarPedidoDialog.tsx` | Usar formas/prazos do banco |
-| 3 | `src/pages/MeusPedidosFornecedor.tsx` | Exibir erros do ERP |
-| 4 | `supabase/config.toml` | Adicionar config da edge function |
+| Arquivo | Modificacao |
+|---------|-------------|
+| `supabase/config.toml` | Adicionar config da nova function |
+| `docs/GSA-TIBIRI-PROTOCOL.md` | Adicionar link para Swagger UI |
 
----
+## Beneficios
 
-## Protocolo GSA Tibiri - Especificacao para Bridge Agent
-
-### Endpoint
-
-```text
-POST https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp
-Header: X-API-Key: <chave-gerada-no-portal>
-Content-Type: application/json
-```
-
-### Exemplos de Requisicoes
-
-```javascript
-// 1. Buscar pedidos novos
-{ "acao": "buscar_pedidos", "status": "pendente" }
-
-// 2. Confirmar importacao no ERP
-{ "acao": "confirmar_pedido_erp", "pedido_id": "uuid", "codigo_erp": "12345" }
-
-// 3. Atualizar status
-{ "acao": "atualizar_status", "pedido_id": "uuid", "novo_status": "aprovado" }
-
-// 4. Registrar erro
-{ "acao": "registrar_erro_pedido", "pedido_id": "uuid", "error_message": "Produto sem estoque" }
-
-// 5. Confirmar NF-e
-{ 
-  "acao": "confirmar_nfe", 
-  "pedido_id": "uuid", 
-  "numero_nfe": "123456", 
-  "chave_nfe": "35260112345678000123550010001234561234567890",
-  "data_faturamento": "2026-01-31"
-}
-
-// 6. Sincronizar produtos
-{ 
-  "acao": "sync_produtos", 
-  "produtos": [
-    { "codigo_erp": "PROD001", "nome": "Racao Inicial", "preco": 185.00, "estoque": 500 }
-  ]
-}
-
-// 7. Sincronizar clientes
-{ 
-  "acao": "sync_clientes", 
-  "clientes": [
-    { "codigo_erp": "CLI001", "razao_social": "Fazenda Boa Vista", "cpf_cnpj": "12345678000199" }
-  ]
-}
-```
-
----
-
-## Analise de Seguranca
-
-| Risco | Mitigacao |
-|-------|-----------|
-| Exposicao de API Key | Armazena apenas hash SHA-256 |
-| Acesso cruzado | Valida `fornecedor_global_id` em TODA operacao |
-| Injecao SQL | Supabase client com prepared statements |
-| Rate limiting | 100 req/min por API Key |
-| Revogacao | Toggle `ativo = false` invalida imediatamente |
-| Auditoria | Log de todas operacoes em `sync_erp_log` |
-
----
-
-## Ordem de Implementacao
-
-| Fase | Descricao | Status |
-|------|-----------|--------|
-| 1 | Migracao SQL (tabelas + campos) | ✅ CONCLUÍDO |
-| 2 | Edge Function sync-erp | ✅ CONCLUÍDO |
-| 3 | Aba Integracao ERP (API Keys + Logs) | ✅ CONCLUÍDO |
-| 4 | Formas/Prazos de Pagamento | ✅ CONCLUÍDO |
-| 5 | Exibicao de erros ERP no PWA | ✅ CONCLUÍDO |
-| 6 | Documentacao para Bridge Agent | ✅ CONCLUÍDO |
-
----
-
-## Resultado Esperado
-
-| Funcionalidade | Beneficio |
-|----------------|-----------|
-| UX Mobile | Vendedores usam como app nativo |
-| Formas/Prazos dinamicos | Fornecedor configura suas condicoes |
-| API Key segura | Integracao sem expor credenciais |
-| Sincronizacao bidirecional | Produtos, clientes, pedidos, NF-e |
-| Erros em tempo real | Vendedor ve problemas imediatamente |
-| Auditoria completa | Rastreabilidade de operacoes |
-| Padrao GSA Tibiri | Desenvolvimento do Bridge facilitado |
+| Beneficio | Descricao |
+|-----------|-----------|
+| Documentacao viva | Sempre sincronizada com a API real |
+| Testes interativos | Desenvolvedores testam direto no browser |
+| Reducao de erros | Schemas validados automaticamente |
+| Onboarding rapido | Novos integradores entendem a API em minutos |
+| Exportacao | Possibilidade de exportar para Postman/Insomnia |
 
