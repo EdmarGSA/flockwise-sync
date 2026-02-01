@@ -1,147 +1,152 @@
 
-
-# Plano: Documentacao Swagger/OpenAPI para API sync-erp
+# Plano: Entrada Manual de Ovos com Lote de Producao Obrigatorio
 
 ## Objetivo
 
-Criar uma interface interativa Swagger UI para documentar a API de integracao ERP (GSA Tibiri), permitindo que desenvolvedores testem endpoints diretamente pelo navegador.
+Modificar o formulario de entrada manual de ovos no modulo Estoque de Ovos para exigir a selecao obrigatoria de um lote de criacao de aves poedeiras, garantindo rastreabilidade completa da origem dos ovos.
 
-## Arquitetura
+## Situacao Atual
+
+O formulario atual (`EstoqueOvos.tsx`, linhas 344-440) permite criar entradas manuais de ovos sem vincular a um lote de producao:
+- Tipo de ovo
+- Classificacao de peso
+- Data producao / validade
+- Quantidade
+- Custo unitario
+- Observacoes
+
+O campo `lote_producao_id` existe na tabela `estoque_ovos` mas nao e preenchido na entrada manual.
+
+## Arquitetura da Solucao
 
 ```text
-+------------------------------------------+
-|          SWAGGER DOCUMENTATION           |
-+------------------------------------------+
-|                                          |
-|  /sync-erp-docs                          |
-|    |                                     |
-|    +-- GET /           -> Swagger UI     |
-|    +-- GET /openapi    -> OpenAPI JSON   |
-|                                          |
-+------------------------------------------+
-|                                          |
-|  /sync-erp  (API existente)              |
-|    |                                     |
-|    +-- POST /  -> Processar acoes        |
-|                                          |
-+------------------------------------------+
++-------------------------------------------+
+|     Dialog: Nova Entrada de Ovos          |
++-------------------------------------------+
+|                                           |
+|  [1] Selecionar Lote de Postura *         |
+|      +------------------------------+     |
+|      | Galpao 01 - Nucleo Sul       |     |
+|      | 12.500 aves | LSL Classic    |     |
+|      +------------------------------+     |
+|                                           |
+|  [2] Tipo de Ovo (inferido da linhagem)   |
+|  [3] Classificacao de Peso                |
+|  [4] Data Producao / Validade             |
+|  [5] Quantidade / Custo                   |
+|                                           |
++-------------------------------------------+
 ```
-
-## Tecnologias
-
-| Tecnologia | Uso |
-|------------|-----|
-| Hono | Framework HTTP para Edge Functions |
-| @hono/swagger-ui | Renderizacao da interface Swagger |
-| OpenAPI 3.0 | Especificacao da API |
 
 ## Implementacao
 
-### Fase 1: Criar Edge Function sync-erp-docs
+### Fase 1: Modificar Estado do Formulario
 
-Nova edge function dedicada para servir a documentacao:
+Adicionar ao estado do componente:
+- `lotesPostura`: Array de lotes ativos de nucleos com tipo_producao = 'postura'
+- `selectedLoteId`: ID do lote selecionado
+- `loadingLotes`: Estado de carregamento
 
-**Arquivo:** `supabase/functions/sync-erp-docs/index.ts`
+Adicionar ao `formData`:
+- `lote_producao_id`: string (obrigatorio)
+
+### Fase 2: Buscar Lotes de Postura
+
+Criar funcao para buscar lotes ativos de nucleos de postura:
 
 ```typescript
-import { Hono } from "https://deno.land/x/hono@v4.0.0/mod.ts";
-import { swaggerUI } from "npm:@hono/swagger-ui";
-
-const app = new Hono();
-
-// OpenAPI Specification completa
-const openApiDoc = {
-  openapi: "3.0.0",
-  info: {
-    title: "GSA Tibiri - API de Integracao ERP",
-    version: "1.0.0",
-    description: "API para sincronizacao bidirecional entre ERP local e Cloud",
-    contact: { name: "Suporte GSA", email: "suporte@gsa.com" }
-  },
-  servers: [
-    { url: "https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1" }
-  ],
-  // ... paths, schemas, security definitions
+const fetchLotesPostura = async () => {
+  const { data } = await supabase
+    .from('lotes')
+    .select(`
+      id,
+      quantidade_aves,
+      linhagem_postura,
+      data_alojamento,
+      galpao:galpoes(nome),
+      nucleo:nucleos!inner(nome, tipo_producao)
+    `)
+    .eq('integrado_id', user?.id)
+    .eq('status', 'alojado')
+    .ilike('nucleo.tipo_producao', '%postura%')
+    .order('created_at', { ascending: false });
 };
-
-// Rota principal - Swagger UI
-app.get("/", swaggerUI({ url: "/sync-erp-docs/openapi" }));
-
-// Rota do OpenAPI JSON
-app.get("/openapi", (c) => c.json(openApiDoc));
-
-Deno.serve(app.fetch);
 ```
 
-### Fase 2: Especificacao OpenAPI Completa
+### Fase 3: Adicionar Select de Lote ao Formulario
 
-Documentar todas as 8 acoes da API:
+Inserir campo Select antes do tipo de ovo:
+- Listar lotes de postura ativos
+- Exibir: Nome galpao + Nome nucleo + Quantidade aves + Linhagem
+- Ao selecionar, inferir automaticamente o tipo de ovo baseado na linhagem
 
-| Acao | Metodo | Descricao |
-|------|--------|-----------|
-| sync_produtos | POST | Sincronizar catalogo de produtos |
-| sync_clientes | POST | Sincronizar cadastro de clientes |
-| sync_credito | POST | Atualizar limite/saldo de credito |
-| buscar_pedidos | POST | Listar pedidos para importacao |
-| confirmar_pedido_erp | POST | Confirmar importacao no ERP |
-| atualizar_status | POST | Atualizar status do pedido |
-| confirmar_nfe | POST | Registrar NF-e emitida |
-| registrar_erro_pedido | POST | Registrar erro visivel ao vendedor |
+### Fase 4: Inferencia de Tipo de Ovo
 
-**Schemas definidos:**
-- ProdutoSync
-- ClienteSync
-- CreditoSync
-- Pedido (com nested Cliente e Itens)
-- ErroResponse
-- SuccessResponse
+Quando um lote for selecionado, inferir automaticamente o tipo de ovo:
+- Linhagem com "LSL", "White", "Branco" = Branco
+- Linhagem com "Brown", "Marrom" = Castanho
+- Demais = Castanho (padrao)
 
-**Seguranca:**
-- apiKey via header X-API-Key
+### Fase 5: Validacao e Persistencia
 
-### Fase 3: Configuracao
-
-Adicionar ao `supabase/config.toml`:
-
-```toml
-[functions.sync-erp-docs]
-verify_jwt = false
-```
-
-## Resultado Final
-
-**URL da Documentacao:**
-```
-https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
-```
-
-**Funcionalidades:**
-- Interface interativa para testar endpoints
-- Schemas de request/response com exemplos
-- Autenticacao via API Key integrada
-- Visualizacao do fluxo de status dos pedidos
-- Codigos de erro documentados
-
-## Arquivos a Criar
-
-| Arquivo | Descricao |
-|---------|-----------|
-| `supabase/functions/sync-erp-docs/index.ts` | Edge Function com Swagger UI |
+Modificar a funcao `handleSubmit`:
+- Validar que `lote_producao_id` foi selecionado
+- Incluir `lote_producao_id` no insert de `estoque_ovos`
+- Atualizar observacao no kardex para incluir referencia ao lote
 
 ## Arquivos a Modificar
 
 | Arquivo | Modificacao |
 |---------|-------------|
-| `supabase/config.toml` | Adicionar config da nova function |
-| `docs/GSA-TIBIRI-PROTOCOL.md` | Adicionar link para Swagger UI |
+| `src/pages/EstoqueOvos.tsx` | Adicionar busca de lotes, campo Select, logica de inferencia |
+
+## Mudancas no Formulario
+
+### Estado Adicional
+```typescript
+const [lotesPostura, setLotesPostura] = useState<LotePostura[]>([]);
+const [loadingLotes, setLoadingLotes] = useState(false);
+```
+
+### FormData Atualizado
+```typescript
+const [formData, setFormData] = useState({
+  lote_producao_id: '',  // NOVO - Obrigatorio
+  tipo_ovo: '',
+  classificacao_peso: '',
+  data_producao: format(new Date(), 'yyyy-MM-dd'),
+  data_validade: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+  quantidade: 0,
+  custo_unitario: 0,
+  observacoes: '',
+});
+```
+
+### Novo Campo no Formulario
+```text
++------------------------------------+
+| Lote de Producao *                 |
+| [ Selecione o lote de postura  v]  |
+|   - Galpao 01 (Nucleo Sul)         |
+|     12.500 aves | LSL Classic      |
+|   - Galpao 02 (Nucleo Norte)       |
+|     8.000 aves | Hy-Line Brown     |
++------------------------------------+
+```
 
 ## Beneficios
 
 | Beneficio | Descricao |
 |-----------|-----------|
-| Documentacao viva | Sempre sincronizada com a API real |
-| Testes interativos | Desenvolvedores testam direto no browser |
-| Reducao de erros | Schemas validados automaticamente |
-| Onboarding rapido | Novos integradores entendem a API em minutos |
-| Exportacao | Possibilidade de exportar para Postman/Insomnia |
+| Rastreabilidade | Cada entrada de ovos vinculada ao lote de origem |
+| Consistencia | Tipo de ovo inferido automaticamente da linhagem |
+| Controle | Apenas lotes ativos de postura sao exibidos |
+| Integracao | Dados consistentes com o fluxo de transferencia de producao |
 
+## Casos de Borda
+
+| Cenario | Tratamento |
+|---------|------------|
+| Nenhum lote de postura ativo | Exibir mensagem informativa e desabilitar cadastro |
+| Linhagem nao reconhecida | Usar "Castanho" como padrao, permitir alteracao manual |
+| Usuario muda tipo de ovo apos selecao | Permitir, pois usuario pode ter ovos de cor diferente |
