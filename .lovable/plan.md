@@ -341,7 +341,7 @@ Content-Type: application/json
 | 2 | Edge Function sync-erp | ✅ CONCLUÍDO |
 | 3 | Aba Integracao ERP (API Keys + Logs) | ✅ CONCLUÍDO |
 | 4 | Formas/Prazos de Pagamento | ✅ CONCLUÍDO |
-| 5 | Exibicao de erros ERP no PWA | ⏳ A FAZER |
+| 5 | Exibicao de erros ERP no PWA | ✅ CONCLUÍDO |
 | 6 | Documentacao para Bridge Agent | ⏳ A FAZER |
 
 ---
