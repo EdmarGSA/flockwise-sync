@@ -27,8 +27,15 @@ import {
   FileText, 
   RefreshCw, 
   Package,
-  Eye
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -43,6 +50,8 @@ interface PedidoCatalogo {
   valor_total: number;
   status: string;
   itens_count: number;
+  erp_error_message: string | null;
+  erp_error_at: string | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -88,7 +97,9 @@ const MeusPedidosFornecedor = () => {
           cliente_fornecedor_id,
           data_pedido,
           valor_total,
-          status
+          status,
+          erp_error_message,
+          erp_error_at
         `)
         .eq('fornecedor_global_id', profile.fornecedor_global_id)
         .order('data_pedido', { ascending: false });
@@ -132,6 +143,8 @@ const MeusPedidosFornecedor = () => {
         valor_total: p.valor_total || 0,
         status: p.status,
         itens_count: itensCount.get(p.id) || 0,
+        erp_error_message: p.erp_error_message,
+        erp_error_at: p.erp_error_at,
       })));
     } catch (error) {
       console.error('Erro ao buscar pedidos:', error);
@@ -284,9 +297,31 @@ const MeusPedidosFornecedor = () => {
                             R$ {pedido.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={statusConfig.variant}>
-                              {statusConfig.label}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={statusConfig.variant}>
+                                {statusConfig.label}
+                              </Badge>
+                              {pedido.erp_error_message && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center gap-1 text-destructive cursor-help">
+                                        <AlertTriangle className="h-4 w-4" />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="max-w-xs">
+                                      <p className="font-medium text-destructive">Erro no ERP:</p>
+                                      <p className="text-sm">{pedido.erp_error_message}</p>
+                                      {pedido.erp_error_at && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {format(new Date(pedido.erp_error_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                        </p>
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Button
