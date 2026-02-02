@@ -38,6 +38,15 @@ interface EstoqueOvo {
   lote?: { galpao?: { nome: string; nucleo?: { nome: string } } };
 }
 
+interface LotePostura {
+  id: string;
+  quantidade_aves: number;
+  linhagem_postura: string | null;
+  data_alojamento: string | null;
+  galpao: { nome: string } | null;
+  nucleo: { nome: string; tipo_producao: string } | null;
+}
+
 const TIPOS_OVO = [
   { value: 'branco', label: 'Branco' },
   { value: 'castanho', label: 'Castanho' },
@@ -66,7 +75,10 @@ export default function EstoqueOvos() {
   const [etiquetaDialogOpen, setEtiquetaDialogOpen] = useState(false);
   const [selectedEstoqueItem, setSelectedEstoqueItem] = useState<EstoqueOvo | null>(null);
   const [liberandoCarencia, setLiberandoCarencia] = useState(false);
+  const [lotesPostura, setLotesPostura] = useState<LotePostura[]>([]);
+  const [loadingLotes, setLoadingLotes] = useState(false);
   const [formData, setFormData] = useState({
+    lote_producao_id: '',
     tipo_ovo: '',
     classificacao_peso: '',
     data_producao: format(new Date(), 'yyyy-MM-dd'),
@@ -79,6 +91,63 @@ export default function EstoqueOvos() {
   useEffect(() => {
     if (user) fetchEstoque();
   }, [user]);
+
+  useEffect(() => {
+    if (dialogOpen && user) {
+      fetchLotesPostura();
+    }
+  }, [dialogOpen, user]);
+
+  const fetchLotesPostura = async () => {
+    if (!user) return;
+    setLoadingLotes(true);
+    try {
+      const { data, error } = await supabase
+        .from('lotes')
+        .select(`
+          id,
+          quantidade_aves,
+          linhagem_postura,
+          data_alojamento,
+          galpao:galpoes(nome),
+          nucleo:nucleos!inner(nome, tipo_producao)
+        `)
+        .eq('integrado_id', user.id)
+        .eq('status', 'alojado')
+        .ilike('nucleo.tipo_producao', '%postura%')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLotesPostura(data as LotePostura[] || []);
+    } catch (error: any) {
+      console.error('Erro ao buscar lotes de postura:', error);
+      setLotesPostura([]);
+    } finally {
+      setLoadingLotes(false);
+    }
+  };
+
+  const inferirTipoOvo = (linhagem: string | null): string => {
+    if (!linhagem) return 'castanho';
+    const linhagemLower = linhagem.toLowerCase();
+    if (linhagemLower.includes('lsl') || 
+        linhagemLower.includes('white') || 
+        linhagemLower.includes('branco') ||
+        linhagemLower.includes('leghorn')) {
+      return 'branco';
+    }
+    return 'castanho';
+  };
+
+  const handleLoteChange = (loteId: string) => {
+    const lote = lotesPostura.find(l => l.id === loteId);
+    const tipoOvoInferido = lote ? inferirTipoOvo(lote.linhagem_postura) : '';
+    setFormData(prev => ({
+      ...prev,
+      lote_producao_id: loteId,
+      tipo_ovo: tipoOvoInferido
+    }));
+  };
 
   const fetchEstoque = async () => {
     try {
@@ -121,11 +190,17 @@ export default function EstoqueOvos() {
       const loteInterno = loteData;
 
       // Criar registro de estoque
+      const selectedLote = lotesPostura.find(l => l.id === formData.lote_producao_id);
+      const loteOrigemDesc = selectedLote 
+        ? `${selectedLote.galpao?.nome || 'Galpão'} - ${selectedLote.nucleo?.nome || 'Núcleo'}`
+        : '';
+
       const { data: estoqueData, error: estoqueError } = await supabase
         .from('estoque_ovos')
         .insert([{
           integrado_id: user.id,
           lote_interno: loteInterno,
+          lote_producao_id: formData.lote_producao_id,
           tipo_ovo: formData.tipo_ovo as any,
           classificacao_peso: formData.classificacao_peso as any,
           data_producao: formData.data_producao,
@@ -151,7 +226,9 @@ export default function EstoqueOvos() {
           saldo_anterior: 0,
           saldo_atual: formData.quantidade,
           documento_ref: loteInterno,
-          observacao: 'Entrada manual de estoque',
+          observacao: loteOrigemDesc 
+            ? `Entrada manual de estoque - Origem: ${loteOrigemDesc}`
+            : 'Entrada manual de estoque',
         });
 
       toast.success(`Lote ${loteInterno} cadastrado com sucesso!`);
@@ -165,6 +242,7 @@ export default function EstoqueOvos() {
 
   const resetForm = () => {
     setFormData({
+      lote_producao_id: '',
       tipo_ovo: '',
       classificacao_peso: '',
       data_producao: format(new Date(), 'yyyy-MM-dd'),
@@ -342,6 +420,38 @@ export default function EstoqueOvos() {
                         <DialogTitle>Nova Entrada de Ovos</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
+                      {/* Lote de Produção - Obrigatório */}
+                      <div className="space-y-2">
+                        <Label>Lote de Produção *</Label>
+                        {loadingLotes ? (
+                          <div className="text-sm text-muted-foreground py-2">Carregando lotes...</div>
+                        ) : lotesPostura.length === 0 ? (
+                          <div className="text-sm text-destructive py-2">
+                            Nenhum lote de postura ativo encontrado. Cadastre um lote de postura primeiro.
+                          </div>
+                        ) : (
+                          <Select value={formData.lote_producao_id} onValueChange={handleLoteChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o lote de postura" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {lotesPostura.map(lote => (
+                                <SelectItem key={lote.id} value={lote.id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {lote.galpao?.nome || 'Galpão'} - {lote.nucleo?.nome || 'Núcleo'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {lote.quantidade_aves.toLocaleString()} aves | {lote.linhagem_postura || 'Linhagem não informada'}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Tipo de Ovo *</Label>
@@ -433,7 +543,10 @@ export default function EstoqueOvos() {
                         <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                           Cancelar
                         </Button>
-                        <Button type="submit" disabled={!formData.tipo_ovo || !formData.classificacao_peso || !formData.quantidade}>
+                        <Button 
+                          type="submit" 
+                          disabled={!formData.lote_producao_id || !formData.tipo_ovo || !formData.classificacao_peso || !formData.quantidade || lotesPostura.length === 0}
+                        >
                           Cadastrar
                         </Button>
                       </div>
