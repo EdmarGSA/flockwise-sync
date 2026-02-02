@@ -44,7 +44,6 @@ O campo `lote_producao_id` existe na tabela `estoque_ovos` mas nao e preenchido 
 
 Adicionar ao estado do componente:
 - `lotesPostura`: Array de lotes ativos de nucleos com tipo_producao = 'postura'
-- `selectedLoteId`: ID do lote selecionado
 - `loadingLotes`: Estado de carregamento
 
 Adicionar ao `formData`:
@@ -55,7 +54,17 @@ Adicionar ao `formData`:
 Criar funcao para buscar lotes ativos de nucleos de postura:
 
 ```typescript
+interface LotePostura {
+  id: string;
+  quantidade_aves: number;
+  linhagem_postura: string | null;
+  data_alojamento: string | null;
+  galpao: { nome: string } | null;
+  nucleo: { nome: string; tipo_producao: string } | null;
+}
+
 const fetchLotesPostura = async () => {
+  setLoadingLotes(true);
   const { data } = await supabase
     .from('lotes')
     .select(`
@@ -70,6 +79,9 @@ const fetchLotesPostura = async () => {
     .eq('status', 'alojado')
     .ilike('nucleo.tipo_producao', '%postura%')
     .order('created_at', { ascending: false });
+  
+  setLotesPostura(data || []);
+  setLoadingLotes(false);
 };
 ```
 
@@ -80,12 +92,34 @@ Inserir campo Select antes do tipo de ovo:
 - Exibir: Nome galpao + Nome nucleo + Quantidade aves + Linhagem
 - Ao selecionar, inferir automaticamente o tipo de ovo baseado na linhagem
 
+```text
++------------------------------------+
+| Lote de Producao *                 |
+| [ Selecione o lote de postura  v]  |
+|   - Galpao 01 (Nucleo Sul)         |
+|     12.500 aves | LSL Classic      |
+|   - Galpao 02 (Nucleo Norte)       |
+|     8.000 aves | Hy-Line Brown     |
++------------------------------------+
+```
+
 ### Fase 4: Inferencia de Tipo de Ovo
 
 Quando um lote for selecionado, inferir automaticamente o tipo de ovo:
-- Linhagem com "LSL", "White", "Branco" = Branco
-- Linhagem com "Brown", "Marrom" = Castanho
-- Demais = Castanho (padrao)
+
+```typescript
+const inferirTipoOvo = (linhagem: string | null): string => {
+  if (!linhagem) return 'castanho';
+  const linhagemLower = linhagem.toLowerCase();
+  if (linhagemLower.includes('lsl') || 
+      linhagemLower.includes('white') || 
+      linhagemLower.includes('branco') ||
+      linhagemLower.includes('leghorn')) {
+    return 'branco';
+  }
+  return 'castanho';
+};
+```
 
 ### Fase 5: Validacao e Persistencia
 
@@ -98,9 +132,9 @@ Modificar a funcao `handleSubmit`:
 
 | Arquivo | Modificacao |
 |---------|-------------|
-| `src/pages/EstoqueOvos.tsx` | Adicionar busca de lotes, campo Select, logica de inferencia |
+| `src/pages/EstoqueOvos.tsx` | Adicionar busca de lotes, campo Select, logica de inferencia, validacao |
 
-## Mudancas no Formulario
+## Detalhes Tecnicos
 
 ### Estado Adicional
 ```typescript
@@ -122,16 +156,17 @@ const [formData, setFormData] = useState({
 });
 ```
 
-### Novo Campo no Formulario
-```text
-+------------------------------------+
-| Lote de Producao *                 |
-| [ Selecione o lote de postura  v]  |
-|   - Galpao 01 (Nucleo Sul)         |
-|     12.500 aves | LSL Classic      |
-|   - Galpao 02 (Nucleo Norte)       |
-|     8.000 aves | Hy-Line Brown     |
-+------------------------------------+
+### Query de Insert Atualizada
+```typescript
+const { data: estoqueData, error: estoqueError } = await supabase
+  .from('estoque_ovos')
+  .insert([{
+    integrado_id: user.id,
+    lote_interno: loteInterno,
+    lote_producao_id: formData.lote_producao_id, // NOVO
+    tipo_ovo: formData.tipo_ovo,
+    // ... resto dos campos
+  }])
 ```
 
 ## Beneficios
@@ -147,6 +182,15 @@ const [formData, setFormData] = useState({
 
 | Cenario | Tratamento |
 |---------|------------|
-| Nenhum lote de postura ativo | Exibir mensagem informativa e desabilitar cadastro |
+| Nenhum lote de postura ativo | Exibir mensagem informativa e desabilitar botao Cadastrar |
 | Linhagem nao reconhecida | Usar "Castanho" como padrao, permitir alteracao manual |
 | Usuario muda tipo de ovo apos selecao | Permitir, pois usuario pode ter ovos de cor diferente |
+
+## Fluxo de Usuario
+
+1. Usuario clica em "Entrada Manual"
+2. Dialog abre com campo "Lote de Producao" em destaque
+3. Ao selecionar um lote, o tipo de ovo e preenchido automaticamente
+4. Usuario ajusta demais campos (classificacao, datas, quantidade)
+5. Ao salvar, o sistema persiste com `lote_producao_id` vinculado
+6. Kardex registra a referencia ao lote de origem
