@@ -1,196 +1,223 @@
 
-# Plano: Entrada Manual de Ovos com Lote de Producao Obrigatorio
+# Plano: Implementar sync_vendedores na API sync-erp
 
 ## Objetivo
 
-Modificar o formulario de entrada manual de ovos no modulo Estoque de Ovos para exigir a selecao obrigatoria de um lote de criacao de aves poedeiras, garantindo rastreabilidade completa da origem dos ovos.
+Adicionar a acao `sync_vendedores` na Edge Function `sync-erp` para permitir sincronizacao bidirecional de vendedores entre o ERP local e o Cloud do Portal do Fornecedor.
 
-## Situacao Atual
+## Estrutura da Tabela vendedores_fornecedor
 
-O formulario atual (`EstoqueOvos.tsx`, linhas 344-440) permite criar entradas manuais de ovos sem vincular a um lote de producao:
-- Tipo de ovo
-- Classificacao de peso
-- Data producao / validade
-- Quantidade
-- Custo unitario
-- Observacoes
-
-O campo `lote_producao_id` existe na tabela `estoque_ovos` mas nao e preenchido na entrada manual.
+| Campo | Tipo | Obrigatorio | Descricao |
+|-------|------|-------------|-----------|
+| id | UUID | Auto | Identificador unico |
+| fornecedor_global_id | UUID | Sim | FK para fornecedor |
+| codigo_vendedor | string | Nao | Codigo unico no ERP local |
+| nome | string | Sim | Nome do vendedor |
+| email | string | Nao | Email do vendedor |
+| telefone | string | Nao | Telefone de contato |
+| regiao | string | Nao | Regiao de atuacao |
+| observacoes | string | Nao | Observacoes adicionais |
+| ativo | boolean | Sim | Status ativo/inativo |
+| user_id | UUID | Nao | Vinculo com auth.users |
 
 ## Arquitetura da Solucao
 
 ```text
 +-------------------------------------------+
-|     Dialog: Nova Entrada de Ovos          |
+|            sync_vendedores                |
 +-------------------------------------------+
 |                                           |
-|  [1] Selecionar Lote de Postura *         |
-|      +------------------------------+     |
-|      | Galpao 01 - Nucleo Sul       |     |
-|      | 12.500 aves | LSL Classic    |     |
-|      +------------------------------+     |
+|  Direcao: ERP -> Cloud (bidirecional)    |
 |                                           |
-|  [2] Tipo de Ovo (inferido da linhagem)   |
-|  [3] Classificacao de Peso                |
-|  [4] Data Producao / Validade             |
-|  [5] Quantidade / Custo                   |
+|  Operacoes:                               |
+|    - INSERT: codigo_vendedor nao existe   |
+|    - UPDATE: codigo_vendedor ja existe    |
+|    - Manter vinculo user_id intacto       |
 |                                           |
 +-------------------------------------------+
 ```
 
-## Implementacao
+## Especificacao da Acao
 
-### Fase 1: Modificar Estado do Formulario
+### Requisicao
 
-Adicionar ao estado do componente:
-- `lotesPostura`: Array de lotes ativos de nucleos com tipo_producao = 'postura'
-- `loadingLotes`: Estado de carregamento
-
-Adicionar ao `formData`:
-- `lote_producao_id`: string (obrigatorio)
-
-### Fase 2: Buscar Lotes de Postura
-
-Criar funcao para buscar lotes ativos de nucleos de postura:
-
-```typescript
-interface LotePostura {
-  id: string;
-  quantidade_aves: number;
-  linhagem_postura: string | null;
-  data_alojamento: string | null;
-  galpao: { nome: string } | null;
-  nucleo: { nome: string; tipo_producao: string } | null;
+```json
+{
+  "acao": "sync_vendedores",
+  "vendedores": [
+    {
+      "codigo_erp": "VEND001",
+      "nome": "Carlos Silva",
+      "email": "carlos@empresa.com",
+      "telefone": "(11) 99999-8888",
+      "regiao": "Sul",
+      "observacoes": "Vendedor senior",
+      "ativo": true
+    }
+  ]
 }
-
-const fetchLotesPostura = async () => {
-  setLoadingLotes(true);
-  const { data } = await supabase
-    .from('lotes')
-    .select(`
-      id,
-      quantidade_aves,
-      linhagem_postura,
-      data_alojamento,
-      galpao:galpoes(nome),
-      nucleo:nucleos!inner(nome, tipo_producao)
-    `)
-    .eq('integrado_id', user?.id)
-    .eq('status', 'alojado')
-    .ilike('nucleo.tipo_producao', '%postura%')
-    .order('created_at', { ascending: false });
-  
-  setLotesPostura(data || []);
-  setLoadingLotes(false);
-};
 ```
 
-### Fase 3: Adicionar Select de Lote ao Formulario
+### Campos do Vendedor
 
-Inserir campo Select antes do tipo de ovo:
-- Listar lotes de postura ativos
-- Exibir: Nome galpao + Nome nucleo + Quantidade aves + Linhagem
-- Ao selecionar, inferir automaticamente o tipo de ovo baseado na linhagem
+| Campo | Tipo | Obrigatorio | Descricao |
+|-------|------|-------------|-----------|
+| codigo_erp | string | Sim | Codigo unico no ERP local |
+| nome | string | Sim | Nome completo do vendedor |
+| email | string | Nao | Email de contato |
+| telefone | string | Nao | Telefone de contato |
+| regiao | string | Nao | Regiao de atuacao |
+| observacoes | string | Nao | Notas adicionais |
+| ativo | boolean | Nao | Status (default: true) |
 
-```text
-+------------------------------------+
-| Lote de Producao *                 |
-| [ Selecione o lote de postura  v]  |
-|   - Galpao 01 (Nucleo Sul)         |
-|     12.500 aves | LSL Classic      |
-|   - Galpao 02 (Nucleo Norte)       |
-|     8.000 aves | Hy-Line Brown     |
-+------------------------------------+
+### Resposta de Sucesso
+
+```json
+{
+  "success": true,
+  "acao": "sync_vendedores",
+  "processados": 2,
+  "erros": 0,
+  "detalhes": []
+}
 ```
 
-### Fase 4: Inferencia de Tipo de Ovo
+## Implementacao Tecnica
 
-Quando um lote for selecionado, inferir automaticamente o tipo de ovo:
+### Nova Funcao: syncVendedores
 
 ```typescript
-const inferirTipoOvo = (linhagem: string | null): string => {
-  if (!linhagem) return 'castanho';
-  const linhagemLower = linhagem.toLowerCase();
-  if (linhagemLower.includes('lsl') || 
-      linhagemLower.includes('white') || 
-      linhagemLower.includes('branco') ||
-      linhagemLower.includes('leghorn')) {
-    return 'branco';
+async function syncVendedores(supabase: any, fornecedorGlobalId: string, vendedores: any[]) {
+  let processados = 0;
+  let erros: any[] = [];
+
+  for (const vendedor of vendedores) {
+    try {
+      // Validacao de campos obrigatorios
+      if (!vendedor.codigo_erp || !vendedor.nome) {
+        erros.push({ codigo_erp: vendedor.codigo_erp, erro: 'codigo_erp e nome sao obrigatorios' });
+        continue;
+      }
+
+      // Verificar se vendedor existe pelo codigo_erp
+      const { data: existente } = await supabase
+        .from('vendedores_fornecedor')
+        .select('id, user_id')
+        .eq('fornecedor_global_id', fornecedorGlobalId)
+        .eq('codigo_vendedor', vendedor.codigo_erp)
+        .single();
+
+      const vendedorData = {
+        nome: vendedor.nome,
+        email: vendedor.email,
+        telefone: vendedor.telefone,
+        regiao: vendedor.regiao,
+        observacoes: vendedor.observacoes,
+        ativo: vendedor.ativo ?? true,
+        updated_at: new Date().toISOString()
+      };
+
+      if (existente) {
+        // UPDATE - manter user_id intacto
+        await supabase
+          .from('vendedores_fornecedor')
+          .update(vendedorData)
+          .eq('id', existente.id);
+      } else {
+        // INSERT
+        await supabase
+          .from('vendedores_fornecedor')
+          .insert({
+            ...vendedorData,
+            fornecedor_global_id: fornecedorGlobalId,
+            codigo_vendedor: vendedor.codigo_erp
+          });
+      }
+      processados++;
+    } catch (e: any) {
+      erros.push({ codigo_erp: vendedor.codigo_erp, erro: e.message });
+    }
   }
-  return 'castanho';
-};
+
+  // Registrar log
+  await registrarLog(
+    supabase, fornecedorGlobalId, 'vendedores', 'erp_para_cloud',
+    vendedores.length, processados, erros.length, erros, { acao: 'sync_vendedores' }
+  );
+
+  return { processados, erros: erros.length, detalhes: erros };
+}
 ```
 
-### Fase 5: Validacao e Persistencia
+### Case no Switch Router
 
-Modificar a funcao `handleSubmit`:
-- Validar que `lote_producao_id` foi selecionado
-- Incluir `lote_producao_id` no insert de `estoque_ovos`
-- Atualizar observacao no kardex para incluir referencia ao lote
+```typescript
+case 'sync_vendedores':
+  if (!dados.vendedores || !Array.isArray(dados.vendedores)) {
+    throw new Error('Campo "vendedores" deve ser um array');
+  }
+  resultado = await syncVendedores(supabase, fornecedorGlobalId, dados.vendedores);
+  break;
+```
 
-## Arquivos a Modificar
+### Atualizar Mensagem de Erro
+
+Atualizar a lista de acoes validas na mensagem de erro default:
+
+```typescript
+default:
+  throw new Error(`Acao desconhecida: ${acao}. Acoes validas: sync_produtos, sync_clientes, sync_credito, sync_vendedores, buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido`);
+```
+
+## Arquivo a Modificar
 
 | Arquivo | Modificacao |
 |---------|-------------|
-| `src/pages/EstoqueOvos.tsx` | Adicionar busca de lotes, campo Select, logica de inferencia, validacao |
+| `supabase/functions/sync-erp/index.ts` | Adicionar funcao syncVendedores e case no switch |
 
-## Detalhes Tecnicos
+## Comportamentos Importantes
 
-### Estado Adicional
-```typescript
-const [lotesPostura, setLotesPostura] = useState<LotePostura[]>([]);
-const [loadingLotes, setLoadingLotes] = useState(false);
+| Cenario | Comportamento |
+|---------|---------------|
+| Vendedor novo | INSERT com codigo_vendedor do ERP |
+| Vendedor existente | UPDATE apenas dados basicos, preserva user_id |
+| Vendedor com user_id | Vinculo de login permanece intacto |
+| Desativar vendedor | Enviar `ativo: false` |
+
+## Exemplo de Uso (Python)
+
+```python
+def sync_vendedores(api_key, vendedores):
+    response = requests.post(
+        "https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp",
+        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        json={
+            "acao": "sync_vendedores",
+            "vendedores": vendedores
+        }
+    )
+    return response.json()
+
+# Exemplo
+vendedores = [
+    {"codigo_erp": "V001", "nome": "Carlos Silva", "email": "carlos@empresa.com", "regiao": "Sul"},
+    {"codigo_erp": "V002", "nome": "Maria Santos", "email": "maria@empresa.com", "regiao": "Norte"}
+]
+resultado = sync_vendedores(api_key, vendedores)
 ```
 
-### FormData Atualizado
-```typescript
-const [formData, setFormData] = useState({
-  lote_producao_id: '',  // NOVO - Obrigatorio
-  tipo_ovo: '',
-  classificacao_peso: '',
-  data_producao: format(new Date(), 'yyyy-MM-dd'),
-  data_validade: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-  quantidade: 0,
-  custo_unitario: 0,
-  observacoes: '',
-});
-```
+## Documentacao a Atualizar
 
-### Query de Insert Atualizada
-```typescript
-const { data: estoqueData, error: estoqueError } = await supabase
-  .from('estoque_ovos')
-  .insert([{
-    integrado_id: user.id,
-    lote_interno: loteInterno,
-    lote_producao_id: formData.lote_producao_id, // NOVO
-    tipo_ovo: formData.tipo_ovo,
-    // ... resto dos campos
-  }])
-```
+Apos implementacao, adicionar ao `docs/GSA-TIBIRI-PROTOCOL.md`:
+- Secao sobre sync_vendedores
+- Exemplo de requisicao/resposta
+- Campos e comportamentos
 
 ## Beneficios
 
 | Beneficio | Descricao |
 |-----------|-----------|
-| Rastreabilidade | Cada entrada de ovos vinculada ao lote de origem |
-| Consistencia | Tipo de ovo inferido automaticamente da linhagem |
-| Controle | Apenas lotes ativos de postura sao exibidos |
-| Integracao | Dados consistentes com o fluxo de transferencia de producao |
-
-## Casos de Borda
-
-| Cenario | Tratamento |
-|---------|------------|
-| Nenhum lote de postura ativo | Exibir mensagem informativa e desabilitar botao Cadastrar |
-| Linhagem nao reconhecida | Usar "Castanho" como padrao, permitir alteracao manual |
-| Usuario muda tipo de ovo apos selecao | Permitir, pois usuario pode ter ovos de cor diferente |
-
-## Fluxo de Usuario
-
-1. Usuario clica em "Entrada Manual"
-2. Dialog abre com campo "Lote de Producao" em destaque
-3. Ao selecionar um lote, o tipo de ovo e preenchido automaticamente
-4. Usuario ajusta demais campos (classificacao, datas, quantidade)
-5. Ao salvar, o sistema persiste com `lote_producao_id` vinculado
-6. Kardex registra a referencia ao lote de origem
+| Cadastro centralizado | Vendedores cadastrados no ERP sincronizam automaticamente |
+| Rastreabilidade | Pedidos vinculados ao codigo_vendedor do ERP |
+| Integridade | Vinculo user_id (login) preservado durante sync |
+| Flexibilidade | Suporta ativacao/desativacao remota |
