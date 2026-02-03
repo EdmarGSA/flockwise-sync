@@ -477,6 +477,149 @@ async function syncVendedores(supabase: any, fornecedorGlobalId: string, vendedo
   return { processados, erros: erros.length, detalhes: erros };
 }
 
+// Ação: sync_formas_pagamento
+async function syncFormasPagamento(supabase: any, fornecedorGlobalId: string, formas: any[], prazos: any[]) {
+  let formasProcessadas = 0;
+  let prazosProcessados = 0;
+  let erros: any[] = [];
+  const formaIdMap: Record<string, string> = {};
+
+  // Primeiro, processar formas de pagamento
+  for (const forma of formas || []) {
+    try {
+      if (!forma.codigo_erp || !forma.nome) {
+        erros.push({ tipo: 'forma', codigo_erp: forma.codigo_erp, erro: 'codigo_erp e nome são obrigatórios' });
+        continue;
+      }
+
+      // Verificar se forma existe pelo codigo_erp
+      const { data: existente } = await supabase
+        .from('formas_pagamento_fornecedor')
+        .select('id')
+        .eq('fornecedor_global_id', fornecedorGlobalId)
+        .eq('codigo_erp', forma.codigo_erp)
+        .single();
+
+      const formaData = {
+        nome: forma.nome,
+        codigo: forma.codigo || forma.codigo_erp,
+        codigo_erp: forma.codigo_erp,
+        ativo: forma.ativo ?? true,
+        updated_at: new Date().toISOString()
+      };
+
+      let formaId: string;
+      if (existente) {
+        await supabase
+          .from('formas_pagamento_fornecedor')
+          .update(formaData)
+          .eq('id', existente.id);
+        formaId = existente.id;
+      } else {
+        const { data: inserted } = await supabase
+          .from('formas_pagamento_fornecedor')
+          .insert({
+            ...formaData,
+            fornecedor_global_id: fornecedorGlobalId
+          })
+          .select('id')
+          .single();
+        formaId = inserted.id;
+      }
+      
+      // Mapear codigo_erp -> id para vincular prazos
+      formaIdMap[forma.codigo_erp] = formaId;
+      formasProcessadas++;
+    } catch (e: any) {
+      erros.push({ tipo: 'forma', codigo_erp: forma.codigo_erp, erro: e.message });
+    }
+  }
+
+  // Depois, processar prazos de pagamento
+  for (const prazo of prazos || []) {
+    try {
+      if (!prazo.codigo_erp || !prazo.nome || !prazo.forma_codigo_erp) {
+        erros.push({ tipo: 'prazo', codigo_erp: prazo.codigo_erp, erro: 'codigo_erp, nome e forma_codigo_erp são obrigatórios' });
+        continue;
+      }
+
+      // Buscar a forma de pagamento pelo codigo_erp
+      let formaId = formaIdMap[prazo.forma_codigo_erp];
+      if (!formaId) {
+        const { data: formaExistente } = await supabase
+          .from('formas_pagamento_fornecedor')
+          .select('id')
+          .eq('fornecedor_global_id', fornecedorGlobalId)
+          .eq('codigo_erp', prazo.forma_codigo_erp)
+          .single();
+        
+        if (!formaExistente) {
+          erros.push({ tipo: 'prazo', codigo_erp: prazo.codigo_erp, erro: `Forma de pagamento ${prazo.forma_codigo_erp} não encontrada` });
+          continue;
+        }
+        formaId = formaExistente.id;
+      }
+
+      // Verificar se prazo existe pelo codigo_erp
+      const { data: existente } = await supabase
+        .from('prazos_pagamento_fornecedor')
+        .select('id')
+        .eq('fornecedor_global_id', fornecedorGlobalId)
+        .eq('codigo_erp', prazo.codigo_erp)
+        .single();
+
+      // Converter dias para array se necessário
+      const diasParcelas = Array.isArray(prazo.dias_parcelas) 
+        ? prazo.dias_parcelas 
+        : [prazo.dias || 0];
+
+      const prazoData = {
+        nome: prazo.nome,
+        forma_pagamento_id: formaId,
+        dias_parcelas: diasParcelas,
+        quantidade_parcelas: prazo.quantidade_parcelas || diasParcelas.length,
+        codigo_erp: prazo.codigo_erp,
+        padrao: prazo.padrao ?? false,
+        ativo: prazo.ativo ?? true,
+        updated_at: new Date().toISOString()
+      };
+
+      if (existente) {
+        await supabase
+          .from('prazos_pagamento_fornecedor')
+          .update(prazoData)
+          .eq('id', existente.id);
+      } else {
+        await supabase
+          .from('prazos_pagamento_fornecedor')
+          .insert({
+            ...prazoData,
+            fornecedor_global_id: fornecedorGlobalId
+          });
+      }
+      prazosProcessados++;
+    } catch (e: any) {
+      erros.push({ tipo: 'prazo', codigo_erp: prazo.codigo_erp, erro: e.message });
+    }
+  }
+
+  const totalEnviados = (formas?.length || 0) + (prazos?.length || 0);
+  const totalProcessados = formasProcessadas + prazosProcessados;
+
+  await registrarLog(
+    supabase, fornecedorGlobalId, 'formas_pagamento', 'erp_para_cloud',
+    totalEnviados, totalProcessados, erros.length, erros, 
+    { acao: 'sync_formas_pagamento', formas: formasProcessadas, prazos: prazosProcessados }
+  );
+
+  return { 
+    formas_processadas: formasProcessadas, 
+    prazos_processados: prazosProcessados, 
+    erros: erros.length, 
+    detalhes: erros 
+  };
+}
+
 // Ação: registrar_erro_pedido
 async function registrarErroPedido(supabase: any, fornecedorGlobalId: string, pedidoId: string, errorMessage: string) {
   // Validar que o pedido pertence ao fornecedor
@@ -618,6 +761,17 @@ serve(async (req) => {
         resultado = await syncVendedores(supabase, fornecedorGlobalId, dados.vendedores);
         break;
 
+      case 'sync_formas_pagamento':
+        if (!dados.formas && !dados.prazos) {
+          throw new Error('Pelo menos um campo "formas" ou "prazos" deve ser fornecido');
+        }
+        resultado = await syncFormasPagamento(
+          supabase, fornecedorGlobalId, 
+          dados.formas || [], 
+          dados.prazos || []
+        );
+        break;
+
       case 'registrar_erro_pedido':
         if (!dados.pedido_id || !dados.error_message) {
           throw new Error('Campos "pedido_id" e "error_message" são obrigatórios');
@@ -626,7 +780,7 @@ serve(async (req) => {
         break;
 
       default:
-        throw new Error(`Ação desconhecida: ${acao}. Ações válidas: sync_produtos, sync_clientes, sync_credito, sync_vendedores, buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido`);
+        throw new Error(`Ação desconhecida: ${acao}. Ações válidas: sync_produtos, sync_clientes, sync_credito, sync_vendedores, sync_formas_pagamento, buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido`);
     }
 
     return new Response(
