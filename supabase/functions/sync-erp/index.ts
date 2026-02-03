@@ -416,6 +416,67 @@ async function confirmarNfe(supabase: any, fornecedorGlobalId: string, pedidoId:
   return { success: true, pedido_id: pedidoId, novo_status: 'faturado', numero_nfe: numeroNfe };
 }
 
+// Ação: sync_vendedores
+async function syncVendedores(supabase: any, fornecedorGlobalId: string, vendedores: any[]) {
+  let processados = 0;
+  let erros: any[] = [];
+
+  for (const vendedor of vendedores) {
+    try {
+      // Validação de campos obrigatórios
+      if (!vendedor.codigo_erp || !vendedor.nome) {
+        erros.push({ codigo_erp: vendedor.codigo_erp, erro: 'codigo_erp e nome são obrigatórios' });
+        continue;
+      }
+
+      // Verificar se vendedor existe pelo codigo_vendedor
+      const { data: existente } = await supabase
+        .from('vendedores_fornecedor')
+        .select('id, user_id')
+        .eq('fornecedor_global_id', fornecedorGlobalId)
+        .eq('codigo_vendedor', vendedor.codigo_erp)
+        .single();
+
+      const vendedorData = {
+        nome: vendedor.nome,
+        email: vendedor.email,
+        telefone: vendedor.telefone,
+        regiao: vendedor.regiao,
+        observacoes: vendedor.observacoes,
+        ativo: vendedor.ativo ?? true,
+        updated_at: new Date().toISOString()
+      };
+
+      if (existente) {
+        // UPDATE - mantém user_id intacto para não quebrar login vinculado
+        await supabase
+          .from('vendedores_fornecedor')
+          .update(vendedorData)
+          .eq('id', existente.id);
+      } else {
+        // INSERT
+        await supabase
+          .from('vendedores_fornecedor')
+          .insert({
+            ...vendedorData,
+            fornecedor_global_id: fornecedorGlobalId,
+            codigo_vendedor: vendedor.codigo_erp
+          });
+      }
+      processados++;
+    } catch (e: any) {
+      erros.push({ codigo_erp: vendedor.codigo_erp, erro: e.message });
+    }
+  }
+
+  await registrarLog(
+    supabase, fornecedorGlobalId, 'vendedores', 'erp_para_cloud',
+    vendedores.length, processados, erros.length, erros, { acao: 'sync_vendedores' }
+  );
+
+  return { processados, erros: erros.length, detalhes: erros };
+}
+
 // Ação: registrar_erro_pedido
 async function registrarErroPedido(supabase: any, fornecedorGlobalId: string, pedidoId: string, errorMessage: string) {
   // Validar que o pedido pertence ao fornecedor
@@ -550,6 +611,13 @@ serve(async (req) => {
         );
         break;
 
+      case 'sync_vendedores':
+        if (!dados.vendedores || !Array.isArray(dados.vendedores)) {
+          throw new Error('Campo "vendedores" deve ser um array');
+        }
+        resultado = await syncVendedores(supabase, fornecedorGlobalId, dados.vendedores);
+        break;
+
       case 'registrar_erro_pedido':
         if (!dados.pedido_id || !dados.error_message) {
           throw new Error('Campos "pedido_id" e "error_message" são obrigatórios');
@@ -558,7 +626,7 @@ serve(async (req) => {
         break;
 
       default:
-        throw new Error(`Ação desconhecida: ${acao}. Ações válidas: sync_produtos, sync_clientes, sync_credito, buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido`);
+        throw new Error(`Ação desconhecida: ${acao}. Ações válidas: sync_produtos, sync_clientes, sync_credito, sync_vendedores, buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido`);
     }
 
     return new Response(
