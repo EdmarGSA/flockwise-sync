@@ -67,6 +67,7 @@ curl -X POST \
 | `sync_clientes` | ERP → Cloud | Sincroniza cadastro de clientes |
 | `sync_credito` | ERP → Cloud | Atualiza limite/saldo de crédito |
 | `sync_vendedores` | ERP → Cloud | Sincroniza equipe de vendedores |
+| `sync_formas_pagamento` | ERP → Cloud | Sincroniza formas e prazos de pagamento |
 | `buscar_pedidos` | Cloud → ERP | Lista pedidos para importação |
 | `confirmar_pedido_erp` | ERP → Cloud | Confirma importação do pedido |
 | `atualizar_status` | ERP → Cloud | Atualiza status do pedido |
@@ -280,7 +281,96 @@ Sincroniza equipe de vendedores entre ERP e Cloud. O vínculo de login (user_id)
 
 ---
 
-## 5. Buscar Pedidos (`buscar_pedidos`)
+## 5. Sincronizar Formas de Pagamento (`sync_formas_pagamento`)
+
+Sincroniza formas e prazos de pagamento entre ERP e Cloud. Os prazos são vinculados às formas de pagamento.
+
+### Requisição
+
+```json
+{
+  "acao": "sync_formas_pagamento",
+  "formas": [
+    {
+      "codigo_erp": "BOL",
+      "nome": "Boleto Bancário",
+      "ativo": true
+    },
+    {
+      "codigo_erp": "PIX",
+      "nome": "PIX",
+      "ativo": true
+    }
+  ],
+  "prazos": [
+    {
+      "codigo_erp": "BOL-7-14-21",
+      "nome": "Boleto 7/14/21 dias",
+      "forma_codigo_erp": "BOL",
+      "dias_parcelas": [7, 14, 21],
+      "quantidade_parcelas": 3,
+      "padrao": true,
+      "ativo": true
+    },
+    {
+      "codigo_erp": "PIX-AV",
+      "nome": "PIX à Vista",
+      "forma_codigo_erp": "PIX",
+      "dias_parcelas": [0],
+      "quantidade_parcelas": 1,
+      "padrao": false,
+      "ativo": true
+    }
+  ]
+}
+```
+
+### Campos da Forma de Pagamento
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `codigo_erp` | string | ✅ | Código único no ERP local |
+| `nome` | string | ✅ | Nome da forma de pagamento |
+| `codigo` | string | ❌ | Código interno (usa codigo_erp se não informado) |
+| `ativo` | boolean | ❌ | Status ativo/inativo (default: true) |
+
+### Campos do Prazo de Pagamento
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `codigo_erp` | string | ✅ | Código único no ERP local |
+| `nome` | string | ✅ | Nome do prazo de pagamento |
+| `forma_codigo_erp` | string | ✅ | Código da forma de pagamento vinculada |
+| `dias_parcelas` | array | ✅ | Array com dias de cada parcela [7, 14, 21] |
+| `quantidade_parcelas` | number | ❌ | Quantidade de parcelas (default: tamanho do array) |
+| `padrao` | boolean | ❌ | Se é o prazo padrão desta forma (default: false) |
+| `ativo` | boolean | ❌ | Status ativo/inativo (default: true) |
+
+### Resposta de Sucesso
+
+```json
+{
+  "success": true,
+  "acao": "sync_formas_pagamento",
+  "formas_processadas": 2,
+  "prazos_processados": 2,
+  "erros": 0,
+  "detalhes": []
+}
+```
+
+### Comportamento
+
+- Formas e prazos são identificados pelo `codigo_erp`
+- Se não existir, será criado automaticamente
+- Se já existir, apenas os campos enviados são atualizados
+- Prazos são vinculados à forma pelo `forma_codigo_erp`
+- Pode enviar apenas formas, apenas prazos, ou ambos
+- Formas devem ser enviadas antes dos prazos na mesma requisição
+
+---
+
+## 6. Buscar Pedidos (`buscar_pedidos`)
 
 Retorna lista de pedidos para importação no ERP.
 
@@ -360,7 +450,7 @@ Retorna lista de pedidos para importação no ERP.
 
 ---
 
-## 6. Confirmar Pedido no ERP (`confirmar_pedido_erp`)
+## 7. Confirmar Pedido no ERP (`confirmar_pedido_erp`)
 
 Marca o pedido como exportado/importado no ERP.
 
@@ -397,7 +487,7 @@ Marca o pedido como exportado/importado no ERP.
 
 ---
 
-## 7. Atualizar Status (`atualizar_status`)
+## 8. Atualizar Status (`atualizar_status`)
 
 Atualiza o status do pedido conforme progresso no ERP.
 
@@ -438,7 +528,7 @@ pendente → exportado → aprovado → separado → faturado → entregue
 
 ---
 
-## 8. Confirmar NF-e (`confirmar_nfe`)
+## 9. Confirmar NF-e (`confirmar_nfe`)
 
 Registra a emissão da Nota Fiscal Eletrônica.
 
@@ -479,7 +569,7 @@ Registra a emissão da Nota Fiscal Eletrônica.
 
 ---
 
-## 9. Registrar Erro (`registrar_erro_pedido`)
+## 10. Registrar Erro (`registrar_erro_pedido`)
 
 Registra um erro no processamento do pedido. **O vendedor verá esta mensagem imediatamente no PWA.**
 
