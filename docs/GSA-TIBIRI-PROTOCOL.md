@@ -66,6 +66,7 @@ curl -X POST \
 | `sync_produtos` | ERP → Cloud | Sincroniza catálogo de produtos |
 | `sync_clientes` | ERP → Cloud | Sincroniza cadastro de clientes |
 | `sync_credito` | ERP → Cloud | Atualiza limite/saldo de crédito |
+| `sync_vendedores` | ERP → Cloud | Sincroniza equipe de vendedores |
 | `buscar_pedidos` | Cloud → ERP | Lista pedidos para importação |
 | `confirmar_pedido_erp` | ERP → Cloud | Confirma importação do pedido |
 | `atualizar_status` | ERP → Cloud | Atualiza status do pedido |
@@ -214,7 +215,72 @@ Atualiza limite e saldo de crédito dos clientes.
 
 ---
 
-## 4. Buscar Pedidos (`buscar_pedidos`)
+## 4. Sincronizar Vendedores (`sync_vendedores`)
+
+Sincroniza equipe de vendedores entre ERP e Cloud. O vínculo de login (user_id) é preservado durante atualizações.
+
+### Requisição
+
+```json
+{
+  "acao": "sync_vendedores",
+  "vendedores": [
+    {
+      "codigo_erp": "VEND001",
+      "nome": "Carlos Silva",
+      "email": "carlos@empresa.com",
+      "telefone": "(11) 99999-8888",
+      "regiao": "Sul",
+      "observacoes": "Vendedor sênior",
+      "ativo": true
+    },
+    {
+      "codigo_erp": "VEND002",
+      "nome": "Maria Santos",
+      "email": "maria@empresa.com",
+      "telefone": "(11) 88888-7777",
+      "regiao": "Norte",
+      "ativo": true
+    }
+  ]
+}
+```
+
+### Campos do Vendedor
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `codigo_erp` | string | ✅ | Código único no ERP local |
+| `nome` | string | ✅ | Nome completo do vendedor |
+| `email` | string | ❌ | E-mail de contato |
+| `telefone` | string | ❌ | Telefone de contato |
+| `regiao` | string | ❌ | Região de atuação |
+| `observacoes` | string | ❌ | Notas adicionais |
+| `ativo` | boolean | ❌ | Status ativo/inativo (default: true) |
+
+### Resposta de Sucesso
+
+```json
+{
+  "success": true,
+  "acao": "sync_vendedores",
+  "processados": 2,
+  "erros": 0,
+  "detalhes": []
+}
+```
+
+### Comportamento
+
+- Vendedores são identificados pelo `codigo_erp` (campo `codigo_vendedor` no Cloud)
+- Se o vendedor não existir, será criado automaticamente
+- Se já existir, apenas os campos enviados são atualizados
+- O campo `user_id` (vínculo de login) é preservado durante updates
+- Para desativar um vendedor, envie `ativo: false`
+
+---
+
+## 5. Buscar Pedidos (`buscar_pedidos`)
 
 Retorna lista de pedidos para importação no ERP.
 
@@ -294,7 +360,7 @@ Retorna lista de pedidos para importação no ERP.
 
 ---
 
-## 5. Confirmar Pedido no ERP (`confirmar_pedido_erp`)
+## 6. Confirmar Pedido no ERP (`confirmar_pedido_erp`)
 
 Marca o pedido como exportado/importado no ERP.
 
@@ -331,7 +397,7 @@ Marca o pedido como exportado/importado no ERP.
 
 ---
 
-## 6. Atualizar Status (`atualizar_status`)
+## 7. Atualizar Status (`atualizar_status`)
 
 Atualiza o status do pedido conforme progresso no ERP.
 
@@ -372,7 +438,7 @@ pendente → exportado → aprovado → separado → faturado → entregue
 
 ---
 
-## 7. Confirmar NF-e (`confirmar_nfe`)
+## 8. Confirmar NF-e (`confirmar_nfe`)
 
 Registra a emissão da Nota Fiscal Eletrônica.
 
@@ -413,7 +479,7 @@ Registra a emissão da Nota Fiscal Eletrônica.
 
 ---
 
-## 8. Registrar Erro (`registrar_erro_pedido`)
+## 9. Registrar Erro (`registrar_erro_pedido`)
 
 Registra um erro no processamento do pedido. **O vendedor verá esta mensagem imediatamente no PWA.**
 
