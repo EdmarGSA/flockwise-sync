@@ -58,6 +58,7 @@ const formSchema = z.object({
   limite_credito: z.number().min(0).default(0),
   observacoes: z.string().optional(),
   ativo: z.boolean().default(true),
+  vendedor_fornecedor_id: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -65,6 +66,7 @@ type FormValues = z.infer<typeof formSchema>;
 export interface ClienteFornecedor {
   id: string;
   fornecedor_global_id: string;
+  vendedor_fornecedor_id: string | null;
   tipo_pessoa: string;
   cpf_cnpj: string;
   razao_social_nome: string;
@@ -89,12 +91,18 @@ export interface ClienteFornecedor {
   updated_at: string;
 }
 
+export interface VendedorOption {
+  id: string;
+  nome: string;
+}
+
 interface ClienteFornecedorFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cliente?: ClienteFornecedor | null;
   fornecedorGlobalId: string;
   onSuccess: () => void;
+  vendedores?: VendedorOption[];
 }
 
 export function ClienteFornecedorForm({
@@ -103,6 +111,7 @@ export function ClienteFornecedorForm({
   cliente,
   fornecedorGlobalId,
   onSuccess,
+  vendedores = [],
 }: ClienteFornecedorFormProps) {
   const [loading, setLoading] = useState(false);
   const [searchingCep, setSearchingCep] = useState(false);
@@ -130,6 +139,7 @@ export function ClienteFornecedorForm({
       limite_credito: 0,
       observacoes: '',
       ativo: true,
+      vendedor_fornecedor_id: null,
     },
   });
 
@@ -154,6 +164,7 @@ export function ClienteFornecedorForm({
         limite_credito: cliente.limite_credito || 0,
         observacoes: cliente.observacoes || '',
         ativo: cliente.ativo,
+        vendedor_fornecedor_id: cliente.vendedor_fornecedor_id || null,
       });
     } else {
       form.reset({
@@ -175,6 +186,7 @@ export function ClienteFornecedorForm({
         limite_credito: 0,
         observacoes: '',
         ativo: true,
+        vendedor_fornecedor_id: null,
       });
     }
   }, [cliente, open, form]);
@@ -298,6 +310,7 @@ export function ClienteFornecedorForm({
         limite_credito: data.limite_credito || 0,
         observacoes: data.observacoes || null,
         ativo: data.ativo,
+        vendedor_fornecedor_id: data.vendedor_fornecedor_id || null,
       };
 
       if (isEditing && cliente) {
@@ -653,6 +666,36 @@ export function ClienteFornecedorForm({
                 </FormItem>
               )}
             />
+
+            {/* Vendedor Responsável */}
+            {vendedores.length > 0 && (
+              <FormField
+                control={form.control}
+                name="vendedor_fornecedor_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vendedor Responsável</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
+                      value={field.value || 'none'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos (não atribuído)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Todos (não atribuído)</SelectItem>
+                        {vendedores.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Observações */}
             <FormField

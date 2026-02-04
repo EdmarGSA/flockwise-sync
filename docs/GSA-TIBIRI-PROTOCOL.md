@@ -144,7 +144,8 @@ Sincroniza cadastro de clientes entre ERP e Cloud.
       "razao_social": "Fazenda Boa Vista Ltda",
       "cpf_cnpj": "12345678000199",
       "email": "contato@boavista.com",
-      "telefone": "(11) 99999-8888"
+      "telefone": "(11) 99999-8888",
+      "vendedor_codigo_erp": "VEND001"
     }
   ]
 }
@@ -156,19 +157,37 @@ Sincroniza cadastro de clientes entre ERP e Cloud.
 |-------|------|-------------|-----------|
 | `codigo_erp` | string | ✅ | Código único no ERP local |
 | `razao_social` | string | ❌ | Razão social ou nome |
-| `cpf_cnpj` | string | ❌ | CPF ou CNPJ (apenas números) |
+| `cpf_cnpj` | string | ✅ | CPF ou CNPJ (apenas números) |
 | `email` | string | ❌ | E-mail de contato |
 | `telefone` | string | ❌ | Telefone de contato |
+| `vendedor_codigo_erp` | string | ❌ | Código do vendedor responsável (vincula automaticamente) |
+| `limite_credito` | number | ❌ | Limite de crédito do cliente |
+| `saldo_credito` | number | ❌ | Saldo de crédito disponível |
+| `endereco.logradouro` | string | ❌ | Endereço - logradouro |
+| `endereco.numero` | string | ❌ | Endereço - número |
+| `endereco.bairro` | string | ❌ | Endereço - bairro |
+| `endereco.cidade` | string | ❌ | Endereço - cidade |
+| `endereco.estado` | string | ❌ | Endereço - UF |
+| `endereco.cep` | string | ❌ | Endereço - CEP |
 
 ### Resposta de Sucesso
 
 ```json
 {
   "success": true,
-  "updated": 1,
-  "message": "1 clientes atualizados"
+  "acao": "sync_clientes",
+  "processados": 1,
+  "erros": 0,
+  "detalhes": []
 }
 ```
+
+### Comportamento
+
+- Clientes são identificados pelo `codigo_erp`
+- Se `vendedor_codigo_erp` for informado, o cliente será vinculado ao vendedor correspondente
+- Vendedores são vinculados apenas se o `codigo_vendedor` existir na tabela `vendedores_fornecedor`
+- Clientes sem `vendedor_codigo_erp` ficam disponíveis para todos os vendedores
 
 ---
 

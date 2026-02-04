@@ -19,6 +19,7 @@ export const useVendedorFornecedor = () => {
   const { user } = useAuth();
   const [vendedor, setVendedor] = useState<VendedorFornecedor | null>(null);
   const [isVendedor, setIsVendedor] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fornecedorGlobalId, setFornecedorGlobalId] = useState<string | null>(null);
 
@@ -39,6 +40,16 @@ export const useVendedorFornecedor = () => {
       if (profile?.fornecedor_global_id) {
         setFornecedorGlobalId(profile.fornecedor_global_id);
         
+        // Verificar se o user_id é o dono do fornecedor_global (tabela fornecedores_globais)
+        const { data: fornecedorData } = await supabase
+          .from('fornecedores_globais')
+          .select('user_id')
+          .eq('id', profile.fornecedor_global_id)
+          .single();
+
+        const userIsOwner = fornecedorData?.user_id === user.id;
+        setIsOwner(userIsOwner);
+        
         // Buscar vendedor vinculado ao user_id
         const { data: vendedorData } = await supabase
           .from('vendedores_fornecedor')
@@ -50,8 +61,8 @@ export const useVendedorFornecedor = () => {
         if (vendedorData) {
           setVendedor(vendedorData as VendedorFornecedor);
           setIsVendedor(true);
-        } else {
-          // Se não tem vendedor específico, usuário é o próprio fornecedor
+        } else if (userIsOwner) {
+          // Se é o dono e não tem vendedor, ainda é "vendedor" (com acesso total)
           setIsVendedor(true);
         }
       }
@@ -69,8 +80,10 @@ export const useVendedorFornecedor = () => {
   return {
     vendedor,
     isVendedor,
+    isOwner,
     loading,
     fornecedorGlobalId,
+    vendedorId: vendedor?.id || null,
     refetch: fetchVendedor
   };
 };

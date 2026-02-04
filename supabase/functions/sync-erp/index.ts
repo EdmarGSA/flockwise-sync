@@ -154,6 +154,21 @@ async function syncClientes(supabase: any, fornecedorGlobalId: string, clientes:
         .eq('codigo_erp', cliente.codigo_erp)
         .single();
 
+      // Buscar vendedor pelo codigo_erp se fornecido
+      let vendedorId: string | null = null;
+      if (cliente.vendedor_codigo_erp) {
+        const { data: vendedor } = await supabase
+          .from('vendedores_fornecedor')
+          .select('id')
+          .eq('fornecedor_global_id', fornecedorGlobalId)
+          .eq('codigo_vendedor', cliente.vendedor_codigo_erp)
+          .single();
+        
+        if (vendedor) {
+          vendedorId = vendedor.id;
+        }
+      }
+
       const clienteData = {
         razao_social_nome: cliente.razao_social || cliente.nome,
         cpf_cnpj: cliente.cpf_cnpj.replace(/\D/g, ''),
@@ -169,6 +184,7 @@ async function syncClientes(supabase: any, fornecedorGlobalId: string, clientes:
         cep: cliente.endereco?.cep,
         limite_credito: cliente.limite_credito,
         saldo_credito: cliente.saldo_credito,
+        vendedor_fornecedor_id: vendedorId,
         ativo: cliente.ativo ?? true,
         updated_at: new Date().toISOString()
       };
