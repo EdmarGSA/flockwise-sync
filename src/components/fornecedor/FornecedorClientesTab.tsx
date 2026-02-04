@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, UserCheck, UserX, Phone, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, Edit, Trash2, UserCheck, UserX, Phone, Mail, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ClienteFornecedorForm, ClienteFornecedor } from './ClienteFornecedorForm';
+import { ClienteFornecedorForm, ClienteFornecedor, VendedorOption } from './ClienteFornecedorForm';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FornecedorClientesTabProps {
@@ -44,6 +44,29 @@ export function FornecedorClientesTab({
   const [selectedCliente, setSelectedCliente] = useState<ClienteFornecedor | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<ClienteFornecedor | null>(null);
+  const [vendedores, setVendedores] = useState<VendedorOption[]>([]);
+  const [vendedoresMap, setVendedoresMap] = useState<Map<string, string>>(new Map());
+
+  // Carregar vendedores do fornecedor
+  useEffect(() => {
+    const fetchVendedores = async () => {
+      if (!fornecedorGlobalId) return;
+      
+      const { data } = await supabase
+        .from('vendedores_fornecedor')
+        .select('id, nome')
+        .eq('fornecedor_global_id', fornecedorGlobalId)
+        .eq('ativo', true)
+        .order('nome');
+
+      if (data) {
+        setVendedores(data);
+        setVendedoresMap(new Map(data.map(v => [v.id, v.nome])));
+      }
+    };
+
+    fetchVendedores();
+  }, [fornecedorGlobalId]);
 
   const filteredClientes = clientes.filter((c) => {
     const matchesSearch = 
@@ -157,7 +180,7 @@ export function FornecedorClientesTab({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Clientes Ativos</p>
-              <p className="text-2xl font-bold text-green-600">{clientesAtivos}</p>
+              <p className="text-2xl font-bold text-primary">{clientesAtivos}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Limite Total</p>
@@ -182,6 +205,7 @@ export function FornecedorClientesTab({
                     <TableHead>Cliente</TableHead>
                     <TableHead>CPF/CNPJ</TableHead>
                     <TableHead>Contato</TableHead>
+                    <TableHead>Vendedor</TableHead>
                     <TableHead>Cidade/UF</TableHead>
                     <TableHead className="text-right">Limite</TableHead>
                     <TableHead className="text-center">Status</TableHead>
@@ -215,6 +239,16 @@ export function FornecedorClientesTab({
                             </span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {cliente.vendedor_fornecedor_id ? (
+                          <Badge variant="outline" className="gap-1">
+                            <User className="h-3 w-3" />
+                            {vendedoresMap.get(cliente.vendedor_fornecedor_id) || 'Vendedor'}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Todos</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {cliente.cidade && cliente.estado 
@@ -270,6 +304,7 @@ export function FornecedorClientesTab({
         cliente={selectedCliente}
         fornecedorGlobalId={fornecedorGlobalId}
         onSuccess={onRefresh}
+        vendedores={vendedores}
       />
 
       {/* Delete Confirmation */}

@@ -70,6 +70,7 @@ export interface DashboardStats {
 export interface ClienteFornecedor {
   id: string;
   fornecedor_global_id: string;
+  vendedor_fornecedor_id: string | null;
   tipo_pessoa: string;
   cpf_cnpj: string;
   razao_social_nome: string;
@@ -426,13 +427,19 @@ export const useFornecedorData = () => {
     return { error };
   }, []);
 
-  // Fetch supplier's own clients (virtual)
-  const fetchMeusClientes = useCallback(async (globalId: string) => {
-    const { data, error } = await supabase
+  // Fetch supplier's own clients (virtual) - filtered by salesperson if applicable
+  const fetchMeusClientes = useCallback(async (globalId: string, vendedorId?: string | null, isOwner?: boolean) => {
+    let query = supabase
       .from('clientes_fornecedor')
       .select('*')
-      .eq('fornecedor_global_id', globalId)
-      .order('razao_social_nome');
+      .eq('fornecedor_global_id', globalId);
+
+    // Se é vendedor (não é dono), filtrar apenas clientes atribuídos ou sem atribuição
+    if (vendedorId && !isOwner) {
+      query = query.or(`vendedor_fornecedor_id.eq.${vendedorId},vendedor_fornecedor_id.is.null`);
+    }
+
+    const { data, error } = await query.order('razao_social_nome');
 
     if (error) {
       console.error('Error fetching clientes_fornecedor:', error);

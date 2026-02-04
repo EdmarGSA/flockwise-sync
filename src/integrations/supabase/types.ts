@@ -297,6 +297,7 @@ export type Database = {
           telefone: string | null
           tipo_pessoa: string
           updated_at: string
+          vendedor_fornecedor_id: string | null
         }
         Insert: {
           ativo?: boolean
@@ -324,6 +325,7 @@ export type Database = {
           telefone?: string | null
           tipo_pessoa?: string
           updated_at?: string
+          vendedor_fornecedor_id?: string | null
         }
         Update: {
           ativo?: boolean
@@ -351,6 +353,7 @@ export type Database = {
           telefone?: string | null
           tipo_pessoa?: string
           updated_at?: string
+          vendedor_fornecedor_id?: string | null
         }
         Relationships: [
           {
@@ -358,6 +361,13 @@ export type Database = {
             columns: ["fornecedor_global_id"]
             isOneToOne: false
             referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_fornecedor_vendedor_fornecedor_id_fkey"
+            columns: ["vendedor_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores_fornecedor"
             referencedColumns: ["id"]
           },
         ]
