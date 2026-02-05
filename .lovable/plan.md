@@ -1,210 +1,218 @@
 
-# Plano: Filtro de Clientes por Vendedor
+# Plano: Swagger UI Interativo para API sync-erp
 
 ## Resumo
 
-Implementar a funcionalidade que permite cada vendedor visualizar apenas sua carteira de clientes atribuida, garantindo isolamento de dados entre vendedores do mesmo fornecedor.
+Criar uma Edge Function dedicada (`sync-erp-docs`) que serve documentacao OpenAPI 3.0 interativa via Swagger UI, permitindo que desenvolvedores testem a API GSA Tibiri diretamente no navegador.
 
 ## Contexto Atual
 
-### Estrutura Existente
+### Situacao Existente
 
-```text
-+-----------------------------+      +-----------------------------+
-|   clientes_fornecedor       |      |   vendedores_fornecedor     |
-+-----------------------------+      +-----------------------------+
-| id                          |      | id                          |
-| fornecedor_global_id (FK)   |      | fornecedor_global_id (FK)   |
-| razao_social_nome           |      | nome                        |
-| cpf_cnpj                    |      | email                       |
-| saldo_credito               |      | user_id (auth.users)        |
-| ...                         |      | ...                         |
-|                             |      |                             |
-| [SEM VINCULO VENDEDOR!]     |      +-----------------------------+
-+-----------------------------+
-```
+| Item | Status |
+|------|--------|
+| API sync-erp | 10 acoes implementadas e funcionais |
+| Documentacao Markdown | docs/GSA-TIBIRI-PROTOCOL.md (completa) |
+| Swagger UI | Nao implementado |
 
-### Comportamento Atual
-- Todos os clientes sao vistos por todos os usuarios do fornecedor
-- O vendedor e registrado no pedido (vendedor_fornecedor_id em pedidos_catalogo_fornecedor)
-- Nao ha filtragem de clientes por vendedor no carrinho ou listagem
+### Problema
+
+Desenvolvedores precisam implementar integracoes ERP sem uma interface interativa para testar as chamadas. Atualmente dependem apenas de documentacao estatica e ferramentas externas como Postman.
 
 ## Arquitetura Proposta
 
-### Novo Modelo de Dados
-
 ```text
-+-----------------------------+
-|   clientes_fornecedor       |
-+-----------------------------+
-| id                          |
-| fornecedor_global_id (FK)   |
-| vendedor_fornecedor_id (FK) | <-- NOVO CAMPO
-| razao_social_nome           |
-| ...                         |
-+-----------------------------+
-         |
-         v
-+-----------------------------+
-|   vendedores_fornecedor     |
-+-----------------------------+
-| id                          |
-| fornecedor_global_id (FK)   |
-| user_id (auth.users)        |
-| ...                         |
-+-----------------------------+
++-------------------+         +----------------------+
+|   Navegador       |         |   sync-erp-docs      |
+|                   |         |   (Edge Function)    |
++-------------------+         +----------------------+
+        |                              |
+        |  GET /sync-erp-docs          |
+        |----------------------------->|
+        |                              |
+        |  HTML + Swagger UI           |
+        |<-----------------------------|
+        |                              |
+        |  Teste via UI                |
+        |  POST /sync-erp              |
+        |----------------------------->|
 ```
 
 ## Etapas de Implementacao
 
-### 1. Migracao de Banco de Dados
+### 1. Criar Edge Function sync-erp-docs
 
-Adicionar coluna vendedor_fornecedor_id na tabela clientes_fornecedor:
+Nova funcao que serve:
+- Rota `/` (GET): Swagger UI HTML
+- Rota `/openapi.json` (GET): Especificacao OpenAPI 3.0
 
-| Coluna | Tipo | Nullable | Descricao |
-|--------|------|----------|-----------|
-| vendedor_fornecedor_id | UUID | Sim | FK para vendedores_fornecedor |
+| Arquivo | Descricao |
+|---------|-----------|
+| supabase/functions/sync-erp-docs/index.ts | Edge function com HTML inline |
 
-### 2. Atualizar Hook useFornecedorData
+### 2. Especificacao OpenAPI 3.0
 
-| Funcao | Modificacao |
-|--------|-------------|
-| fetchMeusClientes | Adicionar filtro por vendedor_fornecedor_id quando usuario e vendedor |
+Documentar todas as 10 acoes com schemas detalhados:
 
-Logica de filtragem:
-- Se usuario e proprietario do fornecedor (sem vendedor vinculado): ver todos os clientes
-- Se usuario e vendedor: ver apenas clientes onde vendedor_fornecedor_id = seu ID OU vendedor_fornecedor_id IS NULL
+| Acao | Metodo | Descricao |
+|------|--------|-----------|
+| sync_produtos | POST | Sincroniza catalogo de produtos |
+| sync_clientes | POST | Sincroniza cadastro de clientes |
+| sync_credito | POST | Atualiza limite/saldo de credito |
+| sync_vendedores | POST | Sincroniza equipe de vendedores |
+| sync_formas_pagamento | POST | Sincroniza formas e prazos |
+| buscar_pedidos | POST | Lista pedidos para importacao |
+| confirmar_pedido_erp | POST | Confirma importacao do pedido |
+| atualizar_status | POST | Atualiza status do pedido |
+| confirmar_nfe | POST | Registra NF-e emitida |
+| registrar_erro_pedido | POST | Registra erro no pedido |
 
-### 3. Atualizar Formulario de Cliente
+### 3. Configurar Acesso Publico
 
-| Componente | Modificacao |
-|------------|-------------|
-| ClienteFornecedorForm.tsx | Adicionar campo Select para escolher vendedor responsavel |
-| FornecedorClientesTab.tsx | Exibir coluna Vendedor na tabela |
+Adicionar no config.toml:
 
-### 4. Atualizar Hook useVendedorFornecedor
-
-| Modificacao | Descricao |
-|-------------|-----------|
-| Retornar vendedor.id | Para usar como filtro nas queries |
-| isOwner flag | Identificar se usuario e dono do fornecedor (ve tudo) |
-
-### 5. Atualizar Componentes de Vendas
-
-| Componente | Modificacao |
-|------------|-------------|
-| CarrinhoDrawer.tsx | Receber lista de clientes ja filtrada |
-| VendasTab.tsx | Passar clientes filtrados para o carrinho |
-
-### 6. Atualizar API sync-erp
-
-Adicionar campo vendedor_codigo_erp na acao sync_clientes para permitir vinculacao automatica via ERP.
-
-## Arquivos a Modificar
-
-| Arquivo | Tipo de Alteracao |
-|---------|-------------------|
-| Database Migration | Adicionar coluna vendedor_fornecedor_id |
-| src/hooks/useFornecedorData.tsx | Filtrar clientes por vendedor |
-| src/hooks/useVendedorFornecedor.tsx | Adicionar flag isOwner |
-| src/components/fornecedor/ClienteFornecedorForm.tsx | Adicionar campo de selecao de vendedor |
-| src/components/fornecedor/FornecedorClientesTab.tsx | Exibir vendedor na tabela, filtrar por vendedor |
-| src/components/fornecedor/vendas/CarrinhoDrawer.tsx | Receber clientes filtrados |
-| supabase/functions/sync-erp/index.ts | Suportar vendedor_codigo_erp em sync_clientes |
+```toml
+[functions.sync-erp-docs]
+verify_jwt = false
+```
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
-
-```sql
--- Adicionar coluna para vincular cliente ao vendedor
-ALTER TABLE clientes_fornecedor
-ADD COLUMN vendedor_fornecedor_id UUID REFERENCES vendedores_fornecedor(id);
-
--- Indice para performance
-CREATE INDEX idx_clientes_fornecedor_vendedor 
-ON clientes_fornecedor(vendedor_fornecedor_id);
-```
-
-### Logica de Filtragem no Hook
+### Estrutura da Edge Function
 
 ```typescript
-// Em fetchMeusClientes
-const fetchMeusClientes = useCallback(async (globalId: string, vendedorId?: string | null) => {
-  let query = supabase
-    .from('clientes_fornecedor')
-    .select('*')
-    .eq('fornecedor_global_id', globalId);
+// supabase/functions/sync-erp-docs/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-  // Se e vendedor, filtrar apenas seus clientes
-  if (vendedorId) {
-    query = query.or(`vendedor_fornecedor_id.eq.${vendedorId},vendedor_fornecedor_id.is.null`);
-  }
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-  const { data } = await query.order('razao_social_nome');
-  return data || [];
-}, []);
-```
-
-### Campo de Selecao no Formulario
-
-```typescript
-// Novo campo em ClienteFornecedorForm
-<FormField
-  control={form.control}
-  name="vendedor_fornecedor_id"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Vendedor Responsavel</FormLabel>
-      <Select onValueChange={field.onChange} value={field.value || ''}>
-        <SelectTrigger>
-          <SelectValue placeholder="Todos (nao atribuido)" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="">Todos (nao atribuido)</SelectItem>
-          {vendedores.map(v => (
-            <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </FormItem>
-  )}
-/>
-```
-
-## Comportamentos Esperados
-
-| Usuario | Visualizacao de Clientes |
-|---------|--------------------------|
-| Proprietario do fornecedor | Todos os clientes |
-| Vendedor A | Clientes atribuidos ao Vendedor A + clientes sem atribuicao |
-| Vendedor B | Clientes atribuidos ao Vendedor B + clientes sem atribuicao |
-
-## Impacto na API sync-erp
-
-### sync_clientes Atualizado
-
-```json
-{
-  "acao": "sync_clientes",
-  "clientes": [
-    {
-      "codigo_erp": "CLI001",
-      "vendedor_codigo_erp": "VEND001",
-      "razao_social_nome": "Cliente Exemplo",
-      ...
+// OpenAPI 3.0 Specification
+const openApiSpec = {
+  openapi: "3.0.3",
+  info: {
+    title: "GSA Tibiri - API de Integracao ERP",
+    version: "1.0.0",
+    description: "API bidirecional para integracao entre sistemas ERP locais e o Portal do Fornecedor."
+  },
+  servers: [
+    { url: "https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1" }
+  ],
+  paths: {
+    "/sync-erp": {
+      post: {
+        summary: "Executar acao de sincronizacao",
+        // ... schemas completos
+      }
     }
-  ]
-}
+  },
+  components: {
+    securitySchemes: {
+      apiKey: {
+        type: "apiKey",
+        in: "header",
+        name: "X-API-Key"
+      }
+    },
+    schemas: {
+      // ... schemas de request/response
+    }
+  }
+};
+
+// Swagger UI HTML
+const swaggerHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GSA Tibiri - Documentacao API</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui.css" />
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: './openapi.json',
+        dom_id: '#swagger-ui',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: 'StandaloneLayout',
+      });
+    };
+  </script>
+</body>
+</html>
+`;
+
+serve(async (req) => {
+  const url = new URL(req.url);
+  
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  
+  // Rota: /openapi.json
+  if (url.pathname.endsWith('/openapi.json')) {
+    return new Response(JSON.stringify(openApiSpec), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  
+  // Rota padrao: Swagger UI
+  return new Response(swaggerHtml, {
+    headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+  });
+});
 ```
 
-A API ira buscar o vendedor pelo codigo_erp e vincular automaticamente.
+### Schemas OpenAPI Detalhados
+
+Cada acao tera:
+- Descricao clara
+- Exemplos de request/response
+- Schemas de validacao
+- Codigos de erro documentados
+
+### Acesso
+
+```text
+URL Swagger UI: https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
+URL OpenAPI JSON: https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs/openapi.json
+```
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Operacao |
+|---------|----------|
+| supabase/functions/sync-erp-docs/index.ts | CRIAR |
+| supabase/config.toml | MODIFICAR (adicionar config) |
 
 ## Beneficios
 
 | Beneficio | Descricao |
 |-----------|-----------|
-| Isolamento de carteira | Cada vendedor ve apenas seus clientes |
-| Flexibilidade | Clientes sem vendedor sao visiveis por todos |
-| Integracao ERP | Vinculacao automatica via codigo_vendedor |
-| Auditoria | Pedidos ja registram qual vendedor criou |
+| Exploracao interativa | Desenvolvedores podem testar endpoints diretamente |
+| Documentacao viva | Sempre sincronizada com a implementacao real |
+| Try it out | Botao para executar chamadas reais com API Key |
+| Acesso publico | Sem necessidade de autenticacao para visualizar |
+| Self-service | Desenvolvedores externos podem integrar sem suporte |
+
+## Consideracoes de Seguranca
+
+| Aspecto | Abordagem |
+|---------|-----------|
+| Documentacao | Acessivel publicamente (apenas leitura) |
+| Testes reais | Requerem API Key valida no header |
+| CORS | Habilitado para permitir uso em qualquer origem |
+
+## Proximos Passos Opcionais
+
+| Melhoria | Descricao |
+|----------|-----------|
+| Temas personalizados | CSS customizado com cores do Portal |
+| Webhooks docs | Documentar eventos de notificacao |
+| SDK Generator | Botao para baixar SDK em Python/Delphi |
