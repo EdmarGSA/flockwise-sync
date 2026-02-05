@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.sync-erp]
 verify_jwt = false
+ 
+ [functions.sync-erp-docs]
+ verify_jwt = false
