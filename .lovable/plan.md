@@ -1,101 +1,122 @@
 
-# Plano: Adicionar Link para Swagger UI na Interface
+# Plano: Corrigir Bug na Função sync_produtos
 
 ## Problema Identificado
 
-A documentacao interativa Swagger UI foi criada em:
+A integração ERP reporta sucesso, mas os produtos não aparecem no catálogo devido a incompatibilidades entre a Edge Function e o schema do banco de dados.
+
+## Mapeamento de Erros
+
+| Linha | Código Atual | Problema |
+|-------|--------------|----------|
+| 104 | `estoque_disponivel: produto.estoque` | Coluna não existe - nome correto é `estoque_proprio` |
+| 118 | `estoque_disponivel: produto.estoque` | Mesmo problema no INSERT |
+| 111-121 | INSERT sem `codigo_interno` | Constraint NOT NULL violada |
+
+## Schema da Tabela (produtos_catalogo_fornecedor)
+
+```text
++----------------------+----------+-------------+
+| Coluna               | Tipo     | Restrição   |
++----------------------+----------+-------------+
+| codigo_interno       | text     | NOT NULL    |
+| codigo_erp           | text     | nullable    |
+| estoque_proprio      | integer  | nullable    |
++----------------------+----------+-------------+
 ```
-https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
+
+## Correções Necessárias
+
+### Arquivo: supabase/functions/sync-erp/index.ts
+
+**1. Linha 104 - UPDATE (corrigir nome da coluna)**
+```typescript
+// DE:
+estoque_disponivel: produto.estoque,
+
+// PARA:
+estoque_proprio: produto.estoque,
 ```
 
-Porem, essa URL nao aparece em nenhum lugar da interface do Portal do Fornecedor. O desenvolvedor nao tem como descobrir que ela existe.
+**2. Linhas 111-121 - INSERT (corrigir nome + adicionar campo obrigatório)**
+```typescript
+// DE:
+await supabase
+  .from('produtos_catalogo_fornecedor')
+  .insert({
+    fornecedor_global_id: fornecedorGlobalId,
+    codigo_erp: produto.codigo_erp,
+    nome: produto.nome,
+    preco_tabela: produto.preco,
+    estoque_disponivel: produto.estoque,
+    ativo: produto.ativo ?? true,
+    unidade_venda: produto.unidade || 'UN'
+  });
 
-## Solucao Proposta
+// PARA:
+await supabase
+  .from('produtos_catalogo_fornecedor')
+  .insert({
+    fornecedor_global_id: fornecedorGlobalId,
+    codigo_erp: produto.codigo_erp,
+    codigo_interno: produto.codigo_erp, // Usa codigo_erp como fallback
+    nome: produto.nome,
+    preco_tabela: produto.preco,
+    estoque_proprio: produto.estoque,
+    ativo: produto.ativo ?? true,
+    unidade_venda: produto.unidade || 'UN'
+  });
+```
 
-Adicionar um botao/link visivel na secao "Documentacao da API" do componente `FornecedorIntegracaoERPTab.tsx`.
+**3. Melhorar Captura de Erros (linhas 97-123)**
 
-## Arquivo a Modificar
+Adicionar verificação do resultado das operações para detectar erros silenciosos:
 
-| Arquivo | Operacao |
+```typescript
+if (existente) {
+  const { error: updateError } = await supabase
+    .from('produtos_catalogo_fornecedor')
+    .update({...})
+    .eq('id', existente.id);
+  
+  if (updateError) {
+    erros.push({ codigo_erp: produto.codigo_erp, erro: updateError.message });
+    continue;
+  }
+} else {
+  const { error: insertError } = await supabase
+    .from('produtos_catalogo_fornecedor')
+    .insert({...});
+  
+  if (insertError) {
+    erros.push({ codigo_erp: produto.codigo_erp, erro: insertError.message });
+    continue;
+  }
+}
+processados++;
+```
+
+## Arquivos a Modificar
+
+| Arquivo | Operação |
 |---------|----------|
-| src/components/fornecedor/FornecedorIntegracaoERPTab.tsx | MODIFICAR |
+| supabase/functions/sync-erp/index.ts | MODIFICAR |
 
-## Alteracoes no Componente
+## Resultado Esperado
 
-### Adicionar no Header da Secao de Documentacao
+Após a correção:
+1. Produtos enviados via `sync_produtos` serão inseridos corretamente no banco
+2. Produtos aparecerão no Catálogo e na tela de Vendas
+3. Erros de banco serão capturados e reportados no log de sincronização
+4. Log mostrará contagem real de processados vs erros
 
-Incluir um botao "Abrir Documentacao Interativa" que abre o Swagger UI em nova aba.
+## Campos da API (Documentação Atualizada)
 
-```typescript
-// Adicionar import
-import { ExternalLink, BookOpen } from 'lucide-react';
-
-// Na secao de Documentacao, adicionar botao no CardHeader
-<Card>
-  <CardHeader className="flex flex-row items-center justify-between">
-    <div>
-      <CardTitle className="text-lg flex items-center gap-2">
-        <BookOpen className="h-5 w-5" />
-        Documentacao da API
-      </CardTitle>
-      <CardDescription>
-        Referencia e testes interativos para integracao ERP
-      </CardDescription>
-    </div>
-    <Button 
-      variant="default" 
-      onClick={() => window.open(
-        'https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs', 
-        '_blank'
-      )}
-    >
-      <ExternalLink className="h-4 w-4 mr-2" />
-      Documentacao Interativa
-    </Button>
-  </CardHeader>
-  ...
-</Card>
-```
-
-### Adicionar Card Destacado para Swagger
-
-Antes da secao de referencia rapida, adicionar um card promocional:
-
-```typescript
-<Card className="border-primary/50 bg-primary/5">
-  <CardContent className="flex items-center justify-between py-4">
-    <div className="flex items-center gap-3">
-      <div className="p-2 bg-primary/10 rounded-lg">
-        <BookOpen className="h-6 w-6 text-primary" />
-      </div>
-      <div>
-        <p className="font-medium">Documentacao Interativa (Swagger UI)</p>
-        <p className="text-sm text-muted-foreground">
-          Teste todas as acoes da API diretamente no navegador
-        </p>
-      </div>
-    </div>
-    <Button onClick={() => window.open(SWAGGER_URL, '_blank')}>
-      <ExternalLink className="h-4 w-4 mr-2" />
-      Abrir
-    </Button>
-  </CardContent>
-</Card>
-```
-
-## Layout Final Esperado
-
-A secao de documentacao tera:
-
-1. Card destacado com link para Swagger UI (novo)
-2. Referencia rapida com endpoint e headers (existente)
-3. Lista de acoes disponiveis (existente)
-4. Ciclo de vida do pedido (existente)
-
-## Beneficios
-
-| Beneficio | Descricao |
-|-----------|-----------|
-| Descoberta facil | Desenvolvedor encontra a URL sem precisar perguntar |
-| Acesso rapido | Um clique para abrir a documentacao interativa |
-| Visibilidade | Card destacado chama atencao para a ferramenta |
+| Campo API | Tipo | Obrigatório | Descrição |
+|-----------|------|-------------|-----------|
+| codigo_erp | string | Sim | Código único do produto no ERP |
+| nome | string | Não | Nome do produto |
+| preco | number | Não | Preço de tabela |
+| estoque | number | Não | Quantidade em estoque |
+| unidade | string | Não | Unidade de venda (default: UN) |
+| ativo | boolean | Não | Status ativo (default: true) |
