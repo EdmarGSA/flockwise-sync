@@ -34,8 +34,12 @@ import {
   ArrowDownCircle,
   AlertTriangle,
   Trash2,
-  FileText
+  FileText,
+  ExternalLink,
+  BookOpen
 } from 'lucide-react';
+
+const SWAGGER_URL = 'https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -323,13 +327,46 @@ export const FornecedorIntegracaoERPTab = ({ fornecedorGlobalId }: FornecedorInt
         </CardContent>
       </Card>
 
+      {/* Card Destacado - Swagger UI */}
+      <Card className="border-primary/50 bg-primary/5">
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <BookOpen className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">Documentação Interativa (Swagger UI)</p>
+              <p className="text-sm text-muted-foreground">
+                Teste todas as ações da API diretamente no navegador
+              </p>
+            </div>
+          </div>
+          <Button onClick={() => window.open(SWAGGER_URL, '_blank')}>
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Abrir
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Documentação */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Documentação da API</CardTitle>
-          <CardDescription>
-            Referência rápida para integração com o Bridge Agent
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Referência Rápida da API
+            </CardTitle>
+            <CardDescription>
+              Guia de endpoints e ações para integração ERP
+            </CardDescription>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => window.open(SWAGGER_URL, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Documentação Interativa
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-muted p-4 rounded-lg">
