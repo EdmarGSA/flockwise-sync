@@ -96,29 +96,40 @@ async function syncProdutos(supabase: any, fornecedorGlobalId: string, produtos:
 
       if (existente) {
         // Update
-        await supabase
+        const { error: updateError } = await supabase
           .from('produtos_catalogo_fornecedor')
           .update({
             nome: produto.nome,
             preco_tabela: produto.preco,
-            estoque_disponivel: produto.estoque,
+            estoque_proprio: produto.estoque,
             ativo: produto.ativo ?? true,
             updated_at: new Date().toISOString()
           })
           .eq('id', existente.id);
+
+        if (updateError) {
+          erros.push({ codigo_erp: produto.codigo_erp, erro: updateError.message });
+          continue;
+        }
       } else {
         // Insert
-        await supabase
+        const { error: insertError } = await supabase
           .from('produtos_catalogo_fornecedor')
           .insert({
             fornecedor_global_id: fornecedorGlobalId,
             codigo_erp: produto.codigo_erp,
+            codigo_interno: produto.codigo_erp,
             nome: produto.nome,
             preco_tabela: produto.preco,
-            estoque_disponivel: produto.estoque,
+            estoque_proprio: produto.estoque,
             ativo: produto.ativo ?? true,
             unidade_venda: produto.unidade || 'UN'
           });
+
+        if (insertError) {
+          erros.push({ codigo_erp: produto.codigo_erp, erro: insertError.message });
+          continue;
+        }
       }
       processados++;
     } catch (e: any) {
