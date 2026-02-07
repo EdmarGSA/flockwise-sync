@@ -1,124 +1,113 @@
 
 
-# Plano: Reorganizar Swagger UI com Endpoints Separados por Ação
+# Plano: Atualizar Documentação do Protocolo GSA Tibiri
 
-## Problema Atual
+## Contexto
 
-A especificação OpenAPI atual define apenas **um endpoint único**:
-```
-POST /sync-erp (com campo "acao" no body)
-```
+Após as correções recentes na Edge Function `sync-erp` e a reorganização do Swagger UI, a documentação em `docs/GSA-TIBIRI-PROTOCOL.md` precisa ser atualizada para refletir:
 
-O Swagger UI mostra isso como um único card, diferente da imagem de referência que mostra endpoints separados e agrupados por tags.
-
-## Formato Desejado (como na imagem)
-
-```text
-+------------------------------------------+
-| Sincronização (ERP → Cloud)              |
-+------------------------------------------+
-| POST /sync-erp/produtos   Sync produtos  |
-| POST /sync-erp/clientes   Sync clientes  |
-| POST /sync-erp/credito    Sync crédito   |
-| POST /sync-erp/vendedores Sync vendedores|
-| POST /sync-erp/formas     Formas pgto    |
-+------------------------------------------+
-| Pedidos (Cloud → ERP)                    |
-+------------------------------------------+
-| POST /sync-erp/pedidos         Buscar    |
-| POST /sync-erp/confirmar       Confirmar |
-| POST /sync-erp/status          Status    |
-| POST /sync-erp/nfe             NF-e      |
-| POST /sync-erp/erro            Erro      |
-+------------------------------------------+
-```
-
-## Solução
-
-Reestruturar a especificação OpenAPI para definir **paths separados** para cada ação, agrupados por **tags**.
+1. As correções de campos (`estoque` mapeia para `estoque_proprio`, `codigo_interno` é preenchido automaticamente)
+2. A nova estrutura do Swagger UI com endpoints separados por tags
+3. Informações sobre o Cloud Agent como "cérebro" central da integração
 
 ## Alterações Necessárias
 
-### Arquivo: supabase/functions/sync-erp-docs/index.ts
+### 1. Atualizar Seção sync_produtos (linha ~79-128)
 
-**1. Expandir a seção de tags:**
-```typescript
-tags: [
-  { 
-    name: "Sincronização", 
-    description: "Ações de push do ERP para o Cloud (Produtos, Clientes, Crédito, etc)" 
-  },
-  { 
-    name: "Pedidos", 
-    description: "Ações de gestão de pedidos (Buscar, Confirmar, Status, NF-e)" 
-  }
-]
+**Situação atual (desatualizada):**
+```markdown
+### Comportamento
+- Produtos são identificados pelo `codigo_erp`
+- Se o produto não existir no Cloud, será ignorado (cadastro deve ser feito manualmente)
+- Apenas campos enviados são atualizados
 ```
 
-**2. Criar paths separados para cada ação:**
+**Correção necessária:**
+- O comportamento mudou: produtos NOVOS são CRIADOS automaticamente agora (não mais ignorados)
+- O campo `codigo_interno` é preenchido automaticamente usando `codigo_erp`
+- O campo `estoque` da API mapeia para `estoque_proprio` no banco
 
-Transformar o único path:
-```typescript
-paths: {
-  "/sync-erp": { post: { ... oneOf schemas ... } }
-}
+### 2. Adicionar Seção sobre Mapeamento de Campos (novo)
+
+Incluir tabela clara de mapeamento API → Banco:
+
+| Campo API | Campo Banco | Notas |
+|-----------|-------------|-------|
+| `estoque` | `estoque_proprio` | Quantidade em estoque próprio |
+| `codigo_erp` | `codigo_erp` + `codigo_interno` | Usado como identificador e código interno |
+
+### 3. Atualizar Diagrama de Arquitetura (linha ~5-24)
+
+Adicionar conceito do "Cloud Agent" explicando:
+- Edge Function `sync-erp` como centro de comando
+- Edge Function `sync-erp-docs` como interface Swagger
+- Fluxo de autenticação via SHA-256 hash
+
+### 4. Adicionar Link para Documentação Interativa
+
+Incluir referência ao Swagger UI:
+```markdown
+## Documentação Interativa (Swagger)
+
+Acesse a documentação interativa com exemplos executáveis:
+https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
 ```
 
-Em múltiplos paths virtuais (documentação):
-```typescript
-paths: {
-  "/sync-erp#sync_produtos": {
-    post: {
-      summary: "Sincronizar Produtos",
-      tags: ["Sincronização"],
-      operationId: "syncProdutos",
-      description: "Envia catálogo de produtos do ERP para o Cloud",
-      requestBody: { schema: SyncProdutosRequest },
-      responses: { ... }
-    }
-  },
-  "/sync-erp#sync_clientes": {
-    post: {
-      summary: "Sincronizar Clientes", 
-      tags: ["Sincronização"],
-      ...
-    }
-  },
-  "/sync-erp#buscar_pedidos": {
-    post: {
-      summary: "Buscar Pedidos Pendentes",
-      tags: ["Pedidos"],
-      ...
-    }
-  }
-  // ... demais endpoints
-}
-```
+### 5. Atualizar Seção de Erros (linha ~124-128)
 
-## Nova Estrutura de Tags
+Documentar melhor os erros capturados:
+- Erros individuais por produto são retornados no array `detalhes`
+- Campo `erros` retorna a contagem total
+- Erros de banco de dados agora são capturados corretamente
 
-| Tag | Endpoints | Descrição |
-|-----|-----------|-----------|
-| **Sincronização** | sync_produtos, sync_clientes, sync_credito, sync_vendedores, sync_formas_pagamento | Push do ERP para Cloud |
-| **Pedidos** | buscar_pedidos, confirmar_pedido_erp, atualizar_status, confirmar_nfe, registrar_erro_pedido | Gestão de pedidos |
-
-## Considerações Técnicas
-
-A API real continua funcionando com o endpoint único `POST /sync-erp` e o campo `acao` no body. A documentação Swagger apenas **organiza visualmente** as ações como se fossem endpoints separados usando path fragments (`#acao`).
-
-Isso é uma prática comum em APIs que usam "action-based routing" - a documentação mostra cada ação como um endpoint separado para melhor usabilidade, mesmo que internamente seja um único endpoint.
-
-## Resultado Esperado
-
-O Swagger UI exibirá:
-- Seções colapsáveis por tag (Sincronização, Pedidos)
-- Cada ação como um card separado com método POST
-- Request/response schemas específicos por ação
-- Botão "Try it out" funcional para cada ação
-
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Operação |
 |---------|----------|
-| supabase/functions/sync-erp-docs/index.ts | MODIFICAR |
+| `docs/GSA-TIBIRI-PROTOCOL.md` | MODIFICAR |
+
+## Seções do Documento a Atualizar
+
+1. **Visão Geral** (~linhas 1-25): Adicionar conceito de Cloud Agent
+2. **sync_produtos** (~linhas 79-128): Corrigir comportamento e mapeamento
+3. **Nova seção**: "Documentação Interativa" após Autenticação
+4. **Nova seção**: "Mapeamento de Campos API → Banco" 
+5. **Respostas de Erro**: Detalhar estrutura de erros
+
+## Exemplo de Atualização - sync_produtos
+
+```markdown
+## 1. Sincronizar Produtos (`sync_produtos`)
+
+Sincroniza catálogo de produtos entre ERP e Cloud. 
+Produtos são identificados pelo `codigo_erp` - se existir atualiza, se não existir cria novo.
+
+### Mapeamento de Campos
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_erp`, `codigo_interno` | Sim | Identificador único (usado em ambos os campos) |
+| `nome` | `nome` | Não | Nome do produto |
+| `preco` | `preco_tabela` | Não | Preço de venda |
+| `estoque` | `estoque_proprio` | Não | Quantidade em estoque |
+| `unidade` | `unidade_venda` | Não | Unidade (default: UN) |
+| `ativo` | `ativo` | Não | Status ativo/inativo (default: true) |
+
+### Comportamento
+
+- Produtos são identificados pelo `codigo_erp`
+- Se o produto NÃO existir no Cloud, será CRIADO automaticamente
+- Se já existir, apenas os campos enviados são atualizados
+- O campo `codigo_interno` é preenchido automaticamente com o valor de `codigo_erp`
+- Erros individuais são retornados no array `detalhes`
+```
+
+## Resultado Esperado
+
+Após as atualizações:
+1. Documentação reflete o comportamento real da API
+2. Mapeamento de campos claramente explicado
+3. Link para Swagger UI disponível
+4. Conceito de Cloud Agent documentado
+5. Desenvolvedores terão referência precisa para integração
 
