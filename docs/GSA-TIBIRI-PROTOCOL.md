@@ -4,10 +4,19 @@
 
 O protocolo GSA Tibiri define a comunicação bidirecional entre sistemas ERP locais (Firebird, SQL Server, etc.) e a plataforma Cloud do Portal do Fornecedor.
 
+### Arquitetura Cloud Agent
+
+O sistema utiliza duas Edge Functions que compõem o **Cloud Agent** (o "cérebro" na nuvem):
+
+| Componente | Endpoint | Função |
+|------------|----------|--------|
+| **sync-erp** | `/functions/v1/sync-erp` | Centro de comando: autenticação, roteamento e persistência |
+| **sync-erp-docs** | `/functions/v1/sync-erp-docs` | Interface Swagger UI interativa |
+
 ```
 +-------------------+         +------------------+         +-------------------+
-|    ERP LOCAL      |         |   BRIDGE AGENT   |         |   CLOUD (API)     |
-|  (Firebird, SQL)  |         |   (GSA Tibiri)   |         |                   |
+|    ERP LOCAL      |         |   BRIDGE AGENT   |         |   CLOUD AGENT     |
+|  (Firebird, SQL)  |         |   (Executável)   |         |   (Edge Functions)|
 +-------------------+         +------------------+         +-------------------+
         |                            |                            |
         |  1. Extrai dados          |                            |
@@ -16,12 +25,36 @@ O protocolo GSA Tibiri define a comunicação bidirecional entre sistemas ERP lo
         |                           |     (API Key + JSON)       |
         |                           |--------------------------->|
         |                           |                            |  3. Valida API Key
+        |                           |                            |     (SHA-256 hash)
         |                           |                            |  4. Processa dados
-        |                           |  5. Response               |
+        |                           |                            |  5. Persiste no DB
+        |                           |  6. Response JSON          |
         |                           |<---------------------------|
-        |  6. Atualiza ERP         |                            |
+        |  7. Atualiza ERP         |                            |
         |<--------------------------|                            |
 ```
+
+**Vantagens do Cloud Agent:**
+- Escalabilidade automática (serverless)
+- Autenticação centralizada via API Keys
+- Logs de sincronização para auditoria
+- Interface Swagger para testes
+
+---
+
+## Documentação Interativa (Swagger)
+
+Acesse a documentação interativa com exemplos executáveis:
+
+```
+https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp-docs
+```
+
+O Swagger UI permite:
+- Testar todas as ações diretamente no navegador
+- Visualizar schemas de request/response
+- Gerar exemplos de código
+- Validar payloads antes de implementar
 
 ---
 
@@ -40,6 +73,13 @@ POST https://zqpjxtlfhxjtenhhzaax.supabase.co/functions/v1/sync-erp
 | `X-API-Key` | `sk_live_...` | Chave gerada no Portal do Fornecedor |
 | `Content-Type` | `application/json` | Tipo de conteúdo |
 
+### Processo de Autenticação
+
+1. A API Key é recebida no header `X-API-Key`
+2. O Cloud Agent calcula o hash SHA-256 da chave
+3. O hash é comparado com os hashes armazenados na tabela `api_keys_fornecedor`
+4. Se válido, o `fornecedor_global_id` é extraído para escopo dos dados
+
 ### Exemplo de Requisição
 
 ```bash
@@ -56,6 +96,68 @@ curl -X POST \
 2. Vá para a aba **Integração ERP**
 3. Clique em **Gerar Nova API Key**
 4. **IMPORTANTE**: A chave é exibida apenas UMA VEZ. Copie e armazene em local seguro.
+
+---
+
+## Mapeamento de Campos API → Banco
+
+Esta seção documenta como os campos enviados pela API são mapeados para as colunas do banco de dados.
+
+### Produtos (`produtos_catalogo_fornecedor`)
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_erp`, `codigo_interno` | ✅ | Identificador único (usado em ambos) |
+| `nome` | `nome` | ❌ | Nome do produto |
+| `preco` | `preco_tabela` | ❌ | Preço de venda |
+| `estoque` | `estoque_proprio` | ❌ | Quantidade em estoque |
+| `unidade` | `unidade_venda` | ❌ | Unidade (default: UN) |
+| `ativo` | `ativo` | ❌ | Status (default: true) |
+
+### Clientes (`clientes_fornecedor`)
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_erp` | ✅ | Código único no ERP |
+| `razao_social` | `razao_social_nome` | ❌ | Razão social ou nome |
+| `cpf_cnpj` | `cpf_cnpj` | ✅ | CPF ou CNPJ |
+| `email` | `email` | ❌ | E-mail de contato |
+| `telefone` | `telefone` | ❌ | Telefone de contato |
+| `limite_credito` | `limite_credito` | ❌ | Limite de crédito |
+| `saldo_credito` | `saldo_credito` | ❌ | Saldo disponível |
+| `vendedor_codigo_erp` | (vincula via `codigo_vendedor`) | ❌ | Código do vendedor |
+
+### Vendedores (`vendedores_fornecedor`)
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_vendedor` | ✅ | Código único no ERP |
+| `nome` | `nome` | ✅ | Nome do vendedor |
+| `email` | `email` | ❌ | E-mail de contato |
+| `telefone` | `telefone` | ❌ | Telefone |
+| `regiao` | `regiao` | ❌ | Região de atuação |
+| `ativo` | `ativo` | ❌ | Status (default: true) |
+
+> **Nota:** O campo `user_id` é preservado durante atualizações para manter vínculos de login.
+
+### Formas de Pagamento (`formas_pagamento_fornecedor`)
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_erp`, `codigo` | ✅ | Código único |
+| `nome` | `nome` | ✅ | Nome da forma |
+| `ativo` | `ativo` | ❌ | Status (default: true) |
+
+### Prazos de Pagamento (`prazos_pagamento_fornecedor`)
+
+| Campo API | Campo Banco | Obrigatório | Descrição |
+|-----------|-------------|-------------|-----------|
+| `codigo_erp` | `codigo_erp` | ✅ | Código único |
+| `nome` | `nome` | ✅ | Nome do prazo |
+| `forma_codigo_erp` | (vincula via FK) | ✅ | Código da forma vinculada |
+| `dias_parcelas` | `dias_parcelas` | ✅ | Array [7, 14, 21] |
+| `quantidade_parcelas` | `quantidade_parcelas` | ❌ | Número de parcelas |
+| `padrao` | `padrao` | ❌ | Se é o prazo padrão |
 
 ---
 
@@ -78,7 +180,7 @@ curl -X POST \
 
 ## 1. Sincronizar Produtos (`sync_produtos`)
 
-Atualiza o catálogo de produtos no Cloud com base nos dados do ERP.
+Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados pelo `codigo_erp` - se existir atualiza, se não existir **cria novo**.
 
 ### Requisição
 
@@ -90,7 +192,9 @@ Atualiza o catálogo de produtos no Cloud com base nos dados do ERP.
       "codigo_erp": "PROD001",
       "nome": "Ração Inicial Premium",
       "preco": 185.50,
-      "estoque": 500
+      "estoque": 500,
+      "unidade": "KG",
+      "ativo": true
     },
     {
       "codigo_erp": "PROD002",
@@ -109,23 +213,47 @@ Atualiza o catálogo de produtos no Cloud com base nos dados do ERP.
 | `codigo_erp` | string | ✅ | Código único no ERP local |
 | `nome` | string | ❌ | Nome do produto (atualiza se enviado) |
 | `preco` | number | ❌ | Preço de venda |
-| `estoque` | number | ❌ | Quantidade em estoque |
+| `estoque` | number | ❌ | Quantidade em estoque (mapeia para `estoque_proprio`) |
+| `unidade` | string | ❌ | Unidade de venda (default: UN) |
+| `ativo` | boolean | ❌ | Status ativo/inativo (default: true) |
 
 ### Resposta de Sucesso
 
 ```json
 {
   "success": true,
-  "updated": 2,
-  "message": "2 produtos atualizados"
+  "acao": "sync_produtos",
+  "processados": 2,
+  "erros": 0,
+  "detalhes": []
+}
+```
+
+### Resposta com Erros Parciais
+
+```json
+{
+  "success": true,
+  "acao": "sync_produtos",
+  "processados": 1,
+  "erros": 1,
+  "detalhes": [
+    {
+      "codigo_erp": "PROD003",
+      "erro": "duplicate key value violates unique constraint"
+    }
+  ]
 }
 ```
 
 ### Comportamento
 
 - Produtos são identificados pelo `codigo_erp`
-- Se o produto não existir no Cloud, será ignorado (cadastro deve ser feito manualmente)
-- Apenas campos enviados são atualizados
+- Se o produto **NÃO existir** no Cloud, será **CRIADO automaticamente**
+- Se já existir, apenas os campos enviados são atualizados
+- O campo `codigo_interno` é preenchido automaticamente com o valor de `codigo_erp`
+- O campo `estoque` da API mapeia para `estoque_proprio` no banco
+- Erros individuais são retornados no array `detalhes` sem interromper o processamento
 
 ---
 
@@ -534,6 +662,8 @@ Atualiza o status do pedido conforme progresso no ERP.
 
 ```
 pendente → exportado → aprovado → separado → faturado → entregue
+                ↘                                    ↗
+                  → erro (pode ocorrer a qualquer momento antes do faturamento)
 ```
 
 ### Resposta de Sucesso
@@ -637,13 +767,36 @@ Registra um erro no processamento do pedido. **O vendedor verá esta mensagem im
 | 403 | `ACCESS_DENIED` | Tentativa de acessar dados de outro fornecedor |
 | 500 | `INTERNAL_ERROR` | Erro interno do servidor |
 
-### Exemplo de Resposta de Erro
+### Estrutura de Resposta de Erro
 
 ```json
 {
   "success": false,
   "error": "NOT_FOUND",
   "message": "Pedido não encontrado"
+}
+```
+
+### Estrutura de Resposta com Erros Parciais
+
+Algumas ações (como `sync_produtos`) processam múltiplos registros e podem ter sucesso parcial:
+
+```json
+{
+  "success": true,
+  "acao": "sync_produtos",
+  "processados": 8,
+  "erros": 2,
+  "detalhes": [
+    {
+      "codigo_erp": "PROD003",
+      "erro": "violates foreign key constraint"
+    },
+    {
+      "codigo_erp": "PROD007",
+      "erro": "invalid input syntax for type numeric"
+    }
+  ]
 }
 ```
 
@@ -699,12 +852,12 @@ class GSATibiriClient:
         })
         return result.get("success", False)
     
-    def sync_produtos(self, produtos: list) -> int:
+    def sync_produtos(self, produtos: list) -> dict:
         result = self._request({
             "acao": "sync_produtos",
             "produtos": produtos
         })
-        return result.get("updated", 0) if result.get("success") else 0
+        return result
     
     def registrar_erro(self, pedido_id: str, mensagem: str) -> bool:
         result = self._request({
@@ -717,6 +870,13 @@ class GSATibiriClient:
 
 # Uso
 client = GSATibiriClient("sk_live_sua_chave_aqui")
+
+# Sincronizar produtos
+resultado = client.sync_produtos([
+    {"codigo_erp": "PROD001", "nome": "Ração Premium", "preco": 185.50, "estoque": 500},
+    {"codigo_erp": "PROD002", "nome": "Ração Standard", "preco": 145.00, "estoque": 800}
+])
+print(f"Processados: {resultado.get('processados')}, Erros: {resultado.get('erros')}")
 
 # Buscar pedidos novos
 pedidos = client.buscar_pedidos_pendentes()
@@ -758,6 +918,7 @@ type
     function AtualizarStatus(const APedidoId, ANovoStatus: string): Boolean;
     function RegistrarNfe(const APedidoId, ANumero, AChave: string): Boolean;
     function RegistrarErro(const APedidoId, AMensagem: string): Boolean;
+    function SyncProdutos(const AProdutos: TJSONArray): TJSONObject;
   end;
 
 implementation
@@ -811,6 +972,21 @@ begin
   end;
 end;
 
+function TGSATibiriClient.SyncProdutos(const AProdutos: TJSONArray): TJSONObject;
+var
+  Payload: TJSONObject;
+begin
+  Payload := TJSONObject.Create;
+  try
+    Payload.AddPair('acao', 'sync_produtos');
+    Payload.AddPair('produtos', AProdutos.Clone as TJSONArray);
+    
+    Result := DoRequest(Payload);
+  finally
+    Payload.Free;
+  end;
+end;
+
 function TGSATibiriClient.ConfirmarImportacao(const APedidoId, ACodigoErp: string): Boolean;
 var
   Payload, Response: TJSONObject;
@@ -843,7 +1019,7 @@ end.
 
 ### 1. Tratamento de Erros
 
-Sempre verifique o campo `success` na resposta antes de processar os dados.
+Sempre verifique o campo `success` na resposta antes de processar os dados. Para ações em lote, verifique também o campo `erros` e processe o array `detalhes`.
 
 ### 2. Retry com Backoff
 
@@ -868,7 +1044,7 @@ Para produtos e clientes, envie apenas registros alterados desde a última sincr
 
 ### 4. Logs
 
-Mantenha logs detalhados de todas as operações para auditoria e troubleshooting.
+Mantenha logs detalhados de todas as operações para auditoria e troubleshooting. O Cloud Agent também mantém logs de sincronização acessíveis na aba **Integração ERP**.
 
 ### 5. Horários de Sincronização
 
@@ -876,8 +1052,23 @@ Mantenha logs detalhados de todas as operações para auditoria e troubleshootin
 - **Pedidos**: A cada 1-2 minutos
 - **Status**: Imediatamente após alteração no ERP
 
+### 6. Validação de Erros Parciais
+
+Para sincronizações em lote, sempre processe o array `detalhes` mesmo quando `success: true`:
+
+```python
+resultado = client.sync_produtos(produtos)
+if resultado.get('erros', 0) > 0:
+    for erro in resultado.get('detalhes', []):
+        print(f"Erro no produto {erro['codigo_erp']}: {erro['erro']}")
+        # Tratar ou logar o erro específico
+```
+
 ---
 
 ## Suporte
 
-Para dúvidas técnicas sobre a integração, entre em contato pelo Portal do Fornecedor ou consulte os logs de sincronização na aba **Integração ERP**.
+Para dúvidas técnicas sobre a integração:
+1. Consulte a **Documentação Interativa (Swagger)** para testar ações
+2. Verifique os **Logs de Sincronização** na aba **Integração ERP** do Portal
+3. Entre em contato pelo suporte do Portal do Fornecedor
