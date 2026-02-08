@@ -202,6 +202,34 @@ export const FinalizarPedidoDialog = ({
         .update({ saldo_credito: novoSaldo })
         .eq('id', clienteSelecionado.id);
 
+      // Disparar webhook de pedido criado (fire and forget)
+      supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          evento: 'pedido_criado',
+          fornecedor_global_id: fornecedorGlobalId,
+          dados: {
+            pedido_id: pedido.id,
+            numero_pedido: pedido.numero_pedido,
+            cliente_id: clienteSelecionado.id,
+            cliente_cpf_cnpj: clienteSelecionado.cpf_cnpj,
+            cliente_razao_social: clienteSelecionado.razao_social_nome,
+            valor_total: total,
+            condicao_pagamento: condicaoFinal,
+            data_entrega_prevista: format(dataEntrega, 'yyyy-MM-dd'),
+            itens: itens.map(item => ({
+              produto_id: item.produto.id,
+              produto_codigo: item.produto.codigo_interno,
+              produto_nome: item.produto.nome,
+              quantidade: item.quantidade,
+              preco_unitario: item.precoPromocional || item.precoUnitario,
+              valor_total: (item.precoPromocional || item.precoUnitario) * item.quantidade,
+            })),
+            observacoes: observacoes || null,
+            created_at: new Date().toISOString(),
+          },
+        },
+      }).catch((err) => console.warn('Webhook dispatch failed:', err));
+
       setPedidoCriado(pedido.numero_pedido);
       limpar();
       toast.success('Pedido criado com sucesso!');

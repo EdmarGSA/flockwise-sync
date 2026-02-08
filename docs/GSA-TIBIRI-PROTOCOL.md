@@ -178,6 +178,206 @@ Esta seção documenta como os campos enviados pela API são mapeados para as co
 
 ---
 
+## Webhooks (Notificações Push)
+
+Em vez de fazer polling constante na API, você pode configurar **webhooks** para receber notificações automáticas quando eventos ocorrerem no Cloud.
+
+### Conceito
+
+```
++-------------------+         +------------------+         +-------------------+
+|   CLOUD PORTAL    |         |  DISPATCH-WEBHOOK|         |   ERP LOCAL       |
+|  (Pedido Criado)  |         |  (Edge Function) |         |   (HTTP Server)   |
++-------------------+         +------------------+         +-------------------+
+        |                            |                            |
+        |  1. Evento disparado       |                            |
+        |--------------------------->|                            |
+        |                            |  2. POST para URL          |
+        |                            |     cadastrada              |
+        |                            |--------------------------->|
+        |                            |                            |  3. Processa pedido
+        |                            |  4. Response 200 OK        |     automaticamente
+        |                            |<---------------------------|
+        |  5. Log registrado         |                            |
+        |<---------------------------|                            |
+```
+
+### Eventos Suportados
+
+| Evento | Descrição |
+|--------|-----------|
+| `pedido_criado` | Novo pedido foi criado no portal |
+| `pedido_atualizado` | Pedido existente foi modificado |
+| `pedido_cancelado` | Pedido foi cancelado |
+
+### Configuração de Webhooks
+
+Configure webhooks via tabela `webhooks_fornecedor` ou diretamente na interface do Portal:
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `evento` | string | ✅ | Tipo de evento (`pedido_criado`, etc.) |
+| `url` | string | ✅ | URL do endpoint que receberá o POST |
+| `secret` | string | ❌ | Chave para assinatura HMAC-SHA256 |
+| `tentativas_max` | number | ❌ | Número máximo de tentativas (default: 3) |
+| `timeout_ms` | number | ❌ | Timeout em milissegundos (default: 5000) |
+| `headers` | object | ❌ | Headers customizados para o request |
+| `ativo` | boolean | ❌ | Se o webhook está ativo (default: true) |
+
+### Formato do Payload (pedido_criado)
+
+```json
+{
+  "evento": "pedido_criado",
+  "fornecedor_global_id": "uuid-do-fornecedor",
+  "dados": {
+    "pedido_id": "uuid-do-pedido",
+    "numero_pedido": "PED-2026-0001",
+    "cliente_id": "uuid-do-cliente",
+    "cliente_cpf_cnpj": "12345678000199",
+    "cliente_razao_social": "Fazenda Boa Vista Ltda",
+    "valor_total": 15750.00,
+    "condicao_pagamento": "Boleto - 7/14/21 dias",
+    "data_entrega_prevista": "2026-02-15",
+    "itens": [
+      {
+        "produto_id": "uuid-do-produto",
+        "produto_codigo": "PROD001",
+        "produto_nome": "Ração Inicial Premium",
+        "quantidade": 50,
+        "preco_unitario": 185.50,
+        "valor_total": 9275.00
+      }
+    ],
+    "observacoes": "Entregar pela manhã",
+    "created_at": "2026-02-08T14:30:00.000Z"
+  }
+}
+```
+
+### Headers do Request
+
+| Header | Descrição |
+|--------|-----------|
+| `Content-Type` | `application/json` |
+| `X-Webhook-Event` | Nome do evento (`pedido_criado`) |
+| `X-Webhook-Timestamp` | Timestamp ISO 8601 do disparo |
+| `X-Webhook-Signature` | Assinatura HMAC-SHA256 (se `secret` configurado) |
+
+### Validação de Assinatura (Opcional)
+
+Se você configurou um `secret`, valide a assinatura para garantir autenticidade:
+
+```python
+import hmac
+import hashlib
+
+def validar_assinatura(payload: bytes, signature: str, secret: str) -> bool:
+    expected = hmac.new(
+        secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+# No handler do webhook:
+body = request.get_data()
+signature = request.headers.get('X-Webhook-Signature')
+if not validar_assinatura(body, signature, 'seu_secret'):
+    return 'Unauthorized', 401
+```
+
+### Retry Automático
+
+Se seu endpoint retornar erro (status >= 400) ou timeout, o sistema fará retry automático:
+
+- **Tentativa 1**: Imediata
+- **Tentativa 2**: Após 1 segundo
+- **Tentativa 3**: Após 2 segundos
+- **Tentativa N**: Após 2^(N-2) segundos (exponential backoff)
+
+### Logs de Webhook
+
+Todos os disparos são registrados na tabela `webhooks_log` para auditoria:
+
+| Campo | Descrição |
+|-------|-----------|
+| `webhook_id` | ID da configuração do webhook |
+| `evento` | Tipo de evento disparado |
+| `payload` | Dados enviados |
+| `tentativa` | Número da tentativa (1, 2, 3...) |
+| `status_code` | Código HTTP da resposta |
+| `resposta` | Body da resposta |
+| `erro` | Mensagem de erro (se houver) |
+| `duracao_ms` | Tempo de resposta em ms |
+| `created_at` | Timestamp do disparo |
+
+### Exemplo: Servidor de Webhook em Python
+
+```python
+from flask import Flask, request, jsonify
+import hmac
+import hashlib
+import json
+
+app = Flask(__name__)
+SECRET = 'seu_webhook_secret'
+
+@app.route('/webhook/pedidos', methods=['POST'])
+def receber_pedido():
+    # 1. Validar assinatura (opcional, mas recomendado)
+    signature = request.headers.get('X-Webhook-Signature')
+    if SECRET and signature:
+        expected = hmac.new(
+            SECRET.encode(),
+            request.data,
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return jsonify({'error': 'Invalid signature'}), 401
+    
+    # 2. Processar payload
+    payload = request.json
+    evento = payload.get('evento')
+    dados = payload.get('dados')
+    
+    if evento == 'pedido_criado':
+        numero = dados.get('numero_pedido')
+        cliente = dados.get('cliente_razao_social')
+        valor = dados.get('valor_total')
+        
+        print(f"Novo pedido recebido: {numero}")
+        print(f"Cliente: {cliente}")
+        print(f"Valor: R$ {valor:.2f}")
+        
+        # 3. Importar para o ERP local
+        # importar_pedido_erp(dados)
+    
+    # 4. Responder com sucesso
+    return jsonify({'success': True}), 200
+
+if __name__ == '__main__':
+    app.run(port=8080)
+```
+
+### Vantagens do Webhook vs Polling
+
+| Aspecto | Polling | Webhook |
+|---------|---------|---------|
+| **Latência** | Depende do intervalo (1-5 min) | Imediata (< 1 seg) |
+| **Uso de recursos** | Alto (requests constantes) | Baixo (apenas quando necessário) |
+| **Complexidade** | Simples | Requer endpoint HTTP |
+| **Confiabilidade** | Alta (você controla) | Retry automático |
+
+### Migração: Polling para Webhook
+
+1. Configure seu endpoint HTTP no ERP local
+2. Cadastre o webhook no Portal (aba Integração ERP)
+3. Teste com um pedido de teste
+4. Remova ou reduza a frequência do polling
+
+---
+
 ## 1. Sincronizar Produtos (`sync_produtos`)
 
 Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados pelo `codigo_erp` - se existir atualiza, se não existir **cria novo**.
