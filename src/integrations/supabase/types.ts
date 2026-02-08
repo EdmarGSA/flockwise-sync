@@ -6064,6 +6064,106 @@ export type Database = {
           },
         ]
       }
+      webhooks_fornecedor: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          evento: string
+          fornecedor_global_id: string
+          headers: Json | null
+          id: string
+          secret: string | null
+          tentativas_max: number
+          timeout_ms: number
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          evento?: string
+          fornecedor_global_id: string
+          headers?: Json | null
+          id?: string
+          secret?: string | null
+          tentativas_max?: number
+          timeout_ms?: number
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          evento?: string
+          fornecedor_global_id?: string
+          headers?: Json | null
+          id?: string
+          secret?: string | null
+          tentativas_max?: number
+          timeout_ms?: number
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_fornecedor_fornecedor_global_id_fkey"
+            columns: ["fornecedor_global_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks_log: {
+        Row: {
+          created_at: string
+          duracao_ms: number | null
+          erro: string | null
+          evento: string
+          fornecedor_global_id: string
+          id: string
+          payload: Json
+          resposta: string | null
+          status_code: number | null
+          tentativa: number
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          evento: string
+          fornecedor_global_id: string
+          id?: string
+          payload: Json
+          resposta?: string | null
+          status_code?: number | null
+          tentativa?: number
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          evento?: string
+          fornecedor_global_id?: string
+          id?: string
+          payload?: Json
+          resposta?: string | null
+          status_code?: number | null
+          tentativa?: number
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_log_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
