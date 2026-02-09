@@ -248,11 +248,11 @@ const PortalFornecedor = () => {
             </TabsTrigger>
             <TabsTrigger value="estoque" className="gap-2">
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Estoque</span>
+              <span className="hidden sm:inline">Est_Cliente</span>
             </TabsTrigger>
             <TabsTrigger value="pedidos" className="gap-2">
               <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Pedidos</span>
+              <span className="hidden sm:inline">OC_Clientes</span>
             </TabsTrigger>
             <TabsTrigger value="historico" className="gap-2">
               <History className="h-4 w-4" />
