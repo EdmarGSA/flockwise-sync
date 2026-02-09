@@ -382,6 +382,31 @@ if __name__ == '__main__':
 
 Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados pelo `codigo_erp` - se existir atualiza, se não existir **cria novo**.
 
+### ⚡ Processamento em Batch (Alta Performance)
+
+A ação `sync_produtos` foi otimizada para processar **milhares de itens** de forma eficiente:
+
+| Configuração | Valor | Descrição |
+|--------------|-------|-----------|
+| `CHUNK_SIZE` | 100 | Produtos processados por lote |
+| `CONCURRENT_CHUNKS` | 2 | Lotes executados em paralelo |
+| `MAX_RETRIES` | 3 | Tentativas automáticas por item |
+| `RETRY_DELAY_MS` | 500ms | Delay base (exponencial: 500ms, 1s, 2s...) |
+
+**Exemplo:** 5.000 produtos serão divididos em 50 chunks de 100 itens, processados 2 em paralelo.
+
+```
+Chunk 1 (1-100)    ┐
+                   ├─> Paralelo 1
+Chunk 2 (101-200)  ┘
+                   
+Chunk 3 (201-300)  ┐
+                   ├─> Paralelo 2
+Chunk 4 (301-400)  ┘
+                   
+... continua até Chunk 50
+```
+
 ### Requisição
 
 ```json
@@ -417,15 +442,21 @@ Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados 
 | `unidade` | string | ❌ | Unidade de venda (default: UN) |
 | `ativo` | boolean | ❌ | Status ativo/inativo (default: true) |
 
-### Resposta de Sucesso
+### Resposta de Sucesso (com métricas de batch)
 
 ```json
 {
   "success": true,
   "acao": "sync_produtos",
-  "processados": 2,
+  "processados": 5000,
   "erros": 0,
-  "detalhes": []
+  "detalhes": [],
+  "batch_info": {
+    "total_itens": 5000,
+    "chunks_processados": 50,
+    "tempo_ms": 12340,
+    "retries_totais": 3
+  }
 }
 ```
 
@@ -435,14 +466,28 @@ Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados 
 {
   "success": true,
   "acao": "sync_produtos",
-  "processados": 1,
-  "erros": 1,
+  "processados": 4998,
+  "erros": 2,
   "detalhes": [
     {
       "codigo_erp": "PROD003",
-      "erro": "duplicate key value violates unique constraint"
+      "erro": "duplicate key value violates unique constraint",
+      "retries": 3,
+      "chunk": 1
+    },
+    {
+      "codigo_erp": "PROD4567",
+      "erro": "connection timeout",
+      "retries": 3,
+      "chunk": 46
     }
-  ]
+  ],
+  "batch_info": {
+    "total_itens": 5000,
+    "chunks_processados": 50,
+    "tempo_ms": 15230,
+    "retries_totais": 8
+  }
 }
 ```
 
@@ -454,6 +499,26 @@ Sincroniza catálogo de produtos entre ERP e Cloud. Produtos são identificados 
 - O campo `codigo_interno` é preenchido automaticamente com o valor de `codigo_erp`
 - O campo `estoque` da API mapeia para `estoque_proprio` no banco
 - Erros individuais são retornados no array `detalhes` sem interromper o processamento
+
+### Retry Automático
+
+Cada item que falhar será automaticamente reprocessado até 3 vezes com backoff exponencial:
+
+```
+Tentativa 1: Falhou → Aguarda 500ms
+Tentativa 2: Falhou → Aguarda 1000ms  
+Tentativa 3: Falhou → Registra erro final
+```
+
+**Erros tratados automaticamente:**
+- Timeouts de conexão
+- Rate limiting temporário
+- Locks de banco de dados
+- Erros transitórios de rede
+
+**Erros NÃO retentados:**
+- `codigo_erp` não fornecido
+- Violação de constraint (dados inválidos)
 
 ---
 

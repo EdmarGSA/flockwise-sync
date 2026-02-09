@@ -74,25 +74,55 @@ async function registrarLog(
   });
 }
 
-// Ação: sync_produtos
-async function syncProdutos(supabase: any, fornecedorGlobalId: string, produtos: any[]) {
-  let processados = 0;
-  let erros: any[] = [];
+// Configurações de batch e retry
+const BATCH_CONFIG = {
+  CHUNK_SIZE: 100, // Processar em lotes de 100 itens
+  MAX_RETRIES: 3,  // Máximo de tentativas por item
+  RETRY_DELAY_MS: 500, // Delay base entre retries (exponencial)
+  CONCURRENT_CHUNKS: 2 // Chunks processados em paralelo
+};
 
-  for (const produto of produtos) {
+// Função de delay para retry
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Divide array em chunks
+function chunkArray<T>(array: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
+// Processa um único produto com retry
+async function processarProdutoComRetry(
+  supabase: any, 
+  fornecedorGlobalId: string, 
+  produto: any, 
+  maxRetries: number = BATCH_CONFIG.MAX_RETRIES
+): Promise<{ success: boolean; error?: string; retries: number }> {
+  let lastError = '';
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (!produto.codigo_erp) {
-        erros.push({ codigo_erp: produto.codigo_erp, erro: 'codigo_erp é obrigatório' });
-        continue;
+        return { success: false, error: 'codigo_erp é obrigatório', retries: 0 };
       }
 
       // Verifica se produto existe pelo codigo_erp
-      const { data: existente } = await supabase
+      const { data: existente, error: selectError } = await supabase
         .from('produtos_catalogo_fornecedor')
         .select('id')
         .eq('fornecedor_global_id', fornecedorGlobalId)
         .eq('codigo_erp', produto.codigo_erp)
         .single();
+
+      // Erros de "not found" são esperados para novos produtos
+      if (selectError && selectError.code !== 'PGRST116') {
+        throw new Error(selectError.message);
+      }
 
       if (existente) {
         // Update
@@ -107,10 +137,7 @@ async function syncProdutos(supabase: any, fornecedorGlobalId: string, produtos:
           })
           .eq('id', existente.id);
 
-        if (updateError) {
-          erros.push({ codigo_erp: produto.codigo_erp, erro: updateError.message });
-          continue;
-        }
+        if (updateError) throw new Error(updateError.message);
       } else {
         // Insert
         const { error: insertError } = await supabase
@@ -126,23 +153,122 @@ async function syncProdutos(supabase: any, fornecedorGlobalId: string, produtos:
             unidade_venda: produto.unidade || 'UN'
           });
 
-        if (insertError) {
-          erros.push({ codigo_erp: produto.codigo_erp, erro: insertError.message });
-          continue;
-        }
+        if (insertError) throw new Error(insertError.message);
       }
-      processados++;
+      
+      return { success: true, retries: attempt - 1 };
     } catch (e: any) {
-      erros.push({ codigo_erp: produto.codigo_erp, erro: e.message });
+      lastError = e.message;
+      
+      // Se não é a última tentativa, aguarda com backoff exponencial
+      if (attempt < maxRetries) {
+        const delayMs = BATCH_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+        await delay(delayMs);
+      }
+    }
+  }
+  
+  return { success: false, error: lastError, retries: maxRetries };
+}
+
+// Processa um chunk de produtos
+async function processarChunkProdutos(
+  supabase: any,
+  fornecedorGlobalId: string,
+  chunk: any[],
+  chunkIndex: number
+): Promise<{ processados: number; erros: any[]; totalRetries: number }> {
+  let processados = 0;
+  let totalRetries = 0;
+  const erros: any[] = [];
+
+  // Processar produtos do chunk sequencialmente para evitar rate limits
+  for (const produto of chunk) {
+    const resultado = await processarProdutoComRetry(supabase, fornecedorGlobalId, produto);
+    
+    if (resultado.success) {
+      processados++;
+      totalRetries += resultado.retries;
+    } else {
+      erros.push({ 
+        codigo_erp: produto.codigo_erp, 
+        erro: resultado.error,
+        retries: resultado.retries,
+        chunk: chunkIndex
+      });
     }
   }
 
+  return { processados, erros, totalRetries };
+}
+
+// Ação: sync_produtos (com batch, chunks e retry automático)
+async function syncProdutos(supabase: any, fornecedorGlobalId: string, produtos: any[]) {
+  const startTime = Date.now();
+  let totalProcessados = 0;
+  let totalRetries = 0;
+  const todosErros: any[] = [];
+
+  // Dividir em chunks
+  const chunks = chunkArray(produtos, BATCH_CONFIG.CHUNK_SIZE);
+  const totalChunks = chunks.length;
+
+  console.log(`[sync_produtos] Iniciando processamento de ${produtos.length} produtos em ${totalChunks} chunks`);
+
+  // Processar chunks em paralelo (limitado por CONCURRENT_CHUNKS)
+  for (let i = 0; i < chunks.length; i += BATCH_CONFIG.CONCURRENT_CHUNKS) {
+    const chunksToProcess = chunks.slice(i, i + BATCH_CONFIG.CONCURRENT_CHUNKS);
+    
+    const resultados = await Promise.all(
+      chunksToProcess.map((chunk, idx) => 
+        processarChunkProdutos(supabase, fornecedorGlobalId, chunk, i + idx + 1)
+      )
+    );
+
+    // Agregar resultados
+    for (const resultado of resultados) {
+      totalProcessados += resultado.processados;
+      totalRetries += resultado.totalRetries;
+      todosErros.push(...resultado.erros);
+    }
+
+    // Log de progresso
+    const processedChunks = Math.min(i + BATCH_CONFIG.CONCURRENT_CHUNKS, totalChunks);
+    console.log(`[sync_produtos] Progresso: ${processedChunks}/${totalChunks} chunks processados`);
+  }
+
+  const elapsedTime = Date.now() - startTime;
+
   await registrarLog(
     supabase, fornecedorGlobalId, 'produtos', 'erp_para_cloud',
-    produtos.length, processados, erros.length, erros, { acao: 'sync_produtos' }
+    produtos.length, totalProcessados, todosErros.length, todosErros, 
+    { 
+      acao: 'sync_produtos',
+      batch_config: {
+        chunk_size: BATCH_CONFIG.CHUNK_SIZE,
+        total_chunks: totalChunks,
+        concurrent_chunks: BATCH_CONFIG.CONCURRENT_CHUNKS,
+        max_retries: BATCH_CONFIG.MAX_RETRIES
+      },
+      performance: {
+        elapsed_ms: elapsedTime,
+        items_per_second: Math.round(produtos.length / (elapsedTime / 1000)),
+        total_retries: totalRetries
+      }
+    }
   );
 
-  return { processados, erros: erros.length, detalhes: erros };
+  return { 
+    processados: totalProcessados, 
+    erros: todosErros.length, 
+    detalhes: todosErros,
+    batch_info: {
+      total_itens: produtos.length,
+      chunks_processados: totalChunks,
+      tempo_ms: elapsedTime,
+      retries_totais: totalRetries
+    }
+  };
 }
 
 // Ação: sync_clientes
