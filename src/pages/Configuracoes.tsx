@@ -3,11 +3,13 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   if (loading) {
     return (
@@ -119,6 +121,37 @@ const Configuracoes = () => {
               <h1 className="text-xl sm:text-3xl font-bold text-foreground">Configurações</h1>
               <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">Gerencie cadastros e configurações</p>
             </div>
+          </div>
+        </div>
+
+        {/* Theme Selector */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Palette className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Aparência</h2>
+            <span className="text-sm text-muted-foreground">— Tema visual do sistema</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <button
+              onClick={() => setTheme("light")}
+              className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "light" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+            >
+              <div className="w-full h-16 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                <Sun className="w-6 h-6 text-yellow-500" />
+              </div>
+              <span className="text-sm font-medium text-foreground">White</span>
+              {theme === "light" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "dark" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+            >
+              <div className="w-full h-16 rounded-lg bg-[hsl(160,30%,6%)] border border-[hsl(160,20%,18%)] flex items-center justify-center">
+                <TreePine className="w-6 h-6 text-emerald-400" />
+              </div>
+              <span className="text-sm font-medium text-foreground">Dark Green</span>
+              {theme === "dark" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+            </button>
           </div>
         </div>
 
