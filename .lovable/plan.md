@@ -1,66 +1,71 @@
 
+# Plano: Seletor de Tema nas Configuracoes (Dark Green / White)
 
-# Plano: Tema Claro para o Modulo "Meus Lotes"
+## Objetivo
 
-## Problema
+Permitir que o usuario escolha entre dois temas visuais diretamente na tela de Configuracoes:
+- **White** (claro) - padrao atual, ideal para uso no campo
+- **Dark Green** (escuro) - o tema original do sistema
 
-O sistema inteiro usa apenas um tema escuro (fundo quase preto com texto claro). No campo, sob luz solar, isso dificulta muito a leitura no celular. O modulo "Meus Lotes" e "Detalhe do Lote" sao os mais usados no campo e precisam de um tema claro.
+A preferencia sera salva no `localStorage` e persistida entre sessoes.
 
-## Solucao
+## Arquivos a Criar
 
-Adicionar um tema claro como padrao no `:root` do CSS, movendo o tema escuro atual para a classe `.dark`. Isso permite que o app use tema claro por padrao, mantendo compatibilidade com dark mode via toggle.
+### 1. `src/hooks/useTheme.tsx`
 
-## Alteracoes
+Hook customizado para gerenciar o tema:
+- Le a preferencia salva no `localStorage` (chave `app-theme`)
+- Aplica/remove a classe `dark` no elemento `<html>`
+- Padrao: `"light"` (White)
+- Exporta `theme` (valor atual) e `setTheme` (funcao para trocar)
 
-### 1. Arquivo: `src/index.css`
+## Arquivos a Modificar
 
-Redefinir as variaveis CSS:
+### 2. `src/pages/Configuracoes.tsx`
 
-- **`:root` (tema claro - novo padrao):**
-  - Background: branco/cinza muito claro
-  - Foreground: cinza escuro/preto
-  - Cards: branco com bordas suaves
-  - Primary: verde (manter identidade visual)
-  - Muted/secondary: tons de cinza claro
+Adicionar um novo card no grid de configuracoes:
+- Titulo: **"Aparencia"**
+- Descricao: "Tema visual do sistema"
+- Icone: `Palette` (do lucide-react)
+- Ao clicar, nao navega para outra pagina - abre um seletor inline ou usa toggle direto no card
+- Duas opcoes visuais:
+  - **White** - fundo claro com preview de cores
+  - **Dark Green** - fundo escuro com preview de cores
+- O tema selecionado recebe destaque visual (borda verde)
+- A troca e instantanea e salva no `localStorage`
 
-- **`.dark` (tema escuro - atual):**
-  - Mover os valores atuais do `:root` para `.dark`
+### 3. `src/App.tsx`
 
-Exemplo das novas variaveis claras:
+Adicionar a inicializacao do tema na raiz do app:
+- Ler `localStorage` no carregamento
+- Aplicar classe `dark` no `<html>` se o tema salvo for "dark"
+- Isso garante que o tema correto seja aplicado antes do primeiro render
+
+## Fluxo
 
 ```text
-:root (CLARO)
-  --background:      0 0% 100%        (branco)
-  --foreground:      160 10% 15%      (cinza escuro)
-  --card:            0 0% 99%         (branco levemente acinzentado)
-  --primary:         145 60% 40%      (verde - mantido)
-  --muted:           160 10% 95%      (cinza bem claro)
-  --border:          160 10% 88%      (cinza claro)
-
-.dark (ESCURO - valores atuais)
-  --background:      160 30% 6%       (preto esverdeado)
-  --foreground:      120 20% 95%      (branco)
-  ... (todos os valores atuais)
+Usuario abre Configuracoes
+  -> Ve card "Aparencia" junto aos demais cards
+  -> Clica no card -> expande seletor de tema inline
+  -> Seleciona "Dark Green" ou "White"
+  -> Classe "dark" e adicionada/removida do <html>
+  -> Preferencia salva no localStorage
+  -> Todas as telas refletem o tema imediatamente
 ```
 
-### 2. Arquivo: `src/index.css` - Gradientes customizados
+## Detalhes Tecnicos
 
-Atualizar os custom tokens (gradientes e sombras) para funcionarem em ambos os temas, criando versoes claras para `:root` e mantendo as atuais em `.dark`.
-
-### 3. Nenhuma alteracao nos componentes
-
-Como `MeusLotes.tsx`, `LoteDetalhe.tsx`, `LoteCard.tsx` e todos os dialogos ja usam classes semanticas do Tailwind (`bg-background`, `text-foreground`, `text-muted-foreground`, etc.), eles vao se adaptar automaticamente ao novo tema claro sem nenhuma alteracao de componente.
+- O CSS ja possui ambos os temas definidos (`:root` para claro, `.dark` para escuro)
+- Nenhuma alteracao no CSS e necessaria
+- O `next-themes` ja esta instalado mas nao sera usado - um hook simples e suficiente e evita dependencias extras
+- A preferencia fica apenas no navegador do usuario (localStorage), sem necessidade de banco de dados
 
 ## Resultado
 
-- O app inteiro fica com tema claro por padrao
-- Melhor visibilidade no campo sob luz solar
-- Tema escuro permanece disponivel via classe `.dark` (para uso futuro com toggle)
-- Zero alteracoes em componentes React
-
-## Arquivo a Modificar
-
-| Arquivo | Operacao |
-|---------|----------|
-| `src/index.css` | MODIFICAR - Reorganizar variaveis CSS |
-
+| Item | Detalhe |
+|------|---------|
+| Arquivos novos | `src/hooks/useTheme.tsx` |
+| Arquivos modificados | `src/pages/Configuracoes.tsx`, `src/App.tsx` |
+| Persistencia | localStorage |
+| Temas disponiveis | White (claro), Dark Green (escuro) |
+| Padrao | White |
