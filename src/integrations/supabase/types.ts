@@ -6166,7 +6166,23 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      rastreio_ovos: {
+        Row: {
+          classificacao_peso:
+            | Database["public"]["Enums"]["classificacao_peso_ovo"]
+            | null
+          data_producao: string | null
+          data_validade: string | null
+          galpao_nome: string | null
+          lote_interno: string | null
+          nucleo_nome: string | null
+          produtor_cidade: string | null
+          produtor_estado: string | null
+          produtor_nome: string | null
+          tipo_ovo: Database["public"]["Enums"]["tipo_ovo"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calcular_fase_postura: {
