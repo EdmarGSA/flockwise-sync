@@ -46,6 +46,7 @@ import OrdensProducao from "./pages/OrdensProducao";
 import PortalFornecedor from "./pages/PortalFornecedor";
 import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
+import RastreioOvos from "./pages/RastreioOvos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -380,6 +381,9 @@ const AppRoutes = () => (
     
     {/* Vitrine pública do fornecedor */}
     <Route path="/vitrine/:id" element={<VitrineFornecedor />} />
+    
+    {/* Rastreio público de ovos */}
+    <Route path="/rastreio/:lote" element={<RastreioOvos />} />
     
     {/* Catch-all */}
     <Route path="*" element={<NotFound />} />
