@@ -19,6 +19,7 @@ import KardexOvosView from '@/components/ovos/KardexOvosView';
 import AjusteInventarioOvosDialog from '@/components/ovos/AjusteInventarioOvosDialog';
 import DashboardProducaoDemanda from '@/components/ovos/DashboardProducaoDemanda';
 import EtiquetaCaixaOvosDialog from '@/components/ovos/EtiquetaCaixaOvosDialog';
+import ConfigValidadeOvosDialog from '@/components/ovos/ConfigValidadeOvosDialog';
 
 interface EstoqueOvo {
   id: string;
@@ -73,8 +74,10 @@ export default function EstoqueOvos() {
   const [activeTab, setActiveTab] = useState('estoque');
   const [ajusteDialogOpen, setAjusteDialogOpen] = useState(false);
   const [etiquetaDialogOpen, setEtiquetaDialogOpen] = useState(false);
+  const [configValidadeOpen, setConfigValidadeOpen] = useState(false);
   const [selectedEstoqueItem, setSelectedEstoqueItem] = useState<EstoqueOvo | null>(null);
   const [liberandoCarencia, setLiberandoCarencia] = useState(false);
+  const [configValidade, setConfigValidade] = useState<any>(null);
   const [lotesPostura, setLotesPostura] = useState<LotePostura[]>([]);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [formData, setFormData] = useState({
@@ -89,7 +92,10 @@ export default function EstoqueOvos() {
   });
 
   useEffect(() => {
-    if (user) fetchEstoque();
+    if (user) {
+      fetchEstoque();
+      fetchConfigValidade();
+    }
   }, [user]);
 
   useEffect(() => {
@@ -97,6 +103,26 @@ export default function EstoqueOvos() {
       fetchLotesPostura();
     }
   }, [dialogOpen, user]);
+
+  const fetchConfigValidade = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('config_validade_ovos' as any)
+        .select('*')
+        .eq('integrado_id', user.id)
+        .maybeSingle();
+      setConfigValidade(data);
+    } catch (e) {
+      console.error('Erro ao buscar config validade:', e);
+    }
+  };
+
+  const getDiasValidade = (tipoOvo: string): number => {
+    if (!configValidade) return 30;
+    const tipoKey = `dias_validade_${tipoOvo}` as string;
+    return (configValidade as any)[tipoKey] || configValidade.dias_validade_padrao || 30;
+  };
 
   const fetchLotesPostura = async () => {
     if (!user) return;
@@ -139,14 +165,90 @@ export default function EstoqueOvos() {
     return 'castanho';
   };
 
-  const handleLoteChange = (loteId: string) => {
+  const handleLoteChange = async (loteId: string) => {
     const lote = lotesPostura.find(l => l.id === loteId);
     const tipoOvoInferido = lote ? inferirTipoOvo(lote.linhagem_postura) : '';
+    const dias = getDiasValidade(tipoOvoInferido);
+    
     setFormData(prev => ({
       ...prev,
       lote_producao_id: loteId,
-      tipo_ovo: tipoOvoInferido
+      tipo_ovo: tipoOvoInferido,
+      data_validade: format(addDays(new Date(prev.data_producao), dias), 'yyyy-MM-dd'),
     }));
+
+    // Auto-calculate cost
+    if (loteId) {
+      try {
+        // Fetch feed costs
+        const { data: racaoData } = await supabase
+          .from('solicitacoes_racao' as any)
+          .select('quantidade_kg, produto:produtos(custo_medio)')
+          .eq('lote_id', loteId)
+          .eq('status', 'recebida');
+        
+        let custoRacao = 0;
+        if (racaoData) {
+          custoRacao = (racaoData as any[]).reduce((sum: number, r: any) => {
+            const custoMedio = r.produto?.custo_medio || 0;
+            return sum + (r.quantidade_kg * custoMedio);
+          }, 0);
+        }
+
+        // Fetch medication costs
+        const { data: medsData } = await supabase
+          .from('tratamentos_lote' as any)
+          .select('custo_total')
+          .eq('lote_id', loteId);
+        
+        const custoMeds = (medsData as any[] || []).reduce((sum: number, t: any) => sum + (t.custo_total || 0), 0);
+
+        // Fetch bird cost from lote
+        const { data: loteData } = await supabase
+          .from('lotes')
+          .select('custo_aves, quantidade_aves, data_alojamento')
+          .eq('id', loteId)
+          .single();
+
+        const custoPintinhas = (loteData as any)?.custo_aves || 0;
+        const qtdAves = loteData?.quantidade_aves || 1;
+        const dataAloj = loteData?.data_alojamento;
+
+        // Fetch fixed costs config
+        const { data: configCusto } = await supabase
+          .from('config_custo_postura' as any)
+          .select('*')
+          .eq('integrado_id', user?.id)
+          .maybeSingle();
+
+        const diasProducao = dataAloj ? differenceInDays(new Date(), new Date(dataAloj)) : 0;
+        const custoFixoDiario = ((configCusto as any)?.custo_ave_dia || 0) + ((configCusto as any)?.custo_mao_obra_dia || 0) + ((configCusto as any)?.outros_custos_dia || 0);
+        const custoFixoTotal = custoFixoDiario * qtdAves * Math.max(diasProducao, 1);
+
+        // Total eggs produced so far
+        const { count: totalOvos } = await supabase
+          .from('estoque_ovos')
+          .select('*', { count: 'exact', head: true })
+          .eq('lote_producao_id', loteId);
+
+        // Use sum of quantidade_inicial instead
+        const { data: somaOvos } = await supabase
+          .from('estoque_ovos')
+          .select('quantidade_inicial')
+          .eq('lote_producao_id', loteId);
+        
+        const totalOvosProd = (somaOvos || []).reduce((sum: number, o: any) => sum + (o.quantidade_inicial || 0), 0) || 1;
+
+        const custoUnitario = (custoRacao + custoMeds + custoPintinhas + custoFixoTotal) / totalOvosProd;
+
+        setFormData(prev => ({
+          ...prev,
+          custo_unitario: parseFloat(custoUnitario.toFixed(4)),
+        }));
+      } catch (err) {
+        console.error('Erro ao calcular custo:', err);
+      }
+    }
   };
 
   const fetchEstoque = async () => {
@@ -406,6 +508,9 @@ export default function EstoqueOvos() {
               <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                 <CardTitle>Lotes em Estoque (FIFO)</CardTitle>
                 <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setConfigValidadeOpen(true)}>
+                    <Settings2 className="w-4 h-4 mr-2" /> Validade
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setEtiquetaDialogOpen(true)}>
                     <Tag className="w-4 h-4 mr-2" /> Etiquetas
                   </Button>
@@ -488,10 +593,11 @@ export default function EstoqueOvos() {
                             type="date"
                             value={formData.data_producao}
                             onChange={(e) => {
+                              const dias = getDiasValidade(formData.tipo_ovo);
                               setFormData(prev => ({
                                 ...prev,
                                 data_producao: e.target.value,
-                                data_validade: format(addDays(new Date(e.target.value), 30), 'yyyy-MM-dd')
+                                data_validade: format(addDays(new Date(e.target.value), dias), 'yyyy-MM-dd')
                               }));
                             }}
                             required
@@ -687,6 +793,15 @@ export default function EstoqueOvos() {
         <EtiquetaCaixaOvosDialog
           open={etiquetaDialogOpen}
           onOpenChange={setEtiquetaDialogOpen}
+          integradoId={user.id}
+        />
+
+        <ConfigValidadeOvosDialog
+          open={configValidadeOpen}
+          onOpenChange={(open) => {
+            setConfigValidadeOpen(open);
+            if (!open) fetchConfigValidade();
+          }}
           integradoId={user.id}
         />
       </main>

@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Printer, Tag } from 'lucide-react';
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 
 interface EtiquetaCaixaOvosDialogProps {
   open: boolean;
@@ -114,7 +115,7 @@ export default function EtiquetaCaixaOvosDialog({
     }
   };
 
-  const gerarEtiquetas = () => {
+  const gerarEtiquetas = async () => {
     if (selecionados.size === 0) {
       toast.error('Selecione pelo menos um lote');
       return;
@@ -126,7 +127,6 @@ export default function EtiquetaCaixaOvosDialog({
       format: 'a4',
     });
 
-    // Configuração para etiquetas 3x10 (3 colunas, 10 linhas por página)
     const etiquetaLargura = 63;
     const etiquetaAltura = 29;
     const margemEsquerda = 7;
@@ -138,66 +138,87 @@ export default function EtiquetaCaixaOvosDialog({
     let linha = 0;
     let totalEtiquetas = 0;
 
-    lotes
-      .filter(l => selecionados.has(l.id))
-      .forEach((lote) => {
-        const quantidade = quantidadeEtiquetas[lote.id] || 1;
+    const baseUrl = window.location.origin;
+    const lotesParaImprimir = lotes.filter(l => selecionados.has(l.id));
 
-        for (let i = 0; i < quantidade; i++) {
-          if (linha >= 10) {
-            doc.addPage();
-            col = 0;
-            linha = 0;
-          }
+    // Pre-generate QR codes
+    const qrMap: Record<string, string> = {};
+    for (const lote of lotesParaImprimir) {
+      try {
+        const url = `${baseUrl}/rastreio/${encodeURIComponent(lote.lote_interno)}`;
+        qrMap[lote.id] = await QRCode.toDataURL(url, { 
+          width: 80, 
+          margin: 0,
+          errorCorrectionLevel: 'M'
+        });
+      } catch (e) {
+        console.error('Erro ao gerar QR:', e);
+      }
+    }
 
-          const x = margemEsquerda + col * (etiquetaLargura + espacoHorizontal);
-          const y = margemTopo + linha * (etiquetaAltura + espacoVertical);
+    lotesParaImprimir.forEach((lote) => {
+      const quantidade = quantidadeEtiquetas[lote.id] || 1;
 
-          // Borda da etiqueta
-          doc.setDrawColor(180);
-          doc.setLineWidth(0.1);
-          doc.rect(x, y, etiquetaLargura, etiquetaAltura);
-
-          // Empresa (cabeçalho)
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
-          const nomeEmpresa = organizacao?.nome_fantasia || organizacao?.razao_social || 'PRODUTOR';
-          doc.text(nomeEmpresa.substring(0, 30), x + 2, y + 4);
-
-          // Tipo e Classificação
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          const tipoClass = `${TIPOS_LABEL[lote.tipo_ovo] || lote.tipo_ovo} - ${CLASSIFICACAO_LABEL[lote.classificacao_peso] || lote.classificacao_peso}`;
-          doc.text(tipoClass, x + 2, y + 10);
-
-          // Lote
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.text(`Lote: ${lote.lote_interno}`, x + 2, y + 15);
-
-          // Datas
-          doc.setFontSize(7);
-          doc.text(`Prod: ${format(new Date(lote.data_producao), 'dd/MM/yyyy')}`, x + 2, y + 20);
-          doc.text(`Val: ${format(new Date(lote.data_validade), 'dd/MM/yyyy')}`, x + 2, y + 24);
-
-          // Código de barras simplificado (linha de texto)
-          doc.setFontSize(8);
-          doc.setFont('courier', 'normal');
-          doc.text(lote.lote_interno, x + etiquetaLargura - 25, y + 24);
-
-          // Quantidade na etiqueta
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${lote.quantidade_atual} un`, x + etiquetaLargura - 18, y + 12);
-
-          totalEtiquetas++;
-          col++;
-          if (col >= 3) {
-            col = 0;
-            linha++;
-          }
+      for (let i = 0; i < quantidade; i++) {
+        if (linha >= 10) {
+          doc.addPage();
+          col = 0;
+          linha = 0;
         }
-      });
+
+        const x = margemEsquerda + col * (etiquetaLargura + espacoHorizontal);
+        const y = margemTopo + linha * (etiquetaAltura + espacoVertical);
+
+        // Borda
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.1);
+        doc.rect(x, y, etiquetaLargura, etiquetaAltura);
+
+        // Empresa
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        const nomeEmpresa = organizacao?.nome_fantasia || organizacao?.razao_social || organizacao?.nome || 'PRODUTOR';
+        doc.text(nomeEmpresa.substring(0, 28), x + 2, y + 4);
+
+        // Tipo e Classificação
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        const tipoClass = `${TIPOS_LABEL[lote.tipo_ovo] || lote.tipo_ovo} - ${CLASSIFICACAO_LABEL[lote.classificacao_peso] || lote.classificacao_peso}`;
+        doc.text(tipoClass, x + 2, y + 10);
+
+        // Lote
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Lote: ${lote.lote_interno}`, x + 2, y + 15);
+
+        // Datas
+        doc.setFontSize(6.5);
+        doc.text(`Prod: ${format(new Date(lote.data_producao), 'dd/MM/yyyy')}`, x + 2, y + 19);
+        doc.text(`Val: ${format(new Date(lote.data_validade), 'dd/MM/yyyy')}`, x + 2, y + 23);
+
+        // Quantidade
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${lote.quantidade_atual} un`, x + 2, y + 28);
+
+        // QR Code
+        const qrDataUrl = qrMap[lote.id];
+        if (qrDataUrl) {
+          const qrSize = 16;
+          doc.addImage(qrDataUrl, 'PNG', x + etiquetaLargura - qrSize - 2, y + 2, qrSize, qrSize);
+          doc.setFontSize(4);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Rastreio', x + etiquetaLargura - qrSize - 1, y + qrSize + 4);
+        }
+
+        totalEtiquetas++;
+        col++;
+        if (col >= 3) {
+          col = 0;
+          linha++;
+        }
+      }
+    });
 
     doc.save(`etiquetas_ovos_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
     toast.success(`${totalEtiquetas} etiqueta(s) gerada(s) com sucesso!`);
