@@ -1,17 +1,21 @@
 
 
-## Envolver o seletor de tema em um Card
+## Transformar o card de Aparencia em card compacto com dialog
 
-Na pagina de Configuracoes, a secao "Aparencia" (tema visual do sistema) esta renderizada sem um Card ao redor, diferente dos demais itens da pagina. A correcao e simples:
+O card de Aparencia ficara do mesmo tamanho dos demais cards de menu. Ao clicar nele, abrira um Dialog (modal) para o usuario selecionar o tema, evitando trocas acidentais.
 
-### Alteracao
+### Alteracoes
 
 **Arquivo:** `src/pages/Configuracoes.tsx`
 
-- Envolver toda a secao de "Aparencia" (icone Palette, titulo, subtitulo e os botoes de tema) dentro de um componente `Card` com `CardHeader` e `CardContent`, seguindo o mesmo padrao visual dos cards de menu abaixo.
-- O titulo "Aparencia" e subtitulo "Tema visual do sistema" ficam no `CardHeader` com `CardTitle` e `CardDescription`.
-- Os botoes de selecao de tema ficam dentro do `CardContent`.
-- Remover a estrutura manual atual (div com flex + h2 + span) e substituir pela estrutura padrao de Card.
+1. Remover o bloco atual do Card de Aparencia (com CardContent e botoes de tema embutidos).
+2. Adicionar "Aparencia" como mais um item no array `menuItems`, com icone `Palette`, descricao "Tema visual do sistema", mas em vez de `path`, tera uma acao que abre um Dialog.
+3. Criar um state `themeDialogOpen` para controlar a abertura do Dialog.
+4. No grid de cards, o card de Aparencia tera a mesma estrutura dos demais (so icone, titulo e descricao), mas ao clicar abrira o dialog em vez de navegar.
+5. Renderizar um `Dialog` com os dois botoes de tema (White e Dark Green) dentro, usando os mesmos estilos atuais dos botoes de selecao.
 
-Resultado: a secao de tema fica visualmente consistente com o restante da pagina.
+### Resultado
 
+- O card de Aparencia fica visualmente identico aos outros cards do grid.
+- O usuario so troca o tema quando clica no card e depois seleciona no modal, eliminando trocas acidentais.
+- Nenhum arquivo novo sera criado; tudo fica em `Configuracoes.tsx` usando o componente `Dialog` ja existente no projeto.
