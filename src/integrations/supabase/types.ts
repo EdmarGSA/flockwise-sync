@@ -500,6 +500,42 @@ export type Database = {
           },
         ]
       }
+      config_validade_ovos: {
+        Row: {
+          created_at: string
+          dias_validade_branco: number | null
+          dias_validade_caipira: number | null
+          dias_validade_castanho: number | null
+          dias_validade_padrao: number
+          dias_validade_vermelho: number | null
+          id: string
+          integrado_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dias_validade_branco?: number | null
+          dias_validade_caipira?: number | null
+          dias_validade_castanho?: number | null
+          dias_validade_padrao?: number
+          dias_validade_vermelho?: number | null
+          id?: string
+          integrado_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dias_validade_branco?: number | null
+          dias_validade_caipira?: number | null
+          dias_validade_castanho?: number | null
+          dias_validade_padrao?: number
+          dias_validade_vermelho?: number | null
+          id?: string
+          integrado_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contas_bancarias: {
         Row: {
           agencia: string
