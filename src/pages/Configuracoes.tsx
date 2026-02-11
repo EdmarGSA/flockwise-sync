@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -125,35 +125,39 @@ const Configuracoes = () => {
         </div>
 
         {/* Theme Selector */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Palette className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Aparência</h2>
-            <span className="text-sm text-muted-foreground">— Tema visual do sistema</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <button
-              onClick={() => setTheme("light")}
-              className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "light" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
-            >
-              <div className="w-full h-16 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
-                <Sun className="w-6 h-6 text-yellow-500" />
-              </div>
-              <span className="text-sm font-medium text-foreground">White</span>
-              {theme === "light" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
-            </button>
-            <button
-              onClick={() => setTheme("dark")}
-              className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "dark" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
-            >
-              <div className="w-full h-16 rounded-lg bg-[hsl(160,30%,6%)] border border-[hsl(160,20%,18%)] flex items-center justify-center">
-                <TreePine className="w-6 h-6 text-emerald-400" />
-              </div>
-              <span className="text-sm font-medium text-foreground">Dark Green</span>
-              {theme === "dark" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
-            </button>
-          </div>
-        </div>
+        <Card className="mb-6 sm:mb-8">
+          <CardHeader className="p-4 sm:p-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+              <Palette className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+            </div>
+            <CardTitle className="text-base sm:text-lg">Aparência</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Tema visual do sistema</CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <button
+                onClick={() => setTheme("light")}
+                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "light" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+              >
+                <div className="w-full h-16 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                  <Sun className="w-6 h-6 text-yellow-500" />
+                </div>
+                <span className="text-sm font-medium text-foreground">White</span>
+                {theme === "light" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+              </button>
+              <button
+                onClick={() => setTheme("dark")}
+                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "dark" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+              >
+                <div className="w-full h-16 rounded-lg bg-[hsl(160,30%,6%)] border border-[hsl(160,20%,18%)] flex items-center justify-center">
+                  <TreePine className="w-6 h-6 text-emerald-400" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Dark Green</span>
+                {theme === "dark" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {menuItems.map((item) => (
