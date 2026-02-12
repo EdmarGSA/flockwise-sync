@@ -928,6 +928,47 @@ export type Database = {
         }
         Relationships: []
       }
+      descarte_ovos: {
+        Row: {
+          created_at: string
+          destino: Database["public"]["Enums"]["destino_descarte_ovo"]
+          estoque_ovo_id: string | null
+          id: string
+          integrado_id: string
+          motivo: string | null
+          observacao: string | null
+          quantidade: number
+        }
+        Insert: {
+          created_at?: string
+          destino: Database["public"]["Enums"]["destino_descarte_ovo"]
+          estoque_ovo_id?: string | null
+          id?: string
+          integrado_id: string
+          motivo?: string | null
+          observacao?: string | null
+          quantidade: number
+        }
+        Update: {
+          created_at?: string
+          destino?: Database["public"]["Enums"]["destino_descarte_ovo"]
+          estoque_ovo_id?: string | null
+          id?: string
+          integrado_id?: string
+          motivo?: string | null
+          observacao?: string | null
+          quantidade?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "descarte_ovos_estoque_ovo_id_fkey"
+            columns: ["estoque_ovo_id"]
+            isOneToOne: false
+            referencedRelation: "estoque_ovos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       desempenho_aves: {
         Row: {
           consumo_acumulado_racao_g: number
@@ -6322,7 +6363,12 @@ export type Database = {
         | "fornecedor"
         | "vendedor_fornecedor"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
-      classificacao_peso_ovo: "medio" | "grande" | "extra" | "jumbo"
+      classificacao_peso_ovo:
+        | "medio"
+        | "grande"
+        | "extra"
+        | "jumbo"
+        | "quebrado"
       conta_pagar_status: "previsto" | "pendente" | "pago" | "cancelado"
       conta_receber_status:
         | "previsao"
@@ -6330,6 +6376,13 @@ export type Database = {
         | "recebido"
         | "parcial"
         | "cancelado"
+      destino_descarte_ovo:
+        | "industria"
+        | "compostagem"
+        | "doacao"
+        | "descarte_sanitario"
+        | "reciclagem_animal"
+        | "outro"
       divergencia_status:
         | "aberta"
         | "em_negociacao"
@@ -6547,7 +6600,7 @@ export const Constants = {
         "vendedor_fornecedor",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
-      classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo"],
+      classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo", "quebrado"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
       conta_receber_status: [
         "previsao",
@@ -6555,6 +6608,14 @@ export const Constants = {
         "recebido",
         "parcial",
         "cancelado",
+      ],
+      destino_descarte_ovo: [
+        "industria",
+        "compostagem",
+        "doacao",
+        "descarte_sanitario",
+        "reciclagem_animal",
+        "outro",
       ],
       divergencia_status: [
         "aberta",
