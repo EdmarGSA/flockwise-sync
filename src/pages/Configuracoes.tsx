@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 
 const Configuracoes = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
 
   if (loading) {
     return (
@@ -124,41 +127,6 @@ const Configuracoes = () => {
           </div>
         </div>
 
-        {/* Theme Selector */}
-        <Card className="mb-6 sm:mb-8">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-              <Palette className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-            </div>
-            <CardTitle className="text-base sm:text-lg">Aparência</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Tema visual do sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              <button
-                onClick={() => setTheme("light")}
-                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "light" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
-              >
-                <div className="w-full h-16 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
-                  <Sun className="w-6 h-6 text-yellow-500" />
-                </div>
-                <span className="text-sm font-medium text-foreground">White</span>
-                {theme === "light" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
-              </button>
-              <button
-                onClick={() => setTheme("dark")}
-                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "dark" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
-              >
-                <div className="w-full h-16 rounded-lg bg-[hsl(160,30%,6%)] border border-[hsl(160,20%,18%)] flex items-center justify-center">
-                  <TreePine className="w-6 h-6 text-emerald-400" />
-                </div>
-                <span className="text-sm font-medium text-foreground">Dark Green</span>
-                {theme === "dark" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {menuItems.map((item) => (
             <Card 
@@ -175,7 +143,53 @@ const Configuracoes = () => {
               </CardHeader>
             </Card>
           ))}
+
+          {/* Aparência card */}
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-lg"
+            onClick={() => setThemeDialogOpen(true)}
+          >
+            <CardHeader className="p-4 sm:p-6">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                <Palette className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              </div>
+              <CardTitle className="text-base sm:text-lg">Aparência</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Tema visual do sistema</CardDescription>
+            </CardHeader>
+          </Card>
         </div>
+
+        {/* Theme Dialog */}
+        <Dialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Aparência</DialogTitle>
+              <DialogDescription>Selecione o tema visual do sistema</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => { setTheme("light"); setThemeDialogOpen(false); }}
+                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "light" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+              >
+                <div className="w-full h-16 rounded-lg bg-card border border-border flex items-center justify-center">
+                  <Sun className="w-6 h-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-foreground">White</span>
+                {theme === "light" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+              </button>
+              <button
+                onClick={() => { setTheme("dark"); setThemeDialogOpen(false); }}
+                className={`relative rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${theme === "dark" ? "border-primary shadow-md" : "border-border hover:border-primary/40"}`}
+              >
+                <div className="w-full h-16 rounded-lg bg-[hsl(160,30%,6%)] border border-[hsl(160,20%,18%)] flex items-center justify-center">
+                  <TreePine className="w-6 h-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Dark Green</span>
+                {theme === "dark" && <span className="text-[10px] text-primary font-semibold">ATIVO</span>}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
