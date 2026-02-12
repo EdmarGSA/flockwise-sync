@@ -1,21 +1,59 @@
 
 
-## Transformar o card de Aparencia em card compacto com dialog
+## Estoque de Ovos Quebrados e Descarte com Destino
 
-O card de Aparencia ficara do mesmo tamanho dos demais cards de menu. Ao clicar nele, abrira um Dialog (modal) para o usuario selecionar o tema, evitando trocas acidentais.
+### Resumo
 
-### Alteracoes
+Duas funcionalidades novas no modulo de Estoque de Ovos:
 
-**Arquivo:** `src/pages/Configuracoes.tsx`
+1. **Campo "Ovos Danificados" na entrada manual** - ao registrar uma nova entrada, o usuario podera informar a quantidade de ovos danificados/quebrados. Esses ovos serao registrados automaticamente em um estoque separado (classificacao "quebrado"), com movimento proprio no Kardex.
 
-1. Remover o bloco atual do Card de Aparencia (com CardContent e botoes de tema embutidos).
-2. Adicionar "Aparencia" como mais um item no array `menuItems`, com icone `Palette`, descricao "Tema visual do sistema", mas em vez de `path`, tera uma acao que abre um Dialog.
-3. Criar um state `themeDialogOpen` para controlar a abertura do Dialog.
-4. No grid de cards, o card de Aparencia tera a mesma estrutura dos demais (so icone, titulo e descricao), mas ao clicar abrira o dialog em vez de navegar.
-5. Renderizar um `Dialog` com os dois botoes de tema (White e Dark Green) dentro, usando os mesmos estilos atuais dos botoes de selecao.
+2. **Dialog de Descarte de Ovos** - nova opcao para dar saida de ovos informando o destino do descarte (ex: industria, compostagem, doacao, lixo, reciclagem animal).
 
-### Resultado
+---
 
-- O card de Aparencia fica visualmente identico aos outros cards do grid.
-- O usuario so troca o tema quando clica no card e depois seleciona no modal, eliminando trocas acidentais.
-- Nenhum arquivo novo sera criado; tudo fica em `Configuracoes.tsx` usando o componente `Dialog` ja existente no projeto.
+### Alteracoes no Banco de Dados
+
+**Migration SQL:**
+
+1. Adicionar valor `quebrado` ao enum `classificacao_peso_ovo` (para identificar ovos danificados no estoque).
+2. Criar tabela `descarte_ovos` para registrar saidas de descarte com campo `destino`:
+   - `id`, `integrado_id`, `estoque_ovo_id` (nullable), `quantidade`, `motivo`, `destino`, `observacao`, `created_at`
+   - Destinos possiveis: industria, compostagem, doacao, descarte_sanitario, reciclagem_animal, outro
+   - RLS habilitado com politicas para SELECT/INSERT baseadas em `auth.uid()`
+
+### Alteracoes no Codigo
+
+**1. Formulario de Nova Entrada (`EstoqueOvos.tsx`)**
+
+- Adicionar campo `quantidade_danificados` ao `formData`
+- Exibir input "Ovos Danificados" abaixo do campo de quantidade
+- No `handleSubmit`, apos criar o estoque principal, se `quantidade_danificados > 0`:
+  - Criar um segundo registro em `estoque_ovos` com `classificacao_peso: 'quebrado'`
+  - Registrar entrada no `kardex_ovos` com `tipo_movimento: 'entrada_manual'` e observacao indicando "Ovos danificados"
+  - O lote interno recebera sufixo `-DMG` para diferenciar
+
+**2. Novo componente: `DescarteOvosDialog.tsx`** (`src/components/ovos/`)
+
+- Dialog para registrar descarte de ovos
+- Campos: selecao do lote de estoque, quantidade a descartar, destino (select com opcoes), motivo, observacao
+- Ao confirmar:
+  - Reduz `quantidade_atual` no `estoque_ovos`
+  - Registra movimento no `kardex_ovos` com `tipo_movimento: 'saida_descarte'`
+  - Insere registro na tabela `descarte_ovos` com o destino
+
+**3. Integracao na pagina (`EstoqueOvos.tsx`)**
+
+- Adicionar botao "Descarte" ao lado dos botoes existentes (Validade, Etiquetas, Entrada Manual)
+- Adicionar o `DescarteOvosDialog` nos dialogs da pagina
+- Nos cards de resumo, mostrar ovos quebrados separadamente se existirem
+
+### Destinos de Descarte Disponiveis
+
+- Industria (processamento)
+- Compostagem
+- Doacao
+- Descarte Sanitario
+- Reciclagem Animal (racao)
+- Outro
+
