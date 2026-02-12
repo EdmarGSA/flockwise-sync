@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Plus, Egg, AlertTriangle, Package, History, Search, Settings2, Tag, BarChart3, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Egg, AlertTriangle, Package, History, Search, Settings2, Tag, BarChart3, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +20,7 @@ import AjusteInventarioOvosDialog from '@/components/ovos/AjusteInventarioOvosDi
 import DashboardProducaoDemanda from '@/components/ovos/DashboardProducaoDemanda';
 import EtiquetaCaixaOvosDialog from '@/components/ovos/EtiquetaCaixaOvosDialog';
 import ConfigValidadeOvosDialog from '@/components/ovos/ConfigValidadeOvosDialog';
+import DescarteOvosDialog from '@/components/ovos/DescarteOvosDialog';
 
 interface EstoqueOvo {
   id: string;
@@ -75,6 +76,7 @@ export default function EstoqueOvos() {
   const [ajusteDialogOpen, setAjusteDialogOpen] = useState(false);
   const [etiquetaDialogOpen, setEtiquetaDialogOpen] = useState(false);
   const [configValidadeOpen, setConfigValidadeOpen] = useState(false);
+  const [descarteDialogOpen, setDescarteDialogOpen] = useState(false);
   const [selectedEstoqueItem, setSelectedEstoqueItem] = useState<EstoqueOvo | null>(null);
   const [liberandoCarencia, setLiberandoCarencia] = useState(false);
   const [configValidade, setConfigValidade] = useState<any>(null);
@@ -87,6 +89,7 @@ export default function EstoqueOvos() {
     data_producao: format(new Date(), 'yyyy-MM-dd'),
     data_validade: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
     quantidade: 0,
+    quantidade_danificados: 0,
     custo_unitario: 0,
     observacoes: '',
   });
@@ -333,6 +336,41 @@ export default function EstoqueOvos() {
             : 'Entrada manual de estoque',
         });
 
+      // Registrar ovos danificados se houver
+      if (formData.quantidade_danificados > 0) {
+        const loteDmg = loteInterno + '-DMG';
+        const { data: estoqueDmg, error: dmgError } = await supabase
+          .from('estoque_ovos')
+          .insert([{
+            integrado_id: user.id,
+            lote_interno: loteDmg,
+            lote_producao_id: formData.lote_producao_id,
+            tipo_ovo: formData.tipo_ovo as any,
+            classificacao_peso: 'quebrado' as any,
+            data_producao: formData.data_producao,
+            data_validade: formData.data_validade,
+            quantidade_inicial: formData.quantidade_danificados,
+            quantidade_atual: formData.quantidade_danificados,
+            custo_unitario: formData.custo_unitario,
+            observacoes: 'Ovos danificados/quebrados',
+          }])
+          .select()
+          .single();
+
+        if (dmgError) throw dmgError;
+
+        await supabase.from('kardex_ovos').insert({
+          integrado_id: user.id,
+          estoque_ovo_id: estoqueDmg.id,
+          tipo_movimento: 'entrada_manual',
+          quantidade: formData.quantidade_danificados,
+          saldo_anterior: 0,
+          saldo_atual: formData.quantidade_danificados,
+          documento_ref: loteDmg,
+          observacao: `Ovos danificados - Origem: ${loteOrigemDesc || 'Entrada manual'}`,
+        });
+      }
+
       toast.success(`Lote ${loteInterno} cadastrado com sucesso!`);
       setDialogOpen(false);
       resetForm();
@@ -350,6 +388,7 @@ export default function EstoqueOvos() {
       data_producao: format(new Date(), 'yyyy-MM-dd'),
       data_validade: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       quantidade: 0,
+      quantidade_danificados: 0,
       custo_unitario: 0,
       observacoes: '',
     });
@@ -514,6 +553,9 @@ export default function EstoqueOvos() {
                   <Button variant="outline" size="sm" onClick={() => setEtiquetaDialogOpen(true)}>
                     <Tag className="w-4 h-4 mr-2" /> Etiquetas
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => setDescarteDialogOpen(true)} className="text-destructive border-destructive/50 hover:bg-destructive/10">
+                    <Trash2 className="w-4 h-4 mr-2" /> Descarte
+                  </Button>
                   <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
                     <DialogTrigger asChild>
                       <Button>
@@ -634,6 +676,18 @@ export default function EstoqueOvos() {
                             onChange={(e) => setFormData(prev => ({ ...prev, custo_unitario: parseFloat(e.target.value) || 0 }))}
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Ovos Danificados</Label>
+                        <Input
+                          type="number"
+                          value={formData.quantidade_danificados || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, quantidade_danificados: parseInt(e.target.value) || 0 }))}
+                          min={0}
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-muted-foreground">Serão registrados como estoque &quot;quebrado&quot;</p>
                       </div>
 
                       <div className="space-y-2">
@@ -803,6 +857,13 @@ export default function EstoqueOvos() {
             if (!open) fetchConfigValidade();
           }}
           integradoId={user.id}
+        />
+
+        <DescarteOvosDialog
+          open={descarteDialogOpen}
+          onOpenChange={setDescarteDialogOpen}
+          integradoId={user.id}
+          onSuccess={fetchEstoque}
         />
       </main>
     </div>
