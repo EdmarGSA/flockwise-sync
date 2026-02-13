@@ -17,14 +17,21 @@ interface PedidoViewDialogProps {
 
 type StatusPedido = 'rascunho' | 'pendente_aprovacao' | 'aprovado' | 'em_separacao' | 'faturado' | 'cancelado';
 
+const STATUS_CONFIG: Record<StatusPedido, { label: string; className: string }> = {
+  rascunho: { label: 'Rascunho', className: 'bg-muted text-muted-foreground border-muted' },
+  pendente_aprovacao: { label: 'Pendente Aprovação', className: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800' },
+  aprovado: { label: 'Aprovado', className: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800' },
+  em_separacao: { label: 'Em Separação', className: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800' },
+  faturado: { label: 'Faturado', className: 'bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800' },
+  cancelado: { label: 'Cancelado', className: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-800' },
+};
+
 export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoViewDialogProps) {
   const [itens, setItens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (open && pedido) {
-      fetchItens();
-    }
+    if (open && pedido) fetchItens();
   }, [open, pedido]);
 
   const fetchItens = async () => {
@@ -32,13 +39,9 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
     try {
       const { data, error } = await supabase
         .from('pedido_itens')
-        .select(`
-          *,
-          produto:produtos(nome, unidade_medida)
-        `)
+        .select('*, produto:produtos(nome, unidade_medida)')
         .eq('pedido_id', pedido.id)
         .order('created_at');
-
       if (error) throw error;
       setItens(data || []);
     } catch (error) {
@@ -49,29 +52,8 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
   };
 
   const getStatusBadge = (status: StatusPedido) => {
-    const statusConfig: Record<StatusPedido, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      rascunho: { label: 'Rascunho', variant: 'secondary' },
-      pendente_aprovacao: { label: 'Pendente Aprovação', variant: 'outline' },
-      aprovado: { label: 'Aprovado', variant: 'default' },
-      em_separacao: { label: 'Em Separação', variant: 'default' },
-      faturado: { label: 'Faturado', variant: 'default' },
-      cancelado: { label: 'Cancelado', variant: 'destructive' },
-    };
-    const config = statusConfig[status] || { label: status, variant: 'secondary' as const };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
-  const getFormaPagamentoLabel = (forma: string) => {
-    const labels: Record<string, string> = {
-      boleto: 'Boleto',
-      pix: 'PIX',
-      transferencia: 'Transferência',
-      cartao_credito: 'Cartão de Crédito',
-      cartao_debito: 'Cartão de Débito',
-      dinheiro: 'Dinheiro',
-      cheque: 'Cheque'
-    };
-    return labels[forma] || forma;
+    const config = STATUS_CONFIG[status] || { label: status, className: '' };
+    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
 
   if (!pedido) return null;
@@ -88,7 +70,6 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Order Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="pt-4 space-y-3">
@@ -96,9 +77,7 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                   <User className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Cliente</span>
                 </div>
-                <p className="font-medium">
-                  {pedido.cliente?.nome_fantasia || pedido.cliente?.razao_social_nome || '-'}
-                </p>
+                <p className="font-medium">{pedido.cliente?.nome_fantasia || pedido.cliente?.razao_social_nome || '-'}</p>
               </CardContent>
             </Card>
 
@@ -111,7 +90,7 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                 <div className="text-sm space-y-1">
                   <p>Emissão: {format(new Date(pedido.data_emissao), 'dd/MM/yyyy', { locale: ptBR })}</p>
                   {pedido.data_entrega_prevista && (
-                    <p>Entrega Prevista: {format(new Date(pedido.data_entrega_prevista), 'dd/MM/yyyy', { locale: ptBR })}</p>
+                    <p>Entrega: {format(new Date(pedido.data_entrega_prevista), 'dd/MM/yyyy', { locale: ptBR })}</p>
                   )}
                 </div>
               </CardContent>
@@ -124,7 +103,7 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                   <span className="text-sm text-muted-foreground">Pagamento</span>
                 </div>
                 <div className="text-sm space-y-1">
-                  <p>Forma: {pedido.forma_pagamento ? getFormaPagamentoLabel(pedido.forma_pagamento) : '-'}</p>
+                  <p>{pedido.forma_pagamento || '-'}</p>
                   <p>Prazo: {pedido.prazo_pagamento_dias} dias</p>
                 </div>
               </CardContent>
@@ -136,14 +115,11 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                   <Truck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Frete</span>
                 </div>
-                <p className="font-medium">
-                  R$ {(pedido.valor_frete || 0).toFixed(2)}
-                </p>
+                <p className="font-medium">R$ {(pedido.valor_frete || 0).toFixed(2)}</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Timeline / Status History */}
           {(pedido.data_aprovacao || pedido.data_faturamento) && (
             <Card>
               <CardContent className="pt-4">
@@ -178,7 +154,6 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
 
           <Separator />
 
-          {/* Items */}
           <div>
             <h4 className="font-medium mb-3">Itens do Pedido</h4>
             {loading ? (
@@ -198,18 +173,10 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                   {itens.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.produto?.nome || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        {item.quantidade} {item.unidade_medida}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        R$ {item.preco_unitario?.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.desconto_percentual > 0 ? `${item.desconto_percentual}%` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        R$ {item.valor_total?.toFixed(2)}
-                      </TableCell>
+                      <TableCell className="text-right">{item.quantidade} {item.unidade_medida}</TableCell>
+                      <TableCell className="text-right">R$ {item.preco_unitario?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{item.desconto_percentual > 0 ? `${item.desconto_percentual}%` : '-'}</TableCell>
+                      <TableCell className="text-right font-medium">R$ {item.valor_total?.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -219,7 +186,6 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
 
           <Separator />
 
-          {/* Totals */}
           <div className="flex justify-end">
             <Card className="w-64">
               <CardContent className="pt-4 space-y-2">
@@ -228,7 +194,7 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
                   <span>R$ {pedido.valor_subtotal?.toFixed(2)}</span>
                 </div>
                 {pedido.desconto > 0 && (
-                  <div className="flex justify-between text-sm text-red-500">
+                  <div className="flex justify-between text-sm text-destructive">
                     <span>Desconto</span>
                     <span>- R$ {pedido.desconto?.toFixed(2)}</span>
                   </div>
@@ -248,13 +214,10 @@ export default function PedidoViewDialog({ open, onOpenChange, pedido }: PedidoV
             </Card>
           </div>
 
-          {/* Observations */}
           {pedido.observacoes && (
             <div>
               <h4 className="font-medium mb-2">Observações</h4>
-              <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                {pedido.observacoes}
-              </p>
+              <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">{pedido.observacoes}</p>
             </div>
           )}
         </div>
