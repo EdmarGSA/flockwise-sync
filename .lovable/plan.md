@@ -1,59 +1,58 @@
 
 
-## Estoque de Ovos Quebrados e Descarte com Destino
+## Barra de Cotacoes de Commodities na Fabrica de Racao
 
-### Resumo
+Adicionar uma barra horizontal rolavel (ticker) logo abaixo do header da pagina Fabrica de Racao, exibindo:
 
-Duas funcionalidades novas no modulo de Estoque de Ovos:
-
-1. **Campo "Ovos Danificados" na entrada manual** - ao registrar uma nova entrada, o usuario podera informar a quantidade de ovos danificados/quebrados. Esses ovos serao registrados automaticamente em um estoque separado (classificacao "quebrado"), com movimento proprio no Kardex.
-
-2. **Dialog de Descarte de Ovos** - nova opcao para dar saida de ovos informando o destino do descarte (ex: industria, compostagem, doacao, lixo, reciclagem animal).
+1. **Cotacoes de commodities** (Milho, Farelo de Soja, Sorgo, Milheto) vindas de uma API externa
+2. **Precos da ultima compra** dos produtos do grupo "Cereais" cadastrados no sistema
 
 ---
 
-### Alteracoes no Banco de Dados
+### Fonte de Dados - Cotacoes
 
-**Migration SQL:**
+Sera usada a API **Commoditic** (commoditic.com), que cobre Corn, Soybeans/Soybean Meal, Sorghum e Millet a um custo acessivel (~$7/mes). A chamada sera feita via Edge Function para proteger a API key.
 
-1. Adicionar valor `quebrado` ao enum `classificacao_peso_ovo` (para identificar ovos danificados no estoque).
-2. Criar tabela `descarte_ovos` para registrar saidas de descarte com campo `destino`:
-   - `id`, `integrado_id`, `estoque_ovo_id` (nullable), `quantidade`, `motivo`, `destino`, `observacao`, `created_at`
-   - Destinos possiveis: industria, compostagem, doacao, descarte_sanitario, reciclagem_animal, outro
-   - RLS habilitado com politicas para SELECT/INSERT baseadas em `auth.uid()`
+**Alternativa sem custo**: caso o usuario prefira nao contratar uma API, a barra mostrara apenas os precos da ultima compra do sistema (sem cotacoes externas). A barra funcionara independentemente da API.
 
-### Alteracoes no Codigo
+---
 
-**1. Formulario de Nova Entrada (`EstoqueOvos.tsx`)**
+### Alteracoes
 
-- Adicionar campo `quantidade_danificados` ao `formData`
-- Exibir input "Ovos Danificados" abaixo do campo de quantidade
-- No `handleSubmit`, apos criar o estoque principal, se `quantidade_danificados > 0`:
-  - Criar um segundo registro em `estoque_ovos` com `classificacao_peso: 'quebrado'`
-  - Registrar entrada no `kardex_ovos` com `tipo_movimento: 'entrada_manual'` e observacao indicando "Ovos danificados"
-  - O lote interno recebera sufixo `-DMG` para diferenciar
+**1. Edge Function: `commodity-prices`** (`supabase/functions/commodity-prices/index.ts`)
 
-**2. Novo componente: `DescarteOvosDialog.tsx`** (`src/components/ovos/`)
+- Recebe o `integrado_id` como parametro
+- Busca cotacoes da API Commoditic (Corn, Soybean Meal, Sorghum, Millet) com cache de 1h (armazena em memoria para evitar chamadas excessivas)
+- Busca no banco os precos da ultima compra (OC com status `aprovada` ou `recebida`) dos produtos cujo grupo de produto contenha "cereal" ou "cereais"
+  - Join: `ordens_compra_itens` -> `ordens_compra` (para status e data) -> `produtos` -> `grupos_produto` (para filtrar por nome)
+  - Agrupa por produto, pega o mais recente
+- Retorna JSON com dois arrays: `cotacoes` (da API) e `ultimaCompra` (do banco)
+- Se a API key nao estiver configurada, retorna `cotacoes: []` (graceful fallback)
 
-- Dialog para registrar descarte de ovos
-- Campos: selecao do lote de estoque, quantidade a descartar, destino (select com opcoes), motivo, observacao
-- Ao confirmar:
-  - Reduz `quantidade_atual` no `estoque_ovos`
-  - Registra movimento no `kardex_ovos` com `tipo_movimento: 'saida_descarte'`
-  - Insere registro na tabela `descarte_ovos` com o destino
+**2. Novo componente: `CommodityTicker.tsx`** (`src/components/fabrica/CommodityTicker.tsx`)
 
-**3. Integracao na pagina (`EstoqueOvos.tsx`)**
+- Barra horizontal com animacao CSS de scroll infinito (marquee)
+- Exibe os itens lado a lado com separadores
+- Cada item mostra: nome da commodity, preco, unidade (R$/ton ou R$/kg)
+- Os precos da ultima compra aparecem com badge "Ult. Compra" para diferenciar das cotacoes de mercado
+- Cores: verde se o preco interno esta abaixo da cotacao de mercado, vermelho se acima
+- Fallback: se nao houver dados, a barra nao aparece
 
-- Adicionar botao "Descarte" ao lado dos botoes existentes (Validade, Etiquetas, Entrada Manual)
-- Adicionar o `DescarteOvosDialog` nos dialogs da pagina
-- Nos cards de resumo, mostrar ovos quebrados separadamente se existirem
+**3. Integracao na pagina** (`src/pages/FabricaRacao.tsx`)
 
-### Destinos de Descarte Disponiveis
+- Importar e renderizar `CommodityTicker` entre o header fixo e o conteudo principal (dentro do `<main>`, antes das `<Tabs>`)
+- Passar `integradoId` como prop
+- A barra tera altura fixa (~40px) e fundo sutil para se destacar
 
-- Industria (processamento)
-- Compostagem
-- Doacao
-- Descarte Sanitario
-- Reciclagem Animal (racao)
-- Outro
+### Secret necessario
+
+- `COMMODITIC_API_KEY`: chave da API Commoditic. Sera solicitada ao usuario antes de implementar. Se nao fornecida, a barra funcionara apenas com precos internos.
+
+### Visual da barra
+
+```text
+|  Milho CBOT: $4.30/bu  |  F. Soja: $310/ton  |  Sorgo: $280/ton  |  Milheto: $250/ton  |  Milho (Ult. Compra): R$1,85/kg  |  F. Soja (Ult. Compra): R$2,40/kg  |
+```
+
+A barra rola continuamente da direita para a esquerda, estilo ticker de bolsa de valores.
 
