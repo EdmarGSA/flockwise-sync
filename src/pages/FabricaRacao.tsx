@@ -30,6 +30,7 @@ import PrevisaoConsumoDialog from '@/components/fabrica/PrevisaoConsumoDialog';
 import AlertasDetalheDialog from '@/components/fabrica/AlertasDetalheDialog';
 import OCManualDialog from '@/components/fabrica/OCManualDialog';
 import ComparativoFornecedoresDialog from '@/components/fabrica/ComparativoFornecedoresDialog';
+import CommodityTicker from '@/components/fabrica/CommodityTicker';
 
 interface ProdutoCritico {
   id: string;
@@ -385,6 +386,8 @@ const [stats, setStats] = useState({
           </Button>
         </div>
       </header>
+
+      <CommodityTicker integradoId={integradoId} />
 
       <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
