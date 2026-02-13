@@ -1,39 +1,22 @@
 
 
-## Variacao Percentual da Ultima Compra no Ticker
+## Corrigir Visibilidade da Barra de Cotacoes
 
-Adicionar a variacao percentual entre a ultima e a penultima compra de cada produto do grupo Cereais, exibida no ticker ao lado do preco.
+O ticker esta invisivel porque o header usa `position: fixed`, fazendo com que ele flutue sobre o conteudo. O `CommodityTicker` esta no fluxo normal do documento, logo fica escondido atras do header fixo.
 
----
+### Solucao
 
-### Alteracoes
+Mover o `CommodityTicker` para **dentro do `<main>`**, antes das `<Tabs>`, e ajustar o layout para que ele apareca entre o header e as tabs.
 
-**1. Edge Function `commodity-prices/index.ts`**
+### Alteracao em `src/pages/FabricaRacao.tsx`
 
-Na secao que agrupa os itens de OC por produto (linhas 130-145), em vez de guardar apenas o mais recente, guardar os **dois mais recentes** por produto. Calcular a variacao percentual entre eles:
+1. Remover o `<CommodityTicker>` da posicao atual (linha 390, entre `</header>` e `<main>`)
+2. Colocar dentro do `<main>`, logo antes do `<Tabs>`, para que herde o padding-top que ja compensa o header fixo
 
-- Manter um `Record<string, any[]>` com ate 2 itens por `produto_id`
-- Se houver 2 itens, calcular: `variacao = ((preco_ultimo - preco_penultimo) / preco_penultimo) * 100`
-- Se houver apenas 1 item, `variacao = null`
-- Incluir o campo `variacao` no objeto retornado em `ultimaCompra`
-
-**2. Componente `CommodityTicker.tsx`**
-
-Nenhuma alteracao necessaria - o componente ja renderiza o campo `variacao` com icones TrendingUp/TrendingDown e formatacao percentual (linhas 75-82). Basta que a Edge Function passe o valor corretamente.
-
----
-
-### Detalhe Tecnico
-
-```text
-Logica no Edge Function:
-
-ocItens (ordenados por created_at DESC):
-  Milho -> [compra_recente: R$1.35, compra_anterior: R$1.20]
-  variacao = ((1.35 - 1.20) / 1.20) * 100 = +12.50%
-
-Resultado no ticker:
-  Milho | Ult. Compra | 1,35 | R$/KG | +12.50% (icone verde)
+```
+<main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
+  <CommodityTicker integradoId={integradoId} />   <!-- movido para ca -->
+  <Tabs ...>
 ```
 
-Apenas a Edge Function precisa ser alterada. O frontend ja suporta a exibicao.
+Apenas 2 linhas alteradas. Nenhuma outra mudanca necessaria.
