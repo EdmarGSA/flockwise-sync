@@ -387,9 +387,8 @@ const [stats, setStats] = useState({
         </div>
       </header>
 
-      <CommodityTicker integradoId={integradoId} />
-
       <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 pt-20 sm:pt-24">
+        <CommodityTicker integradoId={integradoId} />
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6">
             <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-5">
