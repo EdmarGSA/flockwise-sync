@@ -127,22 +127,31 @@ Deno.serve(async (req) => {
           .in('ordens_compra.status', ['aprovada', 'recebida'])
           .order('created_at', { ascending: false });
 
-        // Group by product, keep the most recent
-        const latestByProduct: Record<string, any> = {};
+        // Group by product, keep the two most recent
+        const itemsByProduct: Record<string, any[]> = {};
         (ocItens || []).forEach(item => {
-          if (!latestByProduct[item.produto_id]) {
-            latestByProduct[item.produto_id] = item;
+          if (!itemsByProduct[item.produto_id]) {
+            itemsByProduct[item.produto_id] = [];
+          }
+          if (itemsByProduct[item.produto_id].length < 2) {
+            itemsByProduct[item.produto_id].push(item);
           }
         });
 
         const produtoMap = Object.fromEntries(produtos.map(p => [p.id, p]));
 
-        ultimaCompra = Object.values(latestByProduct).map(item => ({
-          nome: produtoMap[item.produto_id]?.nome || 'Produto',
-          preco: Number(item.preco_unitario),
-          unidade: `R$/${item.unidade_medida || produtoMap[item.produto_id]?.unidade_medida || 'kg'}`,
-          tipo: 'ultima_compra',
-        }));
+        ultimaCompra = Object.entries(itemsByProduct).map(([produtoId, items]) => {
+          const ultimo = Number(items[0].preco_unitario);
+          const penultimo = items.length > 1 ? Number(items[1].preco_unitario) : null;
+          const variacao = penultimo ? ((ultimo - penultimo) / penultimo) * 100 : null;
+          return {
+            nome: produtoMap[produtoId]?.nome || 'Produto',
+            preco: ultimo,
+            unidade: `R$/${items[0].unidade_medida || produtoMap[produtoId]?.unidade_medida || 'kg'}`,
+            variacao,
+            tipo: 'ultima_compra',
+          };
+        });
       }
     }
 
