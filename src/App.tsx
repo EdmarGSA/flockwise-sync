@@ -47,6 +47,7 @@ import PortalFornecedor from "./pages/PortalFornecedor";
 import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
 import RastreioOvos from "./pages/RastreioOvos";
+import CriadorPainel from "./pages/CriadorPainel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -250,6 +251,15 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="estoque-ovos">
           <EstoqueOvos />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
+    {/* Painel do Criador */}
+    <Route path="/criador" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="lotes" requiredLevel="edit">
+          <CriadorPainel />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
