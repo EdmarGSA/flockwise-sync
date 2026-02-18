@@ -65,28 +65,77 @@ export default function SeparacaoDialog({ open, onOpenChange, pedido, integradoI
   const fetchItens = async () => {
     setLoading(true);
     try {
-      // Get regular order items
+      // Get regular order items with joins for both products and animal products
       const { data: pedidoItens, error: itensError } = await supabase
         .from('pedido_itens')
         .select(`
           *,
-          produto:produtos(nome, estoque_atual, unidade_medida)
+          produto:produtos(nome, estoque_atual, unidade_medida),
+          produto_animal:produtos_animais(nome, unidade_venda),
+          lote:lotes(id, quantidade_aves, nucleo:nucleos(nome), galpao:galpoes(nome))
         `)
         .eq('pedido_id', pedido.id);
 
       if (itensError) throw itensError;
 
-      // Map items with stock info
-      const itensMapped: ItemSeparacao[] = (pedidoItens || []).map(item => ({
-        id: item.id,
-        produto_id: item.produto_id,
-        produto_nome: item.produto?.nome || '',
-        quantidade: item.quantidade,
-        quantidade_separada: item.quantidade,
-        unidade_medida: item.unidade_medida,
-        estoque_disponivel: item.produto?.estoque_atual || 0,
-        lote_producao_id: ''
-      }));
+      // Map items with stock info - handle both regular products and live birds
+      const itensMapped: ItemSeparacao[] = [];
+
+      for (const item of pedidoItens || []) {
+        const isAveViva = !!item.produto_animal_id && !item.produto_id;
+
+        if (isAveViva && item.lote_producao_id) {
+          // Live bird: calculate available stock from lot
+          // Get total mortality for this lot
+          const { data: mortalidadeRegistros } = await supabase
+            .from('mortalidade')
+            .select('id')
+            .eq('lote_id', item.lote_producao_id);
+
+          let totalMortalidade = 0;
+          if (mortalidadeRegistros && mortalidadeRegistros.length > 0) {
+            const mortalidadeIds = mortalidadeRegistros.map(m => m.id);
+            const { data: mortalidadeItens } = await supabase
+              .from('mortalidade_itens')
+              .select('quantidade')
+              .in('mortalidade_id', mortalidadeIds);
+
+            totalMortalidade = mortalidadeItens?.reduce((sum, mi) => sum + (mi.quantidade || 0), 0) || 0;
+          }
+
+          const loteData = item.lote as any;
+          const avesAlojadas = loteData?.quantidade_aves || 0;
+          const avesVivas = avesAlojadas - totalMortalidade;
+
+          const nucleoNome = loteData?.nucleo?.nome || '';
+          const galpaoNome = loteData?.galpao?.nome || '';
+          const produtoAnimalNome = (item.produto_animal as any)?.nome || 'Ave Viva';
+          const loteInfo = [nucleoNome, galpaoNome].filter(Boolean).join(' / ');
+
+          itensMapped.push({
+            id: item.id,
+            produto_id: item.produto_animal_id || '',
+            produto_nome: loteInfo ? `${produtoAnimalNome} (${loteInfo})` : produtoAnimalNome,
+            quantidade: item.quantidade,
+            quantidade_separada: item.quantidade,
+            unidade_medida: item.unidade_medida || (item.produto_animal as any)?.unidade_venda || 'KG',
+            estoque_disponivel: avesVivas,
+            lote_producao_id: item.lote_producao_id || '',
+          });
+        } else {
+          // Regular product
+          itensMapped.push({
+            id: item.id,
+            produto_id: item.produto_id || '',
+            produto_nome: (item.produto as any)?.nome || '',
+            quantidade: item.quantidade,
+            quantidade_separada: item.quantidade,
+            unidade_medida: item.unidade_medida,
+            estoque_disponivel: (item.produto as any)?.estoque_atual || 0,
+            lote_producao_id: '',
+          });
+        }
+      }
 
       setItens(itensMapped);
 
@@ -206,8 +255,10 @@ export default function SeparacaoDialog({ open, onOpenChange, pedido, integradoI
 
         if (separacaoError) throw separacaoError;
 
-        // Create kardex entries for stock deduction
+        // Create kardex entries for stock deduction (skip live birds - controlled by lot)
         for (const item of itens) {
+          // Skip live bird items - stock is managed via lot, not produtos table
+          if (item.lote_producao_id) continue;
           if (!item.produto_id) continue;
           
           // Get current stock
