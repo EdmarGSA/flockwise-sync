@@ -33,6 +33,8 @@ interface PedidoItem {
   tipo_venda?: 'unidade' | 'peso';
   is_ovo?: boolean;
   produto_ovo_id?: string;
+  produto_animal_id?: string;
+  peso_total_kg?: number;
 }
 
 type FormaPagamento = 'boleto' | 'pix' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'cheque';
@@ -261,12 +263,13 @@ export default function NovoPedidoStepper({ open, onOpenChange, integradoId, onS
       return;
     }
     setItens([...itens, {
-      produto_id: '', produto_nome: `Aves Corte Viva - ${loteItem.lote_info}`,
+      produto_id: '', produto_nome: loteItem.produto_animal_nome ? `${loteItem.produto_animal_nome} - ${loteItem.lote_info}` : `Aves Corte Viva - ${loteItem.lote_info}`,
       quantidade: loteItem.quantidade, unidade_medida: loteItem.tipo_venda === 'unidade' ? 'UN' : 'KG',
       preco_tabela: loteItem.preco_unitario, preco_unitario: loteItem.preco_unitario,
       desconto_percentual: 0, valor_total: loteItem.valor_total,
       margem_calculada: 0, custo_medio: 0,
-      lote_producao_id: loteItem.lote_id, is_ave_viva: true, tipo_venda: loteItem.tipo_venda
+      lote_producao_id: loteItem.lote_id, is_ave_viva: true, tipo_venda: loteItem.tipo_venda,
+      produto_animal_id: loteItem.produto_animal_id, peso_total_kg: loteItem.peso_total_kg
     }]);
   };
 
@@ -352,10 +355,12 @@ export default function NovoPedidoStepper({ open, onOpenChange, integradoId, onS
 
       const pedidoItens = itens.filter(item => !item.is_ovo).map(item => ({
         pedido_id: pedido.id, produto_id: item.is_ave_viva ? null : item.produto_id,
+        produto_animal_id: item.produto_animal_id || null,
         quantidade: item.quantidade, unidade_medida: item.unidade_medida,
         preco_tabela: item.preco_tabela, preco_unitario: item.preco_unitario,
         desconto_percentual: item.desconto_percentual, valor_total: item.valor_total,
-        margem_calculada: item.margem_calculada, lote_producao_id: item.lote_producao_id || null
+        margem_calculada: item.margem_calculada, lote_producao_id: item.lote_producao_id || null,
+        peso_total_kg: item.peso_total_kg || null
       }));
       if (pedidoItens.length > 0) {
         const { error } = await supabase.from('pedido_itens').insert(pedidoItens);

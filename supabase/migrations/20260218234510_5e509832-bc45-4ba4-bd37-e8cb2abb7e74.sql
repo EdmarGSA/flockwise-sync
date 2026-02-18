@@ -1,0 +1,1 @@
+ALTER TABLE public.pedido_itens ALTER COLUMN produto_id DROP NOT NULL;

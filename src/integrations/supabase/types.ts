@@ -3563,7 +3563,7 @@ export type Database = {
           preco_tabela: number | null
           preco_unitario: number
           produto_animal_id: string | null
-          produto_id: string
+          produto_id: string | null
           quantidade: number
           unidade_medida: string
           valor_total: number
@@ -3579,7 +3579,7 @@ export type Database = {
           preco_tabela?: number | null
           preco_unitario?: number
           produto_animal_id?: string | null
-          produto_id: string
+          produto_id?: string | null
           quantidade: number
           unidade_medida?: string
           valor_total?: number
@@ -3595,7 +3595,7 @@ export type Database = {
           preco_tabela?: number | null
           preco_unitario?: number
           produto_animal_id?: string | null
-          produto_id?: string
+          produto_id?: string | null
           quantidade?: number
           unidade_medida?: string
           valor_total?: number
