@@ -73,7 +73,7 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
         .from('grupos_animal')
         .select('id')
         .eq('integrado_id', integradoId)
-        .ilike('nome', '%aves corte%')
+        .ilike('nome', '%aves%corte%')
         .limit(1);
 
       const grupoId = grupos?.[0]?.id;
