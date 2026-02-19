@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string | null
+          lida: boolean
+          mensagem: string | null
+          tipo: string
+          titulo: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id?: string | null
+          lida?: boolean
+          mensagem?: string | null
+          tipo?: string
+          titulo: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string | null
+          lida?: boolean
+          mensagem?: string | null
+          tipo?: string
+          titulo?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       areas: {
         Row: {
           ativo: boolean
@@ -3090,6 +3123,39 @@ export type Database = {
           },
         ]
       }
+      onboarding_steps: {
+        Row: {
+          concluida: boolean
+          concluida_em: string | null
+          created_at: string
+          etapa: string
+          id: string
+          integrado_id: string
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string
+          etapa: string
+          id?: string
+          integrado_id: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          concluida?: boolean
+          concluida_em?: string | null
+          created_at?: string
+          etapa?: string
+          id?: string
+          integrado_id?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ordens_compra: {
         Row: {
           aprovado_por: string | null
@@ -5559,6 +5625,51 @@ export type Database = {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          atribuido_a: string | null
+          categoria: string | null
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          integrado_id: string
+          prioridade: Database["public"]["Enums"]["ticket_prioridade"]
+          resolvido_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          atribuido_a?: string | null
+          categoria?: string | null
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          prioridade?: Database["public"]["Enums"]["ticket_prioridade"]
+          resolvido_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          atribuido_a?: string | null
+          categoria?: string | null
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          prioridade?: Database["public"]["Enums"]["ticket_prioridade"]
+          resolvido_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sync_erp_api_keys: {
         Row: {
           api_key_hash: string
@@ -6317,6 +6428,7 @@ export type Database = {
         Returns: undefined
       }
       is_demo_user: { Args: never; Returns: boolean }
+      is_superadmin: { Args: never; Returns: boolean }
       reservar_estoque_ovos_fifo: {
         Args: {
           p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]
@@ -6442,6 +6554,8 @@ export type Database = {
         | "cancelado"
       status_quarentena: "quarentena" | "liberado" | "rejeitado"
       submotivo_eliminacao: "problema_locomotor" | "debilitado" | "deficiente"
+      ticket_prioridade: "baixa" | "media" | "alta" | "critica"
+      ticket_status: "aberto" | "em_andamento" | "resolvido" | "fechado"
       tipo_bebedouro: "niple" | "tacas"
       tipo_cadastro: "cliente" | "fornecedor" | "ambos"
       tipo_centro_custo: "lote" | "nucleo" | "geral" | "projeto"
@@ -6684,6 +6798,8 @@ export const Constants = {
       ],
       status_quarentena: ["quarentena", "liberado", "rejeitado"],
       submotivo_eliminacao: ["problema_locomotor", "debilitado", "deficiente"],
+      ticket_prioridade: ["baixa", "media", "alta", "critica"],
+      ticket_status: ["aberto", "em_andamento", "resolvido", "fechado"],
       tipo_bebedouro: ["niple", "tacas"],
       tipo_cadastro: ["cliente", "fornecedor", "ambos"],
       tipo_centro_custo: ["lote", "nucleo", "geral", "projeto"],
