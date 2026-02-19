@@ -6362,6 +6362,7 @@ export type Database = {
         | "criador"
         | "fornecedor"
         | "vendedor_fornecedor"
+        | "superadmin"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo:
         | "medio"
@@ -6598,6 +6599,7 @@ export const Constants = {
         "criador",
         "fornecedor",
         "vendedor_fornecedor",
+        "superadmin",
       ],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo", "quebrado"],
