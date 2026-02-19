@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import { useSuperAdminCheck } from '@/hooks/useSuperAdminCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Bird, 
@@ -16,7 +17,8 @@ import {
   ShoppingCart,
   Plane,
   Egg,
-  Lock
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -138,6 +140,7 @@ export default function Home() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { accessibleModules, loading: modulesLoading } = useModuleAccess();
+  const { isSuperAdmin } = useSuperAdminCheck();
 
   const handleModuleClick = (module: ModuleCard) => {
     if (!module.systemAvailable) return;
@@ -227,6 +230,24 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {isSuperAdmin && (
+              <Card
+                className="bg-card border-primary/30 cursor-pointer hover:shadow-card-hover hover:scale-[1.02] transition-all duration-300 col-span-full"
+                onClick={() => navigate('/backoffice')}
+              >
+                <CardHeader className="pb-3 p-4 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+                      <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-foreground">Backoffice Admin</CardTitle>
+                      <CardDescription>Painel administrativo da plataforma</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
             {modules.map((module) => {
               const status = getModuleStatus(module);
               const isClickable = status === 'available';

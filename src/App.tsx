@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useSupplierCheck } from "@/hooks/useSupplierCheck";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { SuperAdminRoute } from "@/components/SuperAdminRoute";
 import { DemoProvider } from "@/contexts/DemoContext";
 import DemoBanner from "@/components/DemoBanner";
 import Index from "./pages/Index";
@@ -48,6 +49,13 @@ import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
 import RastreioOvos from "./pages/RastreioOvos";
 import CriadorPainel from "./pages/CriadorPainel";
+import BackofficeLayout from "./pages/backoffice/BackofficeLayout";
+import BackofficeDashboard from "./pages/backoffice/BackofficeDashboard";
+import BackofficeGranjas from "./pages/backoffice/BackofficeGranjas";
+import BackofficeUsuarios from "./pages/backoffice/BackofficeUsuarios";
+import BackofficeCS from "./pages/backoffice/BackofficeCS";
+import BackofficeFerramentas from "./pages/backoffice/BackofficeFerramentas";
+import BackofficeNotificacoes from "./pages/backoffice/BackofficeNotificacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -389,6 +397,22 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
     
+    {/* Backoffice Admin - superadmin only */}
+    <Route path="/backoffice" element={
+      <ProtectedRoute>
+        <SuperAdminRoute>
+          <BackofficeLayout />
+        </SuperAdminRoute>
+      </ProtectedRoute>
+    }>
+      <Route index element={<BackofficeDashboard />} />
+      <Route path="granjas" element={<BackofficeGranjas />} />
+      <Route path="usuarios" element={<BackofficeUsuarios />} />
+      <Route path="cs" element={<BackofficeCS />} />
+      <Route path="ferramentas" element={<BackofficeFerramentas />} />
+      <Route path="notificacoes" element={<BackofficeNotificacoes />} />
+    </Route>
+
     {/* Vitrine pública do fornecedor */}
     <Route path="/vitrine/:id" element={<VitrineFornecedor />} />
     
