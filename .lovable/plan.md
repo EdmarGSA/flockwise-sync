@@ -1,37 +1,59 @@
 
 
-## Redirecionar criador direto para o Painel de Lotes
+## Corrigir bug de modulos permitidos perdendo selecoes ao salvar
 
-Quando o usuario logado tiver **apenas** o papel de "criador", ao acessar `/home` ele sera redirecionado automaticamente para `/criador-painel`, pulando a tela de selecao de modulos.
+### Problema identificado
 
-### O que sera feito
+Ao salvar um membro, o sistema:
+1. Apaga TODOS os registros de `user_modulos` do usuario
+2. Insere apenas os modulos que foram **explicitamente alterados** na interface
 
-1. **Criar um hook `useCriadorCheck`** -- consulta a tabela `profiles` para verificar se o `role` do usuario e "criador". Retorna `{ isCriador, loading }`.
+Resultado: modulos que ja estavam configurados e nao foram tocados sao perdidos.
 
-2. **Criar um wrapper `CriadorRedirectWrapper`** no `App.tsx` -- envolve a rota `/home`. Se o usuario for apenas criador (nao superadmin), redireciona para `/criador-painel`. Caso contrario, exibe a Home normalmente.
+### Solucao
 
-3. **Atualizar `PublicRoute`** -- quando o usuario ja esta logado e acessa `/`, o redirect atual vai para `/home`. Precisamos que, se for criador, va direto para `/criador-painel`.
-
-### Fluxo
-
-- Usuario criador faz login --> redirecionado para `/criador-painel`
-- Usuario criador acessa `/home` manualmente --> redirecionado para `/criador-painel`
-- Usuario com outro papel (admin, integrado, veterinario) --> comportamento atual mantido (tela Home com modulos)
+Alterar a logica para que apenas os modulos explicitamente alterados sejam atualizados (upsert individual), sem apagar os demais.
 
 ### Detalhes tecnicos
 
-**Novo hook `src/hooks/useCriadorCheck.tsx`:**
-- Consulta `profiles` onde `id = user.id` e verifica se `role = 'criador'`
-- Retorna `{ isCriador: boolean, loading: boolean }`
+**Arquivo: `src/components/cadastro/MembroEditDialog.tsx`**
 
-**Wrapper `CriadorRedirectWrapper` em `App.tsx`:**
-- Usa `useCriadorCheck` e `useSuperAdminCheck`
-- Se `isCriador && !isSuperAdmin` retorna `<Navigate to="/criador-painel" replace />`
-- Senao renderiza `children`
+Substituir o bloco de "Handle module permission changes" (linhas 119-140) que faz DELETE ALL + INSERT, por uma logica que:
+- Para cada modulo em `moduloChanges`, faz um upsert individual (delete + insert por modulo_id) em vez de deletar tudo
+- Assim, modulos nao alterados permanecem intactos
 
-**Alteracao na `PublicRoute`:**
-- Adicionar `useCriadorCheck` para que usuarios logados do tipo criador sejam redirecionados para `/criador-painel` em vez de `/home`
+Codigo atual (problematico):
+```text
+if (moduloChanges.length > 0) {
+  // Delete existing user_modulos for this user  <-- APAGA TUDO
+  await supabase.from("user_modulos").delete().eq("user_id", membro.id);
+  // Insert new permissions  <-- SO INSERE OS ALTERADOS
+  ...insert(moduloInserts);
+}
+```
 
-**Alteracao na rota `/home` do `App.tsx`:**
-- Envolver `<Home />` com `<CriadorRedirectWrapper>` (dentro do `SupplierRedirectWrapper` existente)
+Codigo corrigido:
+```text
+if (moduloChanges.length > 0) {
+  for (const m of moduloChanges) {
+    // Deleta apenas o modulo especifico
+    await supabase.from("user_modulos")
+      .delete()
+      .eq("user_id", membro.id)
+      .eq("modulo_id", m.modulo_id);
+    
+    // Re-insere com a nova configuracao
+    await supabase.from("user_modulos")
+      .insert({
+        user_id: membro.id,
+        modulo_id: m.modulo_id,
+        permitido: m.permitido,
+        nivel_acesso: m.nivel_acesso,
+        integrado_id: integradoId || membro.integrado_id,
+      });
+  }
+}
+```
+
+Nenhuma alteracao necessaria no `MembroModulosSection.tsx` -- ele ja reporta corretamente apenas as mudancas feitas pelo usuario.
 
