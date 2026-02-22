@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useSupplierCheck } from "@/hooks/useSupplierCheck";
+import { useCriadorCheck } from "@/hooks/useCriadorCheck";
+import { useSuperAdminCheck } from "@/hooks/useSuperAdminCheck";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { SuperAdminRoute } from "@/components/SuperAdminRoute";
@@ -116,18 +118,36 @@ function SupplierOnlyRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Wrapper that redirects criador users to their dedicated panel
+function CriadorRedirectWrapper({ children }: { children: React.ReactNode }) {
+  const { isCriador, loading: criadorLoading } = useCriadorCheck();
+  const { isSuperAdmin, loading: adminLoading } = useSuperAdminCheck();
+
+  if (criadorLoading || adminLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (isCriador && !isSuperAdmin) {
+    return <Navigate to="/criador" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 // Public route - redirects to appropriate page based on user type
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { isSupplier, loading: supplierLoading } = useSupplierCheck();
+  const { isCriador, loading: criadorLoading } = useCriadorCheck();
 
-  if (authLoading || (user && supplierLoading)) {
+  if (authLoading || (user && (supplierLoading || criadorLoading))) {
     return <LoadingScreen />;
   }
 
   if (user) {
-    // Redirect suppliers to portal, others to home
-    return <Navigate to={isSupplier ? "/portal-fornecedor" : "/home"} replace />;
+    if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
+    if (isCriador) return <Navigate to="/criador" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;
@@ -151,7 +171,9 @@ const AppRoutes = () => (
     <Route path="/home" element={
       <ProtectedRoute>
         <SupplierRedirectWrapper>
-          <Home />
+          <CriadorRedirectWrapper>
+            <Home />
+          </CriadorRedirectWrapper>
         </SupplierRedirectWrapper>
       </ProtectedRoute>
     } />
