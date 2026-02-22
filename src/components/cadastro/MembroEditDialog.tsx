@@ -116,29 +116,28 @@ const MembroEditDialog = ({ open, onOpenChange, membro, onSuccess }: MembroEditD
         }
       }
 
-      // Handle module permission changes
+      // Handle module permission changes (upsert individual)
       if (moduloChanges.length > 0) {
-        // Delete existing user_modulos for this user
-        await supabase
-          .from("user_modulos" as any)
-          .delete()
-          .eq("user_id", membro.id);
+        for (const m of moduloChanges) {
+          await supabase
+            .from("user_modulos" as any)
+            .delete()
+            .eq("user_id", membro.id)
+            .eq("modulo_id", m.modulo_id);
 
-        // Insert new permissions
-        const moduloInserts = moduloChanges.map((m) => ({
-          user_id: membro.id,
-          modulo_id: m.modulo_id,
-          permitido: m.permitido,
-          nivel_acesso: m.nivel_acesso,
-          integrado_id: integradoId || membro.integrado_id,
-        }));
+          const { error: moduloError } = await supabase
+            .from("user_modulos" as any)
+            .insert({
+              user_id: membro.id,
+              modulo_id: m.modulo_id,
+              permitido: m.permitido,
+              nivel_acesso: m.nivel_acesso,
+              integrado_id: integradoId || membro.integrado_id,
+            });
 
-        const { error: moduloError } = await supabase
-          .from("user_modulos" as any)
-          .insert(moduloInserts);
-
-        if (moduloError) {
-          console.error("Insert modulos error:", moduloError);
+          if (moduloError) {
+            console.error("Insert modulo error:", moduloError);
+          }
         }
       }
 
