@@ -1,59 +1,45 @@
 
 
-## Corrigir bug de modulos permitidos perdendo selecoes ao salvar
+## Dividir Pesagem em Duas Etapas com UX Mobile Melhorada
 
-### Problema identificado
+### Etapa 1 -- Nivel do Silo (tela dedicada)
 
-Ao salvar um membro, o sistema:
-1. Apaga TODOS os registros de `user_modulos` do usuario
-2. Insere apenas os modulos que foram **explicitamente alterados** na interface
+Quando o usuario abre a pesagem, se o galpao tem silo vinculado e o nivel ainda nao foi gravado, exibir APENAS a etapa do silo:
 
-Resultado: modulos que ja estavam configurados e nao foram tocados sao perdidos.
+- Remover a secao de informacao/alerta "Grave o nivel do silo antes de registrar as pesagens"
+- Melhorar os botoes "Gravar Nivel Informado" e "Aceitar Nivel Atual" para mobile:
+  - Botoes empilhados verticalmente (full-width)
+  - "Gravar Nivel Informado" com variante `default` (verde primario, destaque total)
+  - "Aceitar Nivel Atual" com variante `outline` mas com tamanho `lg` para toque facil
+  - Altura minima de 48px nos dois botoes
+- Apos gravar o nivel, a etapa 1 colapsa mostrando o resumo e a etapa 2 abre automaticamente
 
-### Solucao
+### Etapa 2 -- Pesagem de Aves (nova tela/secao)
 
-Alterar a logica para que apenas os modulos explicitamente alterados sejam atualizados (upsert individual), sem apagar os demais.
+Apos o nivel do silo ser gravado (ou se nao ha silo vinculado), exibir o formulario de pesagem completo:
+
+- Data/hora, tara, formulario de pesagem, tabela de itens, totais, analise CA
+- Sem mudanca na logica, apenas na organizacao visual
 
 ### Detalhes tecnicos
 
-**Arquivo: `src/components/cadastro/MembroEditDialog.tsx`**
+**Arquivo: `src/components/lotes/PesagemDialog.tsx`**
 
-Substituir o bloco de "Handle module permission changes" (linhas 119-140) que faz DELETE ALL + INSERT, por uma logica que:
-- Para cada modulo em `moduloChanges`, faz um upsert individual (delete + insert por modulo_id) em vez de deletar tudo
-- Assim, modulos nao alterados permanecem intactos
+Adicionar estado `etapa` (1 ou 2):
+- Se `showSiloStep && !siloLevelSaved` -> exibe apenas `NivelSiloUpdateForm`
+- Se `!showSiloStep || siloLevelSaved` -> exibe formulario de pesagem
+- Transicao automatica da etapa 1 para 2 quando `onLevelSaved` e chamado
 
-Codigo atual (problematico):
-```text
-if (moduloChanges.length > 0) {
-  // Delete existing user_modulos for this user  <-- APAGA TUDO
-  await supabase.from("user_modulos").delete().eq("user_id", membro.id);
-  // Insert new permissions  <-- SO INSERE OS ALTERADOS
-  ...insert(moduloInserts);
-}
-```
+Reorganizar o render:
+- Etapa 1: Apenas `NivelSiloUpdateForm` + indicador de progresso (Etapa 1 de 2)
+- Etapa 2: Todo o conteudo de pesagem + indicador (Etapa 2 de 2) + resumo compacto do silo gravado
 
-Codigo corrigido:
-```text
-if (moduloChanges.length > 0) {
-  for (const m of moduloChanges) {
-    // Deleta apenas o modulo especifico
-    await supabase.from("user_modulos")
-      .delete()
-      .eq("user_id", membro.id)
-      .eq("modulo_id", m.modulo_id);
-    
-    // Re-insere com a nova configuracao
-    await supabase.from("user_modulos")
-      .insert({
-        user_id: membro.id,
-        modulo_id: m.modulo_id,
-        permitido: m.permitido,
-        nivel_acesso: m.nivel_acesso,
-        integrado_id: integradoId || membro.integrado_id,
-      });
-  }
-}
-```
+**Arquivo: `src/components/lotes/NivelSiloUpdateForm.tsx`**
 
-Nenhuma alteracao necessaria no `MembroModulosSection.tsx` -- ele ja reporta corretamente apenas as mudancas feitas pelo usuario.
+Melhorar os botoes (linhas 542-564):
+- "Gravar Nivel Informado": `variant="default"` + `size="lg"` + classe `h-12 text-base font-semibold`
+- "Aceitar Nivel Atual": `variant="outline"` + `size="lg"` + classe `h-12 text-base`
+- Layout: `flex flex-col gap-3` (sempre empilhados, sem `sm:flex-row`)
+
+Remover o titulo "Etapa 1:" do CardHeader (ja que a etapa sera controlada pelo PesagemDialog com indicador proprio).
 
