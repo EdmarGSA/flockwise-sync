@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package, Clock, CloudOff, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Calculator, Scale, Save, Target, Settings2, CalendarIcon, Package, Clock, CloudOff, RefreshCw, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn, calcularIdadeNaData } from '@/lib/utils';
 import { NivelSiloUpdateForm } from './NivelSiloUpdateForm';
@@ -796,8 +796,33 @@ export function PesagemDialog({
           </DialogHeader>
 
         <div className="space-y-6">
-          {/* Step 1: Silo Level Update */}
+          {/* Step indicator */}
           {showSiloStep && (
+            <div className="flex items-center gap-2 text-sm">
+              <div className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold",
+                !siloLevelSaved ? "bg-primary text-primary-foreground" : "bg-green-500 text-white"
+              )}>
+                {siloLevelSaved ? <CheckCircle className="w-4 h-4" /> : '1'}
+              </div>
+              <span className={cn("font-medium", !siloLevelSaved ? "text-foreground" : "text-muted-foreground")}>
+                Nível do Silo
+              </span>
+              <div className="flex-1 h-px bg-border" />
+              <div className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold",
+                siloLevelSaved ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                2
+              </div>
+              <span className={cn("font-medium", siloLevelSaved ? "text-foreground" : "text-muted-foreground")}>
+                Pesagem
+              </span>
+            </div>
+          )}
+
+          {/* Step 1: Silo Level Update - show ONLY when silo exists and not saved */}
+          {showSiloStep && !siloLevelSaved && (
             <NivelSiloUpdateForm
               galpaoId={galpaoId}
               loteId={loteId}
@@ -815,23 +840,24 @@ export function PesagemDialog({
             />
           )}
 
-          {/* Show message if silo step is required but not completed */}
-          {showSiloStep && !siloLevelSaved && (
-            <Card className="border-amber-500/30 bg-amber-500/5">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-2 text-amber-600">
-                  <Package className="w-4 h-4" />
-                  <span className="text-sm">Grave o nível do silo antes de registrar as pesagens</span>
+          {/* Silo level summary when saved */}
+          {showSiloStep && siloLevelSaved && (
+            <Card className="border-green-500/30 bg-green-500/5">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Nível do silo: {savedSiloLevel?.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
+                    {siloAceito && ' (aceito conforme sistema)'}
+                  </span>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Step 2: Weighing Form (only enabled after silo level is saved) */}
-          <div className={cn(
-            "space-y-6 transition-opacity",
-            showSiloStep && !siloLevelSaved && "opacity-50 pointer-events-none"
-          )}>
+          {/* Step 2: Weighing Form - only show when silo step is done or not needed */}
+          {(!showSiloStep || siloLevelSaved) && (
+          <div className="space-y-6">
             {/* Date and Time Picker */}
             <div className="space-y-2">
               <Label>Data e Hora da Pesagem</Label>
@@ -1130,6 +1156,7 @@ export function PesagemDialog({
               </Button>
             </div>
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

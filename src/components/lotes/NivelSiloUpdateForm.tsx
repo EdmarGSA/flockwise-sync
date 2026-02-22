@@ -362,7 +362,7 @@ export function NivelSiloUpdateForm({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Package className="w-4 h-4 text-primary" />
-          Etapa 1: Atualizar Nível do Silo
+          Atualizar Nível do Silo
           {isAlreadySaved && (
             <Badge variant="outline" className="ml-auto bg-green-500/10 text-green-600">
               <CheckCircle className="w-3 h-3 mr-1" />
@@ -540,24 +540,26 @@ export function NivelSiloUpdateForm({
         )}
 
         {!isAlreadySaved && (
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-3">
             <Button 
               onClick={handleSave} 
               disabled={loading}
-              className="flex-1 gap-2"
-              variant="secondary"
+              className="w-full gap-2 h-12 text-base font-semibold"
+              variant="default"
+              size="lg"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-5 h-5" />
               {loading ? 'Gravando...' : 'Gravar Nível Informado'}
             </Button>
             {nivelEsperado !== null && (
               <Button 
                 onClick={handleAceitarNivelAtual} 
                 disabled={loading}
-                className="flex-1 gap-2"
+                className="w-full gap-2 h-12 text-base"
                 variant="outline"
+                size="lg"
               >
-                <Check className="w-4 h-4" />
+                <Check className="w-5 h-5" />
                 {loading ? 'Aceitando...' : 'Aceitar Nível Atual'}
               </Button>
             )}
