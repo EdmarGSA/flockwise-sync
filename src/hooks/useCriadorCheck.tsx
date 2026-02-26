@@ -22,12 +22,13 @@ export const useCriadorCheck = (): CriadorCheckResult => {
       }
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('user_roles')
           .select('role')
-          .eq('id', user.id)
+          .eq('user_id', user.id)
+          .eq('role', 'criador')
           .maybeSingle();
 
-        setIsCriador(!error && data?.role === 'criador');
+        setIsCriador(!!data && !error);
       } catch {
         setIsCriador(false);
       } finally {
