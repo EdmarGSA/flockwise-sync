@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useSupplierCheck } from "@/hooks/useSupplierCheck";
 import { useCriadorCheck } from "@/hooks/useCriadorCheck";
 import { useVeterinarioCheck } from "@/hooks/useVeterinarioCheck";
+import { useIntegradoCheck } from "@/hooks/useIntegradoCheck";
 import { useSuperAdminCheck } from "@/hooks/useSuperAdminCheck";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -123,15 +124,17 @@ function SupplierOnlyRoute({ children }: { children: React.ReactNode }) {
 function RoleRedirectWrapper({ children }: { children: React.ReactNode }) {
   const { isCriador, loading: criadorLoading } = useCriadorCheck();
   const { isVeterinario, loading: vetLoading } = useVeterinarioCheck();
+  const { isIntegrado, loading: integradoLoading } = useIntegradoCheck();
   const { isSuperAdmin, loading: adminLoading } = useSuperAdminCheck();
 
-  if (criadorLoading || vetLoading || adminLoading) {
+  if (criadorLoading || vetLoading || integradoLoading || adminLoading) {
     return <LoadingScreen />;
   }
 
   if (!isSuperAdmin) {
     if (isCriador) return <Navigate to="/meus-lotes" replace />;
     if (isVeterinario) return <Navigate to="/veterinario" replace />;
+    if (isIntegrado) return <Navigate to="/meus-lotes" replace />;
   }
 
   return <>{children}</>;
@@ -143,8 +146,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isSupplier, loading: supplierLoading } = useSupplierCheck();
   const { isCriador, loading: criadorLoading } = useCriadorCheck();
   const { isVeterinario, loading: vetLoading } = useVeterinarioCheck();
+  const { isIntegrado, loading: integradoLoading } = useIntegradoCheck();
 
-  if (authLoading || (user && (supplierLoading || criadorLoading || vetLoading))) {
+  if (authLoading || (user && (supplierLoading || criadorLoading || vetLoading || integradoLoading))) {
     return <LoadingScreen />;
   }
 
@@ -152,6 +156,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
     if (isCriador) return <Navigate to="/meus-lotes" replace />;
     if (isVeterinario) return <Navigate to="/veterinario" replace />;
+    if (isIntegrado) return <Navigate to="/meus-lotes" replace />;
     return <Navigate to="/home" replace />;
   }
 
