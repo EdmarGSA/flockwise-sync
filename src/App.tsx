@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useSupplierCheck } from "@/hooks/useSupplierCheck";
 import { useCriadorCheck } from "@/hooks/useCriadorCheck";
+import { useVeterinarioCheck } from "@/hooks/useVeterinarioCheck";
 import { useSuperAdminCheck } from "@/hooks/useSuperAdminCheck";
 import { ModuleProtectedRoute } from "@/components/ModuleProtectedRoute";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -118,17 +119,19 @@ function SupplierOnlyRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Wrapper that redirects criador users to their dedicated panel
-function CriadorRedirectWrapper({ children }: { children: React.ReactNode }) {
+// Wrapper that redirects criador/veterinario users to their dedicated pages
+function RoleRedirectWrapper({ children }: { children: React.ReactNode }) {
   const { isCriador, loading: criadorLoading } = useCriadorCheck();
+  const { isVeterinario, loading: vetLoading } = useVeterinarioCheck();
   const { isSuperAdmin, loading: adminLoading } = useSuperAdminCheck();
 
-  if (criadorLoading || adminLoading) {
+  if (criadorLoading || vetLoading || adminLoading) {
     return <LoadingScreen />;
   }
 
-  if (isCriador && !isSuperAdmin) {
-    return <Navigate to="/meus-lotes" replace />;
+  if (!isSuperAdmin) {
+    if (isCriador) return <Navigate to="/meus-lotes" replace />;
+    if (isVeterinario) return <Navigate to="/veterinario" replace />;
   }
 
   return <>{children}</>;
@@ -139,14 +142,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { isSupplier, loading: supplierLoading } = useSupplierCheck();
   const { isCriador, loading: criadorLoading } = useCriadorCheck();
+  const { isVeterinario, loading: vetLoading } = useVeterinarioCheck();
 
-  if (authLoading || (user && (supplierLoading || criadorLoading))) {
+  if (authLoading || (user && (supplierLoading || criadorLoading || vetLoading))) {
     return <LoadingScreen />;
   }
 
   if (user) {
     if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
     if (isCriador) return <Navigate to="/meus-lotes" replace />;
+    if (isVeterinario) return <Navigate to="/veterinario" replace />;
     return <Navigate to="/home" replace />;
   }
 
@@ -171,9 +176,9 @@ const AppRoutes = () => (
     <Route path="/home" element={
       <ProtectedRoute>
         <SupplierRedirectWrapper>
-          <CriadorRedirectWrapper>
+          <RoleRedirectWrapper>
             <Home />
-          </CriadorRedirectWrapper>
+          </RoleRedirectWrapper>
         </SupplierRedirectWrapper>
       </ProtectedRoute>
     } />
