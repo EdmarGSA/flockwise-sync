@@ -1,29 +1,27 @@
 
 
-## Adicionar Botão "Sair" para Criador, Veterinário e Integrado
+## Análise do Problema
 
-### Problema
-Usuários com papel criador, veterinário ou integrado são redirecionados para suas páginas dedicadas (`/meus-lotes`, `/veterinario`) e não têm nenhum botão de logout visível. Ficam presos no sistema.
+A usuária Marcia tem papel **"integrado"** no sistema. O `RoleRedirectWrapper` em `App.tsx` só trata os papéis `criador` e `veterinario`, por isso o papel `integrado` não é interceptado e o usuário cai na tela `/home` (grid de módulos).
 
-### Solução
-Adicionar um botão "Sair" no header de cada página restrita. Como essas páginas já possuem um header com ícone e título, basta adicionar um botão `LogOut` no canto direito.
+Os papéis existentes no banco são: `criador`, `integrado`, `admin`.
 
-### Alterações
+## Solução
 
-**1. `src/pages/MeusLotes.tsx`**
-- Importar `LogOut` do lucide-react e `signOut` do `useAuth`
-- Adicionar botão "Sair" no header da página (ao lado do título ou no canto superior direito)
-- Ao clicar: `await signOut()` → `navigate('/')`
+Adicionar verificação do papel `integrado` no fluxo de redirecionamento, enviando esses usuários direto para `/meus-lotes`.
 
-**2. `src/pages/Veterinario.tsx`**
-- Mesmo padrão: importar `LogOut`, adicionar botão "Sair" no header
-- Ao clicar: `await signOut()` → `navigate('/')`
+### Alterações em `src/App.tsx`
 
-**3. `src/pages/VeterinarioLote.tsx`** (página de detalhe do lote veterinário)
-- Verificar se já tem botão voltar; o logout principal fica na lista, então não precisa duplicar aqui
+1. **Criar hook `useIntegradoCheck`** (mesmo padrão de `useCriadorCheck`): verifica se `profiles.role === 'integrado'`.
 
-### Design do botão
-- `variant="ghost"` com ícone `LogOut` + texto "Sair" em telas maiores
-- Posicionado no canto superior direito do header existente
-- Cor `text-destructive` para destacar como ação de saída
+2. **`RoleRedirectWrapper` (linha 123-138)**: adicionar check de integrado, redirecionando para `/meus-lotes`:
+```typescript
+const { isIntegrado, loading: integradoLoading } = useIntegradoCheck();
+// ...
+if (isIntegrado) return <Navigate to="/meus-lotes" replace />;
+```
+
+3. **`PublicRoute` (linha 140-155)**: adicionar mesma lógica para integrado no redirecionamento pós-login.
+
+4. **Botão "Sair" em `MeusLotes.tsx`**: já existe (adicionado anteriormente), então integrados também terão acesso ao logout.
 
