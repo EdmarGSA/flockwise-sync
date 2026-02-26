@@ -128,7 +128,7 @@ function CriadorRedirectWrapper({ children }: { children: React.ReactNode }) {
   }
 
   if (isCriador && !isSuperAdmin) {
-    return <Navigate to="/criador" replace />;
+    return <Navigate to="/meus-lotes" replace />;
   }
 
   return <>{children}</>;
@@ -146,7 +146,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   if (user) {
     if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
-    if (isCriador) return <Navigate to="/criador" replace />;
+    if (isCriador) return <Navigate to="/meus-lotes" replace />;
     return <Navigate to="/home" replace />;
   }
 
