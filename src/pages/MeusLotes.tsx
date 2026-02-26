@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,7 +80,7 @@ interface LoteComPesagem extends Lote {
 }
 
 export default function MeusLotes() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [lotes, setLotes] = useState<LoteComPesagem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -461,9 +461,20 @@ export default function MeusLotes() {
             </div>
           </div>
 
-          <Button onClick={() => navigate('/gestao-campo')} variant="outline" className="gap-2">
-            Gestão de Campo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => navigate('/gestao-campo')} variant="outline" className="gap-2">
+              Gestão de Campo
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive gap-1.5"
+              onClick={async () => { await signOut(); navigate('/'); }}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sair</span>
+            </Button>
+          </div>
         </div>
       </header>
 
