@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -28,7 +28,7 @@ interface Lote {
 type StatusFilter = 'todos' | 'alojado' | 'previsao' | 'saiu_para_entrega' | 'fechado';
 
 export default function Veterinario() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -193,6 +193,15 @@ export default function Veterinario() {
               {totalAlertas}
             </Badge>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive gap-1.5 shrink-0"
+            onClick={async () => { await signOut(); navigate('/'); }}
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sair</span>
+          </Button>
         </div>
       </header>
 
