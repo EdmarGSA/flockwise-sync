@@ -22,12 +22,13 @@ export const useVeterinarioCheck = (): VeterinarioCheckResult => {
       }
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('user_roles')
           .select('role')
-          .eq('id', user.id)
+          .eq('user_id', user.id)
+          .eq('role', 'veterinario')
           .maybeSingle();
 
-        setIsVeterinario(!error && data?.role === 'veterinario');
+        setIsVeterinario(!!data && !error);
       } catch {
         setIsVeterinario(false);
       } finally {
