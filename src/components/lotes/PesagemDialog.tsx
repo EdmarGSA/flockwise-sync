@@ -562,8 +562,7 @@ export function PesagemDialog({
       }
     }
     
-    // Clear inputs - mantém a tara para reutilização
-    setQuantidadeAves('');
+    // Clear inputs - mantém a tara e quantidade de aves para reutilização
     setPesoBruto('');
     
     // Focus on peso bruto field for next entry
@@ -776,7 +775,7 @@ export function PesagemDialog({
       </AlertDialog>
 
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Scale className="w-5 h-5" />
@@ -913,7 +912,7 @@ export function PesagemDialog({
                     <Target className="w-4 h-4 text-amber-600" />
                     <span className="font-semibold text-amber-700">Metas de Peso</span>
                   </div>
-                  <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center text-xs">
+                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 sm:gap-2 text-center text-xs overflow-x-auto">
                     {historicoPesagens.map((hist, idx) => {
                       const isActive = diasDesdeAlojamento >= hist.diasMin && diasDesdeAlojamento <= hist.diasMax;
                       return (
@@ -956,20 +955,21 @@ export function PesagemDialog({
             {/* Tara Configuration */}
             <Card className="bg-muted/30 border-dashed">
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-2">
                     <Settings2 className="w-4 h-4 text-muted-foreground" />
-                    <Label htmlFor="tara" className="font-medium">Peso Tara (kg)</Label>
+                    <Label htmlFor="tara" className="font-medium text-sm">Peso Tara (kg)</Label>
                   </div>
                   <Input
                     id="tara"
                     type="number"
+                    inputMode="decimal"
                     min="0"
                     step="0.001"
                     value={pesoTara}
                     onChange={(e) => setPesoTara(e.target.value)}
                     placeholder="Ex: 0.500"
-                    className="w-32"
+                    className="w-full sm:w-32 h-12 sm:h-10 text-base"
                   />
                   {parseFloat(pesoTara) > 0 && (
                     <Badge variant="secondary" className="text-xs">
@@ -983,33 +983,37 @@ export function PesagemDialog({
             {/* Input Form */}
             <Card className="bg-secondary/30">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="quantidade">Qtd. Aves</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quantidade" className="text-xs sm:text-sm">Qtd. Aves</Label>
                     <Input
                       id="quantidade"
                       type="number"
+                      inputMode="numeric"
                       min="1"
                       value={quantidadeAves}
                       onChange={(e) => setQuantidadeAves(e.target.value)}
                       placeholder="Ex: 10"
+                      className="h-12 sm:h-10 text-base"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bruto">Peso Bruto (kg)</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bruto" className="text-xs sm:text-sm">Peso Bruto (kg)</Label>
                     <Input
                       ref={pesoBrutoInputRef}
                       id="bruto"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.001"
                       value={pesoBruto}
                       onChange={(e) => setPesoBruto(e.target.value)}
                       placeholder="Ex: 5.250"
+                      className="h-12 sm:h-10 text-base"
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button onClick={handleAddItem} className="w-full gap-2">
+                    <Button onClick={handleAddItem} className="w-full gap-2 h-12 sm:h-10 text-base sm:text-sm">
                       <Plus className="w-4 h-4" />
                       Adicionar
                     </Button>
@@ -1035,47 +1039,66 @@ export function PesagemDialog({
               </CardContent>
             </Card>
 
-            {/* Items Table */}
+            {/* Items List */}
             {itens.length > 0 && (
               <Card>
-                <CardContent className="pt-6">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Qtd. Aves</TableHead>
-                        <TableHead>Peso Bruto</TableHead>
-                        <TableHead>Tara</TableHead>
-                        <TableHead>Líquido</TableHead>
-                        <TableHead>Médio/Ave</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itens.map((item, index) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{index + 1}</TableCell>
-                          <TableCell>{item.quantidade_aves}</TableCell>
-                          <TableCell>{item.peso_bruto_kg.toFixed(3)} kg</TableCell>
-                          <TableCell>{item.peso_tara_kg.toFixed(3)} kg</TableCell>
-                          <TableCell className="font-medium">{item.peso_liquido_kg.toFixed(3)} kg</TableCell>
-                          <TableCell className="text-primary font-medium">
-                            {(item.peso_liquido_kg / item.quantidade_aves).toFixed(3)} kg
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveItem(item.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                <CardContent className="pt-4 pb-2">
+                  {/* Mobile: card list */}
+                  <div className="block sm:hidden space-y-2">
+                    {itens.map((item, index) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
+                            <span className="text-sm font-medium">{item.quantidade_aves} aves</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                            <span>Bruto: {item.peso_bruto_kg.toFixed(3)}</span>
+                            <span>Líq: <span className="font-medium text-foreground">{item.peso_liquido_kg.toFixed(3)}</span></span>
+                            <span className="text-primary font-medium">{(item.peso_liquido_kg / item.quantidade_aves).toFixed(3)} kg/ave</span>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-destructive hover:text-destructive h-8 w-8 shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop: table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Qtd. Aves</TableHead>
+                          <TableHead>Peso Bruto</TableHead>
+                          <TableHead>Tara</TableHead>
+                          <TableHead>Líquido</TableHead>
+                          <TableHead>Médio/Ave</TableHead>
+                          <TableHead className="w-12"></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itens.map((item, index) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell>{item.quantidade_aves}</TableCell>
+                            <TableCell>{item.peso_bruto_kg.toFixed(3)} kg</TableCell>
+                            <TableCell>{item.peso_tara_kg.toFixed(3)} kg</TableCell>
+                            <TableCell className="font-medium">{item.peso_liquido_kg.toFixed(3)} kg</TableCell>
+                            <TableCell className="text-primary font-medium">
+                              {(item.peso_liquido_kg / item.quantidade_aves).toFixed(3)} kg
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-destructive hover:text-destructive">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -1084,7 +1107,7 @@ export function PesagemDialog({
             {itens.length > 0 && (
               <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
                     <div>
                       <p className="text-muted-foreground text-sm">Total Aves</p>
                       <p className="text-xl font-bold">{totalAves.toLocaleString('pt-BR')}</p>
