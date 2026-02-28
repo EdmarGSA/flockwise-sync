@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut, Skull } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut, Skull, Pill } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
+import { useCarenciaAlertaLotes } from '@/hooks/useCarenciaAlerta';
 
 interface Lote {
   id: string;
@@ -40,6 +41,11 @@ export default function Veterinario() {
 
   const { mortalidadeMap } = useMortalidadeAlertaLotes(
     lotes.map(l => ({ id: l.id, quantidade_aves: l.quantidade_aves, data_alojamento: l.data_alojamento })),
+    integradoId
+  );
+
+  const { carenciaMap } = useCarenciaAlertaLotes(
+    lotes.map(l => l.id),
     integradoId
   );
 
@@ -266,11 +272,13 @@ export default function Veterinario() {
               const hasAlerts = (lote.alertas_count || 0) > 0;
               const mortInfo = mortalidadeMap[lote.id];
               const hasMortAlerta = mortInfo?.emAlerta;
+              const carenciaInfo = carenciaMap[lote.id];
+              const hasCarenciaAlerta = carenciaInfo?.emAlerta;
               
               return (
                   <Card 
                   key={lote.id} 
-                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts || hasMortAlerta ? 'border-l-4 border-l-destructive' : ''}`}
+                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts || hasMortAlerta ? 'border-l-4 border-l-destructive' : hasCarenciaAlerta ? 'border-l-4 border-l-amber-500' : ''}`}
                   onClick={() => navigate(`/veterinario/${lote.id}`)}
                 >
                   <CardContent className="p-4">
@@ -323,6 +331,12 @@ export default function Veterinario() {
                             <div className="flex items-center gap-1 text-sm text-destructive font-medium">
                               <Skull className="w-3.5 h-3.5" />
                               <span>{mortInfo.percentual.toFixed(1)}%</span>
+                            </div>
+                          )}
+                          {hasCarenciaAlerta && carenciaInfo && (
+                            <div className="flex items-center gap-1 text-sm text-amber-600 font-medium">
+                              <Pill className="w-3.5 h-3.5" />
+                              <span>{carenciaInfo.tratamentos.length}</span>
                             </div>
                           )}
                         </div>

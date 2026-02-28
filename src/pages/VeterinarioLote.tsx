@@ -10,6 +10,7 @@ import { calcularIdadeLote } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
+import { useCarenciaAlertaLotes } from '@/hooks/useCarenciaAlerta';
 import { toast } from 'sonner';
 import ConnectionStatus from '@/components/veterinario/ConnectionStatus';
 import ObservacoesDialog from '@/components/veterinario/ObservacoesDialog';
@@ -50,6 +51,10 @@ export default function VeterinarioLote() {
   const lotesForHook = lote ? [{ id: lote.id, quantidade_aves: lote.quantidade_aves, data_alojamento: lote.data_alojamento }] : [];
   const { mortalidadeMap } = useMortalidadeAlertaLotes(lotesForHook, integradoId);
   const mortInfo = lote ? mortalidadeMap[lote.id] : undefined;
+
+  const loteIdsForCarencia = lote ? [lote.id] : [];
+  const { carenciaMap } = useCarenciaAlertaLotes(loteIdsForCarencia, integradoId);
+  const carenciaInfo = lote ? carenciaMap[lote.id] : undefined;
 
   // Dialog states
   const [observacoesOpen, setObservacoesOpen] = useState(false);
@@ -230,6 +235,21 @@ export default function VeterinarioLote() {
             <AlertTitle>Mortalidade acima do limiar</AlertTitle>
             <AlertDescription>
               Mortalidade atual: <strong>{mortInfo.percentual.toFixed(2)}%</strong> ({mortInfo.totalMortos} aves) — Limiar: <strong>{mortInfo.limiar?.toFixed(2)}%</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Carência Alert */}
+        {carenciaInfo?.emAlerta && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <Pill className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-700 dark:text-amber-400">Carência vencendo</AlertTitle>
+            <AlertDescription className="text-amber-600 dark:text-amber-300">
+              {carenciaInfo.tratamentos.map(t => (
+                <div key={t.id} className="text-sm">
+                  <strong>{t.produtoNome}</strong> — {t.diasRestantes <= 0 ? 'Carência vencida' : `${t.diasRestantes}d restante${t.diasRestantes > 1 ? 's' : ''}`} (lib. {new Date(t.dataLiberacao).toLocaleDateString('pt-BR')})
+                </div>
+              ))}
             </AlertDescription>
           </Alert>
         )}
