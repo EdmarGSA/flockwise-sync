@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut, Skull } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
 
 interface Lote {
   id: string;
@@ -30,10 +32,16 @@ type StatusFilter = 'todos' | 'alojado' | 'previsao' | 'saiu_para_entrega' | 'fe
 export default function Veterinario() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const { integradoId } = useIntegradoId();
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
+
+  const { mortalidadeMap } = useMortalidadeAlertaLotes(
+    lotes.map(l => ({ id: l.id, quantidade_aves: l.quantidade_aves, data_alojamento: l.data_alojamento })),
+    integradoId
+  );
 
   useEffect(() => {
     if (user) {
@@ -256,11 +264,13 @@ export default function Veterinario() {
             {filteredLotes.map((lote) => {
               const dias = getDiasLote(lote.data_alojamento);
               const hasAlerts = (lote.alertas_count || 0) > 0;
+              const mortInfo = mortalidadeMap[lote.id];
+              const hasMortAlerta = mortInfo?.emAlerta;
               
               return (
-                <Card 
+                  <Card 
                   key={lote.id} 
-                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts ? 'border-l-4 border-l-destructive' : ''}`}
+                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts || hasMortAlerta ? 'border-l-4 border-l-destructive' : ''}`}
                   onClick={() => navigate(`/veterinario/${lote.id}`)}
                 >
                   <CardContent className="p-4">
@@ -307,6 +317,12 @@ export default function Veterinario() {
                             <div className="flex items-center gap-1 text-sm text-destructive">
                               <AlertTriangle className="w-3.5 h-3.5" />
                               <span>{lote.alertas_count}</span>
+                            </div>
+                          )}
+                          {hasMortAlerta && mortInfo && (
+                            <div className="flex items-center gap-1 text-sm text-destructive font-medium">
+                              <Skull className="w-3.5 h-3.5" />
+                              <span>{mortInfo.percentual.toFixed(1)}%</span>
                             </div>
                           )}
                         </div>
