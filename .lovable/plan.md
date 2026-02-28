@@ -1,27 +1,37 @@
 
 
-## Análise do Problema
+## Alerta de Mortalidade na Tela Veterinário (Lista de Lotes)
 
-A usuária Marcia tem papel **"integrado"** no sistema. O `RoleRedirectWrapper` em `App.tsx` só trata os papéis `criador` e `veterinario`, por isso o papel `integrado` não é interceptado e o usuário cai na tela `/home` (grid de módulos).
+### Contexto
+A tabela `mortalidade` registra mortalidade por lote, e `mortalidade_itens` contém a quantidade de aves mortas. A tabela `metas_zootecnicas` define limiares de alerta por faixa de idade (ex: `mortalidade_7_dias_alerta`, `mortalidade_14_dias_alerta`, etc.).
 
-Os papéis existentes no banco são: `criador`, `integrado`, `admin`.
+### Plano
 
-## Solução
+**1. `src/pages/Veterinario.tsx` - Adicionar indicador de mortalidade nos cards de lote**
 
-Adicionar verificação do papel `integrado` no fluxo de redirecionamento, enviando esses usuários direto para `/meus-lotes`.
+- Na função `fetchLotes`, além de buscar observações e alertas, buscar também:
+  - Total de mortalidade acumulada por lote (sum de `mortalidade_itens.quantidade` via join com `mortalidade`)
+  - Metas zootécnicas do integrado para comparar com limiares de alerta
+- Calcular `% mortalidade = total_mortos / quantidade_aves * 100`
+- Comparar com o limiar de alerta da faixa de idade correspondente (`mortalidade_X_dias_alerta`)
+- Adicionar campo `mortalidade_alerta: boolean` e `mortalidade_percentual: number` ao estado do lote
 
-### Alterações em `src/App.tsx`
+- No card de cada lote, quando `mortalidade_alerta === true`:
+  - Exibir badge com ícone `Skull` ou `AlertTriangle` em vermelho com o percentual de mortalidade
+  - Adicionar borda visual similar aos alertas existentes
 
-1. **Criar hook `useIntegradoCheck`** (mesmo padrão de `useCriadorCheck`): verifica se `profiles.role === 'integrado'`.
+**2. `src/pages/VeterinarioLote.tsx` - Adicionar card de mortalidade na tela de detalhe**
 
-2. **`RoleRedirectWrapper` (linha 123-138)**: adicionar check de integrado, redirecionando para `/meus-lotes`:
-```typescript
-const { isIntegrado, loading: integradoLoading } = useIntegradoCheck();
-// ...
-if (isIntegrado) return <Navigate to="/meus-lotes" replace />;
-```
+- Buscar mortalidade acumulada do lote e meta zootécnica
+- Adicionar um card de alerta (usando componente `Alert` destructive) acima dos botões de ação quando mortalidade estiver acima do limiar
+- Mostrar: percentual atual vs limiar, total de aves mortas
 
-3. **`PublicRoute` (linha 140-155)**: adicionar mesma lógica para integrado no redirecionamento pós-login.
-
-4. **Botão "Sair" em `MeusLotes.tsx`**: já existe (adicionado anteriormente), então integrados também terão acesso ao logout.
+### Lógica de faixa de idade
+Mapear dias do lote para a faixa correta:
+- 0-7 dias → `mortalidade_7_dias_alerta`
+- 8-14 dias → `mortalidade_14_dias_alerta`
+- 15-21 dias → `mortalidade_21_dias_alerta`
+- 22-28 dias → `mortalidade_28_dias_alerta`
+- 29-35 dias → `mortalidade_35_dias_alerta`
+- 36+ dias → `mortalidade_42_dias_alerta`
 
