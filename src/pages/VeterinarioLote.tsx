@@ -5,8 +5,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar } from 'lucide-react';
+import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar, Skull } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
 import { toast } from 'sonner';
 import ConnectionStatus from '@/components/veterinario/ConnectionStatus';
 import ObservacoesDialog from '@/components/veterinario/ObservacoesDialog';
@@ -39,9 +42,14 @@ export default function VeterinarioLote() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { loteId } = useParams<{ loteId: string }>();
+  const { integradoId } = useIntegradoId();
   const [lote, setLote] = useState<Lote | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [counts, setCounts] = useState<Counts>({ observacoes: 0, tratamentos: 0, autopsias: 0 });
+
+  const lotesForHook = lote ? [{ id: lote.id, quantidade_aves: lote.quantidade_aves, data_alojamento: lote.data_alojamento }] : [];
+  const { mortalidadeMap } = useMortalidadeAlertaLotes(lotesForHook, integradoId);
+  const mortInfo = lote ? mortalidadeMap[lote.id] : undefined;
 
   // Dialog states
   const [observacoesOpen, setObservacoesOpen] = useState(false);
@@ -215,6 +223,17 @@ export default function VeterinarioLote() {
       </header>
 
       <main className="px-4 pt-4 space-y-4">
+        {/* Mortality Alert */}
+        {mortInfo?.emAlerta && (
+          <Alert variant="destructive">
+            <Skull className="h-4 w-4" />
+            <AlertTitle>Mortalidade acima do limiar</AlertTitle>
+            <AlertDescription>
+              Mortalidade atual: <strong>{mortInfo.percentual.toFixed(2)}%</strong> ({mortInfo.totalMortos} aves) — Limiar: <strong>{mortInfo.limiar?.toFixed(2)}%</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Info Cards 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2">
           <Card className="bg-card border-border">
