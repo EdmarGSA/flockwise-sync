@@ -30,11 +30,13 @@ interface MetasPeso {
   gpd_kg: number;
 }
 
-interface PesagemData {
+export interface PesagemData {
   dia: number;
   peso_real_kg: number;
   data_pesagem: string;
   numSessoes: number;
+  totalAves: number;
+  totalPesoKg: number;
 }
 
 interface DesempenhoReferencia {
@@ -65,7 +67,7 @@ interface MetasVetTabProps {
   onPesagemClick?: (pesagem: PesagemData, pesoReferencia?: number) => void;
 }
 
-export type { PesagemData };
+
 
 export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTabProps) {
   const { user } = useAuth();
@@ -168,7 +170,9 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
             dia, 
             peso_real_kg: pesoMedio,
             data_pesagem: data,
-            numSessoes: sessoes.size
+            numSessoes: sessoes.size,
+            totalAves: totalAves,
+            totalPesoKg: totalPeso / 1000
           };
         }).sort((a, b) => a.dia - b.dia);
         
@@ -688,6 +692,11 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
                     <span className="font-bold text-base">
                       {(pesagem.peso_real_kg * 1000).toFixed(0)}g
                     </span>
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                      <span>{pesagem.totalAves} aves</span>
+                      <span>•</span>
+                      <span>{pesagem.totalPesoKg.toFixed(2)} kg</span>
+                    </div>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-muted-foreground">{dataFormatada}</span>
                       {diferenca !== null && (
