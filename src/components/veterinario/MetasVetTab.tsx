@@ -172,7 +172,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
             data_pesagem: data,
             numSessoes: sessoes.size,
             totalAves: totalAves,
-            totalPesoKg: totalPeso / 1000
+            totalPesoKg: totalPeso
           };
         }).sort((a, b) => a.dia - b.dia);
         
