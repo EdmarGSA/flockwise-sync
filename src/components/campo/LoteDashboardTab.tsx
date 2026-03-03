@@ -130,7 +130,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
 
       if (desempenhoData && desempenhoData.length > 0) {
         // Estimate: consumo_acumulado * aves_vivas / 1000
-        const consumoEstimado = (desempenhoData[0].consumo_acumulado_racao_g * avesAlojadas) / 1000;
+        const consumoEstimado = (desempenhoData[0].consumo_acumulado_racao_g * avesVivas) / 1000;
         setConsumoTotalKg(consumoEstimado);
       }
 
@@ -153,7 +153,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           if (totalAves > 0) {
             pesagensProcessed.push({
               dia: differenceInDays(new Date(p.data_pesagem), new Date(lote.data_alojamento)),
-              peso_kg: totalPeso / totalAves / 1000,
+              peso_kg: totalPeso / totalAves,
             });
           }
         }

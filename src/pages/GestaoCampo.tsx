@@ -133,11 +133,11 @@ export default function GestaoCampo() {
     
     const [nucleosRes, galpoesRes, areasRes, lotesRes, desempenhoRes, gruposRes] = await Promise.all([
       supabase.from('nucleos').select('id, nome, cidade, estado, tipo_producao, ativo, latitude, longitude').eq('integrado_id', integradoId),
-      supabase.from('galpoes').select('*,nucleo:nucleos(nome)').eq('nucleo.integrado_id', integradoId),
+      supabase.from('galpoes').select('*,nucleo:nucleos!inner(nome)').eq('nucleo.integrado_id', integradoId),
       supabase.from('areas').select('id, nome, descricao, cor, ativo').eq('integrado_id', integradoId),
       supabase.from('lotes').select(`
         id, quantidade_aves, data_prevista_alojamento, data_alojamento, data_fechamento,
-        linhagem, status, veterinario_id, nucleo:nucleos(nome), galpao:galpoes(nome)
+        linhagem, status, veterinario_id, galpao_id, nucleo:nucleos(nome), galpao:galpoes(nome)
       `).eq('integrado_id', integradoId).order('created_at', { ascending: false }),
       supabase.from('desempenho_aves').select('*').order('dia', { ascending: true }),
       supabase.from('grupos_animal').select('id, nome').eq('ativo', true).eq('integrado_id', integradoId)
@@ -223,7 +223,12 @@ export default function GestaoCampo() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
       previsao: { label: 'Previsão', variant: 'outline' },
+      agendado: { label: 'Agendado', variant: 'outline' },
       alojado: { label: 'Alojado', variant: 'default' },
+      em_producao: { label: 'Em Produção', variant: 'default' },
+      jejum: { label: 'Jejum', variant: 'destructive' },
+      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'secondary' },
+      abatido: { label: 'Abatido', variant: 'secondary' },
       fechado: { label: 'Fechado', variant: 'secondary' },
     };
     const config = variants[status] || { label: status, variant: 'outline' };
@@ -261,8 +266,8 @@ export default function GestaoCampo() {
 
   // Get nucleo tipo_producao for each lote to enable filtering
   const getLoteTipoProducao = (lote: Lote) => {
-    // Find the nucleo_id from galpoes since lote doesn't directly have it
-    const galpao = galpoes.find(g => g.nome === lote.galpao?.nome);
+    // Find the galpao by ID for reliable matching
+    const galpao = galpoes.find(g => g.id === (lote as any).galpao_id);
     if (!galpao) return null;
     const nucleo = nucleos.find(n => n.id === galpao.nucleo_id);
     return nucleo?.tipo_producao || null;
