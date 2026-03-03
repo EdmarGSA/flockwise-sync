@@ -164,8 +164,8 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
         totalPeso += item.peso_liquido_g || 0;
       });
       if (totalAves > 0) {
-        // peso_liquido_g está em gramas, convertendo para kg
-        setUltimoPesoMedio(totalPeso / totalAves / 1000);
+        // peso_liquido_g armazenado em kg
+        setUltimoPesoMedio(totalPeso / totalAves);
       }
     }
   };
