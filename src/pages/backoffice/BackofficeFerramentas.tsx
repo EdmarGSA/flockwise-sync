@@ -36,7 +36,7 @@ export default function BackofficeFerramentas() {
         .maybeSingle();
 
       if (!profile) {
-        toast({ title: 'Usuário não encontrado', description: 'Verifique o ID informado.', variant: 'destructive' });
+        toast.error('Usuário não encontrado', { description: 'Verifique o ID informado.' });
         setPromoting(false);
         return;
       }
