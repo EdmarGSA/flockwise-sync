@@ -1092,6 +1092,59 @@ export type Database = {
         }
         Relationships: []
       }
+      dispositivos_iot: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          device_id_ewelink: string
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          marca: string | null
+          modelo: string | null
+          nome: string
+          tipo: string
+          ultimo_sync: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          device_id_ewelink: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          marca?: string | null
+          modelo?: string | null
+          nome: string
+          tipo?: string
+          ultimo_sync?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          device_id_ewelink?: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          marca?: string | null
+          modelo?: string | null
+          nome?: string
+          tipo?: string
+          ultimo_sync?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispositivos_iot_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       divergencias_recebimento: {
         Row: {
           aceita: boolean | null
@@ -2022,6 +2075,47 @@ export type Database = {
             columns: ["producao_ovos_id"]
             isOneToOne: false
             referencedRelation: "producao_ovos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leituras_sensores: {
+        Row: {
+          created_at: string
+          dispositivo_id: string
+          id: string
+          lido_em: string
+          online: boolean | null
+          raw_data: Json | null
+          temperatura_c: number | null
+          umidade_pct: number | null
+        }
+        Insert: {
+          created_at?: string
+          dispositivo_id: string
+          id?: string
+          lido_em?: string
+          online?: boolean | null
+          raw_data?: Json | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+        }
+        Update: {
+          created_at?: string
+          dispositivo_id?: string
+          id?: string
+          lido_em?: string
+          online?: boolean | null
+          raw_data?: Json | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leituras_sensores_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
             referencedColumns: ["id"]
           },
         ]

@@ -48,6 +48,7 @@ import CadastroProdutosOvos from "./pages/CadastroProdutosOvos";
 import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
+import DispositivosIoT from "./pages/DispositivosIoT";
 import PortalFornecedor from "./pages/PortalFornecedor";
 import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
@@ -411,6 +412,15 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
     
+    {/* Dispositivos IoT */}
+    <Route path="/configuracoes/dispositivos-iot" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <DispositivosIoT />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
     {/* Portal do Fornecedor - apenas fornecedores */}
     <Route path="/portal-fornecedor" element={
       <ProtectedRoute>
