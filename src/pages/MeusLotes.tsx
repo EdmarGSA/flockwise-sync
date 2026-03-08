@@ -801,6 +801,7 @@ export default function MeusLotes() {
             open={recebimentoOpen}
             onOpenChange={setRecebimentoOpen}
             loteId={selectedLote.id}
+            integradoId={selectedLote.integrado_id}
             quantidadeAves={selectedLote.quantidade_aves}
             onSuccess={fetchLotes}
           />
@@ -813,7 +814,7 @@ export default function MeusLotes() {
             avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
-            pesoMedioPintinhos={selectedLote.peso_medio_pintinhos}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             galpaoId={selectedLote.galpao_id}
             onSuccess={fetchLotes}
           />
@@ -824,8 +825,6 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             quantidadeAves={selectedLote.avesVivas || selectedLote.quantidade_aves}
             dataAlojamento={selectedLote.data_alojamento || ''}
-            linhagem={selectedLote.linhagem}
-            sexo={selectedLote.sexo}
             onSuccess={fetchLotes}
           />
           <RacaoLoteDialog
@@ -834,6 +833,9 @@ export default function MeusLotes() {
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
             galpaoId={selectedLote.galpao_id}
+            nucleo={selectedLote.nucleo?.nome || ''}
+            galpao={selectedLote.galpao?.nome || ''}
+            tipoProducao={selectedLote.nucleo?.tipo_producao || null}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
             diasDesdeAlojamento={selectedLote.diasDesdeAlojamento || 0}
@@ -850,13 +852,22 @@ export default function MeusLotes() {
             open={jejumDialogOpen}
             onOpenChange={setJejumDialogOpen}
             loteId={selectedLote.id}
-            horarioJejum={selectedLote.horario_inicio_jejum || ''}
+            horarioInicioJejum={selectedLote.horario_inicio_jejum}
+            dataPrevistaSaida={selectedLote.data_prevista_saida}
+            jejumConfirmado={selectedLote.jejum_confirmado}
+            jejumConfirmadoEm={selectedLote.jejum_confirmado_em}
             onSuccess={fetchLotes}
           />
           <SaidaLoteInfoDialog
             open={saidaInfoOpen}
             onOpenChange={setSaidaInfoOpen}
-            lote={selectedLote}
+            dataPrevistaSaida={selectedLote.data_prevista_saida}
+            horarioInicioJejum={selectedLote.horario_inicio_jejum}
+            saidaVendaLocal={selectedLote.saida_venda_local}
+            saidaVendaExterna={selectedLote.saida_venda_externa}
+            saidaAbate={selectedLote.saida_abate}
+            jejumConfirmado={selectedLote.jejum_confirmado}
+            jejumConfirmadoEm={selectedLote.jejum_confirmado_em}
           />
           <FechamentoLoteDialog
             open={fechamentoOpen}
