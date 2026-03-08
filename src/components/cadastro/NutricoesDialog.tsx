@@ -261,7 +261,7 @@ const NutricoesDialog = ({
         .update({ padrao: true })
         .eq('id', nutricao.id);
 
-      toast({ title: `${nutricao.nome} definida como padrão` });
+      toast.success(`${nutricao.nome} definida como padrão`);
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao definir padrão:', error);
