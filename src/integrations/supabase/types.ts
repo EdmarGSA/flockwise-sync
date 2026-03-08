@@ -2553,27 +2553,36 @@ export type Database = {
       }
       mortalidade: {
         Row: {
+          analise_ia: Json | null
           created_at: string
           data_registro: string
           id: string
           integrado_id: string
           lote_id: string
+          temperatura_c: number | null
+          umidade_pct: number | null
           updated_at: string
         }
         Insert: {
+          analise_ia?: Json | null
           created_at?: string
           data_registro?: string
           id?: string
           integrado_id: string
           lote_id: string
+          temperatura_c?: number | null
+          umidade_pct?: number | null
           updated_at?: string
         }
         Update: {
+          analise_ia?: Json | null
           created_at?: string
           data_registro?: string
           id?: string
           integrado_id?: string
           lote_id?: string
+          temperatura_c?: number | null
+          umidade_pct?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2582,6 +2591,38 @@ export type Database = {
             columns: ["lote_id"]
             isOneToOne: false
             referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mortalidade_fotos: {
+        Row: {
+          created_at: string
+          id: string
+          mortalidade_id: string
+          motivo: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mortalidade_id: string
+          motivo: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mortalidade_id?: string
+          motivo?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortalidade_fotos_mortalidade_id_fkey"
+            columns: ["mortalidade_id"]
+            isOneToOne: false
+            referencedRelation: "mortalidade"
             referencedColumns: ["id"]
           },
         ]
