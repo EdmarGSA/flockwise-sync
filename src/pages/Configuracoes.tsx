@@ -105,6 +105,12 @@ const Configuracoes = () => {
       description: "Aves vivas, ovos, suínos e outros",
       icon: Bird,
       path: "/configuracoes/produtos-animais"
+    },
+    {
+      title: "Dispositivos IoT",
+      description: "Sensores de temperatura e umidade (Sonoff)",
+      icon: Activity,
+      path: "/configuracoes/dispositivos-iot"
     }
   ];
 
