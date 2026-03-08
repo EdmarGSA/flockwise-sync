@@ -28,12 +28,77 @@ const STATUS_COLORS = {
 export default function VeterinarioDashboard({ mortalidadeMap, carenciaMap }: Props) {
   const { integradoId } = useIntegradoId();
   const { analytics, summary, loading, fetchAnalytics } = useLoteAnalytics();
+  const [weeklyMortData, setWeeklyMortData] = useState<{ semana: string; mortes: number; percentual: number }[]>([]);
+
+  const fetchWeeklyMortality = useCallback(async (intId: string) => {
+    const now = new Date();
+    const sixWeeksAgo = subWeeks(now, 6);
+
+    // Fetch mortality records from the last 6 weeks
+    const { data: mortRecords } = await supabase
+      .from('mortalidade')
+      .select('id, data_registro, lote_id')
+      .eq('integrado_id', intId)
+      .gte('data_registro', sixWeeksAgo.toISOString().split('T')[0]);
+
+    if (!mortRecords || mortRecords.length === 0) {
+      setWeeklyMortData([]);
+      return;
+    }
+
+    const mortIds = mortRecords.map(m => m.id);
+    const { data: mortItens } = await supabase
+      .from('mortalidade_itens')
+      .select('mortalidade_id, quantidade')
+      .in('mortalidade_id', mortIds);
+
+    // Build a map: mortalidade_id -> total quantity
+    const qtyByMort: Record<string, number> = {};
+    (mortItens || []).forEach(item => {
+      qtyByMort[item.mortalidade_id] = (qtyByMort[item.mortalidade_id] || 0) + (item.quantidade || 0);
+    });
+
+    // Group by week
+    const weekBuckets: Record<string, number> = {};
+    for (let w = 5; w >= 0; w--) {
+      const weekStart = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 });
+      const key = format(weekStart, "dd/MM", { locale: ptBR });
+      weekBuckets[key] = 0;
+    }
+
+    mortRecords.forEach(rec => {
+      const recDate = new Date(rec.data_registro);
+      const weekStart = startOfWeek(recDate, { weekStartsOn: 1 });
+      const key = format(weekStart, "dd/MM", { locale: ptBR });
+      if (key in weekBuckets) {
+        weekBuckets[key] += qtyByMort[rec.id] || 0;
+      }
+    });
+
+    // Fetch total aves for percentage calculation
+    const { data: lotesAtivos } = await supabase
+      .from('lotes')
+      .select('quantidade_aves')
+      .eq('integrado_id', intId)
+      .eq('status', 'alojado');
+
+    const totalAves = (lotesAtivos || []).reduce((s, l) => s + (l.quantidade_aves || 0), 0);
+
+    const result = Object.entries(weekBuckets).map(([semana, mortes]) => ({
+      semana,
+      mortes,
+      percentual: totalAves > 0 ? Number(((mortes / totalAves) * 100).toFixed(3)) : 0,
+    }));
+
+    setWeeklyMortData(result);
+  }, []);
 
   useEffect(() => {
     if (integradoId) {
       fetchAnalytics(integradoId);
+      fetchWeeklyMortality(integradoId);
     }
-  }, [integradoId, fetchAnalytics]);
+  }, [integradoId, fetchAnalytics, fetchWeeklyMortality]);
 
   const tratamentosAtivos = Object.values(carenciaMap).reduce(
     (acc, c) => acc + c.tratamentos.length, 0
