@@ -23,7 +23,7 @@ export default function BackofficeFerramentas() {
         .maybeSingle();
 
       if (existing) {
-        toast({ title: 'Já é superadmin', description: 'Este usuário já possui a role superadmin.' });
+        toast.info('Já é superadmin', { description: 'Este usuário já possui a role superadmin.' });
         setPromoting(false);
         return;
       }
