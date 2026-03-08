@@ -1,34 +1,17 @@
 
+## Checklist Geral — Correções Aplicadas
 
-## Plano: Limpar/Popular Demo + Corrigir Filtro Pendente
+### ✅ Corrigido
 
-### Contexto
-A inconsistência #2 do checklist (filtro `integrado_id` em `desempenho_aves`) ainda **não foi aplicada**. Ambas as queries em `GestaoCampo.tsx` (linha 142) e `useLoteAnalytics.tsx` (linha 225) buscam todos os registros sem filtrar por organização.
+1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
+2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
+3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
+4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
+5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
 
-### Ações
+### Pendente (baixa prioridade)
 
-**1. Corrigir filtro `integrado_id` nas queries de `desempenho_aves`**
-- `src/pages/GestaoCampo.tsx` linha 142: adicionar `.eq('integrado_id', integradoId)`
-- `src/hooks/useLoteAnalytics.tsx` linha 225-227: adicionar `.eq('integrado_id', integradoId)` (o hook recebe `integradoId` como parâmetro de `fetchAnalytics`)
-
-**2. Limpar e repopular dados demo**
-- Chamar a edge function `create-demo-user` para garantir que o usuário demo existe e está configurado
-- Executar SQL via insert tool para limpar dados existentes do demo user (`e12d9495-1a59-43aa-bdb5-9121ee0f56fb`) e recriar via as RPCs `initialize_demo_data` e `initialize_demo_lotes`
-
-**3. Testar no preview**
-- Entrar como demo e navegar pelo módulo Gestão de Campo para verificar se os dados estão consistentes
-
-### Detalhes Técnicos
-
-Limpeza SQL (via insert tool):
-```sql
-DELETE FROM lotes WHERE integrado_id = 'e12d9495-...';
-DELETE FROM nucleos WHERE integrado_id = 'e12d9495-...';
-DELETE FROM galpoes WHERE nucleo_id IN (SELECT id FROM nucleos WHERE integrado_id = 'e12d9495-...');
-DELETE FROM silos WHERE integrado_id = 'e12d9495-...';
-DELETE FROM areas WHERE integrado_id = 'e12d9495-...';
--- Depois recriar via RPCs existentes
-```
-
-As RPCs `initialize_demo_data` e `initialize_demo_lotes` já existem e criam núcleos, galpões, silos, lotes com pesagens e metas.
-
+- Remover auth checks redundantes das demais ~14 páginas
+- Otimizar N+1 queries em GestaoProducaoTab
+- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
+- Limpar `as any` em RPCs
