@@ -140,7 +140,7 @@ const CadastroProdutos = () => {
   const handleCategoriaSuccess = () => {
     setShowCategoriaForm(false);
     fetchData();
-    toast({ title: "Categoria salva com sucesso!" });
+    toast.success("Categoria salva com sucesso!");
   };
 
   const handleGrupoSuccess = () => {
