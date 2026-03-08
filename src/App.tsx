@@ -412,6 +412,15 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
     
+    {/* Dispositivos IoT */}
+    <Route path="/configuracoes/dispositivos-iot" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <DispositivosIoT />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
     {/* Portal do Fornecedor - apenas fornecedores */}
     <Route path="/portal-fornecedor" element={
       <ProtectedRoute>

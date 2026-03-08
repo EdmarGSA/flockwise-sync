@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.analise-mortalidade]
 verify_jwt = false
+
+[functions.sync-sensors]
+verify_jwt = false
+
+[functions.sensor-webhook]
+verify_jwt = false
