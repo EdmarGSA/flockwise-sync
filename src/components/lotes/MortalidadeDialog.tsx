@@ -109,6 +109,57 @@ export function MortalidadeDialog({
 
   const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
 
+  // Auto-fill temperature/humidity from IoT sensors
+  useEffect(() => {
+    if (open && loteId && integradoId) {
+      fetchSensorData();
+    }
+  }, [open, loteId, integradoId]);
+
+  const fetchSensorData = async () => {
+    try {
+      // Get galpao_id from lote
+      const { data: lote } = await supabase
+        .from('lotes')
+        .select('galpao_id')
+        .eq('id', loteId)
+        .single();
+
+      if (!lote?.galpao_id) return;
+
+      // Get device linked to this galpao
+      const { data: device } = await supabase
+        .from('dispositivos_iot')
+        .select('id')
+        .eq('galpao_id', lote.galpao_id)
+        .eq('ativo', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!device) return;
+
+      // Get latest reading
+      const { data: leitura } = await supabase
+        .from('leituras_sensores')
+        .select('temperatura_c, umidade_pct, lido_em')
+        .eq('dispositivo_id', device.id)
+        .order('lido_em', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (leitura) {
+        // Only auto-fill if reading is recent (< 2 hours)
+        const readingAge = Date.now() - new Date(leitura.lido_em).getTime();
+        if (readingAge < 2 * 60 * 60 * 1000) {
+          if (leitura.temperatura_c && !temperaturaC) setTemperaturaC(String(leitura.temperatura_c));
+          if (leitura.umidade_pct && !umidadePct) setUmidadePct(String(leitura.umidade_pct));
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar dados do sensor:', err);
+    }
+  };
+
   useEffect(() => {
     if (open && loteId && dataAlojamento) {
       const date = new Date(dataAlojamento);
