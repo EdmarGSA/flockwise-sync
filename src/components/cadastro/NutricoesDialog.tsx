@@ -315,7 +315,7 @@ const NutricoesDialog = ({
 
   const handleSaveNutricao = async () => {
     if (!nutricaoNome.trim()) {
-      toast({ title: "Informe o nome da nutrição", variant: "destructive" });
+      toast.error("Informe o nome da nutrição");
       return;
     }
 
