@@ -21,10 +21,11 @@ export function useCarenciaAlertaLotes(
   const [carenciaMap, setCarenciaMap] = useState<Record<string, CarenciaLoteInfo>>({});
   const [loading, setLoading] = useState(false);
 
+  const loteIdsKey = JSON.stringify(loteIds);
   useEffect(() => {
     if (!loteIds.length || !integradoId) return;
     fetchCarencia();
-  }, [loteIds, integradoId]);
+  }, [loteIdsKey, integradoId]);
 
   const fetchCarencia = async () => {
     setLoading(true);

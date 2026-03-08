@@ -34,10 +34,11 @@ export function useMortalidadeAlertaLotes(
   const [mortalidadeMap, setMortalidadeMap] = useState<Record<string, MortalidadeLoteInfo>>({});
   const [loading, setLoading] = useState(false);
 
+  const lotesKey = JSON.stringify(lotes.map(l => l.id));
   useEffect(() => {
     if (!lotes.length || !integradoId) return;
     fetchMortalidade();
-  }, [lotes, integradoId]);
+  }, [lotesKey, integradoId]);
 
   const fetchMortalidade = async () => {
     setLoading(true);
