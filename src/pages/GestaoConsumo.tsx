@@ -9,9 +9,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, ArrowLeft, Bird, Truck, CheckCircle, Clock, RefreshCw, XCircle, AlertTriangle, Flame, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { differenceInHours } from 'date-fns';
 import { format } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
+import { calcularNivelSilo } from '@/lib/utils/calcularNivelSilo';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { RacaoGestaoDialog } from '@/components/consumo/RacaoGestaoDialog';
@@ -186,7 +186,7 @@ export default function GestaoConsumo() {
         // Dia 1 = dia do alojamento
         const diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
 
-        // Calculate silo level and consumption data
+        // Calculate silo level and consumption data using shared utility
         let nivelSilo = 0;
         let diasEstoque = 0;
         let consumoDiarioKg = 0;
@@ -194,88 +194,23 @@ export default function GestaoConsumo() {
         let consumoEsperadoKg = 0;
         
         if (diasDesdeAlojamento && diasDesdeAlojamento > 0) {
-          // Fetch total received feed
-          const { data: solicitacoesData } = await supabase
-            .from('solicitacoes_racao')
-            .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status')
-            .eq('lote_id', loteData.id);
-
-          const totalRecebido = (solicitacoesData || []).reduce((total, s) => {
-            if (s.status === 'recebido' || s.status === 'parcialmente_devolvido') {
-              const rec = s.quantidade_recebida_kg || 0;
-              const dev = s.devolucao_confirmada ? (s.quantidade_devolvida_kg || 0) : 0;
-              return total + (rec - dev);
-            }
-            return total;
-          }, 0);
-
-          // Fetch performance reference
           const linhagem = (loteData.linhagem || 'cobb_500') as 'cobb_500' | 'ross_308' | 'hubbard';
           const sexo = (loteData.sexo || 'misto') as 'macho' | 'femea' | 'misto';
           
-          const { data: desempenho } = await supabase
-            .from('desempenho_aves')
-            .select('consumo_acumulado_racao_g, consumo_diario_racao_g')
-            .eq('linhagem', linhagem)
-            .eq('sexo', sexo)
-            .lte('dia', Math.max(diasDesdeAlojamento, 1))
-            .order('dia', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const siloResult = await calcularNivelSilo({
+            loteId: loteData.id,
+            linhagem,
+            sexo,
+            diasDesdeAlojamento,
+            avesVivas,
+            galpaoId: (loteData as any).galpao_id,
+          });
 
-          if (desempenho) {
-            consumoEsperadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-            consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-            
-            // Default fallback: total received - expected consumption
-            let nivelSiloCalculado = totalRecebido - consumoEsperadoKg;
-
-            // Check for historico_nivel_silo (manual record) if galpao_id exists
-            if (loteData.galpao_id) {
-              const { data: historicoNivel } = await supabase
-                .from('historico_nivel_silo')
-                .select('nivel_estimado_kg, created_at')
-                .eq('galpao_id', loteData.galpao_id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              if (historicoNivel) {
-                const historicoDate = new Date(historicoNivel.created_at);
-                const now = new Date();
-                const horasDecorridas = differenceInHours(now, historicoDate);
-                const diasDecorridos = horasDecorridas / 24;
-                
-                // Calculate consumption since historico was recorded
-                const consumoDesdeHistorico = consumoDiarioKg * diasDecorridos;
-
-                // Fetch feed received AFTER the last historico record
-                const { data: racaoRecebida } = await supabase
-                  .from('solicitacoes_racao')
-                  .select('quantidade_recebida_kg, data_recebimento')
-                  .eq('lote_id', loteData.id)
-                  .eq('status', 'recebido')
-                  .gt('data_recebimento', historicoDate.toISOString());
-
-                const racaoRecebidaDesdeHistorico = (racaoRecebida || []).reduce(
-                  (sum, r) => sum + (r.quantidade_recebida_kg || 0), 
-                  0
-                );
-
-                // Calculate silo level using historico formula:
-                // Nível = Informado + Ração Recebida Depois - Consumo Desde Registro
-                nivelSiloCalculado = Math.max(0, 
-                  historicoNivel.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico
-                );
-              }
-            }
-
-            nivelSilo = nivelSiloCalculado;
-            diasEstoque = consumoDiarioKg > 0 ? Math.floor(nivelSilo / consumoDiarioKg) : 0;
-            
-            // Real consumption = total received - current silo level
-            consumoRealKg = totalRecebido - nivelSilo;
-          }
+          nivelSilo = siloResult.nivelSilo;
+          diasEstoque = siloResult.diasRestantes;
+          consumoDiarioKg = siloResult.consumoDiarioEstimado;
+          consumoEsperadoKg = siloResult.consumoEstimado;
+          consumoRealKg = siloResult.totalRecebido - nivelSilo;
         }
 
         // Calculate trend based on consumption deviation

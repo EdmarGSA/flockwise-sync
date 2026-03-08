@@ -3,10 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
 import { useConfigSilo } from '@/hooks/useConfigSilo';
+import { calcularNivelSilo, type SiloLevelResult } from '@/lib/utils/calcularNivelSilo';
 import { Package, TrendingDown, Clock, AlertTriangle, CheckCircle, Truck, Sparkles, History } from 'lucide-react';
-import { differenceInHours, differenceInMinutes, differenceInDays } from 'date-fns';
+import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 
 interface NivelSiloCardProps {
   loteId: string;
@@ -19,150 +19,30 @@ interface NivelSiloCardProps {
   refreshKey?: number;
 }
 
-interface DesempenhoAve {
-  dia: number;
-  consumo_acumulado_racao_g: number;
-  consumo_diario_racao_g: number;
-}
-
-interface HistoricoNivel {
-  nivel_estimado_kg: number;
-  nivel_esperado_kg: number | null;
-  divergencia_percentual: number | null;
-  created_at: string;
-}
-
 export function NivelSiloCard({ 
-  loteId, 
-  linhagem, 
-  sexo, 
-  diasDesdeAlojamento, 
-  avesVivas,
-  onSugerirQuantidade,
-  galpaoId,
-  refreshKey
+  loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas,
+  onSugerirQuantidade, galpaoId, refreshKey
 }: NivelSiloCardProps) {
   const { config } = useConfigSilo();
-  const [totalRecebido, setTotalRecebido] = useState(0);
-  const [consumoEstimado, setConsumoEstimado] = useState(0);
-  const [consumoDiarioEstimado, setConsumoDiarioEstimado] = useState(0);
+  const [data, setData] = useState<SiloLevelResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [historicoNivel, setHistoricoNivel] = useState<HistoricoNivel | null>(null);
-  const [consumoDesdeHistorico, setConsumoDesdeHistorico] = useState(0);
-  const [racaoRecebidaDesdeHistorico, setRacaoRecebidaDesdeHistorico] = useState(0);
-  const [divergenciaAcumuladaKg, setDivergenciaAcumuladaKg] = useState(0);
 
   useEffect(() => {
-    fetchData();
+    const fetch = async () => {
+      setLoading(true);
+      try {
+        const result = await calcularNivelSilo({
+          loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId
+        });
+        setData(result);
+      } catch (error) {
+        console.error('Erro ao calcular nível do silo:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetch();
   }, [loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId, refreshKey]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    
-    try {
-      // Fetch total received feed (minus returns)
-      const { data: solicitacoes } = await supabase
-        .from('solicitacoes_racao')
-        .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status')
-        .eq('lote_id', loteId);
-
-      const recebido = (solicitacoes || []).reduce((total, s) => {
-        if (s.status === 'recebido' || s.status === 'parcialmente_devolvido') {
-          const rec = s.quantidade_recebida_kg || 0;
-          const dev = s.devolucao_confirmada ? (s.quantidade_devolvida_kg || 0) : 0;
-          return total + (rec - dev);
-        }
-        return total;
-      }, 0);
-
-      setTotalRecebido(recebido);
-
-      // Fetch performance reference for consumption calculation
-      const { data: desempenho } = await supabase
-        .from('desempenho_aves')
-        .select('dia, consumo_acumulado_racao_g, consumo_diario_racao_g')
-        .eq('linhagem', linhagem)
-        .eq('sexo', sexo)
-        .lte('dia', Math.max(diasDesdeAlojamento, 1))
-        .order('dia', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (desempenho) {
-        // Consumo acumulado em gramas -> converter para kg
-        const consumoAcumuladoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-        setConsumoEstimado(consumoAcumuladoKg);
-
-        // Consumo diário em gramas -> converter para kg
-        const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-        setConsumoDiarioEstimado(consumoDiarioKg);
-      }
-
-      // Fetch last historico_nivel_silo if galpaoId is available
-      if (galpaoId) {
-        const { data: historico } = await supabase
-          .from('historico_nivel_silo')
-          .select('nivel_estimado_kg, nivel_esperado_kg, divergencia_percentual, created_at')
-          .eq('galpao_id', galpaoId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        // Fetch all historical records to calculate accumulated divergence
-        const { data: allHistorico } = await supabase
-          .from('historico_nivel_silo')
-          .select('nivel_estimado_kg, nivel_esperado_kg')
-          .eq('galpao_id', galpaoId)
-          .not('nivel_esperado_kg', 'is', null);
-        
-        const divergenciaTotal = (allHistorico || []).reduce((sum, h) => {
-          const diffKg = (h.nivel_estimado_kg || 0) - (h.nivel_esperado_kg || 0);
-          return sum + diffKg;
-        }, 0);
-        setDivergenciaAcumuladaKg(divergenciaTotal);
-
-        if (historico) {
-          setHistoricoNivel(historico);
-          
-          // Calculate consumption since historico was recorded
-          const historicoDate = new Date(historico.created_at);
-          const now = new Date();
-          const horasDecorridas = differenceInHours(now, historicoDate);
-          const diasDecorridos = horasDecorridas / 24;
-          
-          // Get consumption per day and calculate since historico
-          if (desempenho) {
-            const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-            setConsumoDesdeHistorico(consumoDiarioKg * diasDecorridos);
-          }
-
-          // NOVO: Buscar ração recebida APÓS o último registro de nível
-          const { data: racaoRecebida } = await supabase
-            .from('solicitacoes_racao')
-            .select('quantidade_recebida_kg, data_recebimento')
-            .eq('lote_id', loteId)
-            .eq('status', 'recebido')
-            .gt('data_recebimento', historicoDate.toISOString());
-
-          const totalRecebidoDesdeHistorico = (racaoRecebida || []).reduce(
-            (sum, r) => sum + (r.quantidade_recebida_kg || 0), 
-            0
-          );
-          
-          setRacaoRecebidaDesdeHistorico(totalRecebidoDesdeHistorico);
-        } else {
-          setHistoricoNivel(null);
-          setConsumoDesdeHistorico(0);
-          setRacaoRecebidaDesdeHistorico(0);
-          setDivergenciaAcumuladaKg(0);
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao calcular nível do silo:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatTempoDesdeAtualizacao = (createdAt: string) => {
     const historicoDate = new Date(createdAt);
@@ -170,69 +50,12 @@ export function NivelSiloCard({
     const minutos = differenceInMinutes(now, historicoDate);
     const horas = differenceInHours(now, historicoDate);
     const dias = differenceInDays(now, historicoDate);
-    
     if (minutos < 60) return `${minutos} min`;
     if (horas < 24) return `${horas}h`;
     return `${dias} dia${dias > 1 ? 's' : ''}`;
   };
 
-  // Calculate nivelSilo: prefer historico if available, otherwise use calculation
-  // Formula: Nível Informado + Ração Recebida Depois - Consumo Desde Registro
-  const nivelSiloCalculado = totalRecebido - consumoEstimado;
-  const nivelSilo = historicoNivel 
-    ? Math.max(0, historicoNivel.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico)
-    : nivelSiloCalculado;
-  
-  const diasRestantes = consumoDiarioEstimado > 0 ? Math.floor(nivelSilo / consumoDiarioEstimado) : 0;
-  const percentualConsumido = totalRecebido > 0 ? Math.min((consumoEstimado / totalRecebido) * 100, 100) : 0;
-  
-  // Use dynamic config for thresholds
-  const quantidadeSugerida = Math.max(0, Math.ceil((config.diasEstoqueSugerido - diasRestantes) * consumoDiarioEstimado));
-  const isCritical = diasRestantes < config.diasCritico || nivelSilo < 0;
-
-  const getStatusConfig = () => {
-    if (diasRestantes < 0 || nivelSilo < 0) {
-      return { 
-        color: 'destructive', 
-        bgClass: 'bg-destructive/10 border-destructive/30',
-        icon: <AlertTriangle className="w-5 h-5 text-destructive" />,
-        label: 'Déficit',
-        badgeVariant: 'destructive' as const
-      };
-    }
-    // Critical: < diasCritico
-    if (diasRestantes < config.diasCritico) {
-      return { 
-        color: 'destructive', 
-        bgClass: 'bg-destructive/10 border-destructive/30',
-        icon: <AlertTriangle className="w-5 h-5 text-destructive" />,
-        label: 'Crítico',
-        badgeVariant: 'destructive' as const
-      };
-    }
-    // Warning: diasCritico to diasAtencao
-    if (diasRestantes <= config.diasAtencao) {
-      return { 
-        color: 'warning', 
-        bgClass: 'bg-amber-500/10 border-amber-500/30',
-        icon: <Clock className="w-5 h-5 text-amber-500" />,
-        label: `${diasRestantes} dias`,
-        badgeVariant: 'secondary' as const
-      };
-    }
-    // OK: > diasOk
-    return { 
-      color: 'success', 
-      bgClass: 'bg-green-500/10 border-green-500/30',
-      icon: <CheckCircle className="w-5 h-5 text-green-500" />,
-      label: 'OK',
-      badgeVariant: 'default' as const
-    };
-  };
-
-  const status = getStatusConfig();
-
-  if (loading) {
+  if (loading || !data) {
     return (
       <Card className="border-border">
         <CardContent className="pt-6">
@@ -244,6 +67,26 @@ export function NivelSiloCard({
       </Card>
     );
   }
+
+  const { nivelSilo, diasRestantes, consumoDiarioEstimado, totalRecebido, consumoEstimado, historicoNivel, divergenciaAcumuladaKg } = data;
+  const percentualConsumido = totalRecebido > 0 ? Math.min((consumoEstimado / totalRecebido) * 100, 100) : 0;
+  const quantidadeSugerida = Math.max(0, Math.ceil((config.diasEstoqueSugerido - diasRestantes) * consumoDiarioEstimado));
+  const isCritical = diasRestantes < config.diasCritico || nivelSilo < 0;
+
+  const getStatusConfig = () => {
+    if (diasRestantes < 0 || nivelSilo < 0) {
+      return { bgClass: 'bg-destructive/10 border-destructive/30', icon: <AlertTriangle className="w-5 h-5 text-destructive" />, label: 'Déficit', badgeVariant: 'destructive' as const };
+    }
+    if (diasRestantes < config.diasCritico) {
+      return { bgClass: 'bg-destructive/10 border-destructive/30', icon: <AlertTriangle className="w-5 h-5 text-destructive" />, label: 'Crítico', badgeVariant: 'destructive' as const };
+    }
+    if (diasRestantes <= config.diasAtencao) {
+      return { bgClass: 'bg-amber-500/10 border-amber-500/30', icon: <Clock className="w-5 h-5 text-amber-500" />, label: `${diasRestantes} dias`, badgeVariant: 'secondary' as const };
+    }
+    return { bgClass: 'bg-green-500/10 border-green-500/30', icon: <CheckCircle className="w-5 h-5 text-green-500" />, label: 'OK', badgeVariant: 'default' as const };
+  };
+
+  const status = getStatusConfig();
 
   return (
     <Card className={`border ${status.bgClass}`}>
@@ -259,7 +102,6 @@ export function NivelSiloCard({
           </div>
         </div>
 
-        {/* Indicator for last update */}
         {historicoNivel && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1">
             <History className="w-3 h-3" />
@@ -310,7 +152,6 @@ export function NivelSiloCard({
           </span>
         </div>
 
-        {/* Accumulated divergence display */}
         {divergenciaAcumuladaKg !== 0 && (
           <div className="flex items-center justify-between text-sm border-t pt-3">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -323,7 +164,6 @@ export function NivelSiloCard({
           </div>
         )}
 
-        {/* Alert for critical silo level */}
         {isCritical && quantidadeSugerida > 0 && (
           <Alert className="bg-destructive/10 border-destructive/30 mt-4">
             <div className="flex items-start gap-3">
@@ -363,7 +203,7 @@ export function NivelSiloCard({
   );
 }
 
-// Export a simplified hook for listing - now supports historico_nivel_silo
+// Export a simplified hook for listing - uses shared calculation utility
 export function useSiloLevel(
   loteId: string, 
   linhagem: 'cobb_500' | 'ross_308' | 'hubbard', 
@@ -387,75 +227,15 @@ export function useSiloLevel(
       }
 
       try {
-        // Fetch total received feed
-        const { data: solicitacoes } = await supabase
-          .from('solicitacoes_racao')
-          .select('quantidade_recebida_kg, quantidade_devolvida_kg, devolucao_confirmada, status, data_recebimento')
-          .eq('lote_id', loteId);
-
-        const totalRecebido = (solicitacoes || []).reduce((total, s) => {
-          if (s.status === 'recebido' || s.status === 'parcialmente_devolvido') {
-            const rec = s.quantidade_recebida_kg || 0;
-            const dev = s.devolucao_confirmada ? (s.quantidade_devolvida_kg || 0) : 0;
-            return total + (rec - dev);
-          }
-          return total;
-        }, 0);
-
-        // Fetch performance reference
-        const { data: desempenho } = await supabase
-          .from('desempenho_aves')
-          .select('consumo_acumulado_racao_g, consumo_diario_racao_g')
-          .eq('linhagem', linhagem)
-          .eq('sexo', sexo)
-          .lte('dia', Math.max(diasDesdeAlojamento, 1))
-          .order('dia', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (!desempenho) {
-          setSiloData({ nivelSilo: totalRecebido, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
-          return;
-        }
-
-        const consumoEstimadoKg = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-        const consumoDiarioKg = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
-        
-        let nivel = totalRecebido - consumoEstimadoKg;
-
-        // If galpaoId is provided, check for historico_nivel_silo
-        if (galpaoId) {
-          const { data: historico } = await supabase
-            .from('historico_nivel_silo')
-            .select('nivel_estimado_kg, created_at')
-            .eq('galpao_id', galpaoId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (historico) {
-            const historicoDate = new Date(historico.created_at);
-            const now = new Date();
-            const horasDecorridas = differenceInHours(now, historicoDate);
-            const diasDecorridos = horasDecorridas / 24;
-            const consumoDesdeHistorico = consumoDiarioKg * diasDecorridos;
-
-            // Fetch ração recebida APÓS o último registro de nível
-            const racaoRecebidaDesdeHistorico = (solicitacoes || [])
-              .filter(s => 
-                (s.status === 'recebido' || s.status === 'parcialmente_devolvido') && 
-                s.data_recebimento && 
-                new Date(s.data_recebimento) > historicoDate
-              )
-              .reduce((sum, s) => sum + (s.quantidade_recebida_kg || 0), 0);
-
-            // Nível baseado no histórico: último nível informado + ração recebida depois - consumo desde então
-            nivel = Math.max(0, historico.nivel_estimado_kg + racaoRecebidaDesdeHistorico - consumoDesdeHistorico);
-          }
-        }
-
-        const dias = consumoDiarioKg > 0 ? Math.floor(nivel / consumoDiarioKg) : 0;
-        setSiloData({ nivelSilo: nivel, diasRestantes: dias, consumoDiarioEstimado: consumoDiarioKg, loading: false });
+        const result = await calcularNivelSilo({
+          loteId, linhagem, sexo, diasDesdeAlojamento, avesVivas, galpaoId
+        });
+        setSiloData({
+          nivelSilo: result.nivelSilo,
+          diasRestantes: result.diasRestantes,
+          consumoDiarioEstimado: result.consumoDiarioEstimado,
+          loading: false,
+        });
       } catch (error) {
         console.error('Erro ao calcular nível do silo:', error);
         setSiloData({ nivelSilo: 0, diasRestantes: 0, consumoDiarioEstimado: 0, loading: false });
