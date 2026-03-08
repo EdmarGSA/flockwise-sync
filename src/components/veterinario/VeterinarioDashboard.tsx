@@ -213,6 +213,60 @@ export default function VeterinarioDashboard({ mortalidadeMap, carenciaMap }: Pr
         </Card>
       )}
 
+      {/* Evolução Semanal de Mortalidade */}
+      {weeklyMortData.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <CardTitle className="text-sm font-semibold text-foreground">
+              Evolução Semanal de Mortalidade (últimas 6 semanas)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weeklyMortData} margin={{ left: 0, right: 12, top: 4 }}>
+                  <defs>
+                    <linearGradient id="mortGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="semana" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} unit="%" />
+                  <Tooltip
+                    formatter={(value: number, name: string) =>
+                      name === 'Mortes' ? `${value} aves` : `${value}%`
+                    }
+                    labelFormatter={(label) => `Semana de ${label}`}
+                  />
+                  <Legend iconType="circle" iconSize={8} />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="mortes"
+                    name="Mortes"
+                    stroke="hsl(0, 84%, 60%)"
+                    fill="url(#mortGradient)"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="percentual"
+                    name="% do Plantel"
+                    stroke="hsl(35, 95%, 55%)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Mortalidade por Lote */}
       {mortalidadeData.length > 0 && (
         <Card className="bg-card border-border">
