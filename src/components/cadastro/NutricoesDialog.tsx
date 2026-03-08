@@ -131,7 +131,7 @@ const NutricoesDialog = ({
       setNutricoes(data || []);
     } catch (error) {
       console.error('Erro ao buscar nutrições:', error);
-      toast({ title: "Erro ao carregar nutrições", variant: "destructive" });
+      toast.error("Erro ao carregar nutrições");
     } finally {
       setLoadingNutricoes(false);
     }
