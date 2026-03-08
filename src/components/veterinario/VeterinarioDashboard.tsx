@@ -317,6 +317,9 @@ export default function VeterinarioDashboard({ mortalidadeMap, carenciaMap }: Pr
         </Card>
       )}
 
+      {/* Alertas Inteligentes */}
+      <AlertasInteligentes analytics={analytics} mortalidadeMap={mortalidadeMap} carenciaMap={carenciaMap} />
+
       {/* Tratamentos e Carência */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-2 px-4 pt-4">
