@@ -178,7 +178,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
         .limit(1);
 
       if (tratamentosData && tratamentosData.length > 0) {
-        const diasDesde = differenceInDays(new Date(), new Date(tratamentosData[0].data_inicio));
+        const diasDesde = differenceInDays2(new Date(), new Date(tratamentosData[0].data_inicio));
         setUltimoTratamentoDias(diasDesde);
         setCarenciaTratamento(tratamentosData[0].carencia_dias || 7);
       } else {
