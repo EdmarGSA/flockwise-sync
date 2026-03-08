@@ -126,7 +126,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const result = viacepSchema.safeParse(rawData);
       
       if (!result.success || result.data.erro) {
-        toast({ title: "CEP não encontrado", variant: "destructive" });
+        toast.error("CEP não encontrado");
         return;
       }
 
