@@ -472,7 +472,6 @@ const App = () => (
         <AuthProvider>
           <DemoProvider>
             <DemoBanner />
-            <Toaster />
             <Sonner />
             <AppRoutes />
             <PWAInstallPrompt />
