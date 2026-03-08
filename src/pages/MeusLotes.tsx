@@ -249,28 +249,28 @@ export default function MeusLotes() {
       const [producaoRes, recentProducaoRes] = await Promise.all([
         supabase
           .from('producao_ovos')
-          .select('lote_id, quantidade_ovos')
+          .select('lote_id, ovos_totais')
           .in('lote_id', posturaLoteIds),
         supabase
           .from('producao_ovos')
-          .select('lote_id, quantidade_ovos, data_producao')
+          .select('lote_id, ovos_totais, data_producao')
           .in('lote_id', posturaLoteIds)
           .order('data_producao', { ascending: false }),
       ]);
 
-      (producaoRes.data || []).forEach(p => {
+      (producaoRes.data || []).forEach((p: any) => {
         const list = producaoMap.get(p.lote_id) || [];
-        list.push((p as any).quantidade_ovos || 0);
+        list.push(p.ovos_totais || 0);
         producaoMap.set(p.lote_id, list);
       });
 
       // Get last 7 per lote for recent average
       const recentCountMap = new Map<string, number>();
-      (recentProducaoRes.data || []).forEach(p => {
+      (recentProducaoRes.data || []).forEach((p: any) => {
         const count = recentCountMap.get(p.lote_id) || 0;
         if (count < 7) {
           const list = recentProducaoMap.get(p.lote_id) || [];
-          list.push((p as any).quantidade_ovos || 0);
+          list.push(p.ovos_totais || 0);
           recentProducaoMap.set(p.lote_id, list);
           recentCountMap.set(p.lote_id, count + 1);
         }
