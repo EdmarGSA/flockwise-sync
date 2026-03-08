@@ -159,13 +159,7 @@ export default function VeterinarioLote() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu', variant: 'secondary' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      fechado: { label: 'Fechado', variant: 'destructive' },
-    };
-    const config = statusConfig[status] || { label: status, variant: 'outline' as const };
+    const config = getStatusBadgeConfig(status);
     return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
   };
 
