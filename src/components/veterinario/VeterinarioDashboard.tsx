@@ -383,3 +383,228 @@ function KpiCard({ icon, label, value, color, badge }: {
     </Card>
   );
 }
+
+// --- Alertas Inteligentes ---
+interface Alerta {
+  severity: 'critico' | 'atencao' | 'info';
+  icon: React.ReactNode;
+  titulo: string;
+  descricao: string;
+  recomendacao: string;
+  lote?: string;
+}
+
+function gerarAlertas(
+  analytics: LoteAnalytics[],
+  mortalidadeMap: Record<string, MortalidadeLoteInfo>,
+  carenciaMap: Record<string, CarenciaLoteInfo>,
+): Alerta[] {
+  const alertas: Alerta[] = [];
+
+  for (const lote of analytics) {
+    const loteLabel = `${lote.nucleoNome} - ${lote.galpaoNome}`;
+
+    // Mortalidade crítica
+    if (lote.status === 'critico' && lote.mortalidadeDesvio > 0) {
+      alertas.push({
+        severity: 'critico',
+        icon: <Skull className="w-4 h-4" />,
+        titulo: `Mortalidade crítica: ${lote.mortalidadePercent.toFixed(2)}%`,
+        descricao: `${loteLabel} — ${lote.mortalidadeDesvio.toFixed(1)}% acima da meta (idade ${lote.idadeDias}d).`,
+        recomendacao: lote.idadeDias <= 7
+          ? 'Verificar temperatura de pinteiro, qualidade da água e manejo de recepção. Considerar necropsia imediata.'
+          : lote.idadeDias <= 21
+          ? 'Avaliar programa vacinal, qualidade de ração e condições ambientais. Solicitar autopsia para diagnóstico.'
+          : 'Investigar causas secundárias: cama úmida, ventilação, densidade. Programar visita técnica urgente.',
+        lote: loteLabel,
+      });
+    }
+
+    // Mortalidade atenção
+    if (lote.status === 'atencao' && lote.mortalidadeDesvio > 0) {
+      alertas.push({
+        severity: 'atencao',
+        icon: <AlertTriangle className="w-4 h-4" />,
+        titulo: `Mortalidade acima da meta: ${lote.mortalidadePercent.toFixed(2)}%`,
+        descricao: `${loteLabel} — ${lote.mortalidadeDesvio.toFixed(1)}% acima do limiar OK.`,
+        recomendacao: 'Intensificar rondas de observação. Monitorar consumo de água e ração nas próximas 48h.',
+        lote: loteLabel,
+      });
+    }
+
+    // Peso abaixo da referência (>8% abaixo)
+    if (lote.pesoAtual > 0 && lote.pesoVsMeta < -8) {
+      alertas.push({
+        severity: lote.pesoVsMeta < -15 ? 'critico' : 'atencao',
+        icon: <Scale className="w-4 h-4" />,
+        titulo: `Peso ${Math.abs(lote.pesoVsMeta).toFixed(1)}% abaixo da referência`,
+        descricao: `${loteLabel} — Real: ${(lote.pesoAtual / 1000).toFixed(2)}kg vs Ref: ${(lote.pesoReferencia / 1000).toFixed(2)}kg.`,
+        recomendacao: lote.pesoVsMeta < -15
+          ? 'Revisar formulação de ração, disponibilidade de comedouros e programa de iluminação. Pode indicar problema sanitário subjacente.'
+          : 'Avaliar uniformidade do lote com pesagem amostral. Verificar acesso a comedouros e bebedouros.',
+        lote: loteLabel,
+      });
+    }
+
+    // CA elevada (desvio > 0.1)
+    if (lote.caAtual > 0 && lote.caDesvio > 0.1) {
+      alertas.push({
+        severity: lote.caDesvio > 0.2 ? 'critico' : 'atencao',
+        icon: <TrendingDown className="w-4 h-4" />,
+        titulo: `CA elevada: ${lote.caAtual.toFixed(3)} (+${lote.caDesvio.toFixed(3)})`,
+        descricao: `${loteLabel} — Conversão alimentar ${lote.caDesvio.toFixed(3)} acima da meta.`,
+        recomendacao: lote.caDesvio > 0.2
+          ? 'Investigar desperdício de ração, qualidade dos insumos e possíveis problemas entéricos. Avaliar regulagem de comedouros.'
+          : 'Monitorar consumo diário e verificar integridade do sistema de alimentação. Considerar ajuste nutricional.',
+        lote: loteLabel,
+      });
+    }
+
+    // Consumo desviado
+    if (Math.abs(lote.consumoDesvioPercent) > 15) {
+      const alto = lote.consumoDesvioPercent > 0;
+      alertas.push({
+        severity: Math.abs(lote.consumoDesvioPercent) > 25 ? 'critico' : 'atencao',
+        icon: <Beef className="w-4 h-4" />,
+        titulo: `Consumo ${alto ? 'acima' : 'abaixo'} do esperado: ${Math.abs(lote.consumoDesvioPercent).toFixed(1)}%`,
+        descricao: `${loteLabel} — Consumo real vs esperado com desvio significativo.`,
+        recomendacao: alto
+          ? 'Verificar desperdício, temperatura ambiente (estresse térmico) e regulagem de equipamentos.'
+          : 'Avaliar saúde intestinal, qualidade da água e possíveis intoxicações. Queda de consumo pode preceder surtos.',
+        lote: loteLabel,
+      });
+    }
+  }
+
+  // Carências próximas do vencimento
+  Object.values(carenciaMap)
+    .filter(c => c.emAlerta)
+    .forEach(c => {
+      c.tratamentos.forEach(t => {
+        if (t.diasRestantes <= 3) {
+          alertas.push({
+            severity: 'critico',
+            icon: <Pill className="w-4 h-4" />,
+            titulo: `Carência vencendo em ${t.diasRestantes}d`,
+            descricao: `Produto ${t.produtoNome} — período de carência prestes a encerrar.`,
+            recomendacao: 'Confirmar que não haverá abate antes do término da carência. Registrar liberação veterinária formal.',
+          });
+        }
+      });
+    });
+
+  // Sort: crítico primeiro, depois atenção, depois info
+  const order = { critico: 0, atencao: 1, info: 2 };
+  alertas.sort((a, b) => order[a.severity] - order[b.severity]);
+
+  return alertas;
+}
+
+function AlertasInteligentes({ analytics, mortalidadeMap, carenciaMap }: {
+  analytics: LoteAnalytics[];
+  mortalidadeMap: Record<string, MortalidadeLoteInfo>;
+  carenciaMap: Record<string, CarenciaLoteInfo>;
+}) {
+  const alertas = gerarAlertas(analytics, mortalidadeMap, carenciaMap);
+
+  if (alertas.length === 0) {
+    return (
+      <Card className="bg-card border-primary/30">
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <ShieldAlert className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">Tudo sob controle</p>
+            <p className="text-xs text-muted-foreground">Nenhum alerta crítico identificado nos lotes ativos.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const severityStyles = {
+    critico: {
+      border: 'border-destructive/40',
+      bg: 'bg-destructive/5',
+      iconBg: 'bg-destructive/10',
+      iconColor: 'text-destructive',
+      badge: 'destructive' as const,
+      badgeLabel: 'Crítico',
+    },
+    atencao: {
+      border: 'border-amber-500/40',
+      bg: 'bg-amber-500/5',
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-600',
+      badge: 'outline' as const,
+      badgeLabel: 'Atenção',
+    },
+    info: {
+      border: 'border-primary/30',
+      bg: 'bg-primary/5',
+      iconBg: 'bg-primary/10',
+      iconColor: 'text-primary',
+      badge: 'secondary' as const,
+      badgeLabel: 'Info',
+    },
+  };
+
+  const criticos = alertas.filter(a => a.severity === 'critico').length;
+  const atencoes = alertas.filter(a => a.severity === 'atencao').length;
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2 px-4 pt-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Lightbulb className="w-4 h-4 text-amber-500" />
+            Alertas Inteligentes
+          </CardTitle>
+          <div className="flex gap-1.5">
+            {criticos > 0 && (
+              <Badge variant="destructive" className="text-[10px]">{criticos} crítico{criticos > 1 ? 's' : ''}</Badge>
+            )}
+            {atencoes > 0 && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                {atencoes} atenção
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 space-y-2.5">
+        {alertas.slice(0, 8).map((alerta, i) => {
+          const style = severityStyles[alerta.severity];
+          return (
+            <div key={i} className={`rounded-lg border p-3 space-y-1.5 ${style.border} ${style.bg}`}>
+              <div className="flex items-start gap-2.5">
+                <div className={`w-7 h-7 rounded-md ${style.iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
+                  <span className={style.iconColor}>{alerta.icon}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-semibold text-foreground">{alerta.titulo}</p>
+                    <Badge variant={style.badge} className="text-[9px] px-1.5 py-0">
+                      {style.badgeLabel}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{alerta.descricao}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-1.5 ml-9">
+                <Lightbulb className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+                <p className="text-[11px] text-primary font-medium leading-relaxed">{alerta.recomendacao}</p>
+              </div>
+            </div>
+          );
+        })}
+        {alertas.length > 8 && (
+          <p className="text-[11px] text-muted-foreground text-center pt-1">
+            +{alertas.length - 8} alertas adicionais
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
