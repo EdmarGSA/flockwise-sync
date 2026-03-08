@@ -137,9 +137,9 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       if (data.localidade) form.setValue('cidade', data.localidade);
       if (data.uf) form.setValue('estado', data.uf);
       
-      toast({ title: "Endereço preenchido automaticamente" });
+      toast.success("Endereço preenchido automaticamente");
     } catch (error) {
-      toast({ title: "Erro ao buscar CEP", variant: "destructive" });
+      toast.error("Erro ao buscar CEP");
     } finally {
       setLoadingCep(false);
     }
