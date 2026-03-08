@@ -214,7 +214,7 @@ const NutricoesDialog = ({
       setItens(mappedItens);
     } catch (error) {
       console.error('Erro ao buscar itens:', error);
-      toast({ title: "Erro ao carregar itens", variant: "destructive" });
+      toast.error("Erro ao carregar itens");
     } finally {
       setLoadingItens(false);
     }
