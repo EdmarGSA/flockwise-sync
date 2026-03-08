@@ -134,7 +134,7 @@ const CadastroProdutos = () => {
     setShowProdutoForm(false);
     setEditingProduto(null);
     fetchData();
-    toast({ title: "Produto salvo com sucesso!" });
+    toast.success("Produto salvo com sucesso!");
   };
 
   const handleCategoriaSuccess = () => {
