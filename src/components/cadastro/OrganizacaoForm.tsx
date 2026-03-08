@@ -155,7 +155,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
       
       if (!response.ok) {
-        toast({ title: "CNPJ não encontrado", variant: "destructive" });
+        toast.error("CNPJ não encontrado");
         return;
       }
       
