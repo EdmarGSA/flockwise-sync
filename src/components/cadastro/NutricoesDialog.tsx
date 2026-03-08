@@ -280,7 +280,7 @@ const NutricoesDialog = ({
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      toast({ title: "Erro ao alterar status", variant: "destructive" });
+      toast.error("Erro ao alterar status");
     }
   };
 
