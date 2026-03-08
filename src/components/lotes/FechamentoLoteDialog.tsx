@@ -14,6 +14,7 @@ import { format, parseISO } from 'date-fns';
 import { calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Lock, Calculator, AlertTriangle, CheckCircle } from 'lucide-react';
+import { getLinhagemLabel, getSexoLabel } from '@/lib/utils/labels';
 
 interface FechamentoLoteDialogProps {
   open: boolean;
