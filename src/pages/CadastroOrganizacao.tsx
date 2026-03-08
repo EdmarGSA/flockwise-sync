@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Building2, Pencil, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import OrganizacaoForm from "@/components/cadastro/OrganizacaoForm";
 
 const CadastroOrganizacao = () => {
@@ -55,7 +55,7 @@ const CadastroOrganizacao = () => {
     setShowForm(false);
     setEditingOrg(null);
     fetchData();
-    toast({ title: "Organização salva com sucesso!" });
+    toast.success("Organização salva com sucesso!");
   };
 
   const handleCancel = () => {

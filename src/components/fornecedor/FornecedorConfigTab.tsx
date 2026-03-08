@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Eye, EyeOff, Lock, CheckCircle2, XCircle, Shield } from 'lucide-react';
 
 export const FornecedorConfigTab = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
+  
   
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
@@ -30,29 +30,17 @@ export const FornecedorConfigTab = () => {
 
   const handleTrocarSenha = async () => {
     if (!senhaAtual) {
-      toast({
-        title: "Erro",
-        description: "Informe a senha atual.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "Informe a senha atual." });
       return;
     }
 
     if (!isValidPassword) {
-      toast({
-        title: "Erro",
-        description: "A nova senha não atende aos requisitos de segurança.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "A nova senha não atende aos requisitos de segurança." });
       return;
     }
 
     if (!passwordsMatch) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "As senhas não coincidem." });
       return;
     }
 
@@ -66,11 +54,7 @@ export const FornecedorConfigTab = () => {
       });
 
       if (signInError) {
-        toast({
-          title: "Erro",
-          description: "Senha atual incorreta.",
-          variant: "destructive",
-        });
+        toast.error("Erro", { description: "Senha atual incorreta." });
         setIsLoading(false);
         return;
       }
@@ -81,11 +65,7 @@ export const FornecedorConfigTab = () => {
       });
 
       if (updateError) {
-        toast({
-          title: "Erro",
-          description: "Falha ao atualizar senha: " + updateError.message,
-          variant: "destructive",
-        });
+        toast.error("Erro", { description: "Falha ao atualizar senha: " + updateError.message });
         setIsLoading(false);
         return;
       }
@@ -96,21 +76,14 @@ export const FornecedorConfigTab = () => {
         .update({ senha_alterada: true })
         .eq('id', user?.id);
 
-      toast({
-        title: "Sucesso!",
-        description: "Sua senha foi alterada com sucesso.",
-      });
+      toast.success("Sucesso!", { description: "Sua senha foi alterada com sucesso." });
 
       // Limpar formulário
       setSenhaAtual('');
       setNovaSenha('');
       setConfirmarSenha('');
     } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao alterar a senha.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "Ocorreu um erro ao alterar a senha." });
     } finally {
       setIsLoading(false);
     }

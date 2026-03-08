@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface DemoContextType {
   isDemo: boolean;
@@ -15,7 +15,7 @@ const DemoContext = createContext<DemoContextType | undefined>(undefined);
 export const DemoProvider = ({ children }: { children: ReactNode }) => {
   const [isDemo, setIsDemo] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
-  const { toast } = useToast();
+  
 
   // Check if current user is a demo user
   useEffect(() => {
@@ -97,19 +97,12 @@ export const DemoProvider = ({ children }: { children: ReactNode }) => {
 
       setIsDemo(true);
       
-      toast({
-        title: "Bem-vindo ao modo demonstração!",
-        description: "Explore todas as funcionalidades do sistema com dados acumulados.",
-      });
+      toast.success("Bem-vindo ao modo demonstração!", { description: "Explore todas as funcionalidades do sistema com dados acumulados." });
 
       return true;
     } catch (error: any) {
       console.error('Error entering demo mode:', error);
-      toast({
-        title: "Erro ao entrar no modo demo",
-        description: error.message || "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
+      toast.error("Erro ao entrar no modo demo", { description: error.message || "Tente novamente mais tarde." });
       return false;
     } finally {
       setIsDemoLoading(false);
@@ -121,20 +114,14 @@ export const DemoProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       setIsDemo(false);
       
-      toast({
-        title: "Você saiu do modo demonstração",
-        description: "Crie sua conta para começar a usar o sistema.",
-      });
+      toast.success("Você saiu do modo demonstração", { description: "Crie sua conta para começar a usar o sistema." });
     } catch (error: any) {
       console.error('Error exiting demo mode:', error);
     }
   };
 
   const showDemoToast = (action: string) => {
-    toast({
-      title: "Modo Demonstração",
-      description: `Para ${action}, crie sua conta gratuita.`,
-    });
+    toast.info("Modo Demonstração", { description: `Para ${action}, crie sua conta gratuita.` });
   };
 
   return (

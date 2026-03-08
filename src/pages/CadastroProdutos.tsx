@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import ProdutoForm from "@/components/cadastro/ProdutoForm";
 import ProdutoEditForm from "@/components/cadastro/ProdutoEditForm";
 import CategoriaForm from "@/components/cadastro/CategoriaForm";
@@ -134,19 +134,19 @@ const CadastroProdutos = () => {
     setShowProdutoForm(false);
     setEditingProduto(null);
     fetchData();
-    toast({ title: "Produto salvo com sucesso!" });
+    toast.success("Produto salvo com sucesso!");
   };
 
   const handleCategoriaSuccess = () => {
     setShowCategoriaForm(false);
     fetchData();
-    toast({ title: "Categoria salva com sucesso!" });
+    toast.success("Categoria salva com sucesso!");
   };
 
   const handleGrupoSuccess = () => {
     setShowGrupoForm(false);
     fetchData();
-    toast({ title: "Grupo salvo com sucesso!" });
+    toast.success("Grupo salvo com sucesso!");
   };
 
   const handleResetDefaults = async () => {
@@ -185,7 +185,7 @@ const CadastroProdutos = () => {
     await supabase.from('grupos_produto').insert(defaultGrupos as any);
 
     await fetchData();
-    toast({ title: "Dados padrão recriados com sucesso!" });
+    toast.success("Dados padrão recriados com sucesso!");
   };
 
   const getTipoOrigemLabel = (tipo: string) => {

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import logoGSA from "@/assets/logo-gsa.png";
@@ -90,7 +90,7 @@ const Auth = () => {
   
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
 
   const passwordStrength = getPasswordStrength(password);
 
@@ -100,11 +100,7 @@ const Auth = () => {
     e.preventDefault();
     
     if (!forgotEmail.trim()) {
-      toast({
-        title: "Email obrigatório",
-        description: "Informe o email para recuperar a senha.",
-        variant: "destructive",
-      });
+      toast.error("Email obrigatório", { description: "Informe o email para recuperar a senha." });
       return;
     }
 
@@ -115,25 +111,14 @@ const Auth = () => {
       });
       
       if (error) {
-        toast({
-          title: "Erro",
-          description: error.message,
-          variant: "destructive",
-        });
+        toast.error("Erro", { description: error.message });
       } else {
-        toast({
-          title: "Email enviado!",
-          description: "Verifique sua caixa de entrada para redefinir a senha.",
-        });
+        toast.success("Email enviado!", { description: "Verifique sua caixa de entrada para redefinir a senha." });
         setIsForgotPassword(false);
         setForgotEmail('');
       }
     } catch {
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao enviar o email.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "Ocorreu um erro ao enviar o email." });
     } finally {
       setIsSendingReset(false);
     }
@@ -162,17 +147,9 @@ const Auth = () => {
         const { error } = await signIn(email, password);
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
-            toast({
-              title: "Erro no login",
-              description: "Email ou senha incorretos.",
-              variant: "destructive",
-            });
+            toast.error("Erro no login", { description: "Email ou senha incorretos." });
           } else {
-            toast({
-              title: "Erro no login",
-              description: error.message,
-              variant: "destructive",
-            });
+            toast.error("Erro no login", { description: error.message });
           }
         } else {
           // Login bem-sucedido - verificar se é fornecedor
@@ -204,11 +181,7 @@ const Auth = () => {
                   .limit(1);
                 
                 if (!clientesAtivos?.length) {
-                  toast({
-                    title: "Acesso bloqueado",
-                    description: "Seu acesso ao portal foi suspenso. Entre em contato com seu fornecedor.",
-                    variant: "destructive",
-                  });
+                  toast.error("Acesso bloqueado", { description: "Seu acesso ao portal foi suspenso. Entre em contato com seu fornecedor." });
                   await supabase.auth.signOut();
                   setIsLoading(false);
                   return;
@@ -216,17 +189,10 @@ const Auth = () => {
                 
                 // Aviso para trocar senha se necessário
                 if (profile.senha_alterada === false) {
-                  toast({
-                    title: "Atenção",
-                    description: "Recomendamos alterar sua senha padrão nas configurações.",
-                    variant: "default",
-                  });
+                  toast.info("Atenção", { description: "Recomendamos alterar sua senha padrão nas configurações." });
                 }
                 
-                toast({
-                  title: "Bem-vindo!",
-                  description: "Acesso ao Portal do Fornecedor.",
-                });
+                toast.success("Bem-vindo!", { description: "Acesso ao Portal do Fornecedor." });
                 navigate('/portal-fornecedor');
                 return;
               }
@@ -243,12 +209,7 @@ const Auth = () => {
                 .limit(1);
               
               if (!clientesAtivos?.length) {
-                // Nenhum cliente ativo - bloquear acesso
-                toast({
-                  title: "Acesso bloqueado",
-                  description: "Seu acesso ao portal foi suspenso. Entre em contato com seu cliente.",
-                  variant: "destructive",
-                });
+                toast.error("Acesso bloqueado", { description: "Seu acesso ao portal foi suspenso. Entre em contato com seu cliente." });
                 await supabase.auth.signOut();
                 setIsLoading(false);
                 return;
@@ -256,24 +217,14 @@ const Auth = () => {
               
               // Redirecionar para portal do fornecedor
               if (profile.senha_alterada === false) {
-                toast({
-                  title: "Atenção",
-                  description: "Recomendamos alterar sua senha padrão nas configurações.",
-                  variant: "default",
-                });
+                toast.info("Atenção", { description: "Recomendamos alterar sua senha padrão nas configurações." });
               }
               
-              toast({
-                title: "Bem-vindo!",
-                description: "Acesso ao Portal do Fornecedor.",
-              });
+              toast.success("Bem-vindo!", { description: "Acesso ao Portal do Fornecedor." });
               navigate('/portal-fornecedor');
             } else {
               // Usuário normal - redirecionar para home
-              toast({
-                title: "Bem-vindo!",
-                description: "Login realizado com sucesso.",
-              });
+              toast.success("Bem-vindo!", { description: "Login realizado com sucesso." });
               navigate('/home');
             }
           }
@@ -294,25 +245,14 @@ const Auth = () => {
 
         const { error } = await signUp(email, password, fullName);
         if (error) {
-          toast({
-            title: "Erro no cadastro",
-            description: translateAuthError(error.message),
-            variant: "destructive",
-          });
+          toast.error("Erro no cadastro", { description: translateAuthError(error.message) });
         } else {
-          toast({
-            title: "Conta criada!",
-            description: "Cadastro realizado com sucesso.",
-          });
+          toast.success("Conta criada!", { description: "Cadastro realizado com sucesso." });
           navigate('/home');
         }
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro inesperado.",
-        variant: "destructive",
-      });
+      toast.error("Erro", { description: "Ocorreu um erro inesperado." });
     } finally {
       setIsLoading(false);
     }

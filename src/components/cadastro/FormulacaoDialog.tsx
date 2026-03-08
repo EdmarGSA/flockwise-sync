@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import { Plus, Trash2, FlaskConical } from "lucide-react";
 
 interface FormulacaoDialogProps {
@@ -78,7 +78,7 @@ const FormulacaoDialog = ({
 
   const handleAddItem = () => {
     if (!selectedInsumo || !quantidade) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      toast.error("Preencha todos os campos");
       return;
     }
 
@@ -129,13 +129,13 @@ const FormulacaoDialog = ({
         .insert(inserts as any);
 
       if (error) {
-        toast({ title: "Erro ao salvar formulação", variant: "destructive" });
+        toast.error("Erro ao salvar formulação");
         setLoading(false);
         return;
       }
     }
 
-    toast({ title: "Formulação salva com sucesso!" });
+    toast.success("Formulação salva com sucesso!");
     setLoading(false);
     onOpenChange(false);
   };

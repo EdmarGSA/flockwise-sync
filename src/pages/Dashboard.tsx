@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Loader2, User, Building2, Phone, Save } from 'lucide-react';
 
 interface Profile {
@@ -20,7 +20,7 @@ interface Profile {
 const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,11 +30,6 @@ const Dashboard = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -57,11 +52,7 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar seu perfil.',
-          variant: 'destructive',
-        });
+        toast.error('Erro', { description: 'Não foi possível carregar seu perfil.' });
       } finally {
         setLoading(false);
       }
@@ -70,7 +61,7 @@ const Dashboard = () => {
     if (user) {
       fetchProfile();
     }
-  }, [user, toast]);
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -88,17 +79,10 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Sucesso',
-        description: 'Perfil atualizado com sucesso!',
-      });
+      toast.success('Sucesso', { description: 'Perfil atualizado com sucesso!' });
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar seu perfil.',
-        variant: 'destructive',
-      });
+      toast.error('Erro', { description: 'Não foi possível atualizar seu perfil.' });
     } finally {
       setSaving(false);
     }

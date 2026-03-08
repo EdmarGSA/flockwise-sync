@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ShieldCheck, Play } from 'lucide-react';
 
 export default function BackofficeFerramentas() {
@@ -23,7 +23,7 @@ export default function BackofficeFerramentas() {
         .maybeSingle();
 
       if (existing) {
-        toast({ title: 'Já é superadmin', description: 'Este usuário já possui a role superadmin.' });
+        toast.info('Já é superadmin', { description: 'Este usuário já possui a role superadmin.' });
         setPromoting(false);
         return;
       }
@@ -36,7 +36,7 @@ export default function BackofficeFerramentas() {
         .maybeSingle();
 
       if (!profile) {
-        toast({ title: 'Usuário não encontrado', description: 'Verifique o ID informado.', variant: 'destructive' });
+        toast.error('Usuário não encontrado', { description: 'Verifique o ID informado.' });
         setPromoting(false);
         return;
       }
@@ -44,10 +44,10 @@ export default function BackofficeFerramentas() {
       const { error } = await supabase.from('user_roles').insert({ user_id: profile.id, role: 'superadmin' } as any);
       if (error) throw error;
 
-      toast({ title: `${profile.full_name || 'Usuário'} promovido a superadmin!` });
+      toast.success(`${profile.full_name || 'Usuário'} promovido a superadmin!`);
       setUserId('');
     } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+      toast.error('Erro', { description: err.message });
     } finally {
       setPromoting(false);
     }

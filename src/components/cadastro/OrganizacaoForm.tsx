@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import { Search, Loader2 } from "lucide-react";
 
 const UF_OPTIONS = [
@@ -126,7 +126,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const result = viacepSchema.safeParse(rawData);
       
       if (!result.success || result.data.erro) {
-        toast({ title: "CEP não encontrado", variant: "destructive" });
+        toast.error("CEP não encontrado");
         return;
       }
 
@@ -137,9 +137,9 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       if (data.localidade) form.setValue('cidade', data.localidade);
       if (data.uf) form.setValue('estado', data.uf);
       
-      toast({ title: "Endereço preenchido automaticamente" });
+      toast.success("Endereço preenchido automaticamente");
     } catch (error) {
-      toast({ title: "Erro ao buscar CEP", variant: "destructive" });
+      toast.error("Erro ao buscar CEP");
     } finally {
       setLoadingCep(false);
     }
@@ -155,7 +155,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
       
       if (!response.ok) {
-        toast({ title: "CNPJ não encontrado", variant: "destructive" });
+        toast.error("CNPJ não encontrado");
         return;
       }
       
@@ -163,7 +163,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const result = brasilApiSchema.safeParse(rawData);
       
       if (!result.success) {
-        toast({ title: "Dados do CNPJ inválidos", variant: "destructive" });
+        toast.error("Dados do CNPJ inválidos");
         return;
       }
 
@@ -190,9 +190,9 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       
       if (data.email) form.setValue('email', data.email.toLowerCase());
       
-      toast({ title: "Dados da empresa preenchidos automaticamente" });
+      toast.success("Dados da empresa preenchidos automaticamente");
     } catch (error) {
-      toast({ title: "Erro ao buscar dados do CNPJ", variant: "destructive" });
+      toast.error("Erro ao buscar dados do CNPJ");
     } finally {
       setLoadingCnpj(false);
     }
@@ -209,7 +209,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
       if (error) {
         console.error(error);
-        toast({ title: "Erro ao atualizar", variant: "destructive" });
+        toast.error("Erro ao atualizar");
         setLoading(false);
         return;
       }
@@ -221,7 +221,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
       if (error) {
         console.error(error);
-        toast({ title: "Erro ao salvar", variant: "destructive" });
+        toast.error("Erro ao salvar");
         setLoading(false);
         return;
       }

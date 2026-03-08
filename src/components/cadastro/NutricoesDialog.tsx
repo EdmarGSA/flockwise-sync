@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import { 
   Plus, 
   Trash2, 
@@ -131,7 +131,7 @@ const NutricoesDialog = ({
       setNutricoes(data || []);
     } catch (error) {
       console.error('Erro ao buscar nutrições:', error);
-      toast({ title: "Erro ao carregar nutrições", variant: "destructive" });
+      toast.error("Erro ao carregar nutrições");
     } finally {
       setLoadingNutricoes(false);
     }
@@ -214,7 +214,7 @@ const NutricoesDialog = ({
       setItens(mappedItens);
     } catch (error) {
       console.error('Erro ao buscar itens:', error);
-      toast({ title: "Erro ao carregar itens", variant: "destructive" });
+      toast.error("Erro ao carregar itens");
     } finally {
       setLoadingItens(false);
     }
@@ -261,11 +261,11 @@ const NutricoesDialog = ({
         .update({ padrao: true })
         .eq('id', nutricao.id);
 
-      toast({ title: `${nutricao.nome} definida como padrão` });
+      toast.success(`${nutricao.nome} definida como padrão`);
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao definir padrão:', error);
-      toast({ title: "Erro ao definir padrão", variant: "destructive" });
+      toast.error("Erro ao definir padrão");
     }
   };
 
@@ -276,17 +276,17 @@ const NutricoesDialog = ({
         .update({ ativo: !nutricao.ativo })
         .eq('id', nutricao.id);
 
-      toast({ title: nutricao.ativo ? "Nutrição desativada" : "Nutrição ativada" });
+      toast.success(nutricao.ativo ? "Nutrição desativada" : "Nutrição ativada");
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      toast({ title: "Erro ao alterar status", variant: "destructive" });
+      toast.error("Erro ao alterar status");
     }
   };
 
   const handleAddItem = () => {
     if (!selectedInsumo || !quantidade) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      toast.error("Preencha todos os campos");
       return;
     }
 
@@ -315,7 +315,7 @@ const NutricoesDialog = ({
 
   const handleSaveNutricao = async () => {
     if (!nutricaoNome.trim()) {
-      toast({ title: "Informe o nome da nutrição", variant: "destructive" });
+      toast.error("Informe o nome da nutrição");
       return;
     }
 
@@ -379,13 +379,13 @@ const NutricoesDialog = ({
         if (itemsError) throw itemsError;
       }
 
-      toast({ title: editingNutricao ? "Nutrição atualizada!" : "Nutrição criada!" });
+      toast.success(editingNutricao ? "Nutrição atualizada!" : "Nutrição criada!");
       setEditingNutricao(null);
       setIsCreating(false);
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao salvar nutrição:', error);
-      toast({ title: "Erro ao salvar nutrição", variant: "destructive" });
+      toast.error("Erro ao salvar nutrição");
     } finally {
       setSaving(false);
     }
