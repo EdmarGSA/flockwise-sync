@@ -228,9 +228,9 @@ export function useLoteAnalytics() {
           .order('created_at', { ascending: false }),
         supabase
           .from('solicitacoes_racao')
-          .select('lote_id, quantidade_recebida_kg')
+          .select('lote_id, quantidade_recebida_kg, quantidade_devolvida_kg, status')
           .in('lote_id', loteIds)
-          .eq('status', 'recebido'),
+          .in('status', ['recebido', 'parcialmente_devolvido']),
       ]);
 
       const mortalidadeData = mortalidadeRes.data || [];
