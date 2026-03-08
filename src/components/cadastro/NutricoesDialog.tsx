@@ -385,7 +385,7 @@ const NutricoesDialog = ({
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao salvar nutrição:', error);
-      toast({ title: "Erro ao salvar nutrição", variant: "destructive" });
+      toast.error("Erro ao salvar nutrição");
     } finally {
       setSaving(false);
     }
