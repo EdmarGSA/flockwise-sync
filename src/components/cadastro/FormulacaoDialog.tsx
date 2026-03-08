@@ -78,7 +78,7 @@ const FormulacaoDialog = ({
 
   const handleAddItem = () => {
     if (!selectedInsumo || !quantidade) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      toast.error("Preencha todos os campos");
       return;
     }
 
