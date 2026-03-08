@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Package, AlertTriangle, Clock, TrendingDown } from 'lucide-react';
+import { useConfigSilo } from '@/hooks/useConfigSilo';
 
 interface LoteConsumo {
   id: string;
@@ -22,7 +23,7 @@ interface SilosMapSectionProps {
 }
 
 export function SilosMapSection({ lotes, onLoteClick, loading }: SilosMapSectionProps) {
-  // Filter only active lots with consumption data
+  const { config } = useConfigSilo();
   const lotesAtivos = lotes.filter(l => (l.diasDesdeAlojamento || 0) > 0);
 
   if (loading) {
@@ -50,7 +51,7 @@ export function SilosMapSection({ lotes, onLoteClick, loading }: SilosMapSection
   }
 
   const getSiloStatus = (diasEstoque: number, nivelSilo: number) => {
-    if (nivelSilo < 0 || diasEstoque < 1) {
+    if (nivelSilo < 0 || diasEstoque < config.diasCritico) {
       return { 
         color: 'bg-destructive', 
         barColor: 'bg-destructive',
@@ -59,7 +60,7 @@ export function SilosMapSection({ lotes, onLoteClick, loading }: SilosMapSection
         percentage: Math.max(0, Math.min(100, (nivelSilo / 1000) * 100))
       };
     }
-    if (diasEstoque <= 3) {
+    if (diasEstoque <= config.diasAtencao) {
       return { 
         color: 'bg-amber-500', 
         barColor: 'bg-amber-500',
@@ -100,25 +101,20 @@ export function SilosMapSection({ lotes, onLoteClick, loading }: SilosMapSection
                       className={`relative cursor-pointer transition-all hover:scale-105 rounded-lg border-2 ${status.borderColor} bg-muted/30 p-1`}
                       onClick={() => onLoteClick?.(lote.id)}
                     >
-                      {/* Silo Visual */}
                       <div className="h-16 w-full bg-muted/50 rounded-md overflow-hidden relative">
-                        {/* Fill level */}
                         <div 
                           className={`absolute bottom-0 left-0 right-0 ${status.barColor} transition-all duration-500`}
                           style={{ height: `${siloPercent}%` }}
                         />
-                        {/* Critical indicator */}
-                        {(lote.diasEstoque || 0) < 1 && (
+                        {(lote.diasEstoque || 0) < config.diasCritico && (
                           <div className="absolute top-1 right-1">
                             <AlertTriangle className="w-3 h-3 text-white drop-shadow-md animate-pulse" />
                           </div>
                         )}
                       </div>
-                      {/* Label */}
                       <p className="text-[9px] text-center mt-1 text-muted-foreground truncate">
                         {lote.galpao?.nome || 'Galpão'}
                       </p>
-                      {/* Days badge */}
                       <div className="absolute -top-1 -right-1">
                         <div className={`w-4 h-4 rounded-full ${status.color} flex items-center justify-center`}>
                           <span className="text-[8px] text-white font-bold">
@@ -144,7 +140,7 @@ export function SilosMapSection({ lotes, onLoteClick, loading }: SilosMapSection
                           <Clock className="w-3 h-3" />
                           <span>Restante:</span>
                         </div>
-                        <span className={(lote.diasEstoque || 0) < 1 ? 'text-destructive font-medium' : ''}>
+                        <span className={(lote.diasEstoque || 0) < config.diasCritico ? 'text-destructive font-medium' : ''}>
                           {lote.diasEstoque || 0} dias
                         </span>
                         

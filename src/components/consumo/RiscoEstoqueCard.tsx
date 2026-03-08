@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
+import { useConfigSilo } from '@/hooks/useConfigSilo';
 
 interface LoteConsumo {
   id: string;
@@ -13,12 +14,13 @@ interface RiscoEstoqueCardProps {
 }
 
 export function RiscoEstoqueCard({ lotes, onClick }: RiscoEstoqueCardProps) {
-  // Count lots that will become critical within 3 days
+  const { config } = useConfigSilo();
+
+  // Count lots that are between critical and attention thresholds
   const lotesEmRisco = lotes.filter(l => {
     const diasEstoque = l.diasEstoque || 0;
     const diasDesdeAlojamento = l.diasDesdeAlojamento || 0;
-    // Active lots with 1-3 days of stock (not critical yet, but at risk)
-    return diasDesdeAlojamento > 0 && diasEstoque >= 1 && diasEstoque <= 3;
+    return diasDesdeAlojamento > 0 && diasEstoque >= config.diasCritico && diasEstoque <= config.diasAtencao;
   });
 
   const hasRisk = lotesEmRisco.length > 0;
@@ -31,7 +33,7 @@ export function RiscoEstoqueCard({ lotes, onClick }: RiscoEstoqueCardProps) {
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-muted-foreground text-sm">⏳ Risco 3d</p>
+            <p className="text-muted-foreground text-sm">⏳ Risco {config.diasAtencao}d</p>
             <p className={`text-2xl font-bold ${hasRisk ? 'text-amber-500' : 'text-muted-foreground'}`}>
               {lotesEmRisco.length}
             </p>
