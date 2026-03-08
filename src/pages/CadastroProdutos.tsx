@@ -185,7 +185,7 @@ const CadastroProdutos = () => {
     await supabase.from('grupos_produto').insert(defaultGrupos as any);
 
     await fetchData();
-    toast({ title: "Dados padrão recriados com sucesso!" });
+    toast.success("Dados padrão recriados com sucesso!");
   };
 
   const getTipoOrigemLabel = (tipo: string) => {

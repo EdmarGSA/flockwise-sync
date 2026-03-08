@@ -44,10 +44,10 @@ export default function BackofficeFerramentas() {
       const { error } = await supabase.from('user_roles').insert({ user_id: profile.id, role: 'superadmin' } as any);
       if (error) throw error;
 
-      toast({ title: `${profile.full_name || 'Usuário'} promovido a superadmin!` });
+      toast.success(`${profile.full_name || 'Usuário'} promovido a superadmin!`);
       setUserId('');
     } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+      toast.error('Erro', { description: err.message });
     } finally {
       setPromoting(false);
     }

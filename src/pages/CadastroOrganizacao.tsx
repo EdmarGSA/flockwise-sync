@@ -55,7 +55,7 @@ const CadastroOrganizacao = () => {
     setShowForm(false);
     setEditingOrg(null);
     fetchData();
-    toast({ title: "Organização salva com sucesso!" });
+    toast.success("Organização salva com sucesso!");
   };
 
   const handleCancel = () => {

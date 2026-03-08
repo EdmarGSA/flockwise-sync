@@ -53,9 +53,9 @@ export default function BackofficeCS() {
       criado_por: user?.id,
     });
     if (error) {
-      toast({ title: 'Erro ao criar ticket', description: error.message, variant: 'destructive' });
+      toast.error('Erro ao criar ticket', { description: error.message });
     } else {
-      toast({ title: 'Ticket criado com sucesso' });
+      toast.success('Ticket criado com sucesso');
       setDialogOpen(false);
       setForm({ titulo: '', descricao: '', prioridade: 'media', categoria: '' });
       fetchTickets();

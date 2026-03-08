@@ -221,7 +221,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
       if (error) {
         console.error(error);
-        toast({ title: "Erro ao salvar", variant: "destructive" });
+        toast.error("Erro ao salvar");
         setLoading(false);
         return;
       }
