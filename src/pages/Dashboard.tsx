@@ -30,11 +30,6 @@ const Dashboard = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     const fetchProfile = async () => {
