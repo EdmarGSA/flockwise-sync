@@ -61,6 +61,9 @@ import BackofficeCS from "./pages/backoffice/BackofficeCS";
 import BackofficeFerramentas from "./pages/backoffice/BackofficeFerramentas";
 import BackofficeNotificacoes from "./pages/backoffice/BackofficeNotificacoes";
 import NotFound from "./pages/NotFound";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import TermosUso from "./pages/TermosUso";
+import { CookieConsent } from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
 
