@@ -152,7 +152,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           });
           if (totalAves > 0) {
             pesagensProcessed.push({
-              dia: differenceInDays(new Date(p.data_pesagem), new Date(lote.data_alojamento)),
+              dia: differenceInDays2(new Date(p.data_pesagem), new Date(lote.data_alojamento)),
               peso_kg: totalPeso / totalAves,
             });
           }
