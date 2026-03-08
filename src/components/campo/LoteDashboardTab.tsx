@@ -45,8 +45,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
   const [metaPesoSaida, setMetaPesoSaida] = useState<number>(0);
 
   const diasAlojados = useMemo(() => {
-    if (!lote.data_alojamento) return 0;
-    return differenceInDays(new Date(), new Date(lote.data_alojamento));
+    return calcularIdadeLote(lote.data_alojamento);
   }, [lote.data_alojamento]);
 
   const avesAlojadas = lote.quantidade_aves;
