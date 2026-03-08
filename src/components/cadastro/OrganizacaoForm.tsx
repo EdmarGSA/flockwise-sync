@@ -209,7 +209,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
       if (error) {
         console.error(error);
-        toast({ title: "Erro ao atualizar", variant: "destructive" });
+        toast.error("Erro ao atualizar");
         setLoading(false);
         return;
       }
