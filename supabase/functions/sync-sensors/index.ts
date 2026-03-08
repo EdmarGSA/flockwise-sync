@@ -35,10 +35,17 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", encoder.encode(signPayload), key);
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
   const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
   // Step 2: Login to get token
+  const ewelinkEmail = Deno.env.get("EWELINK_EMAIL");
+  const ewelinkPassword = Deno.env.get("EWELINK_PASSWORD");
+
+  if (!ewelinkEmail || !ewelinkPassword) {
+    throw new Error("Credenciais EWELINK_EMAIL e EWELINK_PASSWORD não configuradas.");
+  }
+
   const loginRes = await fetch("https://apia.coolkit.cc/v2/user/login", {
     method: "POST",
     headers: {
@@ -50,6 +57,8 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
     body: JSON.stringify({
       lang: "en",
       countryCode: "+55",
+      email: ewelinkEmail,
+      password: ewelinkPassword,
       ts,
       nonce,
     }),
