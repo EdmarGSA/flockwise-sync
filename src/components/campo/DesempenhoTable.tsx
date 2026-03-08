@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Pencil } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { getLinhagemLabel } from '@/lib/utils/labels';
 
 type DesempenhoAve = Database['public']['Tables']['desempenho_aves']['Row'];
 
