@@ -276,7 +276,7 @@ const NutricoesDialog = ({
         .update({ ativo: !nutricao.ativo })
         .eq('id', nutricao.id);
 
-      toast({ title: nutricao.ativo ? "Nutrição desativada" : "Nutrição ativada" });
+      toast.success(nutricao.ativo ? "Nutrição desativada" : "Nutrição ativada");
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao alterar status:', error);
