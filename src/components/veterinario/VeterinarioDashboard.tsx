@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLoteAnalytics, LoteAnalytics, AnalyticsSummary } from '@/hooks/useLoteAnalytics';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { supabase } from '@/integrations/supabase/client';
 import { Bird, Skull, TrendingDown, AlertTriangle, Pill, Activity, Scale } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, AreaChart, Area, LineChart, Line,
 } from 'recharts';
+import { subWeeks, startOfWeek, endOfWeek, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { MortalidadeLoteInfo } from '@/hooks/useMortalidadeAlerta';
 import type { CarenciaLoteInfo } from '@/hooks/useCarenciaAlerta';
 
