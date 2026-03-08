@@ -1,44 +1,31 @@
 
+## Checklist Geral — Correções Aplicadas
 
-# Dashboard Visão Geral — Módulo Veterinário
+### ✅ Corrigido
 
-## Objetivo
-Adicionar um dashboard sintético na página `/veterinario` com gráficos e KPIs consolidados de todos os lotes, usando o hook `useLoteAnalytics` já existente (mesmo usado na Gestão de Campo).
+1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
+2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
+3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
+4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
+5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
+6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
+7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
+8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
+9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
+10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
+11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
+12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
+13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
+14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
+15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
+16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
 
-## Estrutura
+### Pendente (baixa prioridade)
 
-A página `Veterinario.tsx` ganhará **duas abas**: "Visão Geral" (dashboard novo) e "Lotes" (lista atual).
-
-### Componente novo: `src/components/veterinario/VeterinarioDashboard.tsx`
-
-**KPI Cards (4 cards compactos no topo):**
-- Total de aves vivas (soma)
-- Mortalidade média geral (%)
-- CA médio geral
-- Lotes com alerta (count)
-
-**Gráficos (usando Recharts, já instalado):**
-
-1. **Mortalidade por Lote** — BarChart horizontal: cada lote com % mortalidade, colorido por status (OK verde, alerta amarelo, crítico vermelho)
-2. **Peso Real vs Referência** — BarChart agrupado: por lote, barras lado a lado (peso real × peso referência)
-3. **Score Operacional** — RadialBarChart ou PieChart: distribuição dos lotes por status (OK / Atenção / Crítico)
-4. **Tratamentos Ativos** — Card com contagem de tratamentos ativos e lotes em carência
-
-### Dados
-- Reutilizar `useLoteAnalytics` para mortalidade, CA, peso, score
-- Batch query adicional para `tratamentos_lote` (status = 'ativo') agrupado
-- Usar `mortalidadeMap` e `carenciaMap` já existentes na página
-
-### Mudanças em `Veterinario.tsx`
-- Adicionar `Tabs` (Visão Geral | Lotes) abaixo do header
-- Tab "Visão Geral" renderiza `<VeterinarioDashboard />`
-- Tab "Lotes" mantém o conteúdo atual (filtros + cards)
-- Usar labels unificados de `src/lib/utils/labels.ts`
-- Remover funções duplicadas `formatLinhagem`, `formatSexo`, `getStatusBadge` locais
-
-### Arquivos
-| Ação | Arquivo |
-|---|---|
-| Criar | `src/components/veterinario/VeterinarioDashboard.tsx` |
-| Editar | `src/pages/Veterinario.tsx` |
-
+- Remover auth checks redundantes das demais ~14 páginas
+- Otimizar N+1 queries em GestaoProducaoTab
+- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
+- Limpar `as any` em RPCs
+- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
+- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
+- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)

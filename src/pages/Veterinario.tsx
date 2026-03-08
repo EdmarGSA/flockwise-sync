@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, Calendar, LogOut, Skull, Pill } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, LogOut, Skull, Pill, BarChart3, List } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
 import { useCarenciaAlertaLotes } from '@/hooks/useCarenciaAlerta';
+import { getLinhagemLabel, getSexoLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
+import VeterinarioDashboard from '@/components/veterinario/VeterinarioDashboard';
 
 interface Lote {
   id: string;
@@ -38,6 +41,7 @@ export default function Veterinario() {
   const [loadingData, setLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const { mortalidadeMap } = useMortalidadeAlertaLotes(
     lotes.map(l => ({ id: l.id, quantidade_aves: l.quantidade_aves, data_alojamento: l.data_alojamento })),
@@ -105,40 +109,6 @@ export default function Veterinario() {
     setLoadingData(false);
   };
 
-  const formatLinhagem = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
-
-  const formatSexo = (sexo: string) => {
-    const labels: Record<string, string> = {
-      macho: 'Macho',
-      femea: 'Fêmea',
-      misto: 'Misto',
-    };
-    return labels[sexo] || sexo;
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu', variant: 'secondary' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      fechado: { label: 'Fechado', variant: 'destructive' },
-    };
-    const config = statusConfig[status] || { label: status, variant: 'outline' as const };
-    return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
-  };
-
-  const getDiasLote = (dataAlojamento: string | null) => {
-    if (!dataAlojamento) return null;
-    return calcularIdadeLote(dataAlojamento);
-  };
-
   // Status counts
   const statusCounts = {
     todos: lotes.length,
@@ -149,16 +119,12 @@ export default function Veterinario() {
   };
 
   const filteredLotes = lotes.filter((lote) => {
-    // Status filter
-    if (statusFilter !== 'todos' && lote.status !== statusFilter) {
-      return false;
-    }
-    // Search filter
+    if (statusFilter !== 'todos' && lote.status !== statusFilter) return false;
     const searchLower = searchTerm.toLowerCase();
     return (
       lote.nucleo?.nome?.toLowerCase().includes(searchLower) ||
       lote.galpao?.nome?.toLowerCase().includes(searchLower) ||
-      formatLinhagem(lote.linhagem).toLowerCase().includes(searchLower)
+      getLinhagemLabel(lote.linhagem).toLowerCase().includes(searchLower)
     );
   });
 
@@ -186,7 +152,7 @@ export default function Veterinario() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Mobile-optimized Header */}
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/home')} className="shrink-0 -ml-2">
@@ -219,139 +185,155 @@ export default function Veterinario() {
         </div>
       </header>
 
-      <main className="px-4 pt-4 space-y-4">
-        {/* Status Filter Pills - Horizontal Scroll */}
-        <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
-          <div className="flex gap-2">
-            {filterButtons.map((btn) => (
-              <Button
-                key={btn.key}
-                variant={statusFilter === btn.key ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setStatusFilter(btn.key)}
-                className="shrink-0 gap-1.5"
-              >
-                {btn.label}
-                <Badge 
-                  variant={statusFilter === btn.key ? 'secondary' : 'outline'} 
-                  className="h-5 min-w-5 px-1.5 text-xs ml-1"
-                >
-                  {statusCounts[btn.key]}
-                </Badge>
-              </Button>
-            ))}
-          </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar lote..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-12 text-base"
-          />
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="px-4 pt-3">
+          <TabsList className="w-full">
+            <TabsTrigger value="dashboard" className="flex-1 gap-1.5">
+              <BarChart3 className="w-4 h-4" />
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="lotes" className="flex-1 gap-1.5">
+              <List className="w-4 h-4" />
+              Lotes
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Lotes Cards List */}
-        {loadingData ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Carregando lotes...
-          </div>
-        ) : filteredLotes.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Bird className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p>{searchTerm || statusFilter !== 'todos' ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredLotes.map((lote) => {
-              const dias = getDiasLote(lote.data_alojamento);
-              const hasAlerts = (lote.alertas_count || 0) > 0;
-              const mortInfo = mortalidadeMap[lote.id];
-              const hasMortAlerta = mortInfo?.emAlerta;
-              const carenciaInfo = carenciaMap[lote.id];
-              const hasCarenciaAlerta = carenciaInfo?.emAlerta;
-              
-              return (
-                  <Card 
-                  key={lote.id} 
-                  className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts || hasMortAlerta ? 'border-l-4 border-l-destructive' : hasCarenciaAlerta ? 'border-l-4 border-l-amber-500' : ''}`}
-                  onClick={() => navigate(`/veterinario/${lote.id}`)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        {/* Location */}
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-foreground truncate">
-                            {lote.nucleo?.nome || 'N/A'} - {lote.galpao?.nome || 'N/A'}
-                          </span>
-                          {hasAlerts && (
-                            <span className="relative flex h-2 w-2 shrink-0">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Details Line */}
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-                          <span>{formatLinhagem(lote.linhagem)}</span>
-                          <span>•</span>
-                          <span>{formatSexo(lote.sexo)}</span>
-                          {dias !== null && (
-                            <>
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="px-4 mt-4">
+          <VeterinarioDashboard mortalidadeMap={mortalidadeMap} carenciaMap={carenciaMap} />
+        </TabsContent>
+
+        {/* Lotes Tab */}
+        <TabsContent value="lotes" className="mt-0">
+          <main className="px-4 pt-4 space-y-4">
+            {/* Status Filter Pills */}
+            <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
+              <div className="flex gap-2">
+                {filterButtons.map((btn) => (
+                  <Button
+                    key={btn.key}
+                    variant={statusFilter === btn.key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter(btn.key)}
+                    className="shrink-0 gap-1.5"
+                  >
+                    {btn.label}
+                    <Badge
+                      variant={statusFilter === btn.key ? 'secondary' : 'outline'}
+                      className="h-5 min-w-5 px-1.5 text-xs ml-1"
+                    >
+                      {statusCounts[btn.key]}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar lote..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-12 text-base"
+              />
+            </div>
+
+            {/* Lotes Cards */}
+            {loadingData ? (
+              <div className="text-center py-12 text-muted-foreground">Carregando lotes...</div>
+            ) : filteredLotes.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Bird className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p>{searchTerm || statusFilter !== 'todos' ? 'Nenhum lote encontrado' : 'Nenhum lote ativo'}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredLotes.map((lote) => {
+                  const dias = lote.data_alojamento ? calcularIdadeLote(lote.data_alojamento) : null;
+                  const hasAlerts = (lote.alertas_count || 0) > 0;
+                  const mortInfo = mortalidadeMap[lote.id];
+                  const hasMortAlerta = mortInfo?.emAlerta;
+                  const carenciaInfo = carenciaMap[lote.id];
+                  const hasCarenciaAlerta = carenciaInfo?.emAlerta;
+                  const statusConfig = getStatusBadgeConfig(lote.status);
+
+                  return (
+                    <Card
+                      key={lote.id}
+                      className={`bg-card border-border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer ${hasAlerts || hasMortAlerta ? 'border-l-4 border-l-destructive' : hasCarenciaAlerta ? 'border-l-4 border-l-amber-500' : ''}`}
+                      onClick={() => navigate(`/veterinario/${lote.id}`)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-foreground truncate">
+                                {lote.nucleo?.nome || 'N/A'} - {lote.galpao?.nome || 'N/A'}
+                              </span>
+                              {hasAlerts && (
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+                              <span>{getLinhagemLabel(lote.linhagem)}</span>
                               <span>•</span>
-                              <span className="font-medium text-foreground">{dias}d</span>
-                            </>
-                          )}
-                        </div>
-                        
-                        {/* Bottom Row */}
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 text-sm">
-                            <Bird className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span>{lote.quantidade_aves.toLocaleString('pt-BR')}</span>
+                              <span>{getSexoLabel(lote.sexo)}</span>
+                              {dias !== null && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-medium text-foreground">{dias}d</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Bird className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>{lote.quantidade_aves.toLocaleString('pt-BR')}</span>
+                              </div>
+                              <Badge variant={statusConfig.variant} className="text-xs">{statusConfig.label}</Badge>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>{lote.observacoes_count || 0}</span>
+                              </div>
+                              {hasAlerts && (
+                                <div className="flex items-center gap-1 text-sm text-destructive">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>{lote.alertas_count}</span>
+                                </div>
+                              )}
+                              {hasMortAlerta && mortInfo && (
+                                <div className="flex items-center gap-1 text-sm text-destructive font-medium">
+                                  <Skull className="w-3.5 h-3.5" />
+                                  <span>{mortInfo.percentual.toFixed(1)}%</span>
+                                </div>
+                              )}
+                              {hasCarenciaAlerta && carenciaInfo && (
+                                <div className="flex items-center gap-1 text-sm text-amber-600 font-medium">
+                                  <Pill className="w-3.5 h-3.5" />
+                                  <span>{carenciaInfo.tratamentos.length}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {getStatusBadge(lote.status)}
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>{lote.observacoes_count || 0}</span>
-                          </div>
-                          {hasAlerts && (
-                            <div className="flex items-center gap-1 text-sm text-destructive">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>{lote.alertas_count}</span>
-                            </div>
-                          )}
-                          {hasMortAlerta && mortInfo && (
-                            <div className="flex items-center gap-1 text-sm text-destructive font-medium">
-                              <Skull className="w-3.5 h-3.5" />
-                              <span>{mortInfo.percentual.toFixed(1)}%</span>
-                            </div>
-                          )}
-                          {hasCarenciaAlerta && carenciaInfo && (
-                            <div className="flex items-center gap-1 text-sm text-amber-600 font-medium">
-                              <Pill className="w-3.5 h-3.5" />
-                              <span>{carenciaInfo.tratamentos.length}</span>
-                            </div>
-                          )}
+                          <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
                         </div>
-                      </div>
-                      
-                      {/* Arrow */}
-                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </main>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </main>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
