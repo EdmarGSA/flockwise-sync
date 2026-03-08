@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Pencil } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { getLinhagemLabel } from '@/lib/utils/labels';
 
 type DesempenhoAve = Database['public']['Tables']['desempenho_aves']['Row'];
 
@@ -18,15 +19,6 @@ interface DesempenhoTableProps {
 export function DesempenhoTable({ data, loading, onEdit }: DesempenhoTableProps) {
   const [selectedLinhagem, setSelectedLinhagem] = useState<string>('cobb_500');
   const [selectedSexo, setSelectedSexo] = useState<string>('misto');
-
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
 
   const getSexoLabel = (sexo: string) => {
     const labels: Record<string, string> = {

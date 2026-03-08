@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar, Skull } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
+import { getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';
@@ -159,13 +160,7 @@ export default function VeterinarioLote() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu', variant: 'secondary' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      fechado: { label: 'Fechado', variant: 'destructive' },
-    };
-    const config = statusConfig[status] || { label: status, variant: 'outline' as const };
+    const config = getStatusBadgeConfig(status);
     return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
   };
 

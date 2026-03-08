@@ -22,6 +22,7 @@ import {
 import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import { getStatusBadgeConfig } from '@/lib/utils/labels';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
 import { PesagemDialog } from '@/components/lotes/PesagemDialog';
@@ -230,16 +231,12 @@ export default function LoteDetalhe() {
   }
 
   const isPostura = lote.linhagem_postura !== null && lote.linhagem_postura !== undefined;
+  // avesVivas: use quantidadeAlojada (which already discounts DOA) 
+  // TODO: also subtract accumulated daily mortality for full accuracy
   const avesVivas = quantidadeAlojada ?? lote.quantidade_aves;
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Em Trânsito', variant: 'destructive' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      fechado: { label: 'Fechado', variant: 'secondary' },
-    };
-    const config = variants[status] || { label: status, variant: 'outline' };
+    const config = getStatusBadgeConfig(status);
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 

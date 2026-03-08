@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInDays, addDays } from 'date-fns';
+import { getLinhagemLabel } from '@/lib/utils/labels';
+import { calcularMortalidadeTotal } from '@/lib/utils/calcularAvesVivas';
 
 export interface LoteAnalytics {
   loteId: string;
@@ -105,14 +107,7 @@ export function useLoteAnalytics() {
   const [analytics, setAnalytics] = useState<LoteAnalytics[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
+  // getLinhagemLabel imported from '@/lib/utils/labels'
 
   const getMetasForDia = (metas: MetasZootecnicas | null, dia: number, tipo: 'mortalidade' | 'ca') => {
     if (!metas) return { ok: 0, alerta: 0 };
@@ -233,9 +228,9 @@ export function useLoteAnalytics() {
           .order('created_at', { ascending: false }),
         supabase
           .from('solicitacoes_racao')
-          .select('lote_id, quantidade_recebida_kg')
+          .select('lote_id, quantidade_recebida_kg, quantidade_devolvida_kg, status')
           .in('lote_id', loteIds)
-          .eq('status', 'recebido'),
+          .in('status', ['recebido', 'parcialmente_devolvido']),
       ]);
 
       const mortalidadeData = mortalidadeRes.data || [];
@@ -246,10 +241,14 @@ export function useLoteAnalytics() {
 
       // Função para calcular consumo real do silo para um lote
       const getConsumoRealSilo = (loteId: string): number => {
-        // Total de ração recebida
+        // Total de ração recebida (including partially returned, minus devolutions)
         const totalRecebido = solicitacoesData
           .filter(s => s.lote_id === loteId)
-          .reduce((sum, s) => sum + (s.quantidade_recebida_kg || 0), 0);
+          .reduce((sum, s) => {
+            const recebido = (s as any).quantidade_recebida_kg || 0;
+            const devolvido = (s as any).quantidade_devolvida_kg || 0;
+            return sum + recebido - devolvido;
+          }, 0);
         
         // Último nível do silo (já ordenado por created_at desc)
         const ultimoSilo = historicoSiloData.find(h => h.lote_id === loteId);
@@ -267,10 +266,12 @@ export function useLoteAnalytics() {
 
         // Mortalidade
         const mortalidadeLote = mortalidadeData.filter(m => m.lote_id === lote.id);
-        const mortalidadeTotal = mortalidadeLote.reduce((acc, m) => {
-          const itens = m.mortalidade_itens as { quantidade: number }[] | null;
-          return acc + (itens?.reduce((sum, i) => sum + i.quantidade, 0) || 0);
-        }, 0);
+        const mortalidadeTotal = calcularMortalidadeTotal(
+          mortalidadeLote.map(m => ({ mortalidade_itens: m.mortalidade_itens as { quantidade: number }[] | null }))
+        );
+        // Note: useLoteAnalytics doesn't have recebimento data per lote yet,
+        // so we use quantidade_aves - mortalidadeTotal as approximation.
+        // A future improvement would batch-fetch recebimento_lotes for all loteIds.
         const avesVivas = lote.quantidade_aves - mortalidadeTotal;
         const mortalidadePercent = lote.quantidade_aves > 0 
           ? (mortalidadeTotal / lote.quantidade_aves) * 100 

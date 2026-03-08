@@ -32,6 +32,8 @@ import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { PosturaIndicators } from '@/components/lotes/postura/PosturaIndicators';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
 import { MetasPosturaDialog } from '@/components/lotes/postura/MetasPosturaDialog';
+import { getLinhagemLabel, getLinhagemPosturaLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
+import { calcularAvesVivas, calcularQuantidadeAlojada, calcularMortalidadeTotal } from '@/lib/utils/calcularAvesVivas';
 
 interface Lote {
   id: string;
@@ -50,7 +52,6 @@ interface Lote {
   galpao_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
-  // Saída de Lote fields
   data_prevista_saida: string | null;
   horario_inicio_jejum: string | null;
   saida_venda_local: number;
@@ -73,7 +74,6 @@ interface LoteComPesagem extends Lote {
   pendenciasVet?: number;
   jejumAtrasado?: boolean;
   saidaProxima?: boolean;
-  // Postura specific
   percentualPostura?: number | null;
   percentualReferencia?: number | null;
   ovosAveAlojada?: number | null;
@@ -141,176 +141,218 @@ export default function MeusLotes() {
       return;
     }
 
-    // Fetch last pesagem and recebimento for each lote
-    const lotesComPesagem: LoteComPesagem[] = await Promise.all(
-      (data || []).map(async (lote) => {
-        const loteData = lote as Lote;
-        
-        // Get last pesagem date
-        const { data: pesagemData } = await supabase
-          .from('pesagens')
-          .select('data_pesagem')
-          .eq('lote_id', loteData.id)
-          .order('data_pesagem', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    const lotesData = (data || []) as Lote[];
+    const loteIds = lotesData.map(l => l.id);
 
-        // Get recebimento data for quantidade alojada
-        const { data: recebimentoData } = await supabase
-          .from('recebimento_lotes')
-          .select('quantidade_mortos, quantidade_eliminados_locomotor, quantidade_eliminados_classificacao')
-          .eq('lote_id', loteData.id)
-          .maybeSingle();
+    if (loteIds.length === 0) {
+      setLotes([]);
+      setLoadingData(false);
+      return;
+    }
 
-        // Get accumulated mortality data
-        const { data: mortalidadeData } = await supabase
-          .from('mortalidade')
-          .select('mortalidade_itens(quantidade)')
-          .eq('lote_id', loteData.id);
+    // Batch queries instead of N+1
+    const [
+      pesagensRes,
+      recebimentosRes,
+      mortalidadeRes,
+      solicitacoesRes,
+      orientacoesRes,
+      tratamentosRes,
+    ] = await Promise.all([
+      supabase
+        .from('pesagens')
+        .select('lote_id, data_pesagem')
+        .in('lote_id', loteIds)
+        .order('data_pesagem', { ascending: false }),
+      supabase
+        .from('recebimento_lotes')
+        .select('lote_id, quantidade_mortos, quantidade_eliminados_locomotor, quantidade_eliminados_classificacao')
+        .in('lote_id', loteIds),
+      supabase
+        .from('mortalidade')
+        .select('lote_id, mortalidade_itens(quantidade)')
+        .in('lote_id', loteIds),
+      supabase
+        .from('solicitacoes_racao')
+        .select('lote_id, status')
+        .in('lote_id', loteIds)
+        .in('status', ['solicitado', 'confirmado', 'enviado']),
+      supabase
+        .from('observacoes_lote')
+        .select('lote_id')
+        .in('lote_id', loteIds)
+        .eq('tipo', 'orientacao')
+        .is('lido_por', null),
+      supabase
+        .from('tratamentos_lote')
+        .select('lote_id')
+        .in('lote_id', loteIds)
+        .eq('status', 'ativo')
+        .eq('aplicacao_confirmada', false),
+    ]);
 
-        // Calculate total accumulated mortality
-        const mortalidadeAcumulada = mortalidadeData?.reduce((total, m) => {
-          const itens = m.mortalidade_itens as { quantidade: number }[];
-          return total + (itens?.reduce((sum, item) => sum + (item.quantidade || 0), 0) || 0);
-        }, 0) || 0;
+    // Index batch results by lote_id for O(1) lookup
+    const pesagensMap = new Map<string, string>();
+    (pesagensRes.data || []).forEach(p => {
+      // Only keep the first (most recent) pesagem per lote
+      if (!pesagensMap.has(p.lote_id)) {
+        pesagensMap.set(p.lote_id, p.data_pesagem);
+      }
+    });
 
-        // Check for pending feed requests (solicitado, confirmado, or enviado status)
-        const { data: solicitacaoData } = await supabase
-          .from('solicitacoes_racao')
-          .select('id, status')
-          .eq('lote_id', loteData.id)
-          .in('status', ['solicitado', 'confirmado', 'enviado']);
+    const recebimentoMap = new Map<string, any>();
+    (recebimentosRes.data || []).forEach(r => {
+      recebimentoMap.set(r.lote_id, r);
+    });
 
-        // Count pending vet notifications (unread orientacoes + unconfirmed tratamentos)
-        const { count: orientacoesCount } = await supabase
-          .from('observacoes_lote')
-          .select('id', { count: 'exact', head: true })
-          .eq('lote_id', loteData.id)
-          .eq('tipo', 'orientacao')
-          .is('lido_por', null);
+    // Group mortality by lote_id
+    const mortalidadeMap = new Map<string, number>();
+    (mortalidadeRes.data || []).forEach(m => {
+      const itens = m.mortalidade_itens as { quantidade: number }[];
+      const total = itens?.reduce((sum, item) => sum + (item.quantidade || 0), 0) || 0;
+      mortalidadeMap.set(m.lote_id, (mortalidadeMap.get(m.lote_id) || 0) + total);
+    });
 
-        const { count: tratamentosCount } = await supabase
-          .from('tratamentos_lote')
-          .select('id', { count: 'exact', head: true })
-          .eq('lote_id', loteData.id)
-          .eq('status', 'ativo')
-          .eq('aplicacao_confirmada', false);
+    // Group solicitações by lote_id
+    const solicitacoesMap = new Map<string, { pendente: boolean; enviada: boolean }>();
+    (solicitacoesRes.data || []).forEach(s => {
+      const existing = solicitacoesMap.get(s.lote_id) || { pendente: false, enviada: false };
+      existing.pendente = true;
+      if (s.status === 'enviado') existing.enviada = true;
+      solicitacoesMap.set(s.lote_id, existing);
+    });
 
-        const pendenciasVet = (orientacoesCount || 0) + (tratamentosCount || 0);
+    // Count vet pendencies per lote
+    const orientacoesMap = new Map<string, number>();
+    (orientacoesRes.data || []).forEach(o => {
+      orientacoesMap.set(o.lote_id, (orientacoesMap.get(o.lote_id) || 0) + 1);
+    });
+    const tratamentosMap = new Map<string, number>();
+    (tratamentosRes.data || []).forEach(t => {
+      tratamentosMap.set(t.lote_id, (tratamentosMap.get(t.lote_id) || 0) + 1);
+    });
 
-        const ultimaPesagem = pesagemData?.data_pesagem || null;
-        const temSolicitacaoPendente = solicitacaoData && solicitacaoData.length > 0;
-        const temSolicitacaoEnviada = solicitacaoData?.some(s => s.status === 'enviado') || false;
-        
-        // Calculate quantidade alojada (descounting dead/eliminated on arrival)
-        let quantidadeAlojada: number | null = null;
-        if (recebimentoData) {
-          const mortos = recebimentoData.quantidade_mortos || 0;
-          const eliminadosLocomotor = recebimentoData.quantidade_eliminados_locomotor || 0;
-          const eliminadosClassificacao = recebimentoData.quantidade_eliminados_classificacao || 0;
-          quantidadeAlojada = loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao;
-        }
-
-        // Calculate live birds (alojada - accumulated daily mortality)
-        const avesVivas = (quantidadeAlojada ?? loteData.quantidade_aves) - mortalidadeAcumulada;
-        
-        // Calculate days since alojamento - Dia 1 = dia do alojamento
-        let diasDesdeAlojamento = 0;
-        let semanasVida = 0;
-        if (loteData.data_alojamento) {
-          diasDesdeAlojamento = calcularIdadeLote(loteData.data_alojamento);
-          semanasVida = Math.ceil(diasDesdeAlojamento / 7);
-        }
-
-        // Check if is postura type
-        const isPostura = loteData.nucleo?.tipo_producao?.toLowerCase().includes('postura');
-
-        // Fetch postura-specific data if applicable
-        let percentualPostura: number | null = null;
-        let percentualReferencia: number | null = null;
-        let ovosAveAlojada: number | null = null;
-
-        if (isPostura && loteData.status === 'alojado' && semanasVida >= 19) {
-          // Get total eggs produced
-          const { data: producaoData } = await supabase
-            .from('producao_ovos')
-            .select('quantidade_ovos')
-            .eq('lote_id', loteData.id);
-          
-          const totalOvos = producaoData?.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) || 0;
-          const avesVivasPostura = avesVivas;
-          
-          // Calculate ovos por ave viva
-          ovosAveAlojada = avesVivasPostura > 0 ? totalOvos / avesVivasPostura : 0;
-          
-          // Calculate approximate % postura (last 7 days average)
-          const { data: recentProducao } = await supabase
-            .from('producao_ovos')
-            .select('quantidade_ovos')
-            .eq('lote_id', loteData.id)
-            .order('data_producao', { ascending: false })
-            .limit(7);
-          
-          if (recentProducao && recentProducao.length > 0) {
-            const avgDailyOvos = recentProducao.reduce((sum, p) => sum + ((p as any).quantidade_ovos || 0), 0) / recentProducao.length;
-            percentualPostura = avesVivasPostura > 0 ? (avgDailyOvos / avesVivasPostura) * 100 : 0;
-            
-          }
-          
-          // Get reference % from desempenho_postura
-          if (loteData.linhagem_postura) {
-            const { data: refData } = await supabase
-              .from('desempenho_postura')
-              .select('producao_percentual')
-              .eq('linhagem', loteData.linhagem_postura as any)
-              .eq('semana', semanasVida)
-              .maybeSingle();
-            
-            percentualReferencia = refData?.producao_percentual || null;
-          }
-        }
-
-        // Check if needs weighing (every 7 days) - only for aves corte
-        let precisaPesar = false;
-        if (!isPostura && loteData.status === 'alojado' && diasDesdeAlojamento >= 7) {
-          if (!ultimaPesagem) {
-            precisaPesar = true;
-          } else {
-            const diasDesdeUltimaPesagem = differenceInDays(new Date(), new Date(ultimaPesagem));
-            precisaPesar = diasDesdeUltimaPesagem >= 7;
-          }
-        }
-
-        // Check jejum atrasado and saida proxima
-        const now = new Date();
-        const jejumAtrasado = loteData.horario_inicio_jejum 
-          ? isBefore(parseISO(loteData.horario_inicio_jejum), now) && !loteData.jejum_confirmado
-          : false;
-        
-        const horasParaSaida = loteData.data_prevista_saida 
-          ? differenceInHours(parseISO(loteData.data_prevista_saida), now)
-          : null;
-        const saidaProxima = horasParaSaida !== null && horasParaSaida <= 24 && horasParaSaida >= 0;
-
-        return {
-          ...loteData,
-          ultimaPesagem,
-          diasDesdeAlojamento,
-          semanasVida,
-          precisaPesar,
-          quantidadeAlojada,
-          avesVivas,
-          temSolicitacaoPendente,
-          temSolicitacaoEnviada,
-          pendenciasVet,
-          jejumAtrasado,
-          saidaProxima,
-          percentualPostura,
-          percentualReferencia,
-          ovosAveAlojada,
-        };
+    // Identify postura lotes that need extra queries
+    const posturaLoteIds = lotesData
+      .filter(l => {
+        const isPostura = l.nucleo?.tipo_producao?.toLowerCase().includes('postura');
+        const semanasVida = l.data_alojamento ? Math.ceil(calcularIdadeLote(l.data_alojamento) / 7) : 0;
+        return isPostura && l.status === 'alojado' && semanasVida >= 19;
       })
-    );
+      .map(l => l.id);
+
+    // Batch postura queries
+    let producaoMap = new Map<string, number[]>();
+    let recentProducaoMap = new Map<string, number[]>();
+    
+    if (posturaLoteIds.length > 0) {
+      const [producaoRes, recentProducaoRes] = await Promise.all([
+        supabase
+          .from('producao_ovos')
+          .select('lote_id, ovos_totais')
+          .in('lote_id', posturaLoteIds),
+        supabase
+          .from('producao_ovos')
+          .select('lote_id, ovos_totais, data_producao')
+          .in('lote_id', posturaLoteIds)
+          .order('data_producao', { ascending: false }),
+      ]);
+
+      (producaoRes.data || []).forEach((p: any) => {
+        const list = producaoMap.get(p.lote_id) || [];
+        list.push(p.ovos_totais || 0);
+        producaoMap.set(p.lote_id, list);
+      });
+
+      // Get last 7 per lote for recent average
+      const recentCountMap = new Map<string, number>();
+      (recentProducaoRes.data || []).forEach((p: any) => {
+        const count = recentCountMap.get(p.lote_id) || 0;
+        if (count < 7) {
+          const list = recentProducaoMap.get(p.lote_id) || [];
+          list.push(p.ovos_totais || 0);
+          recentProducaoMap.set(p.lote_id, list);
+          recentCountMap.set(p.lote_id, count + 1);
+        }
+      });
+    }
+
+    // Process all lotes using indexed data
+    const lotesComPesagem: LoteComPesagem[] = lotesData.map(lote => {
+      const recebimento = recebimentoMap.get(lote.id) || null;
+      const mortalidadeAcumulada = mortalidadeMap.get(lote.id) || 0;
+      
+      const quantidadeAlojadaCalc = calcularQuantidadeAlojada(lote.quantidade_aves, recebimento);
+      const avesVivas = calcularAvesVivas(lote.quantidade_aves, recebimento, mortalidadeAcumulada);
+
+      const ultimaPesagem = pesagensMap.get(lote.id) || null;
+      const solicitacao = solicitacoesMap.get(lote.id);
+      const pendenciasVet = (orientacoesMap.get(lote.id) || 0) + (tratamentosMap.get(lote.id) || 0);
+
+      let diasDesdeAlojamento = 0;
+      let semanasVida = 0;
+      if (lote.data_alojamento) {
+        diasDesdeAlojamento = calcularIdadeLote(lote.data_alojamento);
+        semanasVida = Math.ceil(diasDesdeAlojamento / 7);
+      }
+
+      const isPostura = lote.nucleo?.tipo_producao?.toLowerCase().includes('postura');
+
+      // Postura data
+      let percentualPostura: number | null = null;
+      let ovosAveAlojada: number | null = null;
+
+      if (isPostura && lote.status === 'alojado' && semanasVida >= 19) {
+        const totalOvosList = producaoMap.get(lote.id) || [];
+        const totalOvos = totalOvosList.reduce((sum, v) => sum + v, 0);
+        ovosAveAlojada = avesVivas > 0 ? totalOvos / avesVivas : 0;
+
+        const recentList = recentProducaoMap.get(lote.id) || [];
+        if (recentList.length > 0) {
+          const avgDailyOvos = recentList.reduce((sum, v) => sum + v, 0) / recentList.length;
+          percentualPostura = avesVivas > 0 ? (avgDailyOvos / avesVivas) * 100 : 0;
+        }
+      }
+
+      // Check if needs weighing (every 7 days) - only for corte
+      let precisaPesar = false;
+      if (!isPostura && lote.status === 'alojado' && diasDesdeAlojamento >= 7) {
+        if (!ultimaPesagem) {
+          precisaPesar = true;
+        } else {
+          const diasDesdeUltimaPesagem = differenceInDays(new Date(), new Date(ultimaPesagem));
+          precisaPesar = diasDesdeUltimaPesagem >= 7;
+        }
+      }
+
+      // Check jejum atrasado and saida proxima
+      const now = new Date();
+      const jejumAtrasado = lote.horario_inicio_jejum
+        ? isBefore(parseISO(lote.horario_inicio_jejum), now) && !lote.jejum_confirmado
+        : false;
+      const horasParaSaida = lote.data_prevista_saida
+        ? differenceInHours(parseISO(lote.data_prevista_saida), now)
+        : null;
+      const saidaProxima = horasParaSaida !== null && horasParaSaida <= 24 && horasParaSaida >= 0;
+
+      return {
+        ...lote,
+        ultimaPesagem,
+        diasDesdeAlojamento,
+        semanasVida,
+        precisaPesar,
+        quantidadeAlojada: quantidadeAlojadaCalc,
+        avesVivas,
+        temSolicitacaoPendente: solicitacao?.pendente || false,
+        temSolicitacaoEnviada: solicitacao?.enviada || false,
+        pendenciasVet,
+        jejumAtrasado,
+        saidaProxima,
+        percentualPostura,
+        percentualReferencia: null, // Fetched on demand if needed
+        ovosAveAlojada,
+      };
+    });
     
     setLotes(lotesComPesagem);
     setLoadingData(false);
@@ -329,13 +371,7 @@ export default function MeusLotes() {
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'destructive' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      fechado: { label: 'Fechado', variant: 'secondary' },
-    };
-    const config = variants[status] || { label: status, variant: 'outline' };
+    const config = getStatusBadgeConfig(status);
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -407,29 +443,7 @@ export default function MeusLotes() {
   };
 
   const isPosturaLote = (lote: LoteComPesagem) => {
-    // Lotes de postura usam linhagem_postura, lotes de corte usam linhagem
     return lote.linhagem_postura !== null && lote.linhagem_postura !== undefined;
-  };
-
-  const getLinhagemPosturaLabel = (linhagem: string | null) => {
-    if (!linhagem) return '-';
-    const labels: Record<string, string> = {
-      lohmann_brown_lite: 'Lohmann Brown-Lite',
-      hy_line_brown: 'Hy-Line Brown',
-      isa_brown: 'ISA Brown',
-      lohmann_lsl: 'Lohmann LSL',
-      dekalb_white: 'Dekalb White',
-    };
-    return labels[linhagem] || linhagem;
-  };
-
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -465,127 +479,322 @@ export default function MeusLotes() {
             <Button onClick={() => navigate('/gestao-campo')} variant="outline" className="gap-2">
               Gestão de Campo
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive gap-1.5"
-              onClick={async () => { await signOut(); navigate('/'); }}
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <ChevronDown className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 pt-24">
-        {/* Weighing Alert */}
-        {lotesPrecisandoPesar > 0 && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="flex items-center gap-2">
-              <Scale className="w-4 h-4" />
-              <strong>{lotesPrecisandoPesar} lote(s)</strong> precisam de pesagem.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Filter Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-4">
-          {[
-            { status: 'todos', label: 'Todos', count: lotes.length },
-            { status: 'alojado', label: 'Alojados', count: lotesAtivos },
-            { status: 'previsao', label: 'Previstos', count: lotesPendentes },
-            { status: 'saiu_para_entrega', label: 'Trânsito', count: lotesEmTransito },
-            { status: 'fechado', label: 'Fechados', count: lotesFechados },
-          ].map((tab) => (
-            <Badge
-              key={tab.status}
-              variant={tab.count > 0 ? 'default' : 'secondary'}
-              className="cursor-pointer whitespace-nowrap px-3 py-1.5"
-            >
-              {tab.label} ({tab.count})
-            </Badge>
-          ))}
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Alojados</p>
+                  <p className="text-2xl font-bold text-primary">{lotesAtivos}</p>
+                </div>
+                <Bird className="w-8 h-8 text-primary/50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Previstos</p>
+                  <p className="text-2xl font-bold text-amber-500">{lotesPendentes}</p>
+                </div>
+                <Calendar className="w-8 h-8 text-amber-500/50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Em Trânsito</p>
+                  <p className="text-2xl font-bold text-blue-500">{lotesEmTransito}</p>
+                </div>
+                <Truck className="w-8 h-8 text-blue-500/50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Fechados</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{lotesFechados}</p>
+                </div>
+                <Lock className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+            </CardContent>
+          </Card>
+          {lotesPrecisandoPesar > 0 && (
+            <Card className="bg-destructive/10 border-destructive/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-destructive text-sm">Pesar!</p>
+                    <p className="text-2xl font-bold text-destructive">{lotesPrecisandoPesar}</p>
+                  </div>
+                  <Scale className="w-8 h-8 text-destructive/50" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Lotes Grid */}
-        {loadingData ? (
-          <p className="text-muted-foreground text-center py-8">Carregando...</p>
-        ) : lotes.length === 0 ? (
-          <div className="text-center py-12">
-            <Bird className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground mb-4">Nenhum lote cadastrado ainda.</p>
-            <Button onClick={() => navigate('/gestao-campo')} className="gap-2">
-              Ir para Gestão de Campo
-            </Button>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {lotes.map((lote) => (
-              <Card 
-                key={lote.id}
-                className={`cursor-pointer transition-all hover:shadow-md active:scale-[0.98] ${lote.precisaPesar ? 'border-destructive/50 bg-destructive/5' : ''}`}
-                onClick={() => navigate(`/meus-lotes/${lote.id}`)}
-              >
-                <CardContent className="p-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    {getStatusBadge(lote.status)}
-                    <div className="flex items-center gap-1">
-                      {lote.precisaPesar && (
-                        <div className="w-6 h-6 rounded-full bg-destructive/20 flex items-center justify-center">
-                          <Scale className="w-3 h-3 text-destructive" />
-                        </div>
-                      )}
-                      {lote.temSolicitacaoPendente && (
-                        <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
-                          <Package className="w-3 h-3 text-amber-600" />
-                        </div>
-                      )}
-                      {lote.pendenciasVet && lote.pendenciasVet > 0 && (
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Stethoscope className="w-3 h-3 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+        {/* Table */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">
+              Lotes ({lotes.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingData ? (
+              <p className="text-muted-foreground">Carregando...</p>
+            ) : lotes.length === 0 ? (
+              <div className="text-center py-8">
+                <Bird className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum lote encontrado</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Local</TableHead>
+                      <TableHead className="text-center">Aves</TableHead>
+                      <TableHead className="text-center">Idade</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center">Alertas</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lotes.map((lote) => {
+                      const isPostura = isPosturaLote(lote);
+                      return (
+                        <TableRow key={lote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/meus-lotes/${lote.id}`)}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-foreground">{lote.nucleo?.nome || '-'}</p>
+                              <p className="text-xs text-muted-foreground">{lote.galpao?.nome || '-'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {isPostura 
+                                  ? getLinhagemPosturaLabel(lote.linhagem_postura)
+                                  : getLinhagemLabel(lote.linhagem)
+                                }
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div>
+                              <p className="font-medium">{(lote.avesVivas ?? lote.quantidade_aves).toLocaleString('pt-BR')}</p>
+                              <p className="text-xs text-muted-foreground">de {lote.quantidade_aves.toLocaleString('pt-BR')}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {lote.status === 'alojado' ? (
+                              <div>
+                                {isPostura ? (
+                                  <FasePosturaBadge semanasVida={lote.semanasVida || 0} />
+                                ) : (
+                                  <>
+                                    <p className="font-medium">{lote.diasDesdeAlojamento || 0}d</p>
+                                    <p className="text-xs text-muted-foreground">S{lote.semanasVida}</p>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                {formatDate(lote.data_prevista_alojamento)}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(lote.status)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {lote.precisaPesar && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Scale className="w-4 h-4 text-destructive" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Necessita pesagem</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {lote.temSolicitacaoPendente && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Package className="w-4 h-4 text-amber-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Solicitação de ração pendente</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {(lote.pendenciasVet || 0) > 0 && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Stethoscope className="w-4 h-4 text-blue-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>{lote.pendenciasVet} pendência(s) veterinária(s)</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {lote.jejumAtrasado && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <AlertTriangle className="w-4 h-4 text-destructive" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Jejum atrasado!</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {lote.saidaProxima && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Clock className="w-4 h-4 text-amber-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Saída prevista nas próximas 24h</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <ChevronDown className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {lote.status === 'previsao' && (
+                                  <DropdownMenuItem onClick={() => handleAlojar(lote)}>
+                                    <Truck className="w-4 h-4 mr-2" />
+                                    Enviar para Entrega
+                                  </DropdownMenuItem>
+                                )}
+                                {lote.status === 'saiu_para_entrega' && (
+                                  <DropdownMenuItem onClick={() => handleAdm(lote)}>
+                                    <ClipboardCheck className="w-4 h-4 mr-2" />
+                                    Receber Lote
+                                  </DropdownMenuItem>
+                                )}
+                                {lote.status === 'alojado' && !isPostura && (
+                                  <DropdownMenuItem onClick={() => handlePesagem(lote)}>
+                                    <Scale className="w-4 h-4 mr-2" />
+                                    Pesagem
+                                  </DropdownMenuItem>
+                                )}
+                                {lote.status === 'alojado' && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleMortalidade(lote)}>
+                                      <Skull className="w-4 h-4 mr-2" />
+                                      Mortalidade
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleRacao(lote)}>
+                                      <Package className="w-4 h-4 mr-2" />
+                                      Ração
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleNotificacoesVet(lote)}>
+                                      <Stethoscope className="w-4 h-4 mr-2" />
+                                      Veterinário
+                                    </DropdownMenuItem>
+                                    {isPostura && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleProducaoOvos(lote)}>
+                                          <Egg className="w-4 h-4 mr-2" />
+                                          Produção de Ovos
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleMetasPostura(lote)}>
+                                          <Target className="w-4 h-4 mr-2" />
+                                          Metas Postura
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                    {!isPostura && (
+                                      <DropdownMenuItem onClick={() => navigate(`/meus-lotes/${lote.id}/metas`)}>
+                                        <Target className="w-4 h-4 mr-2" />
+                                        Metas
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => handleFechamento(lote)}>
+                                      <Lock className="w-4 h-4 mr-2" />
+                                      Fechar Lote
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                  {/* Location */}
-                  <h3 className="font-semibold text-foreground mb-3 truncate">
-                    {lote.nucleo?.nome} / {lote.galpao?.nome}
-                  </h3>
-
-                  {/* Info Grid */}
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Bird className="w-4 h-4 text-muted-foreground" />
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {(lote.avesVivas ?? lote.quantidadeAlojada ?? lote.quantidade_aves).toLocaleString('pt-BR')} aves
-                        </span>
-                        {lote.quantidadeAlojada && lote.quantidadeAlojada !== lote.quantidade_aves && (
-                          <span className="text-xs text-muted-foreground">
-                            (alojadas: {lote.quantidadeAlojada.toLocaleString('pt-BR')})
-                          </span>
-                        )}
+        {/* Postura Indicators for selected lotes */}
+        {lotes.filter(l => isPosturaLote(l) && l.status === 'alojado' && (l.semanasVida || 0) >= 19).length > 0 && (
+          <Card className="mt-6 bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Egg className="w-5 h-5" />
+                Indicadores de Postura
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {lotes
+                  .filter(l => isPosturaLote(l) && l.status === 'alojado' && (l.semanasVida || 0) >= 19)
+                  .map(lote => (
+                    <div key={lote.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{lote.nucleo?.nome} / {lote.galpao?.nome}</span>
+                        <FasePosturaBadge semanasVida={lote.semanasVida || 0} />
                       </div>
+                      <PosturaIndicators
+                        percentualPostura={lote.percentualPostura}
+                        percentualReferencia={lote.percentualReferencia}
+                        ovosAveAlojada={lote.ovosAveAlojada}
+                        semanasVida={lote.semanasVida || 0}
+                      />
                     </div>
-                    {lote.status === 'alojado' && (
-                      <div className="flex justify-end">
-                        <Badge variant="secondary" className="text-xs">
-                          {lote.diasDesdeAlojamento}d (S{lote.semanasVida})
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </main>
 
+      {/* Dialogs */}
       {selectedLote && (
         <>
           <RecebimentoLoteDialog
@@ -601,13 +810,12 @@ export default function MeusLotes() {
             onOpenChange={setPesagemOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
-            galpaoId={selectedLote.galpao_id}
-            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
-            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
-            diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
-            dataAlojamento={selectedLote.data_alojamento}
+            dataAlojamento={selectedLote.data_alojamento || ''}
+            avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            galpaoId={selectedLote.galpao_id}
             onSuccess={fetchLotes}
           />
           <MortalidadeDialog
@@ -615,8 +823,8 @@ export default function MeusLotes() {
             onOpenChange={setMortalidadeOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
-            dataAlojamento={selectedLote.data_alojamento}
-            quantidadeAves={selectedLote.quantidade_aves}
+            quantidadeAves={selectedLote.avesVivas || selectedLote.quantidade_aves}
+            dataAlojamento={selectedLote.data_alojamento || ''}
             onSuccess={fetchLotes}
           />
           <RacaoLoteDialog
@@ -625,13 +833,13 @@ export default function MeusLotes() {
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
             galpaoId={selectedLote.galpao_id}
-            nucleo={selectedLote.nucleo?.nome || '-'}
-            galpao={selectedLote.galpao?.nome || '-'}
+            nucleo={selectedLote.nucleo?.nome || ''}
+            galpao={selectedLote.galpao?.nome || ''}
             tipoProducao={selectedLote.nucleo?.tipo_producao || null}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
-            diasDesdeAlojamento={selectedLote.diasDesdeAlojamento}
-            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
+            diasDesdeAlojamento={selectedLote.diasDesdeAlojamento || 0}
+            avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
             onSuccess={fetchLotes}
           />
           <NotificacoesVetDialog
@@ -667,7 +875,7 @@ export default function MeusLotes() {
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
             dataAlojamento={selectedLote.data_alojamento || ''}
-            quantidadeAlojada={selectedLote.quantidadeAlojada || selectedLote.quantidade_aves}
+            quantidadeAlojada={selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
             pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
@@ -678,9 +886,9 @@ export default function MeusLotes() {
             onOpenChange={setProducaoOvosOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
-            linhagem={selectedLote.linhagem_postura || ''}
             semanasVida={selectedLote.semanasVida || 0}
-            avesVivas={selectedLote.avesVivas ?? selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
+            avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
+            linhagem={selectedLote.linhagem_postura || ''}
             onSuccess={fetchLotes}
           />
           <MetasPosturaDialog
@@ -690,7 +898,6 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             linhagem={selectedLote.linhagem_postura || ''}
             semanasVida={selectedLote.semanasVida || 0}
-            onSuccess={fetchLotes}
           />
         </>
       )}

@@ -5,7 +5,8 @@ import { Progress } from '@/components/ui/progress';
 import { TachometerGauge } from '@/components/cockpit/TachometerGauge';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
-import { differenceInDays, format, addDays } from 'date-fns';
+import { format, addDays, differenceInDays as differenceInDays2 } from 'date-fns';
+import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Skull, Wheat, TrendingUp, Pill, CalendarCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
@@ -44,8 +45,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
   const [metaPesoSaida, setMetaPesoSaida] = useState<number>(0);
 
   const diasAlojados = useMemo(() => {
-    if (!lote.data_alojamento) return 0;
-    return differenceInDays(new Date(), new Date(lote.data_alojamento));
+    return calcularIdadeLote(lote.data_alojamento);
   }, [lote.data_alojamento]);
 
   const avesAlojadas = lote.quantidade_aves;
@@ -87,8 +87,8 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           mortalidade_alerta: Number(metasData[`mortalidade${suffix}_alerta` as keyof typeof metasData]) || 3,
           ca_ok: Number(metasData[`ca${suffix}_ok` as keyof typeof metasData]) || 1.5,
           ca_alerta: Number(metasData[`ca${suffix}_alerta` as keyof typeof metasData]) || 1.8,
-          consumo_min: Number(metasData[`consumo${suffix}_min` as keyof typeof metasData]) || 100,
-          consumo_max: Number(metasData[`consumo${suffix}_max` as keyof typeof metasData]) || 180,
+          consumo_min: 100, // consumo_min/max columns don't exist in metas_zootecnicas
+          consumo_max: 180,
           carencia_medicamento_minimo: metasData.carencia_medicamento_minimo || 7,
         });
       } else {
@@ -152,7 +152,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           });
           if (totalAves > 0) {
             pesagensProcessed.push({
-              dia: differenceInDays(new Date(p.data_pesagem), new Date(lote.data_alojamento)),
+              dia: differenceInDays2(new Date(p.data_pesagem), new Date(lote.data_alojamento)),
               peso_kg: totalPeso / totalAves,
             });
           }
@@ -178,7 +178,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
         .limit(1);
 
       if (tratamentosData && tratamentosData.length > 0) {
-        const diasDesde = differenceInDays(new Date(), new Date(tratamentosData[0].data_inicio));
+        const diasDesde = differenceInDays2(new Date(), new Date(tratamentosData[0].data_inicio));
         setUltimoTratamentoDias(diasDesde);
         setCarenciaTratamento(tratamentosData[0].carencia_dias || 7);
       } else {
