@@ -135,7 +135,7 @@ const FormulacaoDialog = ({
       }
     }
 
-    toast({ title: "Formulação salva com sucesso!" });
+    toast.success("Formulação salva com sucesso!");
     setLoading(false);
     onOpenChange(false);
   };

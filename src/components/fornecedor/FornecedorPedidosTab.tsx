@@ -114,16 +114,9 @@ export const FornecedorPedidosTab = ({ pedidos, onConfirmar, onEnviar }: Fornece
     setIsUpdating(null);
 
     if (error) {
-      toast({
-        title: 'Erro ao confirmar pedido',
-        description: 'Não foi possível confirmar o pedido.',
-        variant: 'destructive',
-      });
+      toast.error('Erro ao confirmar pedido', { description: 'Não foi possível confirmar o pedido.' });
     } else {
-      toast({
-        title: 'Pedido confirmado',
-        description: 'O cliente foi notificado da confirmação.',
-      });
+      toast.success('Pedido confirmado', { description: 'O cliente foi notificado da confirmação.' });
     }
   };
 
@@ -136,11 +129,7 @@ export const FornecedorPedidosTab = ({ pedidos, onConfirmar, onEnviar }: Fornece
 
   const handleEnviar = async () => {
     if (!selectedPedido || !nfNumero.trim()) {
-      toast({
-        title: 'Número da NF obrigatório',
-        description: 'Informe o número da nota fiscal para registrar o envio.',
-        variant: 'destructive',
-      });
+      toast.error('Número da NF obrigatório', { description: 'Informe o número da nota fiscal para registrar o envio.' });
       return;
     }
 
@@ -150,16 +139,9 @@ export const FornecedorPedidosTab = ({ pedidos, onConfirmar, onEnviar }: Fornece
     setEnvioDialogOpen(false);
 
     if (error) {
-      toast({
-        title: 'Erro ao registrar envio',
-        description: 'Não foi possível registrar o envio.',
-        variant: 'destructive',
-      });
+      toast.error('Erro ao registrar envio', { description: 'Não foi possível registrar o envio.' });
     } else {
-      toast({
-        title: 'Envio registrado',
-        description: `Pedido enviado com NF ${nfNumero}. O cliente foi notificado.`,
-      });
+      toast.success('Envio registrado', { description: `Pedido enviado com NF ${nfNumero}. O cliente foi notificado.` });
     }
   };
 
