@@ -265,7 +265,7 @@ const NutricoesDialog = ({
       fetchNutricoes();
     } catch (error) {
       console.error('Erro ao definir padrão:', error);
-      toast({ title: "Erro ao definir padrão", variant: "destructive" });
+      toast.error("Erro ao definir padrão");
     }
   };
 
