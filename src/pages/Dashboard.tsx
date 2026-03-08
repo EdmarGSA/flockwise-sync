@@ -57,11 +57,7 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar seu perfil.',
-          variant: 'destructive',
-        });
+        toast.error('Erro', { description: 'Não foi possível carregar seu perfil.' });
       } finally {
         setLoading(false);
       }
@@ -70,7 +66,7 @@ const Dashboard = () => {
     if (user) {
       fetchProfile();
     }
-  }, [user, toast]);
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
