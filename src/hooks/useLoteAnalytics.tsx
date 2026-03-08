@@ -107,14 +107,7 @@ export function useLoteAnalytics() {
   const [analytics, setAnalytics] = useState<LoteAnalytics[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
+  // getLinhagemLabel imported from '@/lib/utils/labels'
 
   const getMetasForDia = (metas: MetasZootecnicas | null, dia: number, tipo: 'mortalidade' | 'ca') => {
     if (!metas) return { ok: 0, alerta: 0 };
