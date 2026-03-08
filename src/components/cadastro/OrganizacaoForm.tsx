@@ -190,9 +190,9 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       
       if (data.email) form.setValue('email', data.email.toLowerCase());
       
-      toast({ title: "Dados da empresa preenchidos automaticamente" });
+      toast.success("Dados da empresa preenchidos automaticamente");
     } catch (error) {
-      toast({ title: "Erro ao buscar dados do CNPJ", variant: "destructive" });
+      toast.error("Erro ao buscar dados do CNPJ");
     } finally {
       setLoadingCnpj(false);
     }
