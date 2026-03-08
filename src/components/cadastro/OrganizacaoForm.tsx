@@ -163,7 +163,7 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
       const result = brasilApiSchema.safeParse(rawData);
       
       if (!result.success) {
-        toast({ title: "Dados do CNPJ inválidos", variant: "destructive" });
+        toast.error("Dados do CNPJ inválidos");
         return;
       }
 
