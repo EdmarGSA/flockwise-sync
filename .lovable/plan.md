@@ -1,31 +1,52 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+# Bug: Mortalidade piscando (loop infinito de re-renders)
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+## Causa raiz
 
-### Pendente (baixa prioridade)
+Ambos os hooks `useMortalidadeAlertaLotes` e `useCarenciaAlertaLotes` recebem arrays criados inline como dependências do `useEffect`:
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+```typescript
+// Veterinario.tsx
+const { mortalidadeMap } = useMortalidadeAlertaLotes(
+  lotes.map(l => ({ ... })),  // novo array a cada render
+  integradoId
+);
+const { carenciaMap } = useCarenciaAlertaLotes(
+  lotes.map(l => l.id),       // novo array a cada render
+  integradoId
+);
+```
+
+Dentro dos hooks, o `useEffect` tem `[lotes, ...]` como dependência. Como `.map()` cria uma nova referência a cada render, o efeito dispara, faz `setState`, o que re-renderiza o componente pai, que cria novas referências, e o ciclo se repete infinitamente -- causando o "piscar".
+
+## Correção
+
+**Arquivo: `src/hooks/useMortalidadeAlerta.tsx`**
+- Serializar `loteIds` com `JSON.stringify` e usar como dependência do `useEffect` em vez do array direto.
+
+**Arquivo: `src/hooks/useCarenciaAlerta.tsx`**
+- Mesma abordagem: `JSON.stringify(loteIds)` como dependência.
+
+Exemplo da mudança:
+
+```typescript
+// Antes
+useEffect(() => {
+  if (!lotes.length || !integradoId) return;
+  fetchMortalidade();
+}, [lotes, integradoId]);
+
+// Depois
+const lotesKey = JSON.stringify(lotes.map(l => l.id));
+useEffect(() => {
+  if (!lotes.length || !integradoId) return;
+  fetchMortalidade();
+}, [lotesKey, integradoId]);
+```
+
+| Arquivo | Acao |
+|---|---|
+| `src/hooks/useMortalidadeAlerta.tsx` | Estabilizar dependencia do useEffect |
+| `src/hooks/useCarenciaAlerta.tsx` | Estabilizar dependencia do useEffect |
+
