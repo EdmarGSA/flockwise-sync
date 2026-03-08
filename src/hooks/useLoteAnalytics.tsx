@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInDays, addDays } from 'date-fns';
+import { getLinhagemLabel } from '@/lib/utils/labels';
+import { calcularMortalidadeTotal } from '@/lib/utils/calcularAvesVivas';
 
 export interface LoteAnalytics {
   loteId: string;
