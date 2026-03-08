@@ -886,7 +886,9 @@ export default function MeusLotes() {
             onOpenChange={setProducaoOvosOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
+            semanasVida={selectedLote.semanasVida || 0}
             avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
+            linhagem={selectedLote.linhagem_postura || ''}
             onSuccess={fetchLotes}
           />
           <MetasPosturaDialog
@@ -894,7 +896,8 @@ export default function MeusLotes() {
             onOpenChange={setMetasPosturaOpen}
             loteId={selectedLote.id}
             integradoId={selectedLote.integrado_id}
-            linhagemPostura={selectedLote.linhagem_postura || ''}
+            linhagem={selectedLote.linhagem_postura || ''}
+            semanasVida={selectedLote.semanasVida || 0}
           />
         </>
       )}

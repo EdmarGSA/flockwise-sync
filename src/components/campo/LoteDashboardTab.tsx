@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { TachometerGauge } from '@/components/cockpit/TachometerGauge';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
-import { format, addDays } from 'date-fns';
+import { format, addDays, differenceInDays as differenceInDays2 } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Skull, Wheat, TrendingUp, Pill, CalendarCheck, Loader2, AlertTriangle } from 'lucide-react';
