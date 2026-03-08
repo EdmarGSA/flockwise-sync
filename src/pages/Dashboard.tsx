@@ -84,17 +84,10 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Sucesso',
-        description: 'Perfil atualizado com sucesso!',
-      });
+      toast.success('Sucesso', { description: 'Perfil atualizado com sucesso!' });
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar seu perfil.',
-        variant: 'destructive',
-      });
+      toast.error('Erro', { description: 'Não foi possível atualizar seu perfil.' });
     } finally {
       setSaving(false);
     }
