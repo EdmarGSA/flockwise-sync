@@ -53,8 +53,8 @@ function calcularTotalRecebido(
  * Soma consumo_diario_racao_g de cada dia individualmente (não multiplica fixo).
  */
 async function calcularConsumoIntervalo(
-  linhagem: string,
-  sexo: string,
+  linhagem: 'cobb_500' | 'ross_308' | 'hubbard',
+  sexo: 'macho' | 'femea' | 'misto',
   diaInicio: number,
   diaFim: number,
   avesVivas: number
