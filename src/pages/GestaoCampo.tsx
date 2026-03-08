@@ -221,27 +221,8 @@ export default function GestaoCampo() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-      previsao: { label: 'Previsão', variant: 'outline' },
-      agendado: { label: 'Agendado', variant: 'outline' },
-      alojado: { label: 'Alojado', variant: 'default' },
-      em_producao: { label: 'Em Produção', variant: 'default' },
-      jejum: { label: 'Jejum', variant: 'destructive' },
-      saiu_para_entrega: { label: 'Saiu p/ Entrega', variant: 'secondary' },
-      abatido: { label: 'Abatido', variant: 'secondary' },
-      fechado: { label: 'Fechado', variant: 'secondary' },
-    };
-    const config = variants[status] || { label: status, variant: 'outline' };
+    const config = getStatusBadgeConfig(status);
     return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
   };
 
   const formatDate = (dateStr: string | null) => {
