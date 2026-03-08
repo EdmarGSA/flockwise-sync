@@ -129,7 +129,7 @@ const FormulacaoDialog = ({
         .insert(inserts as any);
 
       if (error) {
-        toast({ title: "Erro ao salvar formulação", variant: "destructive" });
+        toast.error("Erro ao salvar formulação");
         setLoading(false);
         return;
       }
