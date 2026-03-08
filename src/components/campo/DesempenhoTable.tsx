@@ -20,15 +20,6 @@ export function DesempenhoTable({ data, loading, onEdit }: DesempenhoTableProps)
   const [selectedLinhagem, setSelectedLinhagem] = useState<string>('cobb_500');
   const [selectedSexo, setSelectedSexo] = useState<string>('misto');
 
-  const getLinhagemLabel = (linhagem: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[linhagem] || linhagem;
-  };
-
   const getSexoLabel = (sexo: string) => {
     const labels: Record<string, string> = {
       macho: 'Macho',

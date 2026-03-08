@@ -218,23 +218,7 @@ export function FechamentoLoteDialog({
     }
   };
 
-  const getLinhagemLabel = (lin: string) => {
-    const labels: Record<string, string> = {
-      cobb_500: 'Cobb 500',
-      ross_308: 'Ross 308',
-      hubbard: 'Hubbard',
-    };
-    return labels[lin] || lin;
-  };
-
-  const getSexoLabel = (s: string) => {
-    const labels: Record<string, string> = {
-      macho: 'Macho',
-      femea: 'Fêmea',
-      misto: 'Misto',
-    };
-    return labels[s] || s;
-  };
+  // getLinhagemLabel and getSexoLabel imported from '@/lib/utils/labels'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

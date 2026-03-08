@@ -22,6 +22,7 @@ import {
 import { format, differenceInDays, differenceInHours, parseISO, isBefore } from 'date-fns';
 import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import { getStatusBadgeConfig } from '@/lib/utils/labels';
 import { toast } from 'sonner';
 import { RecebimentoLoteDialog } from '@/components/lotes/RecebimentoLoteDialog';
 import { PesagemDialog } from '@/components/lotes/PesagemDialog';

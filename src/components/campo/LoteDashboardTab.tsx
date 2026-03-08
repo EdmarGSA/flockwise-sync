@@ -87,8 +87,8 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           mortalidade_alerta: Number(metasData[`mortalidade${suffix}_alerta` as keyof typeof metasData]) || 3,
           ca_ok: Number(metasData[`ca${suffix}_ok` as keyof typeof metasData]) || 1.5,
           ca_alerta: Number(metasData[`ca${suffix}_alerta` as keyof typeof metasData]) || 1.8,
-          consumo_min: Number(metasData[`consumo${suffix}_min` as keyof typeof metasData]) || 100,
-          consumo_max: Number(metasData[`consumo${suffix}_max` as keyof typeof metasData]) || 180,
+          consumo_min: 100, // consumo_min/max columns don't exist in metas_zootecnicas
+          consumo_max: 180,
           carencia_medicamento_minimo: metasData.carencia_medicamento_minimo || 7,
         });
       } else {

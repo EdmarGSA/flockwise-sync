@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar, Skull } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
+import { getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { useMortalidadeAlertaLotes } from '@/hooks/useMortalidadeAlerta';

@@ -266,10 +266,12 @@ export function useLoteAnalytics() {
 
         // Mortalidade
         const mortalidadeLote = mortalidadeData.filter(m => m.lote_id === lote.id);
-        const mortalidadeTotal = mortalidadeLote.reduce((acc, m) => {
-          const itens = m.mortalidade_itens as { quantidade: number }[] | null;
-          return acc + (itens?.reduce((sum, i) => sum + i.quantidade, 0) || 0);
-        }, 0);
+        const mortalidadeTotal = calcularMortalidadeTotal(
+          mortalidadeLote.map(m => ({ mortalidade_itens: m.mortalidade_itens as { quantidade: number }[] | null }))
+        );
+        // Note: useLoteAnalytics doesn't have recebimento data per lote yet,
+        // so we use quantidade_aves - mortalidadeTotal as approximation.
+        // A future improvement would batch-fetch recebimento_lotes for all loteIds.
         const avesVivas = lote.quantidade_aves - mortalidadeTotal;
         const mortalidadePercent = lote.quantidade_aves > 0 
           ? (mortalidadeTotal / lote.quantidade_aves) * 100 
