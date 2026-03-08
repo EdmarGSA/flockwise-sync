@@ -379,7 +379,7 @@ const NutricoesDialog = ({
         if (itemsError) throw itemsError;
       }
 
-      toast({ title: editingNutricao ? "Nutrição atualizada!" : "Nutrição criada!" });
+      toast.success(editingNutricao ? "Nutrição atualizada!" : "Nutrição criada!");
       setEditingNutricao(null);
       setIsCreating(false);
       fetchNutricoes();
