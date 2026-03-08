@@ -462,6 +462,10 @@ const AppRoutes = () => (
     
     {/* Rastreio público de ovos */}
     <Route path="/rastreio/:lote" element={<RastreioOvos />} />
+
+    {/* Páginas legais públicas */}
+    <Route path="/politica-privacidade" element={<PoliticaPrivacidade />} />
+    <Route path="/termos-uso" element={<TermosUso />} />
     
     {/* Catch-all */}
     <Route path="*" element={<NotFound />} />
