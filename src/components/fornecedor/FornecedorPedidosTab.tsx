@@ -65,7 +65,7 @@ export const FornecedorPedidosTab = ({ pedidos, onConfirmar, onEnviar }: Fornece
   const [loadingItens, setLoadingItens] = useState(false);
   const [nfNumero, setNfNumero] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const { toast } = useToast();
+  
 
   // Aplicar filtros
   const pedidosFiltrados = pedidos.filter(pedido => {

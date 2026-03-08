@@ -10,7 +10,7 @@ import { Eye, EyeOff, Lock, CheckCircle2, XCircle, Shield } from 'lucide-react';
 
 export const FornecedorConfigTab = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
+  
   
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');

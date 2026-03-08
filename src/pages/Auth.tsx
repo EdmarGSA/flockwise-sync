@@ -90,7 +90,7 @@ const Auth = () => {
   
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
 
   const passwordStrength = getPasswordStrength(password);
 

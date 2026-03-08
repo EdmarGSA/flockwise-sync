@@ -15,7 +15,7 @@ const DemoContext = createContext<DemoContextType | undefined>(undefined);
 export const DemoProvider = ({ children }: { children: ReactNode }) => {
   const [isDemo, setIsDemo] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
-  const { toast } = useToast();
+  
 
   // Check if current user is a demo user
   useEffect(() => {
