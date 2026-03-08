@@ -30,7 +30,7 @@ import {
 import { Search, CheckCircle, Truck, Eye, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { PedidoFornecedor } from '@/hooks/useFornecedorData';
 import { supabase } from '@/integrations/supabase/client';
 

@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from 'sonner';
 import ProdutoForm from "@/components/cadastro/ProdutoForm";
 import ProdutoEditForm from "@/components/cadastro/ProdutoEditForm";
 import CategoriaForm from "@/components/cadastro/CategoriaForm";
