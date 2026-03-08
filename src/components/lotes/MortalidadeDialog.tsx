@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format, setHours, setMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -21,13 +21,16 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock, Thermometer, Droplets } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import MortalidadeSemanaDetalheDialog from './MortalidadeSemanaDetalheDialog';
 import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
+import MortalidadeFotoUpload, { FotoMortalidade, uploadMortalidadeFotos } from './MortalidadeFotoUpload';
+import AnaliseIAMortalidadeCard from './AnaliseIAMortalidadeCard';
 
 interface MortalidadeDialogProps {
   open: boolean;
@@ -45,7 +48,7 @@ type SubmotivoEliminacao = 'problema_locomotor' | 'debilitado' | 'deficiente';
 interface MortalidadeItem {
   id: string;
   motivo: MotivoMortalidade;
-  submotivo: SubmotivoEliminacao | null;
+  submotivos: SubmotivoEliminacao[];
   quantidade: number;
   pesoKg: string;
 }
@@ -76,9 +79,11 @@ export function MortalidadeDialog({
   const [dataRegistro, setDataRegistro] = useState<Date>(new Date());
   const [horaRegistro, setHoraRegistro] = useState<string>('08:00');
   const [motivo, setMotivo] = useState<MotivoMortalidade>('natural');
-  const [submotivo, setSubmotivo] = useState<SubmotivoEliminacao>('problema_locomotor');
+  const [submotivos, setSubmotivos] = useState<SubmotivoEliminacao[]>([]);
   const [quantidade, setQuantidade] = useState('');
   const [pesoKg, setPesoKg] = useState('');
+  const [temperaturaC, setTemperaturaC] = useState('');
+  const [umidadePct, setUmidadePct] = useState('');
   const [saving, setSaving] = useState(false);
   const [historicoMortalidade, setHistoricoMortalidade] = useState<MortalidadeSemana[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState(0);
@@ -87,8 +92,9 @@ export function MortalidadeDialog({
     diaInicio: number;
     diaFim: number;
   } | null>(null);
+  const [fotos, setFotos] = useState<FotoMortalidade[]>([]);
+  const [savedMortalidadeId, setSavedMortalidadeId] = useState<string | null>(null);
 
-  // Mapeamento de semana para range de dias
   const getSemanaRange = (semana: number): { diaInicio: number; diaFim: number } => {
     switch (semana) {
       case 7: return { diaInicio: 1, diaFim: 7 };
@@ -101,10 +107,8 @@ export function MortalidadeDialog({
     }
   };
 
-  // Calcular dias desde alojamento - Dia 1 = dia do alojamento
   const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
 
-  // Buscar histórico de mortalidade
   useEffect(() => {
     if (open && loteId && dataAlojamento) {
       const date = new Date(dataAlojamento);
@@ -117,26 +121,16 @@ export function MortalidadeDialog({
   const fetchHistoricoMortalidade = async () => {
     const { data, error } = await supabase
       .from('mortalidade')
-      .select(`
-        data_registro,
-        mortalidade_itens(quantidade)
-      `)
+      .select(`data_registro, mortalidade_itens(quantidade)`)
       .eq('lote_id', loteId);
 
-    if (error) {
-      console.error('Erro ao buscar histórico:', error);
-      return;
-    }
+    if (error) { console.error('Erro ao buscar histórico:', error); return; }
 
-    // Agrupar por semana
     const semanas: Record<number, number> = {};
     let total = 0;
 
     data?.forEach((mortalidade: any) => {
-      // Dia 1 = dia do alojamento, então Dia 7 = fim da semana 1
       const diasDoRegistro = calcularIdadeNaData(dataAlojamento!, mortalidade.data_registro);
-      
-      // Determinar a semana (1-7 = semana 7, 8-14 = semana 14, etc.)
       let semana: number;
       if (diasDoRegistro <= 7) semana = 7;
       else if (diasDoRegistro <= 14) semana = 14;
@@ -153,7 +147,6 @@ export function MortalidadeDialog({
       total += qtdTotal;
     });
 
-    // Criar array de semanas para exibição
     const semanasArray: MortalidadeSemana[] = [7, 14, 21, 28, 35, 42].map(dias => ({
       semana: dias,
       label: dias === 42 ? '42+' : `${dias}d`,
@@ -165,44 +158,60 @@ export function MortalidadeDialog({
     setTotalMortalidade(total);
   };
 
+  const toggleSubmotivo = (sub: SubmotivoEliminacao) => {
+    setSubmotivos(prev =>
+      prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
+    );
+  };
+
   const handleAddItem = () => {
     const qtd = parseInt(quantidade);
     if (isNaN(qtd) || qtd <= 0) {
       toast.error('Informe uma quantidade válida');
       return;
     }
+    if (!pesoKg || parseFloat(pesoKg) <= 0) {
+      toast.error('Informe o peso das aves (obrigatório)');
+      return;
+    }
+    if (motivo === 'eliminado' && submotivos.length === 0) {
+      toast.error('Selecione pelo menos um submotivo');
+      return;
+    }
 
     const newItem: MortalidadeItem = {
       id: crypto.randomUUID(),
       motivo,
-      submotivo: motivo === 'eliminado' ? submotivo : null,
+      submotivos: motivo === 'eliminado' ? [...submotivos] : [],
       quantidade: qtd,
-      pesoKg: pesoKg || '',
+      pesoKg,
     };
 
     setItems([...items, newItem]);
     setQuantidade('');
     setPesoKg('');
+    setSubmotivos([]);
   };
 
   const handleRemoveItem = (id: string) => {
     setItems(items.filter(item => item.id !== id));
   };
 
-  const getTotalNatural = () => {
-    return items.filter(i => i.motivo === 'natural').reduce((acc, i) => acc + i.quantidade, 0);
-  };
+  const getTotalNatural = () => items.filter(i => i.motivo === 'natural').reduce((acc, i) => acc + i.quantidade, 0);
+  const getTotalEliminados = () => items.filter(i => i.motivo === 'eliminado').reduce((acc, i) => acc + i.quantidade, 0);
+  const getTotalGeral = () => items.reduce((acc, i) => acc + i.quantidade, 0);
 
-  const getTotalEliminados = () => {
-    return items.filter(i => i.motivo === 'eliminado').reduce((acc, i) => acc + i.quantidade, 0);
-  };
-
-  const getTotalBySubmotivo = (sub: SubmotivoEliminacao) => {
-    return items.filter(i => i.submotivo === sub).reduce((acc, i) => acc + i.quantidade, 0);
-  };
-
-  const getTotalGeral = () => {
-    return items.reduce((acc, i) => acc + i.quantidade, 0);
+  // Check if foto requirements are met
+  const fotosAtendidas = () => {
+    const motivoTotals: Record<string, number> = {};
+    items.forEach(i => { motivoTotals[i.motivo] = (motivoTotals[i.motivo] || 0) + i.quantidade; });
+    
+    for (const [motivo, qty] of Object.entries(motivoTotals)) {
+      const needed = Math.max(1, Math.ceil(qty * 0.1));
+      const current = fotos.filter(f => f.motivo === motivo).length;
+      if (current < needed) return false;
+    }
+    return true;
   };
 
   const handleSave = async () => {
@@ -210,31 +219,47 @@ export function MortalidadeDialog({
       toast.error('Adicione pelo menos um registro de mortalidade');
       return;
     }
+    if (!fotosAtendidas()) {
+      toast.error('Adicione as fotos obrigatórias (10% por motivo)');
+      return;
+    }
 
     setSaving(true);
 
     try {
-      // Create mortalidade record
       const { data: mortalidadeData, error: mortalidadeError } = await supabase
         .from('mortalidade')
         .insert({
           lote_id: loteId,
           integrado_id: integradoId,
           data_registro: format(dataRegistro, 'yyyy-MM-dd'),
+          temperatura_c: temperaturaC ? parseFloat(temperaturaC) : null,
+          umidade_pct: umidadePct ? parseFloat(umidadePct) : null,
         })
         .select('id')
         .single();
 
       if (mortalidadeError) throw mortalidadeError;
 
-      // Create mortalidade items
-      const mortalidadeItens = items.map(item => ({
-        mortalidade_id: mortalidadeData.id,
-        motivo: item.motivo,
-        submotivo: item.submotivo,
-        quantidade: item.quantidade,
-        peso_kg: item.pesoKg ? parseFloat(item.pesoKg) : null,
-      }));
+      // Save items - one per submotivo for eliminados
+      const mortalidadeItens = items.flatMap(item => {
+        if (item.motivo === 'eliminado' && item.submotivos.length > 0) {
+          return item.submotivos.map(sub => ({
+            mortalidade_id: mortalidadeData.id,
+            motivo: item.motivo,
+            submotivo: sub,
+            quantidade: item.quantidade,
+            peso_kg: parseFloat(item.pesoKg),
+          }));
+        }
+        return [{
+          mortalidade_id: mortalidadeData.id,
+          motivo: item.motivo,
+          submotivo: item.submotivos[0] || null,
+          quantidade: item.quantidade,
+          peso_kg: parseFloat(item.pesoKg),
+        }];
+      });
 
       const { error: itensError } = await supabase
         .from('mortalidade_itens')
@@ -242,9 +267,23 @@ export function MortalidadeDialog({
 
       if (itensError) throw itensError;
 
+      // Upload and save fotos
+      if (fotos.length > 0) {
+        const uploaded = await uploadMortalidadeFotos(fotos, mortalidadeData.id);
+        if (uploaded.length > 0) {
+          const { error: fotosError } = await supabase
+            .from('mortalidade_fotos')
+            .insert(uploaded.map(f => ({
+              mortalidade_id: mortalidadeData.id,
+              motivo: f.motivo,
+              url: f.url,
+            })));
+          if (fotosError) console.error('Erro ao salvar fotos:', fotosError);
+        }
+      }
+
       toast.success('Mortalidade registrada com sucesso!');
-      setItems([]);
-      onOpenChange(false);
+      setSavedMortalidadeId(mortalidadeData.id);
       onSuccess();
     } catch (error) {
       console.error('Erro ao salvar mortalidade:', error);
@@ -261,7 +300,11 @@ export function MortalidadeDialog({
     setQuantidade('');
     setPesoKg('');
     setMotivo('natural');
-    setSubmotivo('problema_locomotor');
+    setSubmotivos([]);
+    setTemperaturaC('');
+    setUmidadePct('');
+    setFotos([]);
+    setSavedMortalidadeId(null);
     onOpenChange(false);
   };
 
@@ -277,7 +320,7 @@ export function MortalidadeDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Painel Informativo - Histórico de Mortalidade */}
+          {/* Histórico */}
           {dataAlojamento && diasDesdeAlojamento > 0 && (
             <Card className="border-amber-500/50 bg-amber-950/20">
               <CardContent className="pt-4">
@@ -290,7 +333,7 @@ export function MortalidadeDialog({
                     const isActive = diasDesdeAlojamento >= (semana.semana === 42 ? 36 : semana.semana - 6);
                     const hasData = semana.quantidade > 0;
                     return (
-                      <div 
+                      <div
                         key={semana.semana}
                         onClick={() => {
                           if (isActive && hasData) {
@@ -328,51 +371,77 @@ export function MortalidadeDialog({
             </Card>
           )}
 
-          {/* Date and Time Picker */}
-          <div className="space-y-2">
-            <Label>Data e Hora do Registro</Label>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "flex-1 justify-start text-left font-normal",
-                      !dataRegistro && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataRegistro ? format(dataRegistro, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataRegistro}
-                    onSelect={(date) => date && setDataRegistro(date)}
-                    disabled={getDateDisabledFunction()}
-                    initialFocus
-                    className="pointer-events-auto"
-                    locale={ptBR}
-                  />
-                  <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
-                    Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <Input
-                type="time"
-                value={horaRegistro}
-                onChange={(e) => setHoraRegistro(e.target.value)}
-                className="w-28"
-              />
+          {/* Date/Time + Environment */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Data e Hora do Registro</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("flex-1 justify-start text-left font-normal", !dataRegistro && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataRegistro ? format(dataRegistro, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataRegistro}
+                      onSelect={(date) => date && setDataRegistro(date)}
+                      disabled={getDateDisabledFunction()}
+                      initialFocus
+                      className="pointer-events-auto"
+                      locale={ptBR}
+                    />
+                    <div className="px-3 pb-3 text-xs text-muted-foreground text-center border-t pt-2">
+                      Limite: até {MAX_RETROACTIVE_DAYS} dias retroativos
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Input type="time" value={horaRegistro} onChange={(e) => setHoraRegistro(e.target.value)} className="w-28" />
+              </div>
+              {isRetroactiveDate(dataRegistro) && (
+                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
+                  <Clock className="w-3 h-3" />
+                  Registro retroativo
+                </Badge>
+              )}
             </div>
-            {isRetroactiveDate(dataRegistro) && (
-              <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1">
-                <Clock className="w-3 h-3" />
-                Registro retroativo
-              </Badge>
-            )}
+
+            {/* Temperature & Humidity */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Thermometer className="w-3.5 h-3.5" />
+                  Temperatura (°C)
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 28.5"
+                  value={temperaturaC}
+                  onChange={(e) => setTemperaturaC(e.target.value)}
+                  step="0.1"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Droplets className="w-3.5 h-3.5" />
+                  Umidade (%)
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 65"
+                  value={umidadePct}
+                  onChange={(e) => setUmidadePct(e.target.value)}
+                  step="1"
+                  min={0}
+                  max={100}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Input Form */}
@@ -381,10 +450,8 @@ export function MortalidadeDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Motivo</Label>
-                  <Select value={motivo} onValueChange={(v) => setMotivo(v as MotivoMortalidade)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={motivo} onValueChange={(v) => { setMotivo(v as MotivoMortalidade); setSubmotivos([]); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="natural">Natural</SelectItem>
                       <SelectItem value="eliminado">Eliminado</SelectItem>
@@ -394,17 +461,19 @@ export function MortalidadeDialog({
 
                 {motivo === 'eliminado' && (
                   <div className="space-y-2">
-                    <Label>Submotivo</Label>
-                    <Select value={submotivo} onValueChange={(v) => setSubmotivo(v as SubmotivoEliminacao)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="problema_locomotor">Problema Locomotor</SelectItem>
-                        <SelectItem value="debilitado">Debilitado</SelectItem>
-                        <SelectItem value="deficiente">Deficiente</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Submotivos *</Label>
+                    <div className="space-y-2 pt-1">
+                      {(Object.entries(SUBMOTIVO_LABELS) as [SubmotivoEliminacao, string][]).map(([key, label]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`sub-${key}`}
+                            checked={submotivos.includes(key)}
+                            onCheckedChange={() => toggleSubmotivo(key)}
+                          />
+                          <label htmlFor={`sub-${key}`} className="text-sm cursor-pointer">{label}</label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -412,24 +481,11 @@ export function MortalidadeDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Quantidade *</Label>
-                  <Input
-                    type="number"
-                    placeholder="Ex: 5"
-                    value={quantidade}
-                    onChange={(e) => setQuantidade(e.target.value)}
-                    min={1}
-                  />
+                  <Input type="number" placeholder="Ex: 5" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} min={1} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Peso (kg) - Opcional</Label>
-                  <Input
-                    type="number"
-                    placeholder="Ex: 1.5"
-                    value={pesoKg}
-                    onChange={(e) => setPesoKg(e.target.value)}
-                    step="0.01"
-                    min={0}
-                  />
+                  <Label>Peso (kg) *</Label>
+                  <Input type="number" placeholder="Ex: 1.5" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} step="0.01" min={0.01} />
                 </div>
               </div>
 
@@ -446,31 +502,18 @@ export function MortalidadeDialog({
               <CardContent className="pt-4">
                 <div className="space-y-2">
                   {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                    >
-                      <div className="flex items-center gap-3">
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <Badge variant={item.motivo === 'natural' ? 'secondary' : 'destructive'}>
                           {item.motivo === 'natural' ? 'Natural' : 'Eliminado'}
                         </Badge>
-                        {item.submotivo && (
-                          <span className="text-sm text-muted-foreground">
-                            {SUBMOTIVO_LABELS[item.submotivo]}
-                          </span>
-                        )}
+                        {item.submotivos.map(sub => (
+                          <span key={sub} className="text-sm text-muted-foreground">{SUBMOTIVO_LABELS[sub]}</span>
+                        ))}
                         <span className="font-semibold">{item.quantidade} aves</span>
-                        {item.pesoKg && (
-                          <span className="text-sm text-muted-foreground">
-                            ({item.pesoKg} kg)
-                          </span>
-                        )}
+                        <span className="text-sm text-muted-foreground">({item.pesoKg} kg)</span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -478,6 +521,16 @@ export function MortalidadeDialog({
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Foto Upload */}
+          {items.length > 0 && (
+            <MortalidadeFotoUpload
+              items={items.map(i => ({ motivo: i.motivo, quantidade: i.quantidade }))}
+              fotos={fotos}
+              onChange={setFotos}
+              disabled={saving}
+            />
           )}
 
           {/* Summary */}
@@ -497,18 +550,15 @@ export function MortalidadeDialog({
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground font-medium mb-1">Detalhamento Eliminados:</p>
-                    <div className="flex justify-between text-xs">
-                      <span>Problema Locomotor:</span>
-                      <span>{getTotalBySubmotivo('problema_locomotor')}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Debilitado:</span>
-                      <span>{getTotalBySubmotivo('debilitado')}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Deficiente:</span>
-                      <span>{getTotalBySubmotivo('deficiente')}</span>
-                    </div>
+                    {(Object.entries(SUBMOTIVO_LABELS) as [SubmotivoEliminacao, string][]).map(([key, label]) => {
+                      const total = items.filter(i => i.submotivos.includes(key)).reduce((acc, i) => acc + i.quantidade, 0);
+                      return (
+                        <div key={key} className="flex justify-between text-xs">
+                          <span>{label}:</span>
+                          <span>{total}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
@@ -522,20 +572,29 @@ export function MortalidadeDialog({
             </Card>
           )}
 
+          {/* AI Analysis (after save) */}
+          {savedMortalidadeId && (
+            <AnaliseIAMortalidadeCard
+              mortalidadeId={savedMortalidadeId}
+              loteId={loteId}
+            />
+          )}
+
           {/* Actions */}
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={handleClose}>
-              Cancelar
+              {savedMortalidadeId ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button onClick={handleSave} disabled={saving || items.length === 0}>
-              {saving ? 'Salvando...' : 'Salvar Mortalidade'}
-            </Button>
+            {!savedMortalidadeId && (
+              <Button onClick={handleSave} disabled={saving || items.length === 0}>
+                {saving ? 'Salvando...' : 'Salvar Mortalidade'}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
 
-    {/* Diálogo de detalhe como irmão (padrão Radix UI) */}
     {dataAlojamento && selectedSemana && (
       <MortalidadeSemanaDetalheDialog
         open={!!selectedSemana}
