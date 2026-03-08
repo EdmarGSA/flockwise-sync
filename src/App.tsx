@@ -61,6 +61,9 @@ import BackofficeCS from "./pages/backoffice/BackofficeCS";
 import BackofficeFerramentas from "./pages/backoffice/BackofficeFerramentas";
 import BackofficeNotificacoes from "./pages/backoffice/BackofficeNotificacoes";
 import NotFound from "./pages/NotFound";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import TermosUso from "./pages/TermosUso";
+import { CookieConsent } from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
 
@@ -459,6 +462,10 @@ const AppRoutes = () => (
     
     {/* Rastreio público de ovos */}
     <Route path="/rastreio/:lote" element={<RastreioOvos />} />
+
+    {/* Páginas legais públicas */}
+    <Route path="/politica-privacidade" element={<PoliticaPrivacidade />} />
+    <Route path="/termos-uso" element={<TermosUso />} />
     
     {/* Catch-all */}
     <Route path="*" element={<NotFound />} />
@@ -474,6 +481,7 @@ const App = () => (
             <DemoBanner />
             <Sonner />
             <AppRoutes />
+            <CookieConsent />
             <PWAInstallPrompt />
           </DemoProvider>
         </AuthProvider>
