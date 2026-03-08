@@ -146,7 +146,7 @@ const CadastroProdutos = () => {
   const handleGrupoSuccess = () => {
     setShowGrupoForm(false);
     fetchData();
-    toast({ title: "Grupo salvo com sucesso!" });
+    toast.success("Grupo salvo com sucesso!");
   };
 
   const handleResetDefaults = async () => {
