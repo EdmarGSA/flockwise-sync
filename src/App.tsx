@@ -481,6 +481,7 @@ const App = () => (
             <DemoBanner />
             <Sonner />
             <AppRoutes />
+            <CookieConsent />
             <PWAInstallPrompt />
           </DemoProvider>
         </AuthProvider>
