@@ -241,10 +241,14 @@ export function useLoteAnalytics() {
 
       // Função para calcular consumo real do silo para um lote
       const getConsumoRealSilo = (loteId: string): number => {
-        // Total de ração recebida
+        // Total de ração recebida (including partially returned, minus devolutions)
         const totalRecebido = solicitacoesData
           .filter(s => s.lote_id === loteId)
-          .reduce((sum, s) => sum + (s.quantidade_recebida_kg || 0), 0);
+          .reduce((sum, s) => {
+            const recebido = (s as any).quantidade_recebida_kg || 0;
+            const devolvido = (s as any).quantidade_devolvida_kg || 0;
+            return sum + recebido - devolvido;
+          }, 0);
         
         // Último nível do silo (já ordenado por created_at desc)
         const ultimoSilo = historicoSiloData.find(h => h.lote_id === loteId);
