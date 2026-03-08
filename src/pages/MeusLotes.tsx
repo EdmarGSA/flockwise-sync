@@ -784,6 +784,7 @@ export default function MeusLotes() {
                         percentualPostura={lote.percentualPostura}
                         percentualReferencia={lote.percentualReferencia}
                         ovosAveAlojada={lote.ovosAveAlojada}
+                        semanasVida={lote.semanasVida || 0}
                       />
                     </div>
                   ))}
