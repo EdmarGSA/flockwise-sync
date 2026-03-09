@@ -39,11 +39,7 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
 
   const errors: string[] = [];
 
-  for (const region of EWELINK_REGIONS) {
-    const baseUrl = region === "cn"
-      ? "https://cn-apia.coolkit.cc"
-      : `https://${region}-apia.coolkit.cc`;
-
+  for (const [regionKey, baseUrl] of Object.entries(EWELINK_REGION_URLS)) {
     // Generate fresh nonce/ts/sign per attempt
     const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
     const ts = Math.floor(Date.now() / 1000);
