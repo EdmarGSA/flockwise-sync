@@ -1,31 +1,32 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+# Ativar Integração IoT — Configurar Segredos eWeLink
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+## Situação Atual
+- Edge functions `sync-sensors` e `sensor-webhook` já estão implementadas
+- Página `/dispositivos-iot` já existe com UI de cadastro e sincronização
+- Tabelas `dispositivos_iot` e `leituras_sensores` já criadas no banco
+- **Faltam os 4 segredos** no backend para autenticar com a eWeLink Cloud API
 
-### Pendente (baixa prioridade)
+## O que será feito
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+### 1. Configurar os 4 segredos no backend
+Solicitar ao usuário a inserção de:
+
+| Segredo | Valor | Onde encontrar |
+|---------|-------|----------------|
+| `EWELINK_APP_ID` | `5nYhS73SiUx8bWY2qfL45otG9tCuIC4a` | Já fornecido pelo console eWeLink |
+| `EWELINK_APP_SECRET` | `****` | Console eWeLink → App → APP SECRET |
+| `EWELINK_EMAIL` | Email da conta eWeLink | Conta usada no app eWeLink |
+| `EWELINK_PASSWORD` | Senha da conta eWeLink | Mesma conta |
+
+### 2. Atualizar edge function `sync-sensors`
+- Corrigir a invocação no frontend (atualmente usa `method: 'GET'` com `body: null`, o que pode causar erro)
+- Passar `integrado_id` como query parameter na chamada
+
+### 3. Verificar config.toml
+- Garantir que `sync-sensors` e `sensor-webhook` estejam com `verify_jwt = false` (webhook recebe chamadas externas)
+
+## Resultado
+Após configurar os segredos, o botão "Sincronizar" na página de Dispositivos IoT buscará as leituras dos Sonoff TH cadastrados na conta eWeLink e exibirá temperatura/umidade em tempo real.
+
