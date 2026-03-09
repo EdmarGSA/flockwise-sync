@@ -64,7 +64,13 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
     }),
   });
 
-  const loginData = await loginRes.json();
+  const loginText = await loginRes.text();
+  let loginData;
+  try {
+    loginData = JSON.parse(loginText);
+  } catch {
+    throw new Error(`eWeLink login returned invalid JSON (status ${loginRes.status}): ${loginText.substring(0, 200)}`);
+  }
   if (loginData.error !== 0) {
     throw new Error(`eWeLink login failed: ${JSON.stringify(loginData)}`);
   }
