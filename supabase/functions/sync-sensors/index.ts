@@ -115,8 +115,17 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action") || "sync";
-    const integradoId = url.searchParams.get("integrado_id");
+    let action = url.searchParams.get("action") || "sync";
+    let integradoId = url.searchParams.get("integrado_id");
+
+    // Also accept from POST body
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        if (body?.action) action = body.action;
+        if (body?.integrado_id) integradoId = body.integrado_id;
+      } catch { /* no body */ }
+    }
 
     if (action === "list-devices") {
       // List all devices from eWeLink account

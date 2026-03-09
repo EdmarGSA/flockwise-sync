@@ -95,8 +95,7 @@ export default function DispositivosIoT() {
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('sync-sensors', {
-        body: null,
-        method: 'GET',
+        body: { action: 'sync', integrado_id: integradoId },
       });
 
       if (error) throw error;
