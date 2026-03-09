@@ -77,36 +77,37 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
       const loginText = await loginRes.text();
 
       if (loginRes.status >= 500) {
-        errors.push(`${region}: HTTP ${loginRes.status}`);
-        continue; // try next region
+        errors.push(`${regionKey}: HTTP ${loginRes.status}`);
+        continue;
       }
 
       let loginData;
       try {
         loginData = JSON.parse(loginText);
       } catch {
-        errors.push(`${region}: invalid JSON (${loginRes.status})`);
+        errors.push(`${regionKey}: invalid JSON (${loginRes.status})`);
         continue;
       }
 
       // error 10004 = wrong region, try next
       if (loginData.error === 10004) {
-        errors.push(`${region}: wrong region`);
+        errors.push(`${regionKey}: wrong region`);
         continue;
       }
 
       if (loginData.error !== 0) {
-        throw new Error(`eWeLink login failed (region ${region}): ${JSON.stringify(loginData)}`);
+        throw new Error(`eWeLink login failed (region ${regionKey}): ${JSON.stringify(loginData)}`);
       }
 
-      console.log(`eWeLink: authenticated via region ${loginData.data?.region || region}`);
+      const resolvedRegion = loginData.data?.region || (regionKey === "dispatcher" ? "us" : regionKey);
+      console.log(`eWeLink: authenticated via region ${resolvedRegion}`);
       return {
         accessToken: loginData.data.at,
-        region: loginData.data.region || region,
+        region: resolvedRegion,
       };
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("eWeLink login failed")) throw err;
-      errors.push(`${region}: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(`${regionKey}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
