@@ -20,7 +20,14 @@ interface EwelinkDevice {
   };
 }
 
-const EWELINK_REGIONS = ["us", "eu", "as", "cn"];
+// Include the dispatcher endpoint (no region prefix) as fallback
+const EWELINK_REGION_URLS: Record<string, string> = {
+  "us": "https://us-apia.coolkit.cc",
+  "eu": "https://eu-apia.coolkit.cc",
+  "as": "https://as-apia.coolkit.cc",
+  "cn": "https://cn-apia.coolkit.cc",
+  "dispatcher": "https://apia.coolkit.cc",
+};
 
 async function getEwelinkToken(appId: string, appSecret: string): Promise<{ accessToken: string; region: string }> {
   const ewelinkEmail = Deno.env.get("EWELINK_EMAIL");
