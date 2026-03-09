@@ -92,7 +92,13 @@ async function getEwelinkDevices(accessToken: string, appId: string, region: str
     },
   });
 
-  const data = await res.json();
+  const devText = await res.text();
+  let data;
+  try {
+    data = JSON.parse(devText);
+  } catch {
+    throw new Error(`eWeLink devices returned invalid JSON (status ${res.status}): ${devText.substring(0, 200)}`);
+  }
   if (data.error !== 0) {
     throw new Error(`eWeLink get devices failed: ${JSON.stringify(data)}`);
   }
