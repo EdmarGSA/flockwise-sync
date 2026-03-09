@@ -96,7 +96,9 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
       }
 
       if (loginData.error !== 0) {
-        throw new Error(`eWeLink login failed (region ${regionKey}): ${JSON.stringify(loginData)}`);
+        // Don't throw on credential errors - collect and continue to try other regions
+        errors.push(`${regionKey}: error ${loginData.error} - ${loginData.msg || 'unknown'}`);
+        continue;
       }
 
       const resolvedRegion = loginData.data?.region || (regionKey === "dispatcher" ? "us" : regionKey);
