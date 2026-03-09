@@ -64,7 +64,13 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
     }),
   });
 
-  const loginData = await loginRes.json();
+  const loginText = await loginRes.text();
+  let loginData;
+  try {
+    loginData = JSON.parse(loginText);
+  } catch {
+    throw new Error(`eWeLink login returned invalid JSON (status ${loginRes.status}): ${loginText.substring(0, 200)}`);
+  }
   if (loginData.error !== 0) {
     throw new Error(`eWeLink login failed: ${JSON.stringify(loginData)}`);
   }
@@ -86,7 +92,13 @@ async function getEwelinkDevices(accessToken: string, appId: string, region: str
     },
   });
 
-  const data = await res.json();
+  const devText = await res.text();
+  let data;
+  try {
+    data = JSON.parse(devText);
+  } catch {
+    throw new Error(`eWeLink devices returned invalid JSON (status ${res.status}): ${devText.substring(0, 200)}`);
+  }
   if (data.error !== 0) {
     throw new Error(`eWeLink get devices failed: ${JSON.stringify(data)}`);
   }
