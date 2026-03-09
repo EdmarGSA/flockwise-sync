@@ -20,25 +20,9 @@ interface EwelinkDevice {
   };
 }
 
+const EWELINK_REGIONS = ["us", "eu", "as", "cn"];
+
 async function getEwelinkToken(appId: string, appSecret: string): Promise<{ accessToken: string; region: string }> {
-  // Step 1: Get nonce
-  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-  const ts = Math.floor(Date.now() / 1000);
-
-  // Generate HMAC-SHA256 sign
-  const signPayload = `${appId}_${ts}_${nonce}`;
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(appSecret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
-  const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
-
-  // Step 2: Login to get token
   const ewelinkEmail = Deno.env.get("EWELINK_EMAIL");
   const ewelinkPassword = Deno.env.get("EWELINK_PASSWORD");
 
@@ -46,39 +30,84 @@ async function getEwelinkToken(appId: string, appSecret: string): Promise<{ acce
     throw new Error("Credenciais EWELINK_EMAIL e EWELINK_PASSWORD não configuradas.");
   }
 
-  const loginRes = await fetch("https://apia.coolkit.cc/v2/user/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CK-Appid": appId,
-      "X-CK-Nonce": nonce,
-      Authorization: `Sign ${sign}`,
-    },
-    body: JSON.stringify({
-      lang: "en",
-      countryCode: "+55",
-      email: ewelinkEmail,
-      password: ewelinkPassword,
-      ts,
-      nonce,
-    }),
-  });
+  const errors: string[] = [];
 
-  const loginText = await loginRes.text();
-  let loginData;
-  try {
-    loginData = JSON.parse(loginText);
-  } catch {
-    throw new Error(`eWeLink login returned invalid JSON (status ${loginRes.status}): ${loginText.substring(0, 200)}`);
-  }
-  if (loginData.error !== 0) {
-    throw new Error(`eWeLink login failed: ${JSON.stringify(loginData)}`);
+  for (const region of EWELINK_REGIONS) {
+    const baseUrl = region === "cn"
+      ? "https://cn-apia.coolkit.cc"
+      : `https://${region}-apia.coolkit.cc`;
+
+    // Generate fresh nonce/ts/sign per attempt
+    const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+    const ts = Math.floor(Date.now() / 1000);
+    const signPayload = `${appId}_${ts}_${nonce}`;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(appSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
+    const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
+
+    try {
+      const loginRes = await fetch(`${baseUrl}/v2/user/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CK-Appid": appId,
+          "X-CK-Nonce": nonce,
+          Authorization: `Sign ${sign}`,
+        },
+        body: JSON.stringify({
+          lang: "en",
+          countryCode: "+55",
+          email: ewelinkEmail,
+          password: ewelinkPassword,
+          ts,
+          nonce,
+        }),
+      });
+
+      const loginText = await loginRes.text();
+
+      if (loginRes.status >= 500) {
+        errors.push(`${region}: HTTP ${loginRes.status}`);
+        continue; // try next region
+      }
+
+      let loginData;
+      try {
+        loginData = JSON.parse(loginText);
+      } catch {
+        errors.push(`${region}: invalid JSON (${loginRes.status})`);
+        continue;
+      }
+
+      // error 10004 = wrong region, try next
+      if (loginData.error === 10004) {
+        errors.push(`${region}: wrong region`);
+        continue;
+      }
+
+      if (loginData.error !== 0) {
+        throw new Error(`eWeLink login failed (region ${region}): ${JSON.stringify(loginData)}`);
+      }
+
+      console.log(`eWeLink: authenticated via region ${loginData.data?.region || region}`);
+      return {
+        accessToken: loginData.data.at,
+        region: loginData.data.region || region,
+      };
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("eWeLink login failed")) throw err;
+      errors.push(`${region}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
-  return {
-    accessToken: loginData.data.at,
-    region: loginData.data.region || "us",
-  };
+  throw new Error(`eWeLink login failed on all regions: ${errors.join("; ")}`);
 }
 
 async function getEwelinkDevices(accessToken: string, appId: string, region: string): Promise<EwelinkDevice[]> {
