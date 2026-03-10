@@ -1340,6 +1340,42 @@ export type Database = {
           },
         ]
       }
+      ewelink_tokens: {
+        Row: {
+          access_token: string
+          at_expired_at: string
+          created_at: string
+          id: string
+          integrado_id: string
+          refresh_token: string
+          region: string
+          rt_expired_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          at_expired_at: string
+          created_at?: string
+          id?: string
+          integrado_id: string
+          refresh_token: string
+          region?: string
+          rt_expired_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          at_expired_at?: string
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          refresh_token?: string
+          region?: string
+          rt_expired_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fases_animal: {
         Row: {
           ativo: boolean
