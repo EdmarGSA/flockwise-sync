@@ -128,19 +128,12 @@ export default function DispositivosIoT() {
 
   const handleConnectEwelink = async () => {
     if (!integradoId) return;
-    // Fetch App ID from edge function
     try {
-      const { data, error } = await supabase.functions.invoke('ewelink-oauth-callback', {
-        body: {},
-        method: 'GET',
-      });
-      // Use the known App ID approach - fetch from config endpoint
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
       const nonce = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
       const state = integradoId;
 
-      // Get App ID via a simple config endpoint
       const configRes = await fetch(`${supabaseUrl}/functions/v1/sync-sensors?action=config`);
       const configData = await configRes.json();
       const appId = configData?.appId;
