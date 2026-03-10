@@ -126,16 +126,34 @@ export default function DispositivosIoT() {
     setLoading(false);
   };
 
-  const handleConnectEwelink = () => {
+  const handleConnectEwelink = async () => {
     if (!integradoId) return;
-    const appId = import.meta.env.VITE_EWELINK_APP_ID || '';
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
-    const nonce = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
-    const state = integradoId; // Pass integrado_id as state
+    // Fetch App ID from edge function
+    try {
+      const { data, error } = await supabase.functions.invoke('ewelink-oauth-callback', {
+        body: {},
+        method: 'GET',
+      });
+      // Use the known App ID approach - fetch from config endpoint
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
+      const nonce = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
+      const state = integradoId;
 
-    const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}`;
-    window.location.href = oauthUrl;
+      // Get App ID via a simple config endpoint
+      const configRes = await fetch(`${supabaseUrl}/functions/v1/sync-sensors?action=config`);
+      const configData = await configRes.json();
+      const appId = configData?.appId;
+      if (!appId) {
+        toast.error('App ID eWeLink não configurado');
+        return;
+      }
+
+      const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}`;
+      window.location.href = oauthUrl;
+    } catch {
+      toast.error('Erro ao iniciar conexão eWeLink');
+    }
   };
 
   const handleDisconnectEwelink = async () => {
