@@ -20,100 +20,83 @@ interface EwelinkDevice {
   };
 }
 
-// Include the dispatcher endpoint (no region prefix) as fallback
-const EWELINK_REGION_URLS: Record<string, string> = {
-  "us": "https://us-apia.coolkit.cc",
-  "eu": "https://eu-apia.coolkit.cc",
-  "as": "https://as-apia.coolkit.cc",
-  "cn": "https://cn-apia.coolkit.cc",
-  "dispatcher": "https://apia.coolkit.cc",
-};
+interface TokenRecord {
+  id: string;
+  integrado_id: string;
+  access_token: string;
+  refresh_token: string;
+  at_expired_at: string;
+  rt_expired_at: string;
+  region: string;
+}
 
-async function getEwelinkToken(appId: string, appSecret: string): Promise<{ accessToken: string; region: string }> {
-  const ewelinkEmail = Deno.env.get("EWELINK_EMAIL");
-  const ewelinkPassword = Deno.env.get("EWELINK_PASSWORD");
+async function refreshAccessToken(
+  supabase: any,
+  token: TokenRecord,
+  appId: string,
+  appSecret: string
+): Promise<string> {
+  const now = new Date();
+  const atExpiry = new Date(token.at_expired_at);
 
-  if (!ewelinkEmail || !ewelinkPassword) {
-    throw new Error("Credenciais EWELINK_EMAIL e EWELINK_PASSWORD não configuradas.");
+  // Token still valid
+  if (now < atExpiry) {
+    return token.access_token;
   }
 
-  const errors: string[] = [];
-
-  for (const [regionKey, baseUrl] of Object.entries(EWELINK_REGION_URLS)) {
-    // Generate fresh nonce/ts/sign per attempt
-    const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-    const ts = Math.floor(Date.now() / 1000);
-    const signPayload = `${appId}_${ts}_${nonce}`;
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(appSecret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
-    const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
-
-    try {
-      const loginRes = await fetch(`${baseUrl}/v2/user/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CK-Appid": appId,
-          "X-CK-Nonce": nonce,
-          Authorization: `Sign ${sign}`,
-        },
-        body: JSON.stringify({
-          lang: "en",
-          countryCode: "+55",
-          email: ewelinkEmail,
-          password: ewelinkPassword,
-          ts,
-          nonce,
-        }),
-      });
-
-      const loginText = await loginRes.text();
-
-      if (loginRes.status >= 500) {
-        errors.push(`${regionKey}: HTTP ${loginRes.status}`);
-        continue;
-      }
-
-      let loginData;
-      try {
-        loginData = JSON.parse(loginText);
-      } catch {
-        errors.push(`${regionKey}: invalid JSON (${loginRes.status})`);
-        continue;
-      }
-
-      // error 10004 = wrong region, try next
-      if (loginData.error === 10004) {
-        errors.push(`${regionKey}: wrong region`);
-        continue;
-      }
-
-      if (loginData.error !== 0) {
-        // Don't throw on credential errors - collect and continue to try other regions
-        errors.push(`${regionKey}: error ${loginData.error} - ${loginData.msg || 'unknown'}`);
-        continue;
-      }
-
-      const resolvedRegion = loginData.data?.region || (regionKey === "dispatcher" ? "us" : regionKey);
-      console.log(`eWeLink: authenticated via region ${resolvedRegion}`);
-      return {
-        accessToken: loginData.data.at,
-        region: resolvedRegion,
-      };
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith("eWeLink login failed")) throw err;
-      errors.push(`${regionKey}: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  // Check if refresh token is still valid
+  const rtExpiry = new Date(token.rt_expired_at);
+  if (now >= rtExpiry) {
+    throw new Error("REAUTH_REQUIRED");
   }
 
-  throw new Error(`eWeLink login failed on all regions: ${errors.join("; ")}`);
+  // Refresh the token
+  const regionUrl = `https://${token.region}-apia.coolkit.cc`;
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+  const ts = Math.floor(Date.now() / 1000);
+  const signPayload = `${appId}_${ts}_${nonce}`;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
+  const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
+
+  const res = await fetch(`${regionUrl}/v2/user/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CK-Appid": appId,
+      "X-CK-Nonce": nonce,
+      Authorization: `Sign ${sign}`,
+    },
+    body: JSON.stringify({ rt: token.refresh_token }),
+  });
+
+  const data = await res.json();
+  if (data.error !== 0) {
+    throw new Error(`Token refresh failed: ${data.msg || data.error}`);
+  }
+
+  const newAtExpiry = new Date(now.getTime() + (data.data.atExpiredTime || 86400) * 1000);
+  const newRtExpiry = new Date(now.getTime() + (data.data.rtExpiredTime || 5184000) * 1000);
+
+  await supabase
+    .from("ewelink_tokens")
+    .update({
+      access_token: data.data.at,
+      refresh_token: data.data.rt,
+      at_expired_at: newAtExpiry.toISOString(),
+      rt_expired_at: newRtExpiry.toISOString(),
+    })
+    .eq("id", token.id);
+
+  console.log("eWeLink token refreshed successfully");
+  return data.data.at;
 }
 
 async function getEwelinkDevices(accessToken: string, appId: string, region: string): Promise<EwelinkDevice[]> {
@@ -127,12 +110,12 @@ async function getEwelinkDevices(accessToken: string, appId: string, region: str
     },
   });
 
-  const devText = await res.text();
+  const text = await res.text();
   let data;
   try {
-    data = JSON.parse(devText);
+    data = JSON.parse(text);
   } catch {
-    throw new Error(`eWeLink devices returned invalid JSON (status ${res.status}): ${devText.substring(0, 200)}`);
+    throw new Error(`eWeLink devices returned invalid JSON (status ${res.status})`);
   }
   if (data.error !== 0) {
     throw new Error(`eWeLink get devices failed: ${JSON.stringify(data)}`);
@@ -156,7 +139,7 @@ Deno.serve(async (req) => {
 
     if (!appId || !appSecret) {
       return new Response(
-        JSON.stringify({ error: "Credenciais eWeLink não configuradas. Configure EWELINK_APP_ID e EWELINK_APP_SECRET." }),
+        JSON.stringify({ error: "Credenciais eWeLink não configuradas." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -165,7 +148,6 @@ Deno.serve(async (req) => {
     let action = url.searchParams.get("action") || "sync";
     let integradoId = url.searchParams.get("integrado_id");
 
-    // Also accept from POST body
     if (req.method === "POST") {
       try {
         const body = await req.json();
@@ -174,11 +156,47 @@ Deno.serve(async (req) => {
       } catch { /* no body */ }
     }
 
-    if (action === "list-devices") {
-      // List all devices from eWeLink account
-      const { accessToken, region } = await getEwelinkToken(appId, appSecret);
-      const devices = await getEwelinkDevices(accessToken, appId, region);
+    if (!integradoId) {
+      return new Response(
+        JSON.stringify({ error: "integrado_id é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
+    // Get stored OAuth token
+    const { data: tokenRecord, error: tokenError } = await supabase
+      .from("ewelink_tokens")
+      .select("*")
+      .eq("integrado_id", integradoId)
+      .maybeSingle();
+
+    if (tokenError || !tokenRecord) {
+      return new Response(
+        JSON.stringify({ error: "NOT_CONNECTED", message: "Conta eWeLink não conectada. Clique em 'Conectar eWeLink' primeiro." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get valid access token (auto-refresh if needed)
+    let accessToken: string;
+    try {
+      accessToken = await refreshAccessToken(supabase, tokenRecord as TokenRecord, appId, appSecret);
+    } catch (err) {
+      if (err instanceof Error && err.message === "REAUTH_REQUIRED") {
+        // Delete expired token
+        await supabase.from("ewelink_tokens").delete().eq("id", tokenRecord.id);
+        return new Response(
+          JSON.stringify({ error: "REAUTH_REQUIRED", message: "Token expirado. Reconecte sua conta eWeLink." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw err;
+    }
+
+    const region = tokenRecord.region || "us";
+
+    if (action === "list-devices") {
+      const devices = await getEwelinkDevices(accessToken, appId, region);
       const sensorDevices = devices
         .filter((d) => d.itemType === 1 || d.itemType === 2)
         .map((d) => ({
@@ -196,26 +214,19 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync") {
-      // Sync readings for all registered devices
-      const { accessToken, region } = await getEwelinkToken(appId, appSecret);
       const ewelinkDevices = await getEwelinkDevices(accessToken, appId, region);
-
-      // Build map: deviceId -> params
       const deviceMap = new Map<string, EwelinkDevice["itemData"]["params"]>();
       for (const d of ewelinkDevices) {
         deviceMap.set(d.itemData.deviceid, d.itemData.params);
       }
 
-      // Get registered devices from DB
-      let query = supabase.from("dispositivos_iot").select("*").eq("ativo", true);
-      if (integradoId) {
-        query = query.eq("integrado_id", integradoId);
-      }
-      const { data: dbDevices, error: dbError } = await query;
+      const { data: dbDevices, error: dbError } = await supabase
+        .from("dispositivos_iot")
+        .select("*")
+        .eq("ativo", true)
+        .eq("integrado_id", integradoId);
 
-      if (dbError) {
-        throw new Error(`DB error: ${dbError.message}`);
-      }
+      if (dbError) throw new Error(`DB error: ${dbError.message}`);
 
       const readings = [];
       for (const dev of dbDevices || []) {
@@ -226,7 +237,6 @@ Deno.serve(async (req) => {
         const hum = params.currentHumidity ? parseFloat(params.currentHumidity) : null;
         const online = params.online ?? false;
 
-        // Insert reading
         const { error: insertErr } = await supabase.from("leituras_sensores").insert({
           dispositivo_id: dev.id,
           temperatura_c: temp,
@@ -239,7 +249,6 @@ Deno.serve(async (req) => {
           readings.push({ device: dev.nome, temp, hum, online });
         }
 
-        // Update ultimo_sync
         await supabase
           .from("dispositivos_iot")
           .update({ ultimo_sync: new Date().toISOString() })
