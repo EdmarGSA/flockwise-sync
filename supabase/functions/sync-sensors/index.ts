@@ -156,6 +156,14 @@ Deno.serve(async (req) => {
       } catch { /* no body */ }
     }
 
+    // Return public App ID for OAuth flow
+    if (action === "config") {
+      return new Response(
+        JSON.stringify({ appId }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!integradoId) {
       return new Response(
         JSON.stringify({ error: "integrado_id é obrigatório" }),
