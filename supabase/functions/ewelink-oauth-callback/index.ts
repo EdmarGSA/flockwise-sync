@@ -14,10 +14,11 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state"); // contains integrado_id
-    const redirectUrl = url.searchParams.get("redirectUrl") || url.searchParams.get("redirect_url");
 
     if (!code) {
-      return new Response("Missing authorization code", { status: 400 });
+      return new Response(buildHtmlResponse(false, "Missing authorization code"), {
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
     const appId = Deno.env.get("EWELINK_APP_ID")!;
@@ -25,7 +26,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // The actual redirect URL used during the OAuth flow (this function's URL)
     const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
 
     // Exchange code for tokens - try multiple regions
@@ -38,7 +38,6 @@ Deno.serve(async (req) => {
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
       const ts = Math.floor(Date.now() / 1000);
 
-      // HMAC sign
       const signPayload = `${appId}_${ts}_${nonce}`;
       const encoder = new TextEncoder();
       const key = await crypto.subtle.importKey(
@@ -72,50 +71,39 @@ Deno.serve(async (req) => {
         try {
           data = JSON.parse(text);
         } catch {
-          console.log(`${region}: invalid JSON`);
           continue;
         }
 
-        if (data.error === 10004) {
-          // Wrong region
-          continue;
-        }
-
-        if (data.error !== 0) {
-          console.log(`${region}: error ${data.error} - ${data.msg}`);
-          continue;
-        }
+        if (data.error === 10004) continue;
+        if (data.error !== 0) continue;
 
         tokenData = data.data;
         resolvedRegion = tokenData.region || region;
         break;
-      } catch (err) {
-        console.log(`${region}: ${err}`);
+      } catch {
         continue;
       }
     }
 
     if (!tokenData) {
-      // Redirect back with error
-      const appUrl = redirectUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/configuracoes/dispositivos-iot`;
-      return Response.redirect(`${appUrl}?ewelink_error=token_exchange_failed`, 302);
+      return new Response(buildHtmlResponse(false, "Falha ao trocar código por token"), {
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
-    // Store tokens in DB using service role
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Parse state to get integrado_id
     const integradoId = state;
     if (!integradoId) {
-      return new Response("Missing state (integrado_id)", { status: 400 });
+      return new Response(buildHtmlResponse(false, "Missing state (integrado_id)"), {
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
-    // Calculate expiration timestamps
     const now = new Date();
     const atExpiry = new Date(now.getTime() + (tokenData.atExpiredTime || 86400) * 1000);
     const rtExpiry = new Date(now.getTime() + (tokenData.rtExpiredTime || 5184000) * 1000);
 
-    // Upsert token
     const { error: dbError } = await supabase
       .from("ewelink_tokens")
       .upsert({
@@ -129,19 +117,36 @@ Deno.serve(async (req) => {
 
     if (dbError) {
       console.error("DB error storing tokens:", dbError);
-      return new Response(`DB error: ${dbError.message}`, { status: 500 });
+      return new Response(buildHtmlResponse(false, `Erro ao salvar: ${dbError.message}`), {
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
     console.log(`eWeLink OAuth: tokens stored for integrado ${integradoId}, region ${resolvedRegion}`);
 
-    // Redirect back to the app
-    const appBaseUrl = Deno.env.get("APP_URL") || "https://flockwise-sync.lovable.app";
-    return Response.redirect(`${appBaseUrl}/configuracoes/dispositivos-iot?ewelink_connected=true`, 302);
+    return new Response(buildHtmlResponse(true), {
+      headers: { "Content-Type": "text/html" },
+    });
   } catch (error) {
     console.error("OAuth callback error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(buildHtmlResponse(false, error instanceof Error ? error.message : "Erro interno"), {
+      headers: { "Content-Type": "text/html" },
+    });
   }
 });
+
+function buildHtmlResponse(success: boolean, errorMsg?: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><title>eWeLink OAuth</title></head>
+<body>
+<p>${success ? "Conectado com sucesso! Fechando..." : `Erro: ${errorMsg}`}</p>
+<script>
+  if (window.opener) {
+    window.opener.postMessage({ type: "ewelink-oauth-complete", success: ${success} }, "*");
+  }
+  setTimeout(function() { window.close(); }, 1500);
+</script>
+</body>
+</html>`;
+}

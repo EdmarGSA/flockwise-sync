@@ -126,6 +126,22 @@ export default function DispositivosIoT() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'ewelink-oauth-complete') {
+        if (event.data.success) {
+          toast.success('Conta eWeLink conectada com sucesso!');
+          setEwelinkConnected(true);
+          fetchData();
+        } else {
+          toast.error('Erro ao conectar conta eWeLink. Tente novamente.');
+        }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const handleConnectEwelink = async () => {
     if (!integradoId) return;
     try {
@@ -143,7 +159,10 @@ export default function DispositivosIoT() {
       }
 
       const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}`;
-      window.location.href = oauthUrl;
+      const popup = window.open(oauthUrl, 'ewelink-oauth', 'width=600,height=700');
+      if (!popup) {
+        toast.error('Permita popups neste site para conectar o eWeLink.');
+      }
     } catch {
       toast.error('Erro ao iniciar conexão eWeLink');
     }
