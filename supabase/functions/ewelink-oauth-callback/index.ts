@@ -37,9 +37,12 @@ Deno.serve(async (req) => {
     for (const region of regions) {
       const regionUrl = `https://${region}-apia.coolkit.cc`;
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-      const ts = Math.floor(Date.now() / 1000);
+      const tokenBody = {
+        code,
+        redirectUrl: callbackUrl,
+        grantType: "authorization_code",
+      };
 
-      const signPayload = `${appId}_${ts}_${nonce}`;
       const encoder = new TextEncoder();
       const key = await crypto.subtle.importKey(
         "raw",
@@ -48,7 +51,7 @@ Deno.serve(async (req) => {
         false,
         ["sign"]
       );
-      const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
+      const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(JSON.stringify(tokenBody)));
       const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
       try {
@@ -61,11 +64,7 @@ Deno.serve(async (req) => {
             "X-CK-Nonce": nonce,
             Authorization: `Sign ${sign}`,
           },
-          body: JSON.stringify({
-            code,
-            redirectUrl: callbackUrl,
-            grantType: "authorization_code",
-          }),
+          body: JSON.stringify(tokenBody),
         });
 
         const text = await res.text();

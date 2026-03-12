@@ -53,8 +53,7 @@ async function refreshAccessToken(
   // Refresh the token
   const regionUrl = `https://${token.region}-apia.coolkit.cc`;
   const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-  const ts = Math.floor(Date.now() / 1000);
-  const signPayload = `${appId}_${ts}_${nonce}`;
+  const body = { rt: token.refresh_token };
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -63,7 +62,7 @@ async function refreshAccessToken(
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(JSON.stringify(body)));
   const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
   const res = await fetch(`${regionUrl}/v2/user/refresh`, {
@@ -74,7 +73,7 @@ async function refreshAccessToken(
       "X-CK-Nonce": nonce,
       Authorization: `Sign ${sign}`,
     },
-    body: JSON.stringify({ rt: token.refresh_token }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();
