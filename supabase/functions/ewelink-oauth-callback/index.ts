@@ -29,9 +29,10 @@ Deno.serve(async (req) => {
     const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
 
     // Exchange code for tokens - try multiple regions
-    const regions = ["us", "eu", "as"];
+    const regions = ["us", "eu", "as", "cn"];
     let tokenData: any = null;
     let resolvedRegion = "us";
+    const lastErrors: string[] = [];
 
     for (const region of regions) {
       const regionUrl = `https://${region}-apia.coolkit.cc`;
@@ -51,6 +52,7 @@ Deno.serve(async (req) => {
       const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
       try {
+        console.log(`[oauth-callback] Trying region ${region}...`);
         const res = await fetch(`${regionUrl}/v2/user/oauth/token`, {
           method: "POST",
           headers: {
@@ -67,22 +69,36 @@ Deno.serve(async (req) => {
         });
 
         const text = await res.text();
+        console.log(`[oauth-callback] Region ${region} response (${res.status}): ${text.substring(0, 500)}`);
         let data;
         try {
           data = JSON.parse(text);
         } catch {
+          lastErrors.push(`${region}: invalid JSON`);
           continue;
         }
 
-        if (data.error === 10004) continue;
-        if (data.error !== 0) continue;
+        if (data.error === 10004) {
+          lastErrors.push(`${region}: wrong region (10004)`);
+          continue;
+        }
+        if (data.error !== 0) {
+          lastErrors.push(`${region}: error ${data.error} - ${data.msg || JSON.stringify(data)}`);
+          continue;
+        }
 
         tokenData = data.data;
         resolvedRegion = tokenData.region || region;
+        console.log(`[oauth-callback] Token obtained from region ${resolvedRegion}`);
         break;
-      } catch {
+      } catch (e) {
+        lastErrors.push(`${region}: fetch error - ${e instanceof Error ? e.message : String(e)}`);
         continue;
       }
+    }
+
+    if (!tokenData) {
+      console.error("[oauth-callback] All regions failed:", lastErrors);
     }
 
     if (!tokenData) {
