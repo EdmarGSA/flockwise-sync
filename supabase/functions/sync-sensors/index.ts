@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "Ação inválida. Use action=list-devices ou action=sync" }),
+      JSON.stringify({ error: "Ação inválida. Use action=oauth-url, list-devices ou sync" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
