@@ -1,66 +1,31 @@
 
-Diagnóstico (com base no código + docs eWeLink que você enviou)
+## Checklist Geral — Correções Aplicadas
 
-1) O fluxo atual monta a URL OAuth sem dois parâmetros obrigatórios da eWeLink:
-- `seq` (timestamp em ms)
-- `authorization` (assinatura HMAC-SHA256 de `clientId_seq` com `APP_SECRET`)
+### ✅ Corrigido
 
-2) No `src/pages/DispositivosIoT.tsx`, hoje a URL é:
-- `clientId`, `redirectUrl`, `grantType`, `state`, `nonce`
-- faltam `seq` e `authorization`
+1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
+2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
+3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
+4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
+5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
+6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
+7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
+8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
+9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
+10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
+11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
+12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
+13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
+14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
+15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
+16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
 
-3) Isso explica exatamente o sintoma de “fica rodando e não loga” na tela `c2ccdn.coolkit.cc/oauth/index.html`: a página abre, mas a autorização não conclui por falta de assinatura válida.
+### Pendente (baixa prioridade)
 
-Plano de correção
-
-1. Gerar URL OAuth assinada no backend (não no frontend)
-- Arquivo: `supabase/functions/sync-sensors/index.ts`
-- Adicionar um novo action, por exemplo `action=oauth-url`, que:
-  - lê `EWELINK_APP_ID` e `EWELINK_APP_SECRET`
-  - gera `seq = Date.now().toString()`
-  - calcula `authorization = base64(HMAC_SHA256(appSecret, appId + "_" + seq))`
-  - gera `nonce` alfanumérico de 8 chars
-  - monta e retorna a URL completa:
-    - `clientId`
-    - `seq`
-    - `authorization`
-    - `redirectUrl`
-    - `grantType=authorization_code`
-    - `state` (integrado_id)
-    - `nonce`
-    - `showQRCode=false` (força login por usuário/senha, evitando variações de UI)
-- Manter `action=config` compatível, mas o frontend passará a usar `oauth-url`.
-
-2. Ajustar frontend para usar a URL assinada
-- Arquivo: `src/pages/DispositivosIoT.tsx`
-- Em `handleConnectEwelink`:
-  - substituir fetch manual de `action=config` + montagem local da URL
-  - chamar `supabase.functions.invoke('sync-sensors', { body: { action: 'oauth-url', integrado_id } })`
-  - abrir popup com a URL retornada
-- Manter listener `postMessage` já existente para concluir conexão.
-- Melhorar UX:
-  - se popup for bloqueado, mensagem clara
-  - se popup fechar sem sucesso, exibir aviso de cancelamento/falha
-
-3. Pequeno hardening de robustez
-- Em `sync-sensors`, atualizar mensagem de erro de action inválida para incluir `oauth-url`.
-- Opcional: incluir `callback_url` fixo vindo do backend (fonte única da verdade), para evitar qualquer divergência futura de redirect.
-
-Validação após implementação (fim a fim)
-
-1) Na tela `/configuracoes/dispositivos-iot`, clicar “Conectar eWeLink”.
-2) Confirmar que o popup abre com URL contendo `seq` e `authorization`.
-3) Fazer login no popup.
-4) Confirmar redirecionamento ao callback + fechamento automático da janela.
-5) Confirmar toast de sucesso e card “Conta eWeLink conectada”.
-6) Validar que existe registro em `ewelink_tokens` para o `integrado_id`.
-7) Clicar “Sincronizar” e verificar leituras.
-
-Detalhes técnicos (resumo)
-
-- Fórmula exigida pela doc eWeLink para a página OAuth:
-  - `authorization = Base64(HMAC_SHA256(APP_SECRET, APP_ID + "_" + seq))`
-- Parâmetros obrigatórios na URL OAuth:
-  - `clientId`, `seq`, `authorization`, `redirectUrl`, `grantType`, `state`, `nonce`
-- Motivo para assinar no backend:
-  - não expor `APP_SECRET` no navegador.
+- Remover auth checks redundantes das demais ~14 páginas
+- Otimizar N+1 queries em GestaoProducaoTab
+- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
+- Limpar `as any` em RPCs
+- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
+- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
+- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)

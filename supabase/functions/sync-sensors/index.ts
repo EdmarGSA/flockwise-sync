@@ -156,10 +156,44 @@ Deno.serve(async (req) => {
       } catch { /* no body */ }
     }
 
-    // Return public App ID for OAuth flow
+    // Return public App ID for OAuth flow (legacy)
     if (action === "config") {
       return new Response(
         JSON.stringify({ appId }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Generate signed OAuth URL (backend-only, keeps APP_SECRET safe)
+    if (action === "oauth-url") {
+      if (!integradoId) {
+        return new Response(
+          JSON.stringify({ error: "integrado_id é obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const seq = Date.now().toString();
+      const signPayload = `${appId}_${seq}`;
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(appSecret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signPayload));
+      const authorization = btoa(String.fromCharCode(...new Uint8Array(sig)));
+
+      const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
+
+      const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&seq=${seq}&authorization=${encodeURIComponent(authorization)}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${integradoId}&nonce=${nonce}`;
+
+      return new Response(
+        JSON.stringify({ url: oauthUrl }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -270,7 +304,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "Ação inválida. Use action=list-devices ou action=sync" }),
+      JSON.stringify({ error: "Ação inválida. Use action=oauth-url, list-devices ou sync" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

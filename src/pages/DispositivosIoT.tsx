@@ -145,21 +145,16 @@ export default function DispositivosIoT() {
   const handleConnectEwelink = async () => {
     if (!integradoId) return;
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
-      const nonce = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
-      const state = integradoId;
+      const { data, error } = await supabase.functions.invoke('sync-sensors', {
+        body: { action: 'oauth-url', integrado_id: integradoId },
+      });
 
-      const configRes = await fetch(`${supabaseUrl}/functions/v1/sync-sensors?action=config`);
-      const configData = await configRes.json();
-      const appId = configData?.appId;
-      if (!appId) {
-        toast.error('App ID eWeLink não configurado');
+      if (error || !data?.url) {
+        toast.error('Erro ao gerar URL de autorização eWeLink');
         return;
       }
 
-      const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}`;
-      const popup = window.open(oauthUrl, 'ewelink-oauth', 'width=600,height=700');
+      const popup = window.open(data.url, 'ewelink-oauth', 'width=600,height=700');
       if (!popup) {
         toast.error('Permita popups neste site para conectar o eWeLink.');
       }
