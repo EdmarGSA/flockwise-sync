@@ -1,31 +1,81 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Login Direto eWeLink (email + senha por integrado)
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+### Conceito
 
-### Pendente (baixa prioridade)
+Cada integrado informa o **email e senha** da conta eWeLink onde seus dispositivos estão pareados. O sistema faz login via API (`POST /v2/user/login`) e armazena o token por integrado. Na sincronização, o sistema usa o token de cada integrado para buscar seus dispositivos.
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+### Mudanças
+
+#### 1. `sync-sensors/index.ts` — Nova action `login`
+
+Adicionar action `login` que recebe `email`, `password`, `countryCode` e `integrado_id`:
+
+```text
+POST /v2/user/login
+Body: { email, password, countryCode }
+Headers: X-CK-Appid, Authorization: Sign HMAC(body)
+```
+
+- Salva o token na tabela `ewelink_tokens` vinculado ao `integrado_id`
+- Retorna sucesso/erro
+
+#### 2. `sync-sensors/index.ts` — Sync por integrado
+
+Alterar action `sync`:
+- Buscar token do `integrado_id` específico (não mais "mestre global")
+- Usar esse token para buscar dispositivos da conta do integrado
+- Cruzar com `dispositivos_iot` daquele integrado
+
+#### 3. `DispositivosIoT.tsx` — UI de login eWeLink
+
+Substituir o fluxo OAuth por formulário simples:
+- Campo **Email eWeLink**
+- Campo **Senha eWeLink**
+- Campo **Código do País** (default: +55)
+- Botão "Conectar"
+
+Ao conectar, chama `sync-sensors` com `action: login`. Se sucesso, marca como conectado.
+
+#### 4. Remover fluxo OAuth
+
+- Remover action `oauth-url` e código relacionado ao OAuth
+- Manter `check-connection` buscando token por `integrado_id`
+- Botão "Conectar eWeLink" disponível para qualquer usuário (não só admin)
+
+### Fluxo final
+
+```text
+1. Integrado pareia Sonoff TH no app eWeLink (conta dele)
+2. No sistema, integrado informa email + senha da conta eWeLink
+3. Sistema faz login na API, obtém token e salva
+4. Integrado clica "Buscar dispositivos" → lista sensores da conta dele
+5. Seleciona dispositivo → cadastra com device_id
+6. Clica "Sincronizar" → lê temperatura/umidade
+```
+
+### Detalhes técnicos
+
+**Login via API eWeLink v2:**
+```typescript
+const body = { email, password, countryCode };
+const sign = HMAC_SHA256(appSecret, JSON.stringify(body));
+
+POST ${regionUrl}/v2/user/login
+Headers: {
+  "X-CK-Appid": appId,
+  "Authorization": "Sign " + base64(sign),
+  "Content-Type": "application/json"
+}
+// Response: { data: { at, rt, user: { region, apikey } } }
+```
+
+**Token storage:**
+- Upsert em `ewelink_tokens` com `integrado_id` do usuário
+- Guardar `access_token`, `refresh_token`, `region`, expiry timestamps
+
+**Segurança:**
+- Email e senha NÃO são armazenados — apenas os tokens OAuth resultantes
+- Senha trafega apenas na chamada de login, via edge function (server-side)
+
