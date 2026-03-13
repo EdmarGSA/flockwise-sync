@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
     const region = tokenRecord.region || "us";
 
     if (action === "list-devices") {
-      const devices = await getEwelinkDevices(accessToken, appId, region);
+      const devices = await getEwelinkDevices(accessToken, appId, appSecret, region);
       const sensorDevices = devices
         .filter((d) => d.itemType === 1 || d.itemType === 2)
         .map((d) => ({
