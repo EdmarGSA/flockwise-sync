@@ -10,15 +10,50 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Parse state to extract integradoId and optional returnUrl
+  function parseState(state: string | null): { integradoId: string | null; returnUrl: string | null } {
+    if (!state) return { integradoId: null, returnUrl: null };
+    try {
+      const parsed = JSON.parse(decodeURIComponent(state));
+      return { integradoId: parsed.integradoId || null, returnUrl: parsed.returnUrl || null };
+    } catch {
+      // Fallback: state is a raw UUID
+      return { integradoId: state, returnUrl: null };
+    }
+  }
+
+  function buildRedirectOrHtml(success: boolean, returnUrl: string | null, errorMsg?: string): Response {
+    if (returnUrl) {
+      const sep = returnUrl.includes("?") ? "&" : "?";
+      const target = success
+        ? `${returnUrl}${sep}ewelink_connected=true`
+        : `${returnUrl}${sep}ewelink_error=${encodeURIComponent(errorMsg || "Erro desconhecido")}`;
+      return Response.redirect(target, 302);
+    }
+    // Fallback: postMessage for popup context
+    return new Response(
+      `<!DOCTYPE html><html><head><title>eWeLink OAuth</title></head><body>
+<p>${success ? "Conectado com sucesso! Fechando..." : `Erro: ${errorMsg}`}</p>
+<script>
+if(window.opener){window.opener.postMessage({type:"ewelink-oauth-complete",success:${success}},"*");}
+setTimeout(function(){window.close();},1500);
+</script></body></html>`,
+      { headers: { "Content-Type": "text/html" } }
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state"); // contains integrado_id
+    const stateRaw = url.searchParams.get("state");
+    const { integradoId, returnUrl } = parseState(stateRaw);
 
     if (!code) {
-      return new Response(buildHtmlResponse(false, "Missing authorization code"), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return buildRedirectOrHtml(false, returnUrl, "Missing authorization code");
+    }
+
+    if (!integradoId) {
+      return buildRedirectOrHtml(false, returnUrl, "Missing state (integrado_id)");
     }
 
     const appId = Deno.env.get("EWELINK_APP_ID")!;
@@ -98,22 +133,10 @@ Deno.serve(async (req) => {
 
     if (!tokenData) {
       console.error("[oauth-callback] All regions failed:", lastErrors);
-    }
-
-    if (!tokenData) {
-      return new Response(buildHtmlResponse(false, "Falha ao trocar código por token"), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return buildRedirectOrHtml(false, returnUrl, "Falha ao trocar código por token");
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    const integradoId = state;
-    if (!integradoId) {
-      return new Response(buildHtmlResponse(false, "Missing state (integrado_id)"), {
-        headers: { "Content-Type": "text/html" },
-      });
-    }
 
     // Token exchange returns: accessToken, refreshToken, atExpiredTime (ms timestamp), rtExpiredTime (ms timestamp)
     const atExpiry = new Date(tokenData.atExpiredTime);
@@ -132,36 +155,32 @@ Deno.serve(async (req) => {
 
     if (dbError) {
       console.error("DB error storing tokens:", dbError);
-      return new Response(buildHtmlResponse(false, `Erro ao salvar: ${dbError.message}`), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return buildRedirectOrHtml(false, returnUrl, `Erro ao salvar: ${dbError.message}`);
     }
 
     console.log(`eWeLink OAuth: tokens stored for integrado ${integradoId}, region ${resolvedRegion}`);
 
-    return new Response(buildHtmlResponse(true), {
-      headers: { "Content-Type": "text/html" },
-    });
+    return buildRedirectOrHtml(true, returnUrl);
   } catch (error) {
     console.error("OAuth callback error:", error);
-    return new Response(buildHtmlResponse(false, error instanceof Error ? error.message : "Erro interno"), {
-      headers: { "Content-Type": "text/html" },
-    });
+    // Try to extract returnUrl from state for error redirect
+    try {
+      const url = new URL(req.url);
+      const { returnUrl } = parseState(url.searchParams.get("state"));
+      return buildRedirectOrHtml(false, returnUrl, error instanceof Error ? error.message : "Erro interno");
+    } catch {
+      return new Response("Erro interno", { status: 500 });
+    }
   }
 });
 
-function buildHtmlResponse(success: boolean, errorMsg?: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head><title>eWeLink OAuth</title></head>
-<body>
-<p>${success ? "Conectado com sucesso! Fechando..." : `Erro: ${errorMsg}`}</p>
-<script>
-  if (window.opener) {
-    window.opener.postMessage({ type: "ewelink-oauth-complete", success: ${success} }, "*");
+// Helper to parse state outside try block (hoisted)
+function parseState(state: string | null): { integradoId: string | null; returnUrl: string | null } {
+  if (!state) return { integradoId: null, returnUrl: null };
+  try {
+    const parsed = JSON.parse(decodeURIComponent(state));
+    return { integradoId: parsed.integradoId || null, returnUrl: parsed.returnUrl || null };
+  } catch {
+    return { integradoId: state, returnUrl: null };
   }
-  setTimeout(function() { window.close(); }, 1500);
-</script>
-</body>
-</html>`;
 }
