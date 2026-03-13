@@ -146,12 +146,14 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     let action = url.searchParams.get("action") || "sync";
     let integradoId = url.searchParams.get("integrado_id");
+    let returnUrl: string | null = null;
 
     if (req.method === "POST") {
       try {
         const body = await req.json();
         if (body?.action) action = body.action;
         if (body?.integrado_id) integradoId = body.integrado_id;
+        if (body?.return_url) returnUrl = body.return_url;
       } catch { /* no body */ }
     }
 
@@ -189,7 +191,12 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
 
-      const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&seq=${seq}&authorization=${encodeURIComponent(authorization)}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${integradoId}&nonce=${nonce}`;
+      const statePayload = returnUrl
+        ? JSON.stringify({ integradoId, returnUrl })
+        : integradoId;
+      const state = encodeURIComponent(statePayload);
+
+      const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&seq=${seq}&authorization=${encodeURIComponent(authorization)}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}&showQRCode=false`;
 
       return new Response(
         JSON.stringify({ url: oauthUrl }),

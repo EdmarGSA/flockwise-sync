@@ -1,81 +1,31 @@
 
+## Checklist Geral — Correções Aplicadas
 
-## Problema
+### ✅ Corrigido
 
-A tela OAuth da eWeLink (`c2ccdn.coolkit.cc/oauth/index.html`) carrega corretamente no popup, mas ao clicar "Oauth And Log In" o botão fica girando infinitamente. O callback nunca é chamado (zero logs na edge function). Isso sugere que a página OAuth da eWeLink tem problemas no contexto de popup (`window.open`).
+1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
+2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
+3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
+4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
+5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
+6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
+7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
+8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
+9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
+10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
+11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
+12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
+13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
+14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
+15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
+16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
 
-## Solução: Trocar de popup para fluxo de redirect
+### Pendente (baixa prioridade)
 
-Em vez de abrir a OAuth em popup (que pode ter restrições de contexto), redirecionar o usuário diretamente para a página OAuth. Após o login, o callback redireciona de volta para o app.
-
-## Mudanças
-
-### 1. `sync-sensors/index.ts` (action `oauth-url`)
-- Aceitar `returnUrl` do frontend
-- Codificar `state` como JSON: `{ integradoId, returnUrl }`
-- Adicionar `showQRCode=false` na URL OAuth
-
-### 2. `ewelink-oauth-callback/index.ts`
-- Parsear `state` como JSON para obter `integradoId` e `returnUrl`
-- Manter compatibilidade com state simples (string de UUID)
-- Após armazenar tokens: **redirecionar via HTTP 302** para `returnUrl?ewelink_connected=true`
-- Em caso de erro: redirecionar para `returnUrl?ewelink_error=mensagem`
-- Manter fallback postMessage para contexto de popup
-
-### 3. `DispositivosIoT.tsx`
-- Trocar `window.open(popup)` por `window.location.href = url` (redirect direto)
-- Passar `returnUrl` (baseado em `window.location.origin + '/configuracoes/dispositivos-iot'`) para a edge function
-- Manter o handler de URL params que já existe (linhas 61-72) para capturar o retorno
-
-## Fluxo resultante
-
-```text
-1. Usuário clica "Conectar eWeLink"
-2. Frontend chama sync-sensors?action=oauth-url com returnUrl
-3. Página redireciona para c2ccdn.coolkit.cc/oauth/...
-4. Usuário faz login na eWeLink (página inteira, não popup)
-5. eWeLink redireciona para ewelink-oauth-callback?code=X&region=Y&state=Z
-6. Callback troca code por token, armazena no DB
-7. Callback redireciona HTTP 302 → returnUrl?ewelink_connected=true
-8. App carrega, detecta URL param, mostra toast de sucesso
-```
-
-## Detalhes técnicos
-
-**State encoding:**
-```typescript
-// sync-sensors (oauth-url action)
-const statePayload = JSON.stringify({ integradoId, returnUrl });
-const state = encodeURIComponent(statePayload);
-```
-
-**Callback redirect:**
-```typescript
-// ewelink-oauth-callback
-let integradoId: string;
-let returnUrl: string | null = null;
-try {
-  const parsed = JSON.parse(state);
-  integradoId = parsed.integradoId;
-  returnUrl = parsed.returnUrl;
-} catch {
-  integradoId = state; // fallback: raw UUID
-}
-
-// After success:
-if (returnUrl) {
-  return Response.redirect(`${returnUrl}?ewelink_connected=true`, 302);
-}
-// fallback: postMessage HTML
-```
-
-**Frontend:**
-```typescript
-// DispositivosIoT.tsx handleConnectEwelink
-const returnUrl = `${window.location.origin}/configuracoes/dispositivos-iot`;
-const { data } = await supabase.functions.invoke('sync-sensors', {
-  body: { action: 'oauth-url', integrado_id: integradoId, return_url: returnUrl },
-});
-window.location.href = data.url; // redirect, não popup
-```
-
+- Remover auth checks redundantes das demais ~14 páginas
+- Otimizar N+1 queries em GestaoProducaoTab
+- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
+- Limpar `as any` em RPCs
+- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
+- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
+- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)

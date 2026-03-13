@@ -145,8 +145,9 @@ export default function DispositivosIoT() {
   const handleConnectEwelink = async () => {
     if (!integradoId) return;
     try {
+      const returnUrl = `${window.location.origin}/configuracoes/dispositivos-iot`;
       const { data, error } = await supabase.functions.invoke('sync-sensors', {
-        body: { action: 'oauth-url', integrado_id: integradoId },
+        body: { action: 'oauth-url', integrado_id: integradoId, return_url: returnUrl },
       });
 
       if (error || !data?.url) {
@@ -154,10 +155,8 @@ export default function DispositivosIoT() {
         return;
       }
 
-      const popup = window.open(data.url, 'ewelink-oauth', 'width=600,height=700');
-      if (!popup) {
-        toast.error('Permita popups neste site para conectar o eWeLink.');
-      }
+      // Redirect directly instead of popup (eWeLink OAuth has issues in popup context)
+      window.location.href = data.url;
     } catch {
       toast.error('Erro ao iniciar conexão eWeLink');
     }
