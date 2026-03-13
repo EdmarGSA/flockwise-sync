@@ -444,52 +444,15 @@ export default function DispositivosIoT() {
               )}
             </div>
 
-            {/* Login form — show when not connected */}
+            {/* OAuth connect button — show when not connected */}
             {!ewelinkConnected && !checkingConnection && (
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Código do País</Label>
-                  <Input
-                    placeholder="+55"
-                    value={ewelinkCountryCode}
-                    onChange={(e) => setEwelinkCountryCode(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Email eWeLink</Label>
-                  <Input
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={ewelinkEmail}
-                    onChange={(e) => setEwelinkEmail(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Senha eWeLink</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={ewelinkPassword}
-                      onChange={(e) => setEwelinkPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="sm:col-span-1 flex items-end">
-                  <Button className="w-full" onClick={handleConnectEwelink} disabled={connecting}>
-                    <Link className="h-4 w-4 mr-2" />
-                    {connecting ? 'Conectando...' : 'Conectar'}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground sm:col-span-4">
-                  Sua senha não será armazenada — apenas o token de acesso resultante é salvo de forma segura.
+              <div className="mt-3 space-y-2">
+                <Button className="w-full sm:w-auto" onClick={handleConnectEwelink} disabled={connecting}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {connecting ? 'Redirecionando...' : 'Conectar conta eWeLink'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Você será redirecionado para a página de login do eWeLink para autorizar o acesso aos seus dispositivos.
                 </p>
               </div>
             )}
