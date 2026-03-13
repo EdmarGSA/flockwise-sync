@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const lastErrors: string[] = [];
 
     for (const region of regions) {
-      const regionUrl = `https://${region}-apia.coolkit.cc`;
+      const regionUrl = region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${region}-apia.coolkit.cc`;
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
       const tokenBody = {
         code,
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         }
 
         tokenData = data.data;
-        resolvedRegion = tokenData.region || region;
+        resolvedRegion = data.data.region || region;
         console.log(`[oauth-callback] Token obtained from region ${resolvedRegion}`);
         break;
       } catch (e) {
@@ -115,16 +115,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const now = new Date();
-    const atExpiry = new Date(now.getTime() + (tokenData.atExpiredTime || 86400) * 1000);
-    const rtExpiry = new Date(now.getTime() + (tokenData.rtExpiredTime || 5184000) * 1000);
+    // Token exchange returns: accessToken, refreshToken, atExpiredTime (ms timestamp), rtExpiredTime (ms timestamp)
+    const atExpiry = new Date(tokenData.atExpiredTime);
+    const rtExpiry = new Date(tokenData.rtExpiredTime);
 
     const { error: dbError } = await supabase
       .from("ewelink_tokens")
       .upsert({
         integrado_id: integradoId,
-        access_token: tokenData.at,
-        refresh_token: tokenData.rt,
+        access_token: tokenData.accessToken,
+        refresh_token: tokenData.refreshToken,
         at_expired_at: atExpiry.toISOString(),
         rt_expired_at: rtExpiry.toISOString(),
         region: resolvedRegion,

@@ -1,45 +1,31 @@
 
+## Checklist Geral — Correções Aplicadas
 
-## Problem
+### ✅ Corrigido
 
-Based on the eWeLink documentation you shared, there are critical bugs in the token exchange callback:
+1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
+2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
+3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
+4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
+5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
+6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
+7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
+8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
+9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
+10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
+11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
+12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
+13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
+14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
+15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
+16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
 
-### Bug 1: Wrong field names in token exchange response
-The `/v2/user/oauth/token` endpoint returns `accessToken` and `refreshToken`, but our code reads `tokenData.at` and `tokenData.rt` (which are the field names for the **refresh** endpoint only).
+### Pendente (baixa prioridade)
 
-**Docs say:**
-- Token exchange: `accessToken`, `refreshToken`, `atExpiredTime`, `rtExpiredTime`
-- Token refresh: `at`, `rt`
-
-**Our code (line 126):** `tokenData.at` → `undefined`
-
-### Bug 2: Expiry times are absolute timestamps, not durations
-The docs say `atExpiredTime` and `rtExpiredTime` are "expiration timestamps in milliseconds". Our code treats them as durations in seconds and adds them to `now`.
-
-### Bug 3: CN region uses wrong domain
-China API uses `cn-apia.coolkit.cn` (`.cn`), not `cn-apia.coolkit.cc` (`.cc`).
-
-## Plan
-
-### 1. Fix `ewelink-oauth-callback/index.ts`
-- Read `data.data.accessToken` / `data.data.refreshToken` instead of `.at` / `.rt`
-- Convert `atExpiredTime` / `rtExpiredTime` from millisecond timestamps to ISO dates directly (not as duration offsets)
-- Use `.cn` domain for `cn` region
-
-### 2. Fix `sync-sensors/index.ts`
-- Use `.cn` domain for `cn` region in refresh and device API calls
-- Token refresh response uses `at`/`rt` which is correct per docs — no change needed there
-
-### Technical detail
-
-```text
-Token exchange response fields:
-  data.accessToken  → store as access_token
-  data.refreshToken → store as refresh_token  
-  data.atExpiredTime → millisecond timestamp → new Date(value).toISOString()
-  data.rtExpiredTime → millisecond timestamp → new Date(value).toISOString()
-
-CN domain fix:
-  region === "cn" ? "cn-apia.coolkit.cn" : `${region}-apia.coolkit.cc`
-```
-
+- Remover auth checks redundantes das demais ~14 páginas
+- Otimizar N+1 queries em GestaoProducaoTab
+- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
+- Limpar `as any` em RPCs
+- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
+- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
+- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
