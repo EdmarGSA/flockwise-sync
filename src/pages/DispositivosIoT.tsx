@@ -77,6 +77,20 @@ export default function DispositivosIoT() {
     }
   }, [integradoId]);
 
+  // Detect OAuth callback redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('ewelink_connected') === 'true') {
+      toast.success('Conta eWeLink conectada com sucesso!');
+      setEwelinkConnected(true);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('ewelink_error')) {
+      toast.error(`Erro ao conectar eWeLink: ${params.get('ewelink_error')}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const checkEwelinkConnection = async () => {
     setCheckingConnection(true);
     try {
