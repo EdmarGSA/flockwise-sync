@@ -98,30 +98,17 @@ async function refreshAccessToken(
   return data.data.at;
 }
 
-async function getEwelinkDevices(accessToken: string, appId: string, appSecret: string, region: string): Promise<EwelinkDevice[]> {
+async function getEwelinkDevices(accessToken: string, appId: string, region: string): Promise<EwelinkDevice[]> {
   const regionUrl = region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${region}-apia.coolkit.cc`;
   const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 
-  // eWeLink GET requests require HMAC-SHA256 signature of sorted query params
-  const queryParams = "num=0";
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(appSecret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(queryParams));
-  const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
-
-  const res = await fetch(`${regionUrl}/v2/device/thing?${queryParams}`, {
+  const res = await fetch(`${regionUrl}/v2/device/thing?num=0`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
       "X-CK-Appid": appId,
       "X-CK-Nonce": nonce,
-      Authorization: `Sign ${sign}`,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 
