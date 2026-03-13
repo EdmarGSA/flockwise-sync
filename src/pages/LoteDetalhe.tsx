@@ -36,6 +36,7 @@ import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
 import { AlertasProducaoCard } from '@/components/lotes/postura/AlertasProducaoCard';
 import { SiloBadge } from '@/components/lotes/SiloBadge';
+import { TemperaturaUmidadeCard } from '@/components/lotes/TemperaturaUmidadeCard';
 
 interface LoteData {
   id: string;
@@ -306,6 +307,11 @@ export default function LoteDetalhe() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Monitoramento IoT - Temperatura e Umidade */}
+        {lote.status === 'alojado' && (
+          <TemperaturaUmidadeCard galpaoId={lote.galpao_id} />
+        )}
 
         {/* Alertas de Produção para lotes de postura */}
         {isPostura && lote.status === 'alojado' && semanasVida >= 19 && (

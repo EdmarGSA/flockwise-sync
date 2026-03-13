@@ -98,18 +98,35 @@ async function refreshAccessToken(
   return data.data.at;
 }
 
-async function getEwelinkDevices(accessToken: string, appId: string, region: string): Promise<EwelinkDevice[]> {
+async function getEwelinkDevices(accessToken: string, appId: string, appSecret: string, region: string): Promise<EwelinkDevice[]> {
   const regionUrl = region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${region}-apia.coolkit.cc`;
-  const res = await fetch(`${regionUrl}/v2/device/thing`, {
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+
+  // eWeLink GET requests require HMAC-SHA256 signature of sorted query params
+  const queryParams = "num=0";
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(queryParams));
+  const sign = btoa(String.fromCharCode(...new Uint8Array(sig)));
+
+  const res = await fetch(`${regionUrl}/v2/device/thing?${queryParams}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
       "X-CK-Appid": appId,
-      Authorization: `Bearer ${accessToken}`,
+      "X-CK-Nonce": nonce,
+      Authorization: `Sign ${sign}`,
     },
   });
 
   const text = await res.text();
+  console.log("eWeLink GET /v2/device/thing response:", text.substring(0, 500));
   let data;
   try {
     data = JSON.parse(text);
@@ -120,6 +137,7 @@ async function getEwelinkDevices(accessToken: string, appId: string, region: str
     throw new Error(`eWeLink get devices failed: ${JSON.stringify(data)}`);
   }
 
+  console.log(`eWeLink returned ${data.data?.thingList?.length || 0} devices`);
   return data.data?.thingList || [];
 }
 
@@ -244,7 +262,7 @@ Deno.serve(async (req) => {
     const region = tokenRecord.region || "us";
 
     if (action === "list-devices") {
-      const devices = await getEwelinkDevices(accessToken, appId, region);
+      const devices = await getEwelinkDevices(accessToken, appId, appSecret, region);
       const sensorDevices = devices
         .filter((d) => d.itemType === 1 || d.itemType === 2)
         .map((d) => ({
@@ -262,7 +280,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync") {
-      const ewelinkDevices = await getEwelinkDevices(accessToken, appId, region);
+      const ewelinkDevices = await getEwelinkDevices(accessToken, appId, appSecret, region);
       const deviceMap = new Map<string, EwelinkDevice["itemData"]["params"]>();
       for (const d of ewelinkDevices) {
         deviceMap.set(d.itemData.deviceid, d.itemData.params);
