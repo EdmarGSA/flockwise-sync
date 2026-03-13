@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: "Sync concluído", leituras: readings.length, detalhes: readings });
     }
 
-    return jsonResponse({ error: "Ação inválida. Use action=login, check-connection, list-devices ou sync" }, 400);
+    return jsonResponse({ error: "Ação inválida. Use action=oauth-url, check-connection, list-devices ou sync" }, 400);
   } catch (error) {
     console.error("Erro no sync-sensors:", error);
     return jsonResponse({ error: error instanceof Error ? error.message : "Erro interno" }, 500);
