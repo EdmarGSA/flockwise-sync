@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -62,11 +62,7 @@ export default function DispositivosIoT() {
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
 
-  // eWeLink login state
-  const [ewelinkEmail, setEwelinkEmail] = useState('');
-  const [ewelinkPassword, setEwelinkPassword] = useState('');
-  const [ewelinkCountryCode, setEwelinkCountryCode] = useState('+55');
-  const [showPassword, setShowPassword] = useState(false);
+  // OAuth connecting state
   const [connecting, setConnecting] = useState(false);
 
   // eWeLink device picker state
@@ -80,6 +76,20 @@ export default function DispositivosIoT() {
       fetchData();
     }
   }, [integradoId]);
+
+  // Detect OAuth callback redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('ewelink_connected') === 'true') {
+      toast.success('Conta eWeLink conectada com sucesso!');
+      setEwelinkConnected(true);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('ewelink_error')) {
+      toast.error(`Erro ao conectar eWeLink: ${params.get('ewelink_error')}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const checkEwelinkConnection = async () => {
     setCheckingConnection(true);
@@ -125,19 +135,14 @@ export default function DispositivosIoT() {
   };
 
   const handleConnectEwelink = async () => {
-    if (!ewelinkEmail || !ewelinkPassword) {
-      toast.error('Informe email e senha da conta eWeLink');
-      return;
-    }
     setConnecting(true);
     try {
+      const returnUrl = window.location.origin + window.location.pathname;
       const { data, error } = await supabase.functions.invoke('sync-sensors', {
         body: {
-          action: 'login',
+          action: 'oauth-url',
           integrado_id: integradoId,
-          email: ewelinkEmail,
-          password: ewelinkPassword,
-          countryCode: ewelinkCountryCode,
+          returnUrl,
         },
       });
 
@@ -147,12 +152,13 @@ export default function DispositivosIoT() {
         return;
       }
 
-      toast.success(`Conta eWeLink conectada! (região: ${data?.region || 'auto'})`);
-      setEwelinkConnected(true);
-      setEwelinkEmail('');
-      setEwelinkPassword('');
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error('URL de autorização não retornada');
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao conectar';
+      const message = err instanceof Error ? err.message : 'Erro ao gerar URL OAuth';
       toast.error(message);
     } finally {
       setConnecting(false);
@@ -427,7 +433,7 @@ export default function DispositivosIoT() {
                   <p className="text-xs text-muted-foreground">
                     {ewelinkConnected
                       ? 'Seus sensores serão sincronizados através da sua conta eWeLink'
-                      : 'Informe o email e senha da conta eWeLink onde seus Sonoff TH estão pareados'}
+                      : 'Conecte sua conta eWeLink para sincronizar seus sensores Sonoff TH'}
                   </p>
                 </div>
               </div>
@@ -439,52 +445,15 @@ export default function DispositivosIoT() {
               )}
             </div>
 
-            {/* Login form — show when not connected */}
+            {/* OAuth connect button — show when not connected */}
             {!ewelinkConnected && !checkingConnection && (
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Código do País</Label>
-                  <Input
-                    placeholder="+55"
-                    value={ewelinkCountryCode}
-                    onChange={(e) => setEwelinkCountryCode(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Email eWeLink</Label>
-                  <Input
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={ewelinkEmail}
-                    onChange={(e) => setEwelinkEmail(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <Label className="text-xs">Senha eWeLink</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={ewelinkPassword}
-                      onChange={(e) => setEwelinkPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="sm:col-span-1 flex items-end">
-                  <Button className="w-full" onClick={handleConnectEwelink} disabled={connecting}>
-                    <Link className="h-4 w-4 mr-2" />
-                    {connecting ? 'Conectando...' : 'Conectar'}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground sm:col-span-4">
-                  Sua senha não será armazenada — apenas o token de acesso resultante é salvo de forma segura.
+              <div className="mt-3 space-y-2">
+                <Button className="w-full sm:w-auto" onClick={handleConnectEwelink} disabled={connecting}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {connecting ? 'Redirecionando...' : 'Conectar conta eWeLink'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Você será redirecionado para a página de login do eWeLink para autorizar o acesso aos seus dispositivos.
                 </p>
               </div>
             )}
@@ -579,7 +548,7 @@ export default function DispositivosIoT() {
             <h4 className="font-medium text-sm text-foreground mb-2">Como configurar</h4>
             <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
               <li>Pareie seus sensores Sonoff TH no app eWeLink (na sua conta pessoal)</li>
-              <li>No card acima, informe o email e senha da sua conta eWeLink para conectar</li>
+              <li>Clique em "Conectar conta eWeLink" e autorize o acesso na página do eWeLink</li>
               <li>Clique em "Adicionar" e use "Buscar dispositivos" para selecionar o sensor da lista</li>
               <li>Vincule a um galpão para monitoramento automático</li>
               <li>Clique em "Sincronizar" para buscar a primeira leitura</li>
