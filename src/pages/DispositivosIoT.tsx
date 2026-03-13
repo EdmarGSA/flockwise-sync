@@ -62,11 +62,7 @@ export default function DispositivosIoT() {
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
 
-  // eWeLink login state
-  const [ewelinkEmail, setEwelinkEmail] = useState('');
-  const [ewelinkPassword, setEwelinkPassword] = useState('');
-  const [ewelinkCountryCode, setEwelinkCountryCode] = useState('+55');
-  const [showPassword, setShowPassword] = useState(false);
+  // OAuth connecting state
   const [connecting, setConnecting] = useState(false);
 
   // eWeLink device picker state
