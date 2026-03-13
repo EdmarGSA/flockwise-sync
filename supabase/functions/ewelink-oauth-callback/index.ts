@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         }
 
         tokenData = data.data;
-        resolvedRegion = tokenData.region || region;
+        resolvedRegion = data.data.region || region;
         console.log(`[oauth-callback] Token obtained from region ${resolvedRegion}`);
         break;
       } catch (e) {
