@@ -547,7 +547,7 @@ export default function DispositivosIoT() {
             <h4 className="font-medium text-sm text-foreground mb-2">Como configurar</h4>
             <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
               <li>Pareie seus sensores Sonoff TH no app eWeLink (na sua conta pessoal)</li>
-              <li>No card acima, informe o email e senha da sua conta eWeLink para conectar</li>
+              <li>Clique em "Conectar conta eWeLink" e autorize o acesso na página do eWeLink</li>
               <li>Clique em "Adicionar" e use "Buscar dispositivos" para selecionar o sensor da lista</li>
               <li>Vincule a um galpão para monitoramento automático</li>
               <li>Clique em "Sincronizar" para buscar a primeira leitura</li>
