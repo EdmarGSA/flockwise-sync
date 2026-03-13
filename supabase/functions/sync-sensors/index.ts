@@ -99,7 +99,7 @@ async function refreshAccessToken(
 }
 
 async function getEwelinkDevices(accessToken: string, appId: string, region: string): Promise<EwelinkDevice[]> {
-  const regionUrl = `https://${region}-apia.coolkit.cc`;
+  const regionUrl = region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${region}-apia.coolkit.cc`;
   const res = await fetch(`${regionUrl}/v2/device/thing`, {
     method: "GET",
     headers: {

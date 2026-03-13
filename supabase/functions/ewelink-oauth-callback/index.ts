@@ -115,16 +115,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const now = new Date();
-    const atExpiry = new Date(now.getTime() + (tokenData.atExpiredTime || 86400) * 1000);
-    const rtExpiry = new Date(now.getTime() + (tokenData.rtExpiredTime || 5184000) * 1000);
+    // Token exchange returns: accessToken, refreshToken, atExpiredTime (ms timestamp), rtExpiredTime (ms timestamp)
+    const atExpiry = new Date(tokenData.atExpiredTime);
+    const rtExpiry = new Date(tokenData.rtExpiredTime);
 
     const { error: dbError } = await supabase
       .from("ewelink_tokens")
       .upsert({
         integrado_id: integradoId,
-        access_token: tokenData.at,
-        refresh_token: tokenData.rt,
+        access_token: tokenData.accessToken,
+        refresh_token: tokenData.refreshToken,
         at_expired_at: atExpiry.toISOString(),
         rt_expired_at: rtExpiry.toISOString(),
         region: resolvedRegion,
