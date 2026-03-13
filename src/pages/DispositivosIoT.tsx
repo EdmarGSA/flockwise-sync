@@ -135,19 +135,14 @@ export default function DispositivosIoT() {
   };
 
   const handleConnectEwelink = async () => {
-    if (!ewelinkEmail || !ewelinkPassword) {
-      toast.error('Informe email e senha da conta eWeLink');
-      return;
-    }
     setConnecting(true);
     try {
+      const returnUrl = window.location.origin + window.location.pathname;
       const { data, error } = await supabase.functions.invoke('sync-sensors', {
         body: {
-          action: 'login',
+          action: 'oauth-url',
           integrado_id: integradoId,
-          email: ewelinkEmail,
-          password: ewelinkPassword,
-          countryCode: ewelinkCountryCode,
+          returnUrl,
         },
       });
 
@@ -157,12 +152,13 @@ export default function DispositivosIoT() {
         return;
       }
 
-      toast.success(`Conta eWeLink conectada! (região: ${data?.region || 'auto'})`);
-      setEwelinkConnected(true);
-      setEwelinkEmail('');
-      setEwelinkPassword('');
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error('URL de autorização não retornada');
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao conectar';
+      const message = err instanceof Error ? err.message : 'Erro ao gerar URL OAuth';
       toast.error(message);
     } finally {
       setConnecting(false);
