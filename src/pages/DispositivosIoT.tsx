@@ -431,9 +431,8 @@ export default function DispositivosIoT() {
                     {checkingConnection ? 'Verificando conexão...' : ewelinkConnected ? 'Conta eWeLink conectada' : 'Conta eWeLink não conectada'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {ewelinkConnected
                       ? 'Seus sensores serão sincronizados através da sua conta eWeLink'
-                      : 'Informe o email e senha da conta eWeLink onde seus Sonoff TH estão pareados'}
+                      : 'Conecte sua conta eWeLink para sincronizar seus sensores Sonoff TH'}
                   </p>
                 </div>
               </div>
