@@ -171,86 +171,13 @@ async function getAllEwelinkDevices(
   return [];
 }
 
-// ── Login via eWeLink API v2 ───────────────────────────────────
+// ── OAuth URL generator ────────────────────────────────────────
 
-async function loginEwelink(
-  appId: string, appSecret: string,
-  email: string, password: string, countryCode: string
-): Promise<{ at: string; rt: string; region: string; atExpiredTime: number; rtExpiredTime: number }> {
-  // Try dispatcher first, then common regions
-  const regions = ["us", "eu", "as", "cn"];
-  
-  for (const region of regions) {
-    const baseUrl = getRegionUrl(region);
-    const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-    const body = { email, password, countryCode };
-    const sign = await hmacSign(appSecret, JSON.stringify(body));
-
-    console.log(`Trying login on region: ${region}`);
-    const res = await fetch(`${baseUrl}/v2/user/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CK-Appid": appId,
-        "X-CK-Nonce": nonce,
-        Authorization: `Sign ${sign}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    
-    // error 10004 = wrong region, try next
-    if (data.error === 10004) {
-      console.log(`Region ${region} returned 10004, trying next…`);
-      continue;
-    }
-
-    if (data.error !== 0) {
-      throw new Error(data.msg || `Login failed (error ${data.error})`);
-    }
-
-    const userRegion = data.data?.user?.region || region;
-    
-    // If the API says user is in a different region, re-login there
-    if (userRegion !== region) {
-      console.log(`User region is ${userRegion}, re-logging…`);
-      const correctUrl = getRegionUrl(userRegion);
-      const nonce2 = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-      const sign2 = await hmacSign(appSecret, JSON.stringify(body));
-      
-      const res2 = await fetch(`${correctUrl}/v2/user/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CK-Appid": appId,
-          "X-CK-Nonce": nonce2,
-          Authorization: `Sign ${sign2}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const data2 = await res2.json();
-      if (data2.error !== 0) throw new Error(data2.msg || `Login failed on region ${userRegion}`);
-      
-      return {
-        at: data2.data.at,
-        rt: data2.data.rt,
-        region: userRegion,
-        atExpiredTime: data2.data.atExpiredTime || 86400,
-        rtExpiredTime: data2.data.rtExpiredTime || 5184000,
-      };
-    }
-
-    return {
-      at: data.data.at,
-      rt: data.data.rt,
-      region: userRegion,
-      atExpiredTime: data.data.atExpiredTime || 86400,
-      rtExpiredTime: data.data.rtExpiredTime || 5184000,
-    };
-  }
-
-  throw new Error("Não foi possível conectar em nenhuma região. Verifique email e senha.");
+function generateOAuthUrl(
+  appId: string, region: string, redirectUrl: string, state: string, nonce: string
+): string {
+  const baseUrl = getRegionUrl(region);
+  return `${baseUrl}/v2/user/oauth/authorize?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${encodeURIComponent(state)}&nonce=${nonce}`;
 }
 
 // ── JSON response helper ───────────────────────────────────────
