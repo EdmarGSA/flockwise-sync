@@ -212,18 +212,14 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     let action = url.searchParams.get("action") || "sync";
     let integradoId = url.searchParams.get("integrado_id");
-    let email: string | null = null;
-    let password: string | null = null;
-    let countryCode = "+55";
+    let returnUrl: string | null = null;
 
     if (req.method === "POST") {
       try {
         const body = await req.json();
         if (body?.action) action = body.action;
         if (body?.integrado_id) integradoId = body.integrado_id;
-        if (body?.email) email = body.email;
-        if (body?.password) password = body.password;
-        if (body?.countryCode) countryCode = body.countryCode;
+        if (body?.returnUrl) returnUrl = body.returnUrl;
       } catch { /* no body */ }
     }
 
@@ -234,17 +230,6 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
-      
-      // Parse optional returnUrl from body
-      let returnUrl: string | null = null;
-      if (req.method === "POST") {
-        try {
-          const url2 = new URL(req.url);
-          // Already parsed body above, use the variable scope
-        } catch { /* ignore */ }
-      }
-      // Get returnUrl from query or use default
-      returnUrl = url.searchParams.get("returnUrl") || null;
 
       const state = JSON.stringify({ integradoId, returnUrl });
       const oauthUrl = generateOAuthUrl(appId, "us", callbackUrl, state, nonce);
