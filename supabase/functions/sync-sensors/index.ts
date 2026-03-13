@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync") {
-      const ewelinkDevices = await getEwelinkDevices(accessToken, appId, region);
+      const ewelinkDevices = await getEwelinkDevices(accessToken, appId, appSecret, region);
       const deviceMap = new Map<string, EwelinkDevice["itemData"]["params"]>();
       for (const d of ewelinkDevices) {
         deviceMap.set(d.itemData.deviceid, d.itemData.params);

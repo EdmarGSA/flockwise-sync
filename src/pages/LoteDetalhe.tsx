@@ -308,6 +308,11 @@ export default function LoteDetalhe() {
           </CardContent>
         </Card>
 
+        {/* Monitoramento IoT - Temperatura e Umidade */}
+        {lote.status === 'alojado' && (
+          <TemperaturaUmidadeCard galpaoId={lote.galpao_id} />
+        )}
+
         {/* Alertas de Produção para lotes de postura */}
         {isPostura && lote.status === 'alojado' && semanasVida >= 19 && (
           <div className="mb-6">
