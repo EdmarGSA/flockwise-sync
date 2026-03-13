@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const lastErrors: string[] = [];
 
     for (const region of regions) {
-      const regionUrl = `https://${region}-apia.coolkit.cc`;
+      const regionUrl = region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${region}-apia.coolkit.cc`;
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
       const tokenBody = {
         code,
