@@ -1,31 +1,55 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Diagnóstico
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+### Problema 1: Sync retorna 0 leituras
+Testei a API diretamente. A eWeLink retorna `devices: []` (lista vazia de dispositivos). Isso acontece porque a requisição GET para `/v2/device/thing` precisa, segundo a documentação, de **assinatura HMAC-SHA256 dos parâmetros da query** (não Bearer token) para certas configurações de APPID. A documentação diz:
 
-### Pendente (baixa prioridade)
+> **GET Request:** Order all parameters alphabetically and concatenate them with `&`, then sign with HMAC-SHA256 using app secret.
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+Porém o código atual usa `Authorization: Bearer {accessToken}`, que pode não funcionar para APPIDs OAuth (terceiros). A API retorna `error: 0` com lista vazia em vez de erro de autenticação.
+
+Além disso, o código não envia o parâmetro `num=0` (que significa "buscar todos os dispositivos") nem adiciona logging para debugar a resposta da API.
+
+### Problema 2: Tela de monitoramento dentro do lote
+Não existe nenhum componente de monitoramento de temperatura/umidade na página do lote (`LoteDetalhe.tsx`). Apenas o `MortalidadeDialog` busca dados de sensores para auto-preencher campos.
+
+## Plano
+
+### 1. Corrigir `getEwelinkDevices` em `sync-sensors/index.ts`
+- Trocar de `Bearer {accessToken}` para `Sign {hmac}` na requisição GET
+- Para GET, a assinatura é calculada sobre os parâmetros da query ordenados alfabeticamente: `num=0` concatenados com `&`
+- Adicionar `console.log` com a resposta da eWeLink para debug
+- Passar `num=0` para buscar todos dispositivos
+
+```text
+GET /v2/device/thing?num=0
+Headers:
+  X-CK-Appid: {appId}
+  X-CK-Nonce: {nonce}
+  Authorization: Sign {hmac_sha256(appSecret, "num=0")}
+```
+
+### 2. Criar componente `TemperaturaUmidadeCard` em `src/components/lotes/TemperaturaUmidadeCard.tsx`
+- Recebe `galpaoId` como prop
+- Busca o dispositivo IoT vinculado ao galpão via `dispositivos_iot`
+- Busca a última leitura de `leituras_sensores`
+- Mostra temperatura e umidade com indicadores visuais de cor (verde/amarelo/vermelho)
+- Mostra "há X minutos" e ícone de online/offline
+- Se não houver dispositivo vinculado, mostra mensagem informativa
+
+### 3. Adicionar o card no `LoteDetalhe.tsx`
+- Inserir o `TemperaturaUmidadeCard` logo após o card de resumo do lote
+- Mostrar apenas quando `lote.status === 'alojado'`
+- Passar `galpaoId={lote.galpao_id}`
+
+### Detalhes técnicos da assinatura GET
+
+Segundo a documentação eWeLink:
+```typescript
+// Para GET: ordenar params alfabeticamente e concatenar com &
+const params = "num=0";
+const sign = hmac_sha256(appSecret, params); // base64
+// Header: Authorization: Sign {sign}
+```
+
