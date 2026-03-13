@@ -227,31 +227,30 @@ Deno.serve(async (req) => {
       } catch { /* no body */ }
     }
 
-    // ── login: authenticate with eWeLink using email+password ──
-    if (action === "login") {
+    // ── oauth-url: generate eWeLink OAuth authorization URL ──
+    if (action === "oauth-url") {
       if (!integradoId) return jsonResponse({ error: "integrado_id é obrigatório" }, 400);
-      if (!email || !password) return jsonResponse({ error: "Email e senha são obrigatórios" }, 400);
 
-      const result = await loginEwelink(appId, appSecret, email, password, countryCode);
-      const now = new Date();
-      const atExpiry = new Date(now.getTime() + result.atExpiredTime * 1000);
-      const rtExpiry = new Date(now.getTime() + result.rtExpiredTime * 1000);
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
+      const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+      
+      // Parse optional returnUrl from body
+      let returnUrl: string | null = null;
+      if (req.method === "POST") {
+        try {
+          const url2 = new URL(req.url);
+          // Already parsed body above, use the variable scope
+        } catch { /* ignore */ }
+      }
+      // Get returnUrl from query or use default
+      returnUrl = url.searchParams.get("returnUrl") || null;
 
-      // Delete existing tokens for this integrado and insert new one
-      await supabase.from("ewelink_tokens").delete().eq("integrado_id", integradoId);
-      const { error: insertErr } = await supabase.from("ewelink_tokens").insert({
-        integrado_id: integradoId,
-        access_token: result.at,
-        refresh_token: result.rt,
-        region: result.region,
-        at_expired_at: atExpiry.toISOString(),
-        rt_expired_at: rtExpiry.toISOString(),
-      });
+      const state = JSON.stringify({ integradoId, returnUrl });
+      const oauthUrl = generateOAuthUrl(appId, "us", callbackUrl, state, nonce);
 
-      if (insertErr) throw new Error(`Erro ao salvar token: ${insertErr.message}`);
-
-      console.log(`eWeLink login successful for integrado ${integradoId}, region: ${result.region}`);
-      return jsonResponse({ success: true, region: result.region });
+      console.log(`OAuth URL generated for integrado ${integradoId}`);
+      return jsonResponse({ url: oauthUrl });
     }
 
     // ── check-connection: check if integrado has a valid token ──
