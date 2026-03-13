@@ -191,24 +191,10 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const redirectUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
 
-      // Encode state as JSON with returnUrl for redirect flow
-      let returnUrl: string | null = null;
-      if (req.method === "POST") {
-        try {
-          // body was already parsed above, re-parse for return_url
-        } catch { /* ignore */ }
-      }
-      // Get return_url from the parsed body
-      try {
-        const bodyText = await req.clone().text();
-        const bodyJson = JSON.parse(bodyText);
-        if (bodyJson?.return_url) returnUrl = bodyJson.return_url;
-      } catch { /* ignore */ }
-
       const statePayload = returnUrl
         ? JSON.stringify({ integradoId, returnUrl })
         : integradoId;
-      const state = encodeURIComponent(typeof statePayload === 'string' ? statePayload : JSON.stringify(statePayload));
+      const state = encodeURIComponent(statePayload);
 
       const oauthUrl = `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&seq=${seq}&authorization=${encodeURIComponent(authorization)}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}&showQRCode=false`;
 
