@@ -146,12 +146,14 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     let action = url.searchParams.get("action") || "sync";
     let integradoId = url.searchParams.get("integrado_id");
+    let returnUrl: string | null = null;
 
     if (req.method === "POST") {
       try {
         const body = await req.json();
         if (body?.action) action = body.action;
         if (body?.integrado_id) integradoId = body.integrado_id;
+        if (body?.return_url) returnUrl = body.return_url;
       } catch { /* no body */ }
     }
 
