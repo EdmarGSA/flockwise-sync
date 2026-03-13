@@ -435,7 +435,6 @@ export default function DispositivosIoT() {
                       ? 'Seus sensores serão sincronizados através da sua conta eWeLink'
                       : 'Conecte sua conta eWeLink para sincronizar seus sensores Sonoff TH'}
                   </p>
-                  </p>
                 </div>
               </div>
               {ewelinkConnected && (
