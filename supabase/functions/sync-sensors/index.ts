@@ -51,7 +51,7 @@ async function refreshAccessToken(
   }
 
   // Refresh the token
-  const regionUrl = `https://${token.region}-apia.coolkit.cc`;
+  const regionUrl = token.region === "cn" ? "https://cn-apia.coolkit.cn" : `https://${token.region}-apia.coolkit.cc`;
   const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
   const body = { rt: token.refresh_token };
   const encoder = new TextEncoder();
