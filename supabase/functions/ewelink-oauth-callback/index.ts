@@ -174,13 +174,3 @@ setTimeout(function(){window.close();},1500);
   }
 });
 
-// Helper to parse state outside try block (hoisted)
-function parseState(state: string | null): { integradoId: string | null; returnUrl: string | null } {
-  if (!state) return { integradoId: null, returnUrl: null };
-  try {
-    const parsed = JSON.parse(decodeURIComponent(state));
-    return { integradoId: parsed.integradoId || null, returnUrl: parsed.returnUrl || null };
-  } catch {
-    return { integradoId: state, returnUrl: null };
-  }
-}
