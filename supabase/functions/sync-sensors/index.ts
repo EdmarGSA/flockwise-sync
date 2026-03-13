@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
         await supabase.from("ewelink_tokens").delete().eq("id", token.id);
         return jsonResponse({
           error: "REAUTH_REQUIRED",
-          message: "Token expirado. Reconecte sua conta eWeLink informando email e senha.",
+          message: "Token expirado. Reconecte sua conta eWeLink clicando em 'Conectar'.",
         }, 401);
       }
       throw err;
