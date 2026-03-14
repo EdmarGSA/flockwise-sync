@@ -174,9 +174,25 @@ async function getAllEwelinkDevices(
 // ── OAuth URL generator ────────────────────────────────────────
 
 function generateOAuthUrl(
-  appId: string, _region: string, redirectUrl: string, state: string, nonce: string
+  appId: string,
+  _region: string,
+  redirectUrl: string,
+  state: string,
+  nonce: string,
 ): string {
-  return `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${encodeURIComponent(state)}&nonce=${nonce}`;
+  const params = new URLSearchParams({
+    clientId: appId,
+    redirectUrl,
+    // eWeLink OAuth landing page expects responseType/scope;
+    // keep grantType for backward compatibility.
+    responseType: "code",
+    grantType: "authorization_code",
+    scope: "userinfo_email,userinfo_nickname",
+    state,
+    nonce,
+  });
+
+  return `https://c2ccdn.coolkit.cc/oauth/index.html?${params.toString()}`;
 }
 
 // ── JSON response helper ───────────────────────────────────────
