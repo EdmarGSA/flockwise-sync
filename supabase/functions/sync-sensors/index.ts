@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
       const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 
       const state = JSON.stringify({ integradoId, returnUrl });
-      const oauthUrl = generateOAuthUrl(appId, "us", callbackUrl, state, nonce);
+      const oauthUrl = await generateOAuthUrl(appId, appSecret, callbackUrl, state);
 
       console.log(`OAuth URL generated for integrado ${integradoId}`);
       return jsonResponse({ url: oauthUrl });
