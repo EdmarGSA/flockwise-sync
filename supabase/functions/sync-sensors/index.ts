@@ -255,7 +255,6 @@ Deno.serve(async (req) => {
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
-      const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 
       const state = JSON.stringify({ integradoId, returnUrl });
       const oauthUrl = await generateOAuthUrl(appId, appSecret, callbackUrl, state);
