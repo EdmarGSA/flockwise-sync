@@ -174,10 +174,9 @@ async function getAllEwelinkDevices(
 // ── OAuth URL generator ────────────────────────────────────────
 
 function generateOAuthUrl(
-  appId: string, region: string, redirectUrl: string, state: string, nonce: string
+  appId: string, _region: string, redirectUrl: string, state: string, nonce: string
 ): string {
-  const baseUrl = getRegionUrl(region);
-  return `${baseUrl}/v2/user/oauth/authorize?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${encodeURIComponent(state)}&nonce=${nonce}`;
+  return `https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${encodeURIComponent(state)}&nonce=${nonce}`;
 }
 
 // ── JSON response helper ───────────────────────────────────────
