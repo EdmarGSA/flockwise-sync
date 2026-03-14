@@ -173,23 +173,34 @@ async function getAllEwelinkDevices(
 
 // ── OAuth URL generator ────────────────────────────────────────
 
-function generateOAuthUrl(
+async function generateOAuthUrl(
   appId: string,
-  _region: string,
+  appSecret: string,
   redirectUrl: string,
   state: string,
-  nonce: string,
-): string {
+): Promise<string> {
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+  const seq = Date.now().toString();
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(`${appId}_${seq}`));
+  const authorization = btoa(String.fromCharCode(...new Uint8Array(sig)));
+
   const params = new URLSearchParams({
     clientId: appId,
     redirectUrl,
-    // eWeLink OAuth landing page expects responseType/scope;
-    // keep grantType for backward compatibility.
-    responseType: "code",
     grantType: "authorization_code",
-    scope: "userinfo_email,userinfo_nickname",
     state,
     nonce,
+    seq,
+    authorization,
   });
 
   return `https://c2ccdn.coolkit.cc/oauth/index.html?${params.toString()}`;
@@ -244,10 +255,9 @@ Deno.serve(async (req) => {
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const callbackUrl = `${supabaseUrl}/functions/v1/ewelink-oauth-callback`;
-      const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 
       const state = JSON.stringify({ integradoId, returnUrl });
-      const oauthUrl = generateOAuthUrl(appId, "us", callbackUrl, state, nonce);
+      const oauthUrl = await generateOAuthUrl(appId, appSecret, callbackUrl, state);
 
       console.log(`OAuth URL generated for integrado ${integradoId}`);
       return jsonResponse({ url: oauthUrl });
