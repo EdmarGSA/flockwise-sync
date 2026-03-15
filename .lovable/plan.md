@@ -1,31 +1,26 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Problema
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+O componente `TemperaturaUmidadeCard` busca apenas **1 dispositivo** por galpão (usa `.limit(1).maybeSingle()`). Se um galpão tem múltiplos sensores cadastrados, só o primeiro aparece.
 
-### Pendente (baixa prioridade)
+## Solução
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+Alterar o componente para buscar **todos** os dispositivos ativos vinculados ao galpão e exibir um card para cada um.
+
+### Alterações
+
+**`src/components/lotes/TemperaturaUmidadeCard.tsx`**
+- Remover `.limit(1).maybeSingle()` e usar `.select()` para buscar array de dispositivos
+- Para cada dispositivo, buscar a última leitura
+- Renderizar um card por dispositivo (com nome, temperatura, umidade, status online/offline)
+- Manter o comportamento de não renderizar nada se não houver dispositivos
+
+**`src/pages/LoteDetalhe.tsx`**
+- Sem alterações necessárias — o componente já recebe `galpaoId` corretamente
+
+### Detalhes Técnicos
+- State muda de `leitura` singular para `dispositivos[]` com leitura embutida
+- Loop de busca de leituras em paralelo (`Promise.all`) para performance
+- Cada card mostra: nome do sensor, temperatura, umidade, badge online/offline, tempo desde última leitura
+
