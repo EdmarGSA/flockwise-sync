@@ -305,19 +305,22 @@ Deno.serve(async (req) => {
     // ── list-devices ──
     if (action === "list-devices") {
       const devices = await getAllEwelinkDevices(accessToken, appId, region);
-      const sensorDevices = devices
-        .filter((d) => d.itemType === 1 || d.itemType === 2)
-        .map((d) => ({
-          deviceId: d.itemData.deviceid,
-          name: d.itemData.name,
-          online: d.itemData.params?.online ?? false,
-          temperatura: d.itemData.params?.currentTemperature
-            ? parseFloat(d.itemData.params.currentTemperature) : null,
-          umidade: d.itemData.params?.currentHumidity
-            ? parseFloat(d.itemData.params.currentHumidity) : null,
-        }));
+      console.log(`list-devices: ${devices.length} total devices from eWeLink API`);
 
-      return jsonResponse({ devices: sensorDevices });
+      const mappedDevices = devices.map((d) => ({
+        deviceId: d.itemData.deviceid,
+        name: d.itemData.name,
+        online: d.itemData.params?.online ?? false,
+        itemType: d.itemType,
+        temperatura: d.itemData.params?.currentTemperature
+          ? parseFloat(d.itemData.params.currentTemperature) : null,
+        umidade: d.itemData.params?.currentHumidity
+          ? parseFloat(d.itemData.params.currentHumidity) : null,
+        hasSensorData: !!(d.itemData.params?.currentTemperature || d.itemData.params?.currentHumidity),
+      }));
+
+      console.log(`list-devices: ${mappedDevices.filter(d => d.hasSensorData).length} devices with sensor data`);
+      return jsonResponse({ devices: mappedDevices });
     }
 
     // ── sync ──
