@@ -1,31 +1,25 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Correção: Listagem de dispositivos eWeLink
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+### Problema identificado
+Na action `list-devices` (linha 309 do `sync-sensors/index.ts`), há um filtro restritivo:
+```typescript
+.filter((d) => d.itemType === 1 || d.itemType === 2)
+```
+Dispositivos Sonoff TH podem ter `itemType` diferente (ex: 3 para dispositivos compartilhados). Isso pode fazer com que nenhum dispositivo apareça na busca.
 
-### Pendente (baixa prioridade)
+### Solução
+1. **Remover filtro de itemType** — aceitar todos os dispositivos retornados pela API e mostrar ao integrado
+2. **Melhorar a action `list-devices`** — adicionar log do total de dispositivos antes/depois do filtro para debug
+3. **No sync também** — garantir que o sync busca dados de qualquer tipo de dispositivo
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+### Alterações
+
+**`supabase/functions/sync-sensors/index.ts`**
+- Action `list-devices`: remover filtro `itemType`, mapear todos os dispositivos que tenham `currentTemperature` ou `currentHumidity` nos params (indica sensor TH)
+- Fallback: se não tiver esses params, ainda listar o dispositivo para que o integrado possa vinculá-lo
+
+**`src/pages/DispositivosIoT.tsx`**  
+- Sem alterações necessárias — a UI já suporta a lista
+
