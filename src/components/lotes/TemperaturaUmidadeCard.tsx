@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
-import { Thermometer, Droplets, Wifi, WifiOff } from 'lucide-react';
+import { Thermometer, Droplets, Wifi, WifiOff, Power, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useDeviceControl } from '@/hooks/useDeviceControl';
 
 interface Props {
   galpaoId: string;
@@ -13,15 +16,23 @@ interface Props {
 interface DispositivoComLeitura {
   id: string;
   nome: string;
+  device_id_ewelink: string;
   temperatura_c: number | null;
   umidade_pct: number | null;
   online: boolean;
   created_at: string | null;
+  switchState: string | null;
 }
 
 export function TemperaturaUmidadeCard({ galpaoId }: Props) {
   const [dispositivos, setDispositivos] = useState<DispositivoComLeitura[]>([]);
   const [loading, setLoading] = useState(true);
+  const { integradoId } = useIntegradoId();
+
+  const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
+    integradoId,
+    onSuccess: () => fetchData(),
+  });
 
   useEffect(() => {
     fetchData();
@@ -30,7 +41,7 @@ export function TemperaturaUmidadeCard({ galpaoId }: Props) {
   const fetchData = async () => {
     const { data: devices } = await supabase
       .from('dispositivos_iot')
-      .select('id, nome')
+      .select('id, nome, device_id_ewelink')
       .eq('galpao_id', galpaoId)
       .eq('ativo', true);
 
@@ -41,21 +52,28 @@ export function TemperaturaUmidadeCard({ galpaoId }: Props) {
 
     const results = await Promise.all(
       devices.map(async (device) => {
-        const { data: reading } = await supabase
-          .from('leituras_sensores')
-          .select('temperatura_c, umidade_pct, online, created_at')
-          .eq('dispositivo_id', device.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const [readingResult, statusResult] = await Promise.all([
+          supabase
+            .from('leituras_sensores')
+            .select('temperatura_c, umidade_pct, online, created_at')
+            .eq('dispositivo_id', device.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          integradoId ? fetchDeviceStatus(device.device_id_ewelink) : Promise.resolve(null),
+        ]);
+
+        const reading = readingResult.data;
 
         return {
           id: device.id,
           nome: device.nome,
+          device_id_ewelink: device.device_id_ewelink,
           temperatura_c: reading?.temperatura_c ?? null,
           umidade_pct: reading?.umidade_pct ?? null,
           online: reading?.online ?? false,
           created_at: reading?.created_at ?? null,
+          switchState: statusResult?.switch ?? null,
         };
       })
     );
@@ -90,7 +108,23 @@ export function TemperaturaUmidadeCard({ galpaoId }: Props) {
                 <Thermometer className="w-4 h-4" />
                 <span>{d.nome}</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                {d.switchState !== null && (
+                  <div className="flex items-center gap-1.5">
+                    {isControlling(d.device_id_ewelink) ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Power className={`w-3.5 h-3.5 ${d.switchState === 'on' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    )}
+                    <Switch
+                      checked={d.switchState === 'on'}
+                      disabled={isControlling(d.device_id_ewelink) || !d.online}
+                      onCheckedChange={() =>
+                        toggleDevice(d.device_id_ewelink, d.switchState)
+                      }
+                    />
+                  </div>
+                )}
                 {d.online ? (
                   <Badge variant="outline" className="text-emerald-600 border-emerald-200 gap-1 text-xs">
                     <Wifi className="w-3 h-3" /> Online

@@ -14,6 +14,8 @@ interface EwelinkDevice {
       currentTemperature?: string;
       currentHumidity?: string;
       online?: boolean;
+      switch?: string;
+      switches?: { switch: string; outlet: number }[];
       [key: string]: unknown;
     };
     [key: string]: unknown;
@@ -171,6 +173,58 @@ async function getAllEwelinkDevices(
   return [];
 }
 
+// ── Control device ─────────────────────────────────────────────
+
+async function controlEwelinkDevice(
+  accessToken: string,
+  appId: string,
+  appSecret: string,
+  region: string,
+  deviceId: string,
+  params: Record<string, unknown>,
+): Promise<{ error: number; msg?: string }> {
+  const regionUrl = getRegionUrl(region);
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+  const body = { type: 1, id: deviceId, params };
+  const sign = await hmacSign(appSecret, JSON.stringify(body));
+
+  const res = await fetch(`${regionUrl}/v2/device/thing/status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CK-Appid": appId,
+      "X-CK-Nonce": nonce,
+      Authorization: `Sign ${sign}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  return await res.json();
+}
+
+// ── Get single device status ───────────────────────────────────
+
+async function getDeviceStatus(
+  accessToken: string,
+  appId: string,
+  region: string,
+  deviceId: string,
+): Promise<any> {
+  const regionUrl = getRegionUrl(region);
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+
+  const res = await fetch(`${regionUrl}/v2/device/thing/status?type=1&id=${deviceId}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-CK-Appid": appId,
+      "X-CK-Nonce": nonce,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return await res.json();
+}
+
 // ── OAuth URL generator ────────────────────────────────────────
 
 async function generateOAuthUrl(
@@ -239,13 +293,14 @@ Deno.serve(async (req) => {
     let action = url.searchParams.get("action") || "sync";
     let integradoId = url.searchParams.get("integrado_id");
     let returnUrl: string | null = null;
+    let bodyParams: Record<string, any> = {};
 
     if (req.method === "POST") {
       try {
-        const body = await req.json();
-        if (body?.action) action = body.action;
-        if (body?.integrado_id) integradoId = body.integrado_id;
-        if (body?.returnUrl) returnUrl = body.returnUrl;
+        bodyParams = await req.json();
+        if (bodyParams?.action) action = bodyParams.action;
+        if (bodyParams?.integrado_id) integradoId = bodyParams.integrado_id;
+        if (bodyParams?.returnUrl) returnUrl = bodyParams.returnUrl;
       } catch { /* no body */ }
     }
 
@@ -273,7 +328,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ connected });
     }
 
-    // ── For list-devices, sync: require integrado_id and their token ──
+    // ── For remaining actions: require integrado_id and their token ──
     if (!integradoId) {
       return jsonResponse({ error: "integrado_id é obrigatório" }, 400);
     }
@@ -317,10 +372,75 @@ Deno.serve(async (req) => {
         umidade: d.itemData.params?.currentHumidity
           ? parseFloat(d.itemData.params.currentHumidity) : null,
         hasSensorData: !!(d.itemData.params?.currentTemperature || d.itemData.params?.currentHumidity),
+        switchState: d.itemData.params?.switch || null,
+        switches: d.itemData.params?.switches || null,
       }));
 
       console.log(`list-devices: ${mappedDevices.filter(d => d.hasSensorData).length} devices with sensor data`);
       return jsonResponse({ devices: mappedDevices });
+    }
+
+    // ── device-status: get current switch state of a device ──
+    if (action === "device-status") {
+      const deviceId = bodyParams.device_id;
+      if (!deviceId) return jsonResponse({ error: "device_id é obrigatório" }, 400);
+
+      const result = await getDeviceStatus(accessToken, appId, region, deviceId);
+      if (result.error !== 0) {
+        return jsonResponse({ error: `Falha ao buscar status: ${result.msg || result.error}` }, 400);
+      }
+
+      return jsonResponse({
+        deviceId,
+        params: result.data?.params || {},
+      });
+    }
+
+    // ── control-device: send on/off command ──
+    if (action === "control-device") {
+      const deviceId = bodyParams.device_id;
+      const switchState = bodyParams.switch; // "on" or "off"
+      const outlet = bodyParams.outlet; // optional, for multi-channel devices
+
+      if (!deviceId || !switchState) {
+        return jsonResponse({ error: "device_id e switch (on/off) são obrigatórios" }, 400);
+      }
+
+      if (switchState !== "on" && switchState !== "off") {
+        return jsonResponse({ error: "switch deve ser 'on' ou 'off'" }, 400);
+      }
+
+      let controlParams: Record<string, unknown>;
+
+      if (outlet !== undefined && outlet !== null) {
+        // Multi-channel device: control specific outlet
+        controlParams = {
+          switches: [{ switch: switchState, outlet: Number(outlet) }],
+        };
+      } else {
+        // Single-channel device
+        controlParams = { switch: switchState };
+      }
+
+      console.log(`control-device: ${deviceId} → ${switchState} (outlet: ${outlet ?? 'single'})`);
+
+      const result = await controlEwelinkDevice(
+        accessToken, appId, appSecret, region, deviceId, controlParams
+      );
+
+      if (result.error !== 0) {
+        console.error("control-device error:", result);
+        return jsonResponse({
+          error: `Falha ao controlar dispositivo: ${result.msg || 'erro desconhecido'}`,
+        }, 400);
+      }
+
+      return jsonResponse({
+        success: true,
+        deviceId,
+        switchState,
+        outlet: outlet ?? null,
+      });
     }
 
     // ── sync ──
@@ -370,7 +490,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: "Sync concluído", leituras: readings.length, detalhes: readings });
     }
 
-    return jsonResponse({ error: "Ação inválida. Use action=oauth-url, check-connection, list-devices ou sync" }, 400);
+    return jsonResponse({ error: "Ação inválida. Use action=oauth-url, check-connection, list-devices, device-status, control-device ou sync" }, 400);
   } catch (error) {
     console.error("Erro no sync-sensors:", error);
     return jsonResponse({ error: error instanceof Error ? error.message : "Erro interno" }, 500);
