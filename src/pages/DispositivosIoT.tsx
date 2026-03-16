@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useDeviceControl } from '@/hooks/useDeviceControl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink, Power, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -47,6 +49,7 @@ interface EwelinkApiDevice {
   online: boolean;
   temperatura: number | null;
   umidade: number | null;
+  switchState?: string | null;
 }
 
 export default function DispositivosIoT() {
@@ -55,6 +58,7 @@ export default function DispositivosIoT() {
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [leituras, setLeituras] = useState<Record<string, Leitura>>({});
+  const [switchStates, setSwitchStates] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -70,6 +74,11 @@ export default function DispositivosIoT() {
   const [loadingEwelinkDevices, setLoadingEwelinkDevices] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
 
+  const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
+    integradoId,
+    onSuccess: () => fetchDeviceStates(),
+  });
+
   useEffect(() => {
     if (integradoId) {
       checkEwelinkConnection();
@@ -83,7 +92,6 @@ export default function DispositivosIoT() {
     if (params.get('ewelink_connected') === 'true') {
       toast.success('Conta eWeLink conectada com sucesso!');
       setEwelinkConnected(true);
-      // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     } else if (params.get('ewelink_error')) {
       toast.error(`Erro ao conectar eWeLink: ${params.get('ewelink_error')}`);
@@ -129,9 +137,29 @@ export default function DispositivosIoT() {
         if (leitura) leiturasMap[dev.id] = leitura as Leitura;
       }
       setLeituras(leiturasMap);
+
+      // Fetch switch states
+      fetchDeviceStatesForDevices(devRes.data as Dispositivo[]);
     }
 
     setLoading(false);
+  };
+
+  const fetchDeviceStatesForDevices = async (devices: Dispositivo[]) => {
+    const states: Record<string, string | null> = {};
+    await Promise.all(
+      devices.map(async (dev) => {
+        const params = await fetchDeviceStatus(dev.device_id_ewelink);
+        states[dev.id] = params?.switch ?? null;
+      })
+    );
+    setSwitchStates(states);
+  };
+
+  const fetchDeviceStates = async () => {
+    if (dispositivos.length > 0) {
+      await fetchDeviceStatesForDevices(dispositivos);
+    }
   };
 
   const handleConnectEwelink = async () => {
@@ -308,7 +336,7 @@ export default function DispositivosIoT() {
                 <Activity className="h-6 w-6 text-primary" />
                 Dispositivos IoT
               </h1>
-              <p className="text-sm text-muted-foreground">Monitoramento de temperatura e umidade via Sonoff TH</p>
+              <p className="text-sm text-muted-foreground">Monitoramento e controle de dispositivos Sonoff</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -432,8 +460,8 @@ export default function DispositivosIoT() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {ewelinkConnected
-                      ? 'Seus sensores serão sincronizados através da sua conta eWeLink'
-                      : 'Conecte sua conta eWeLink para sincronizar seus sensores Sonoff TH'}
+                      ? 'Seus dispositivos serão sincronizados e controlados através da sua conta eWeLink'
+                      : 'Conecte sua conta eWeLink para sincronizar e controlar seus dispositivos Sonoff'}
                   </p>
                 </div>
               </div>
@@ -445,7 +473,6 @@ export default function DispositivosIoT() {
               )}
             </div>
 
-            {/* OAuth connect button — show when not connected */}
             {!ewelinkConnected && !checkingConnection && (
               <div className="mt-3 space-y-2">
                 <Button className="w-full sm:w-auto" onClick={handleConnectEwelink} disabled={connecting}>
@@ -467,7 +494,7 @@ export default function DispositivosIoT() {
               <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold text-lg text-foreground">Nenhum dispositivo cadastrado</h3>
               <p className="text-muted-foreground mt-1">
-                Adicione seus sensores Sonoff TH para monitorar temperatura e umidade dos galpões.
+                Adicione seus dispositivos Sonoff para monitorar e controlar temperatura, umidade, ventiladores e aquecedores.
               </p>
             </CardContent>
           </Card>
@@ -476,13 +503,15 @@ export default function DispositivosIoT() {
             {dispositivos.map((dev) => {
               const leitura = leituras[dev.id];
               const galpao = galpoes.find((g) => g.id === dev.galpao_id);
+              const currentSwitch = switchStates[dev.id];
+              const isOnline = leitura?.online !== false;
 
               return (
                 <Card key={dev.id} className="relative">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base flex items-center gap-2">
-                        {leitura?.online !== false ? (
+                        {isOnline ? (
                           <Wifi className="h-4 w-4 text-primary" />
                         ) : (
                           <WifiOff className="h-4 w-4 text-destructive" />
@@ -535,6 +564,29 @@ export default function DispositivosIoT() {
                         Sem leituras. Clique em "Sincronizar".
                       </p>
                     )}
+
+                    {/* Device Control */}
+                    {currentSwitch !== undefined && (
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {isControlling(dev.device_id_ewelink) ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Power className={`h-4 w-4 ${currentSwitch === 'on' ? 'text-primary' : 'text-muted-foreground'}`} />
+                          )}
+                          <span className="text-sm font-medium text-foreground">
+                            {currentSwitch === 'on' ? 'Ligado' : currentSwitch === 'off' ? 'Desligado' : 'Controle'}
+                          </span>
+                        </div>
+                        <Switch
+                          checked={currentSwitch === 'on'}
+                          disabled={isControlling(dev.device_id_ewelink) || !isOnline}
+                          onCheckedChange={() =>
+                            toggleDevice(dev.device_id_ewelink, currentSwitch)
+                          }
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -547,11 +599,12 @@ export default function DispositivosIoT() {
           <CardContent className="py-4">
             <h4 className="font-medium text-sm text-foreground mb-2">Como configurar</h4>
             <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Pareie seus sensores Sonoff TH no app eWeLink (na sua conta pessoal)</li>
+              <li>Pareie seus dispositivos Sonoff no app eWeLink (na sua conta pessoal)</li>
               <li>Clique em "Conectar conta eWeLink" e autorize o acesso na página do eWeLink</li>
               <li>Clique em "Adicionar" e use "Buscar dispositivos" para selecionar o sensor da lista</li>
               <li>Vincule a um galpão para monitoramento automático</li>
               <li>Clique em "Sincronizar" para buscar a primeira leitura</li>
+              <li>Use o controle on/off para ligar/desligar ventiladores e aquecedores</li>
             </ol>
           </CardContent>
         </Card>
