@@ -75,6 +75,7 @@ export function TemperaturaUmidadeCard({ galpaoId }: Props) {
           online: reading?.online ?? false,
           created_at: reading?.created_at ?? null,
           switchState: statusResult?.switch ?? null,
+          autoControlEnabled: statusResult?.autoControlEnabled === 1,
         };
       })
     );
