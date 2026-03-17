@@ -10,6 +10,7 @@ interface EwelinkDevice {
   itemData: {
     deviceid: string;
     name: string;
+    online?: boolean;
     params: {
       currentTemperature?: string;
       currentHumidity?: string;
@@ -365,7 +366,7 @@ Deno.serve(async (req) => {
       const mappedDevices = devices.map((d) => ({
         deviceId: d.itemData.deviceid,
         name: d.itemData.name,
-        online: d.itemData.params?.online ?? false,
+        online: d.itemData.online ?? d.itemData.params?.online ?? false,
         itemType: d.itemType,
         temperatura: d.itemData.params?.currentTemperature
           ? parseFloat(d.itemData.params.currentTemperature) : null,
@@ -446,9 +447,12 @@ Deno.serve(async (req) => {
     // ── sync ──
     if (action === "sync") {
       const ewelinkDevices = await getAllEwelinkDevices(accessToken, appId, region);
-      const deviceMap = new Map<string, EwelinkDevice["itemData"]["params"]>();
+      const deviceMap = new Map<string, { params: EwelinkDevice["itemData"]["params"]; online: boolean }>();
       for (const d of ewelinkDevices) {
-        deviceMap.set(d.itemData.deviceid, d.itemData.params);
+        deviceMap.set(d.itemData.deviceid, {
+          params: d.itemData.params,
+          online: d.itemData.online ?? d.itemData.params?.online ?? false,
+        });
       }
 
       const { data: dbDevices, error: dbError } = await supabase
@@ -462,19 +466,19 @@ Deno.serve(async (req) => {
 
       const readings = [];
       for (const dev of dbDevices || []) {
-        const params = deviceMap.get(dev.device_id_ewelink);
-        if (!params) continue;
+        const entry = deviceMap.get(dev.device_id_ewelink);
+        if (!entry) continue;
 
-        const temp = params.currentTemperature ? parseFloat(params.currentTemperature) : null;
-        const hum = params.currentHumidity ? parseFloat(params.currentHumidity) : null;
-        const online = params.online ?? false;
+        const temp = entry.params.currentTemperature ? parseFloat(entry.params.currentTemperature) : null;
+        const hum = entry.params.currentHumidity ? parseFloat(entry.params.currentHumidity) : null;
+        const online = entry.online;
 
         const { error: insertErr } = await supabase.from("leituras_sensores").insert({
           dispositivo_id: dev.id,
           temperatura_c: temp,
           umidade_pct: hum,
           online,
-          raw_data: params as Record<string, unknown>,
+          raw_data: entry.params as Record<string, unknown>,
         });
 
         if (!insertErr) {
