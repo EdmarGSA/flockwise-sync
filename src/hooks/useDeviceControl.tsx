@@ -42,7 +42,15 @@ export function useDeviceControl({ integradoId, onSuccess }: UseDeviceControlOpt
         return;
       }
 
-      toast.success(`Dispositivo ${newState === 'on' ? 'ligado' : 'desligado'}`);
+      if (data?.confirmed === false) {
+        if (data?.autoControlEnabled) {
+          toast.warning('Comando enviado, mas o dispositivo tem automação por temperatura ativa. O estado pode não mudar até a condição ser atendida.', { duration: 6000 });
+        } else {
+          toast.warning('Comando enviado, mas o dispositivo não alterou o estado.');
+        }
+      } else {
+        toast.success(`Dispositivo ${newState === 'on' ? 'ligado' : 'desligado'}`);
+      }
       onSuccess?.();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao controlar dispositivo';
