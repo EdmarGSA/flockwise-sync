@@ -10,6 +10,7 @@ interface EwelinkDevice {
   itemData: {
     deviceid: string;
     name: string;
+    online?: boolean;
     params: {
       currentTemperature?: string;
       currentHumidity?: string;
