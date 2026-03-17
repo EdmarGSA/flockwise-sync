@@ -22,6 +22,7 @@ interface DispositivoComLeitura {
   online: boolean;
   created_at: string | null;
   switchState: string | null;
+  autoControlEnabled: boolean;
 }
 
 export function TemperaturaUmidadeCard({ galpaoId }: Props) {
