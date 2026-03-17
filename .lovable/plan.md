@@ -1,31 +1,45 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Problema
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+Os dispositivos aparecem como **"Offline"** mesmo estando online e sincronizando dados (temperatura/umidade). O bug está na leitura do campo `online` da API eWeLink.
 
-### Pendente (baixa prioridade)
+## Causa raiz
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+Na API eWeLink v2, o campo `online` fica em `itemData.online`, **não** em `itemData.params.online`. O código atual lê `d.itemData.params?.online`, que é `undefined` para a maioria dos dispositivos Sonoff, e o `?? false` faz todos ficarem como offline.
+
+Locais afetados:
+- **Linha 368** do `sync-sensors/index.ts` (list-devices): `d.itemData.params?.online ?? false`
+- **Linha 470** do `sync-sensors/index.ts` (sync): `params.online ?? false`
+- **Linha 449-451**: o `deviceMap` só guarda `params`, perdendo o `online` que está um nível acima
+
+## Solução
+
+### 1. Atualizar interface `EwelinkDevice` (sync-sensors/index.ts)
+Adicionar `online?: boolean` em `itemData` (fora de `params`).
+
+### 2. Corrigir `list-devices` (linha 368)
+```typescript
+// De:
+online: d.itemData.params?.online ?? false,
+// Para:
+online: (d.itemData as any).online ?? d.itemData.params?.online ?? false,
+```
+
+### 3. Corrigir `sync` (linhas 446-470)
+Mudar o `deviceMap` para guardar o `online` do nível `itemData`:
+```typescript
+const deviceMap = new Map<string, { params: ..., online: boolean }>();
+for (const d of ewelinkDevices) {
+  deviceMap.set(d.itemData.deviceid, {
+    params: d.itemData.params,
+    online: (d.itemData as any).online ?? d.itemData.params?.online ?? false,
+  });
+}
+// ...
+const online = entry.online;
+```
+
+### Arquivos alterados
+- `supabase/functions/sync-sensors/index.ts` — corrigir leitura do campo `online` em `list-devices` e `sync`
+
