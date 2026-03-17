@@ -73,6 +73,7 @@ export default function DispositivosIoT() {
   const [ewelinkDevices, setEwelinkDevices] = useState<EwelinkApiDevice[]>([]);
   const [loadingEwelinkDevices, setLoadingEwelinkDevices] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
+  const [autoControlDevices, setAutoControlDevices] = useState<Set<string>>(new Set());
 
   const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
     integradoId,
