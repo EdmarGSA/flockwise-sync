@@ -83,7 +83,7 @@ export function useDeviceControl({ integradoId, onSuccess }: UseDeviceControlOpt
 
       if (error) throw error;
       if (data?.error) return null;
-      return data?.params || null;
+      return data?.params ?? data ?? null;
     } catch {
       return null;
     }

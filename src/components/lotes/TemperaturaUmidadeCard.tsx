@@ -113,6 +113,9 @@ export function TemperaturaUmidadeCard({ galpaoId }: Props) {
               <div className="flex items-center gap-2">
                 {d.switchState !== null && (
                   <div className="flex items-center gap-1.5">
+                    {d.autoControlEnabled && (
+                      <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 mr-1">Auto</Badge>
+                    )}
                     {isControlling(d.device_id_ewelink) ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                     ) : (

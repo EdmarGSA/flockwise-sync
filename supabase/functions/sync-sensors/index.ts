@@ -435,8 +435,24 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
+      // Wait and verify actual state
+      await new Promise(r => setTimeout(r, 1200));
+      const verifyStatus = await getDeviceStatus(accessToken, appId, region, deviceId);
+      const actualParams = verifyStatus?.data?.params || {};
+      const actualState = actualParams.switch ?? null;
+      const autoCtrl = actualParams.autoControlEnabled === 1;
+
+      const confirmed = outlet != null
+        ? (actualParams.switches?.[Number(outlet)]?.switch === switchState)
+        : (actualState === switchState);
+
+      console.log(`control-device verify: requested=${switchState}, actual=${actualState}, confirmed=${confirmed}, autoControl=${autoCtrl}`);
+
       return jsonResponse({
         success: true,
+        confirmed,
+        actualState,
+        autoControlEnabled: autoCtrl,
         deviceId,
         switchState,
         outlet: outlet ?? null,

@@ -581,6 +581,9 @@ export default function DispositivosIoT() {
                           <span className="text-sm font-medium text-foreground">
                             {currentSwitch === 'on' ? 'Ligado' : currentSwitch === 'off' ? 'Desligado' : 'Controle'}
                           </span>
+                          {autoControlDevices.has(dev.id) && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">Auto</Badge>
+                          )}
                         </div>
                         <Switch
                           checked={currentSwitch === 'on'}
