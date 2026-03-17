@@ -179,7 +179,7 @@ async function getAllEwelinkDevices(
 async function controlEwelinkDevice(
   accessToken: string,
   appId: string,
-  appSecret: string,
+  _appSecret: string,
   region: string,
   deviceId: string,
   params: Record<string, unknown>,
@@ -187,7 +187,6 @@ async function controlEwelinkDevice(
   const regionUrl = getRegionUrl(region);
   const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
   const body = { type: 1, id: deviceId, params };
-  const sign = await hmacSign(appSecret, JSON.stringify(body));
 
   const res = await fetch(`${regionUrl}/v2/device/thing/status`, {
     method: "POST",
@@ -195,7 +194,7 @@ async function controlEwelinkDevice(
       "Content-Type": "application/json",
       "X-CK-Appid": appId,
       "X-CK-Nonce": nonce,
-      Authorization: `Sign ${sign}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
   });
