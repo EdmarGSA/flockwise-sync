@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
       const mappedDevices = devices.map((d) => ({
         deviceId: d.itemData.deviceid,
         name: d.itemData.name,
-        online: d.itemData.params?.online ?? false,
+        online: d.itemData.online ?? d.itemData.params?.online ?? false,
         itemType: d.itemType,
         temperatura: d.itemData.params?.currentTemperature
           ? parseFloat(d.itemData.params.currentTemperature) : null,
