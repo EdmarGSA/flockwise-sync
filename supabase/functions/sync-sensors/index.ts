@@ -466,19 +466,19 @@ Deno.serve(async (req) => {
 
       const readings = [];
       for (const dev of dbDevices || []) {
-        const params = deviceMap.get(dev.device_id_ewelink);
-        if (!params) continue;
+        const entry = deviceMap.get(dev.device_id_ewelink);
+        if (!entry) continue;
 
-        const temp = params.currentTemperature ? parseFloat(params.currentTemperature) : null;
-        const hum = params.currentHumidity ? parseFloat(params.currentHumidity) : null;
-        const online = params.online ?? false;
+        const temp = entry.params.currentTemperature ? parseFloat(entry.params.currentTemperature) : null;
+        const hum = entry.params.currentHumidity ? parseFloat(entry.params.currentHumidity) : null;
+        const online = entry.online;
 
         const { error: insertErr } = await supabase.from("leituras_sensores").insert({
           dispositivo_id: dev.id,
           temperatura_c: temp,
           umidade_pct: hum,
           online,
-          raw_data: params as Record<string, unknown>,
+          raw_data: entry.params as Record<string, unknown>,
         });
 
         if (!insertErr) {
