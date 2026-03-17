@@ -447,9 +447,12 @@ Deno.serve(async (req) => {
     // ── sync ──
     if (action === "sync") {
       const ewelinkDevices = await getAllEwelinkDevices(accessToken, appId, region);
-      const deviceMap = new Map<string, EwelinkDevice["itemData"]["params"]>();
+      const deviceMap = new Map<string, { params: EwelinkDevice["itemData"]["params"]; online: boolean }>();
       for (const d of ewelinkDevices) {
-        deviceMap.set(d.itemData.deviceid, d.itemData.params);
+        deviceMap.set(d.itemData.deviceid, {
+          params: d.itemData.params,
+          online: d.itemData.online ?? d.itemData.params?.online ?? false,
+        });
       }
 
       const { data: dbDevices, error: dbError } = await supabase
