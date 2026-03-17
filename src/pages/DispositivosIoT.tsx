@@ -148,13 +148,16 @@ export default function DispositivosIoT() {
 
   const fetchDeviceStatesForDevices = async (devices: Dispositivo[]) => {
     const states: Record<string, string | null> = {};
+    const autoCtrl = new Set<string>();
     await Promise.all(
       devices.map(async (dev) => {
         const params = await fetchDeviceStatus(dev.device_id_ewelink);
         states[dev.id] = params?.switch ?? null;
+        if (params?.autoControlEnabled === 1) autoCtrl.add(dev.id);
       })
     );
     setSwitchStates(states);
+    setAutoControlDevices(autoCtrl);
   };
 
   const fetchDeviceStates = async () => {
