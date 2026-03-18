@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.ewelink-oauth-callback]
 verify_jwt = false
+
+[functions.auto-temperatura]
+verify_jwt = false

@@ -310,7 +310,10 @@ export default function LoteDetalhe() {
 
         {/* Monitoramento IoT - Temperatura e Umidade */}
         {lote.status === 'alojado' && (
-          <TemperaturaUmidadeCard galpaoId={lote.galpao_id} />
+          <TemperaturaUmidadeCard
+            galpaoId={lote.galpao_id}
+            idadeDias={lote.data_alojamento ? Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)) + 1 : undefined}
+          />
         )}
 
         {/* Alertas de Produção para lotes de postura */}
