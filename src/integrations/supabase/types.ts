@@ -1095,8 +1095,10 @@ export type Database = {
       dispositivos_iot: {
         Row: {
           ativo: boolean
+          automacao_ativa: boolean
           created_at: string
           device_id_ewelink: string
+          funcao_automacao: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id: string | null
           id: string
           integrado_id: string
@@ -1109,8 +1111,10 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          automacao_ativa?: boolean
           created_at?: string
           device_id_ewelink: string
+          funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id?: string | null
           id?: string
           integrado_id: string
@@ -1123,8 +1127,10 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          automacao_ativa?: boolean
           created_at?: string
           device_id_ewelink?: string
+          funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id?: string | null
           id?: string
           integrado_id?: string
@@ -2152,6 +2158,57 @@ export type Database = {
             columns: ["dispositivo_id"]
             isOneToOne: false
             referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      log_automacao_temperatura: {
+        Row: {
+          acao: string
+          created_at: string
+          dispositivo_id: string
+          id: string
+          lote_id: string | null
+          resultado: string | null
+          temp_max_regra: number | null
+          temp_min_regra: number | null
+          temperatura_lida: number | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          dispositivo_id: string
+          id?: string
+          lote_id?: string | null
+          resultado?: string | null
+          temp_max_regra?: number | null
+          temp_min_regra?: number | null
+          temperatura_lida?: number | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          dispositivo_id?: string
+          id?: string
+          lote_id?: string | null
+          resultado?: string | null
+          temp_max_regra?: number | null
+          temp_min_regra?: number | null
+          temperatura_lida?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_automacao_temperatura_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_automacao_temperatura_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
             referencedColumns: ["id"]
           },
         ]
@@ -5480,6 +5537,51 @@ export type Database = {
           },
         ]
       }
+      regras_temperatura_lote: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          dia_fim: number
+          dia_inicio: number
+          id: string
+          integrado_id: string
+          nome: string
+          temp_max_c: number
+          temp_min_c: number
+          umidade_max_pct: number | null
+          umidade_min_pct: number | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          dia_fim: number
+          dia_inicio: number
+          id?: string
+          integrado_id: string
+          nome?: string
+          temp_max_c: number
+          temp_min_c: number
+          umidade_max_pct?: number | null
+          umidade_min_pct?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          dia_fim?: number
+          dia_inicio?: number
+          id?: string
+          integrado_id?: string
+          nome?: string
+          temp_max_c?: number
+          temp_min_c?: number
+          umidade_max_pct?: number | null
+          umidade_min_pct?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reserva_estoque_ovos: {
         Row: {
           created_at: string
@@ -6685,6 +6787,7 @@ export type Database = {
         | "dinheiro"
         | "cheque"
         | "cartao"
+      funcao_automacao: "aquecimento" | "ventilacao" | "nenhuma"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       linhagem_postura:
         | "lohmann_brown_lite"
@@ -6925,6 +7028,7 @@ export const Constants = {
         "cheque",
         "cartao",
       ],
+      funcao_automacao: ["aquecimento", "ventilacao", "nenhuma"],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       linhagem_postura: [
         "lohmann_brown_lite",
