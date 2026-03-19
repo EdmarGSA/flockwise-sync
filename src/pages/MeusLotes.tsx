@@ -498,6 +498,8 @@ export default function MeusLotes() {
       </header>
 
       <main className="container mx-auto px-4 py-8 pt-24">
+        {/* Temperature Alerts */}
+        <AlertasTemperaturaBar />
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card className="bg-card border-border">
