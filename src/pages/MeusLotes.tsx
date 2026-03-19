@@ -28,6 +28,7 @@ import { NotificacoesVetDialog } from '@/components/lotes/NotificacoesVetDialog'
 import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
 import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
 import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
+import { AlertasTemperaturaBar } from '@/components/lotes/AlertasTemperaturaBar';
 import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { PosturaIndicators } from '@/components/lotes/postura/PosturaIndicators';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
