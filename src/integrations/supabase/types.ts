@@ -47,6 +47,75 @@ export type Database = {
         }
         Relationships: []
       }
+      alertas_temperatura: {
+        Row: {
+          created_at: string
+          duracao_minutos: number
+          galpao_id: string
+          id: string
+          integrado_id: string
+          lote_id: string
+          notificado: boolean
+          primeira_leitura_fora: string
+          resolvido: boolean
+          resolvido_em: string | null
+          temp_max_regra: number
+          temp_min_regra: number
+          temperatura_lida: number
+          tipo: string
+          ultima_leitura_fora: string
+        }
+        Insert: {
+          created_at?: string
+          duracao_minutos?: number
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          lote_id: string
+          notificado?: boolean
+          primeira_leitura_fora?: string
+          resolvido?: boolean
+          resolvido_em?: string | null
+          temp_max_regra: number
+          temp_min_regra: number
+          temperatura_lida: number
+          tipo: string
+          ultima_leitura_fora?: string
+        }
+        Update: {
+          created_at?: string
+          duracao_minutos?: number
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+          notificado?: boolean
+          primeira_leitura_fora?: string
+          resolvido?: boolean
+          resolvido_em?: string | null
+          temp_max_regra?: number
+          temp_min_regra?: number
+          temperatura_lida?: number
+          tipo?: string
+          ultima_leitura_fora?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_temperatura_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_temperatura_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           ativo: boolean
