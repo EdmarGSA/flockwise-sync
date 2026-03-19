@@ -5,7 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ── HMAC helper ────────────────────────────────────────────────
 async function hmacSign(secret: string, message: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -106,6 +105,83 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// ── Alert management ───────────────────────────────────────────
+async function manageAlerts(
+  supabase: any,
+  integradoId: string,
+  loteId: string,
+  galpaoId: string,
+  temp: number,
+  tempMin: number,
+  tempMax: number,
+) {
+  const isOutOfRange = temp < tempMin || temp > tempMax;
+  const alertType = temp < tempMin ? "temp_baixa" : "temp_alta";
+
+  // Look for existing open alert for this galpao
+  const { data: existingAlert } = await supabase
+    .from("alertas_temperatura")
+    .select("*")
+    .eq("galpao_id", galpaoId)
+    .eq("resolvido", false)
+    .limit(1)
+    .maybeSingle();
+
+  if (isOutOfRange) {
+    if (existingAlert) {
+      // Update existing alert: update duration and last reading
+      const firstTime = new Date(existingAlert.primeira_leitura_fora);
+      const duracao = Math.round((Date.now() - firstTime.getTime()) / 60000);
+
+      await supabase.from("alertas_temperatura").update({
+        temperatura_lida: temp,
+        ultima_leitura_fora: new Date().toISOString(),
+        duracao_minutos: duracao,
+        tipo: alertType,
+        temp_min_regra: tempMin,
+        temp_max_regra: tempMax,
+        // Mark as notified once 10+ minutes have passed
+        notificado: duracao >= 10 ? true : existingAlert.notificado,
+      }).eq("id", existingAlert.id);
+
+      if (duracao >= 10 && !existingAlert.notificado) {
+        // Create admin notification
+        await supabase.from("admin_notifications").insert({
+          integrado_id: integradoId,
+          tipo: "alerta_temperatura",
+          titulo: `⚠️ Temperatura fora da faixa há ${duracao} min`,
+          mensagem: `Galpão com temperatura ${temp.toFixed(1)}°C (faixa ideal: ${tempMin}–${tempMax}°C). Alerta ativo há ${duracao} minutos.`,
+        });
+        console.log(`alert: notification created for galpao ${galpaoId} (${duracao}min out of range)`);
+      }
+    } else {
+      // Create new alert
+      await supabase.from("alertas_temperatura").insert({
+        integrado_id: integradoId,
+        lote_id: loteId,
+        galpao_id: galpaoId,
+        tipo: alertType,
+        temperatura_lida: temp,
+        temp_min_regra: tempMin,
+        temp_max_regra: tempMax,
+        primeira_leitura_fora: new Date().toISOString(),
+        ultima_leitura_fora: new Date().toISOString(),
+        duracao_minutos: 0,
+      });
+      console.log(`alert: new alert created for galpao ${galpaoId} (${alertType}, ${temp}°C)`);
+    }
+  } else {
+    // Temperature back to normal — resolve any open alert
+    if (existingAlert) {
+      await supabase.from("alertas_temperatura").update({
+        resolvido: true,
+        resolvido_em: new Date().toISOString(),
+      }).eq("id", existingAlert.id);
+      console.log(`alert: resolved for galpao ${galpaoId} (temp ${temp}°C back in range)`);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -123,7 +199,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Credenciais eWeLink não configuradas" }, 400);
     }
 
-    // 1. Find all active batches with housing date
     const { data: lotes, error: lotesErr } = await supabase
       .from("lotes")
       .select("id, integrado_id, galpao_id, data_alojamento")
@@ -133,12 +208,11 @@ Deno.serve(async (req) => {
 
     if (lotesErr) throw new Error(`Lotes query error: ${lotesErr.message}`);
     if (!lotes || lotes.length === 0) {
-      return jsonResponse({ message: "Nenhum lote alojado encontrado", actions: 0 });
+      return jsonResponse({ message: "Nenhum lote alojado encontrado", actions: 0, alerts: 0 });
     }
 
     console.log(`auto-temperatura: ${lotes.length} lotes alojados encontrados`);
 
-    // Group lotes by integrado_id for token efficiency
     const lotesByIntegrado = new Map<string, typeof lotes>();
     for (const lote of lotes) {
       const arr = lotesByIntegrado.get(lote.integrado_id) || [];
@@ -147,9 +221,9 @@ Deno.serve(async (req) => {
     }
 
     let totalActions = 0;
+    let totalAlerts = 0;
 
     for (const [integradoId, integradoLotes] of lotesByIntegrado) {
-      // Get eWeLink token for this integrado
       const { data: tokenData } = await supabase
         .from("ewelink_tokens")
         .select("*")
@@ -158,22 +232,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (!tokenData) {
-        console.log(`auto-temperatura: no token for integrado ${integradoId}, skipping`);
-        continue;
-      }
-
-      let accessToken: string;
-      try {
-        accessToken = await refreshAccessToken(supabase, tokenData, appId, appSecret);
-      } catch (err) {
-        console.error(`auto-temperatura: token refresh failed for ${integradoId}:`, err);
-        continue;
-      }
-
-      const region = tokenData.region || "us";
-
-      // Get temperature rules for this integrado
+      // Get temperature rules (needed for alerts even without token)
       const { data: regras } = await supabase
         .from("regras_temperatura_lote")
         .select("*")
@@ -186,118 +245,112 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Get automation-enabled devices for this integrado
+      let accessToken: string | null = null;
+      let region = "us";
+
+      if (tokenData) {
+        try {
+          accessToken = await refreshAccessToken(supabase, tokenData, appId, appSecret);
+          region = tokenData.region || "us";
+        } catch (err) {
+          console.error(`auto-temperatura: token refresh failed for ${integradoId}:`, err);
+        }
+      }
+
+      // Get automation-enabled devices
       const { data: devices } = await supabase
         .from("dispositivos_iot")
-        .select("id, device_id_ewelink, galpao_id, funcao_automacao")
+        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa")
         .eq("integrado_id", integradoId)
-        .eq("ativo", true)
-        .eq("automacao_ativa", true)
-        .neq("funcao_automacao", "nenhuma");
+        .eq("ativo", true);
 
-      if (!devices || devices.length === 0) continue;
+      const automationDevices = (devices || []).filter(
+        (d: any) => d.automacao_ativa && d.funcao_automacao !== "nenhuma"
+      );
 
       for (const lote of integradoLotes) {
         const ageDays = Math.floor(
           (Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)
         ) + 1;
 
-        // Find applicable rule
-        const regra = regras.find(r => ageDays >= r.dia_inicio && ageDays <= r.dia_fim);
-        if (!regra) {
-          console.log(`auto-temperatura: no rule for age ${ageDays}d on lote ${lote.id}`);
-          continue;
-        }
+        const regra = regras.find((r: any) => ageDays >= r.dia_inicio && ageDays <= r.dia_fim);
+        if (!regra) continue;
 
-        // Get devices linked to this lot's galpao
-        const galpaoDevices = devices.filter(d => d.galpao_id === lote.galpao_id);
-        if (galpaoDevices.length === 0) continue;
+        // Get all devices in this galpao for reading
+        const allGalpaoDeviceIds = (devices || [])
+          .filter((d: any) => d.galpao_id === lote.galpao_id)
+          .map((d: any) => d.id);
 
-        // Get latest temperature reading from any sensor in this galpao
-        const sensorDeviceIds = galpaoDevices.map(d => d.id);
-        // Also check all devices in the galpao (including sensors that aren't automation-enabled)
-        const { data: allGalpaoDevices } = await supabase
-          .from("dispositivos_iot")
-          .select("id")
-          .eq("galpao_id", lote.galpao_id)
-          .eq("ativo", true);
-
-        const allDeviceIds = (allGalpaoDevices || []).map(d => d.id);
-        if (allDeviceIds.length === 0) continue;
+        if (allGalpaoDeviceIds.length === 0) continue;
 
         const { data: leitura } = await supabase
           .from("leituras_sensores")
           .select("temperatura_c, created_at")
-          .in("dispositivo_id", allDeviceIds)
+          .in("dispositivo_id", allGalpaoDeviceIds)
           .not("temperatura_c", "is", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (!leitura || leitura.temperatura_c === null) {
-          console.log(`auto-temperatura: no reading for galpao of lote ${lote.id}`);
-          continue;
-        }
+        if (!leitura || leitura.temperatura_c === null) continue;
 
-        // Check if reading is recent (< 15 min)
         const readingAge = Date.now() - new Date(leitura.created_at).getTime();
-        if (readingAge > 15 * 60 * 1000) {
-          console.log(`auto-temperatura: reading too old (${Math.round(readingAge / 60000)}min) for lote ${lote.id}`);
-          continue;
-        }
+        if (readingAge > 15 * 60 * 1000) continue;
 
         const temp = Number(leitura.temperatura_c);
+        const tempMin = Number(regra.temp_min_c);
+        const tempMax = Number(regra.temp_max_c);
+
+        // ── Manage alerts (works even without eWeLink token) ──
+        await manageAlerts(supabase, integradoId, lote.id, lote.galpao_id, temp, tempMin, tempMax);
+        totalAlerts++;
+
+        // ── Device automation (requires eWeLink token) ──
+        if (!accessToken) continue;
+
+        const galpaoDevices = automationDevices.filter((d: any) => d.galpao_id === lote.galpao_id);
+        if (galpaoDevices.length === 0) continue;
 
         for (const device of galpaoDevices) {
           let desiredState: "on" | "off" | null = null;
           let acao = "";
 
           if (device.funcao_automacao === "aquecimento") {
-            if (temp < Number(regra.temp_min_c)) {
+            if (temp < tempMin) {
               desiredState = "on";
-              acao = `ligar_aquecimento (temp ${temp}°C < min ${regra.temp_min_c}°C)`;
-            } else if (temp >= Number(regra.temp_min_c)) {
+              acao = `ligar_aquecimento (temp ${temp}°C < min ${tempMin}°C)`;
+            } else {
               desiredState = "off";
-              acao = `desligar_aquecimento (temp ${temp}°C >= min ${regra.temp_min_c}°C)`;
+              acao = `desligar_aquecimento (temp ${temp}°C >= min ${tempMin}°C)`;
             }
           } else if (device.funcao_automacao === "ventilacao") {
-            if (temp > Number(regra.temp_max_c)) {
+            if (temp > tempMax) {
               desiredState = "on";
-              acao = `ligar_ventilacao (temp ${temp}°C > max ${regra.temp_max_c}°C)`;
-            } else if (temp <= Number(regra.temp_max_c)) {
+              acao = `ligar_ventilacao (temp ${temp}°C > max ${tempMax}°C)`;
+            } else {
               desiredState = "off";
-              acao = `desligar_ventilacao (temp ${temp}°C <= max ${regra.temp_max_c}°C)`;
+              acao = `desligar_ventilacao (temp ${temp}°C <= max ${tempMax}°C)`;
             }
           }
 
           if (desiredState === null) continue;
 
-          // Check current state to avoid redundant commands
           try {
             const statusResult = await getDeviceStatus(accessToken, appId, region, device.device_id_ewelink);
             const currentState = statusResult?.data?.params?.switch;
+            if (currentState === desiredState) continue;
+          } catch { /* proceed */ }
 
-            if (currentState === desiredState) {
-              console.log(`auto-temperatura: device ${device.device_id_ewelink} already ${desiredState}, skipping`);
-              continue;
-            }
-          } catch {
-            // If we can't check status, proceed with command anyway
-          }
-
-          // Send command
           console.log(`auto-temperatura: ${acao} → device ${device.device_id_ewelink}`);
           const result = await controlDevice(accessToken, appId, region, device.device_id_ewelink, { switch: desiredState });
-
           const resultado = result.error === 0 ? "sucesso" : `erro: ${result.msg || result.error}`;
 
-          // Log the action
           await supabase.from("log_automacao_temperatura").insert({
             dispositivo_id: device.id,
             lote_id: lote.id,
             temperatura_lida: temp,
-            temp_min_regra: regra.temp_min_c,
-            temp_max_regra: regra.temp_max_c,
+            temp_min_regra: tempMin,
+            temp_max_regra: tempMax,
             acao,
             resultado,
           });
@@ -307,8 +360,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`auto-temperatura: completed with ${totalActions} actions`);
-    return jsonResponse({ message: "Automação executada", actions: totalActions });
+    console.log(`auto-temperatura: completed with ${totalActions} actions, ${totalAlerts} alert checks`);
+    return jsonResponse({ message: "Automação executada", actions: totalActions, alerts: totalAlerts });
 
   } catch (error) {
     console.error("auto-temperatura error:", error);
