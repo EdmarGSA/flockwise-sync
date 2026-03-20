@@ -1502,6 +1502,15 @@ export default function MetasPesoLote() {
                 </CardContent>
               </Card>
             </div>
+            {/* Histórico de Temperatura */}
+            {lote?.galpao_id && lote?.data_alojamento && (
+              <HistoricoTemperaturaLote
+                galpaoId={lote.galpao_id}
+                dataAlojamento={lote.data_alojamento}
+                linhagem={lote.linhagem}
+                sexo={lote.sexo}
+              />
+            )}
           </div>
         )}
       </main>
