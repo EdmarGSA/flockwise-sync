@@ -19,6 +19,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import PesagemDetalheDialog from '@/components/veterinario/PesagemDetalheDialog';
 import MortalidadeSemanaDetalheDialog from '@/components/lotes/MortalidadeSemanaDetalheDialog';
 import { PesagemAnaliseCard } from '@/components/lotes/PesagemAnaliseCard';
+import { HistoricoTemperaturaLote } from '@/components/lotes/HistoricoTemperaturaLote';
 
 interface Lote {
   id: string;
@@ -27,6 +28,7 @@ interface Lote {
   linhagem: string;
   sexo: string;
   peso_medio_pintinhos: number | null;
+  galpao_id: string | null;
   nucleo: { nome: string } | null;
   galpao: { nome: string } | null;
 }
@@ -184,6 +186,7 @@ export default function MetasPesoLote() {
         linhagem,
         sexo,
         peso_medio_pintinhos,
+        galpao_id,
         nucleo:nucleos(nome),
         galpao:galpoes(nome)
       `)
@@ -1499,6 +1502,15 @@ export default function MetasPesoLote() {
                 </CardContent>
               </Card>
             </div>
+            {/* Histórico de Temperatura */}
+            {lote?.galpao_id && lote?.data_alojamento && (
+              <HistoricoTemperaturaLote
+                galpaoId={lote.galpao_id}
+                dataAlojamento={lote.data_alojamento}
+                linhagem={lote.linhagem}
+                sexo={lote.sexo}
+              />
+            )}
           </div>
         )}
       </main>
