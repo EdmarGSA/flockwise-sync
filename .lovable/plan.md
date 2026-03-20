@@ -1,35 +1,40 @@
 
 
-## Histórico de Temperatura Diário (Min/Máx) na Página de Metas do Lote
+## Vincular Dispositivos à Tabela de Automação
+
+### Situação Atual
+
+Hoje, cada dispositivo tem campos `funcao_automacao` e `automacao_ativa` diretamente na tabela `dispositivos_iot`. As regras de temperatura (`regras_temperatura_lote`) são globais por organização. Não há vínculo explícito entre o dispositivo e as regras.
 
 ### O que será feito
 
-Adicionar uma seção "Histórico de Temperatura" na página `MetasPesoLote` que mostra, para cada dia desde o alojamento, a temperatura mínima e máxima registrada pelos sensores do galpão, junto com o horário de cada ocorrência. Inclui um gráfico de linha (min/max por dia) e uma tabela com os dados detalhados.
+Criar um vínculo explícito entre dispositivos e a tabela de regras de automação. Na aba "Automação", ao invés de apenas selecionar função e toggle, o usuário:
+1. Seleciona o dispositivo
+2. Escolhe "Automatizar"
+3. O sistema busca e exibe as regras de temperatura disponíveis
+4. O dispositivo fica vinculado às regras, mostrando visualmente quais faixas se aplicam
 
-### Como funciona
+### Alterações
 
-1. A partir do `lote_id`, buscar o `galpao_id` do lote
-2. Buscar os `dispositivos_iot` vinculados ao galpão
-3. Buscar todas as `leituras_sensores` desses dispositivos desde a `data_alojamento`
-4. Agrupar por dia no frontend: calcular min/max de `temperatura_c` e guardar o `created_at` (horário) de cada extremo
-5. Se houver `regras_temperatura_lote` configuradas, plotar a faixa ideal como área de referência no gráfico
+**Banco de dados (migração)**
+- Adicionar coluna `regra_grupo` (text, nullable) em `dispositivos_iot` para agrupar qual conjunto de regras o dispositivo segue (ex: "Padrão Frango Corte")
+- Adicionar coluna `nome` como campo de agrupamento em `regras_temperatura_lote` (já existe, valor default "Padrão")
 
-### Arquivos a editar
+**`src/pages/DispositivosIoT.tsx`** — Refatorar a seção "Função dos Dispositivos":
+- Ao ativar automação em um dispositivo, abrir um dialog/seção que mostra as regras de temperatura disponíveis (agrupadas por `nome`)
+- Mostrar preview das faixas vinculadas ao dispositivo (mini-tabela com dia início/fim, temp min/max)
+- O toggle de automação vincula/desvincula o dispositivo das regras
+- Badge no card do dispositivo indicando o nome do grupo de regras vinculado
+- Se não houver regras cadastradas, exibir aviso com botão para criar regras padrão
 
-**`src/pages/MetasPesoLote.tsx`**
-- Incluir `galpao_id` no select do lote (já busca `galpao:galpoes(nome)`, basta adicionar o campo)
-- Novo state para dados de temperatura diários
-- Nova query em `fetchData` para buscar leituras de sensores e regras de temperatura
-- Processar dados: agrupar por dia, extrair min/max com horários
-- Nova seção no render com:
-  - Gráfico Recharts `LineChart` com linhas de min e max, e área de faixa ideal (se houver regras)
-  - Tabela responsiva: Dia | Data | Mín (°C) | Horário Mín | Máx (°C) | Horário Máx | Status (dentro/fora da faixa)
+**`supabase/functions/auto-temperatura/index.ts`**
+- Sem alteração de lógica — já busca regras por `integrado_id` e dispositivos por `galpao_id`. O vínculo visual no frontend complementa o funcionamento existente.
 
 ### Detalhes técnicos
 
-- Query de leituras: `leituras_sensores` filtrado por `dispositivo_id IN (devices do galpão)` e `created_at >= data_alojamento`, sem limite de 1000 rows (usar paginação se necessário)
-- Agrupamento feito no frontend por `date` (YYYY-MM-DD) do `created_at`
-- Para cada dia, `Math.min/max` sobre `temperatura_c`, armazenando o `created_at` correspondente
-- Faixa ideal vem de `regras_temperatura_lote` mapeada pelo dia de idade do lote
-- Ícones de alerta para dias onde min ou max ficaram fora da faixa
+- A coluna `regra_grupo` no dispositivo armazena o nome do grupo de regras (ex: "Padrão Frango Corte"), criando o vínculo visual
+- Na UI, ao clicar "Automatizar", um dialog busca `regras_temperatura_lote` filtrado pelo `integrado_id` e agrupa por `nome`
+- O usuário seleciona o grupo de regras e a função (aquecimento/ventilação)
+- Ao confirmar, atualiza `funcao_automacao`, `automacao_ativa` e `regra_grupo` no dispositivo
+- A tabela de dispositivos na aba Automação mostra o grupo vinculado com link para expandir as faixas
 
