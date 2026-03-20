@@ -1,31 +1,35 @@
 
-## Checklist Geral — Correções Aplicadas
 
-### ✅ Corrigido
+## Histórico de Temperatura Diário (Min/Máx) na Página de Metas do Lote
 
-1. **HMAC sign invertido** em `sync-sensors` — parâmetros `key` e `data` agora na ordem correta
-2. **Login eWeLink sem credenciais** — adicionado `email` e `password` no body (requer secrets `EWELINK_EMAIL` e `EWELINK_PASSWORD`)
-3. **Sonner importando `next-themes`** — substituído por `@/hooks/useTheme`
-4. **Sistema dual de toast** — migrado 12 arquivos de Radix Toast para Sonner, removido `<Toaster />` do App.tsx
-5. **Auth check redundante** — removido do Dashboard.tsx (ProtectedRoute já cobre)
-6. **Cálculo de nível de silo unificado** — extraído para `src/lib/utils/calcularNivelSilo.ts`, eliminando 3 cópias independentes
-7. **Consumo pós-histórico corrigido** — agora soma consumo dia a dia em vez de multiplicar consumo fixo × dias
-8. **Devoluções no cálculo pós-histórico** — filtro unificado incluindo `parcialmente_devolvido` e descontando `quantidade_devolvida_kg`
-9. **Thresholds dinâmicos** — `SilosMapSection` e `RiscoEstoqueCard` agora usam `config_silo` em vez de valores hardcoded
-10. **Divergência filtrada por lote_id** — `NivelSiloCard` agora filtra histórico por `lote_id` em vez de só `galpao_id`
-11. **getLinhagemLabel unificado** — extraído para `src/lib/utils/labels.ts`, eliminando 5 cópias em GestaoCampo, MeusLotes, useLoteAnalytics, DesempenhoTable, FechamentoLoteDialog
-12. **getStatusBadge unificado** — mapeamento completo (previsao, agendado, alojado, em_producao, jejum, saiu_para_entrega, abatido, fechado) em `src/lib/utils/labels.ts`, corrigindo 4 versões inconsistentes
-13. **MeusLotes N+1 queries eliminado** — refatorado de ~7 queries/lote para batch queries com `WHERE lote_id IN (...)`
-14. **calcularAvesVivas unificado** — criado `src/lib/utils/calcularAvesVivas.ts` com fórmula correta: `(quantidade_aves - mortos_recebimento) - mortalidade_acumulada`
-15. **LoteDashboardTab corrigido** — removido acesso a `consumo_min/max` inexistentes, substituído `differenceInDays` por `calcularIdadeLote`
-16. **useLoteAnalytics devoluções** — propagada correção de devoluções do silo (filtra `parcialmente_devolvido`, desconta `quantidade_devolvida_kg`)
+### O que será feito
 
-### Pendente (baixa prioridade)
+Adicionar uma seção "Histórico de Temperatura" na página `MetasPesoLote` que mostra, para cada dia desde o alojamento, a temperatura mínima e máxima registrada pelos sensores do galpão, junto com o horário de cada ocorrência. Inclui um gráfico de linha (min/max por dia) e uma tabela com os dados detalhados.
 
-- Remover auth checks redundantes das demais ~14 páginas
-- Otimizar N+1 queries em GestaoProducaoTab
-- Limpar arquivo `src/components/ui/use-toast.ts` duplicado
-- Limpar `as any` em RPCs
-- Corrigir `diasDesdeAlojamento` retroativo no `NivelSiloUpdateForm`
-- Padronizar fórmula de CA entre dashboard e pesagem (massa total vs massa ganho)
-- Propagar `calcularAvesVivas` para LoteDetalhe.tsx (atualmente ignora mortalidade diária)
+### Como funciona
+
+1. A partir do `lote_id`, buscar o `galpao_id` do lote
+2. Buscar os `dispositivos_iot` vinculados ao galpão
+3. Buscar todas as `leituras_sensores` desses dispositivos desde a `data_alojamento`
+4. Agrupar por dia no frontend: calcular min/max de `temperatura_c` e guardar o `created_at` (horário) de cada extremo
+5. Se houver `regras_temperatura_lote` configuradas, plotar a faixa ideal como área de referência no gráfico
+
+### Arquivos a editar
+
+**`src/pages/MetasPesoLote.tsx`**
+- Incluir `galpao_id` no select do lote (já busca `galpao:galpoes(nome)`, basta adicionar o campo)
+- Novo state para dados de temperatura diários
+- Nova query em `fetchData` para buscar leituras de sensores e regras de temperatura
+- Processar dados: agrupar por dia, extrair min/max com horários
+- Nova seção no render com:
+  - Gráfico Recharts `LineChart` com linhas de min e max, e área de faixa ideal (se houver regras)
+  - Tabela responsiva: Dia | Data | Mín (°C) | Horário Mín | Máx (°C) | Horário Máx | Status (dentro/fora da faixa)
+
+### Detalhes técnicos
+
+- Query de leituras: `leituras_sensores` filtrado por `dispositivo_id IN (devices do galpão)` e `created_at >= data_alojamento`, sem limite de 1000 rows (usar paginação se necessário)
+- Agrupamento feito no frontend por `date` (YYYY-MM-DD) do `created_at`
+- Para cada dia, `Math.min/max` sobre `temperatura_c`, armazenando o `created_at` correspondente
+- Faixa ideal vem de `regras_temperatura_lote` mapeada pelo dia de idade do lote
+- Ícones de alerta para dias onde min ou max ficaram fora da faixa
+
