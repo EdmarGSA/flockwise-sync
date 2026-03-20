@@ -28,6 +28,7 @@ interface Lote {
   linhagem: string;
   sexo: string;
   peso_medio_pintinhos: number | null;
+  galpao_id: string | null;
   nucleo: { nome: string } | null;
   galpao: { nome: string } | null;
 }
