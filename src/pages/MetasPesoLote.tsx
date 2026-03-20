@@ -19,6 +19,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import PesagemDetalheDialog from '@/components/veterinario/PesagemDetalheDialog';
 import MortalidadeSemanaDetalheDialog from '@/components/lotes/MortalidadeSemanaDetalheDialog';
 import { PesagemAnaliseCard } from '@/components/lotes/PesagemAnaliseCard';
+import { HistoricoTemperaturaLote } from '@/components/lotes/HistoricoTemperaturaLote';
 
 interface Lote {
   id: string;
