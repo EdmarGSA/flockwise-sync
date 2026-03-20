@@ -186,6 +186,7 @@ export default function MetasPesoLote() {
         linhagem,
         sexo,
         peso_medio_pintinhos,
+        galpao_id,
         nucleo:nucleos(nome),
         galpao:galpoes(nome)
       `)
