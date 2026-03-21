@@ -31,6 +31,7 @@ interface Dispositivo {
   ultimo_sync: string | null;
   funcao_automacao: string;
   automacao_ativa: boolean;
+  regra_grupo: string | null;
 }
 
 interface Leitura {
