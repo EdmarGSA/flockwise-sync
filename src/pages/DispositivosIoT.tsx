@@ -31,6 +31,7 @@ interface Dispositivo {
   ultimo_sync: string | null;
   funcao_automacao: string;
   automacao_ativa: boolean;
+  regra_grupo: string | null;
 }
 
 interface Leitura {
@@ -98,6 +99,10 @@ export default function DispositivosIoT() {
   const [loadingEwelinkDevices, setLoadingEwelinkDevices] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [autoControlDevices, setAutoControlDevices] = useState<Set<string>>(new Set());
+  const [automacaoDialogOpen, setAutomacaoDialogOpen] = useState(false);
+  const [selectedDeviceForAutomacao, setSelectedDeviceForAutomacao] = useState<Dispositivo | null>(null);
+  const [selectedFuncao, setSelectedFuncao] = useState<string>('nenhuma');
+  const [selectedRegraGrupo, setSelectedRegraGrupo] = useState<string>('');
 
   // Automation state
   const [regras, setRegras] = useState<RegraTemperatura[]>([]);
@@ -330,6 +335,48 @@ export default function DispositivosIoT() {
     toast.success('Dispositivo atualizado');
   };
 
+  const openAutomacaoDialog = (dev: Dispositivo) => {
+    setSelectedDeviceForAutomacao(dev);
+    setSelectedFuncao(dev.funcao_automacao || 'nenhuma');
+    setSelectedRegraGrupo(dev.regra_grupo || '');
+    setAutomacaoDialogOpen(true);
+  };
+
+  const handleSaveAutomacao = async () => {
+    if (!selectedDeviceForAutomacao) return;
+    const isActive = selectedFuncao !== 'nenhuma' && !!selectedRegraGrupo && !!selectedDeviceForAutomacao.galpao_id;
+    const { error } = await supabase
+      .from('dispositivos_iot')
+      .update({
+        funcao_automacao: selectedFuncao as any,
+        regra_grupo: selectedRegraGrupo || null,
+        automacao_ativa: isActive,
+      })
+      .eq('id', selectedDeviceForAutomacao.id);
+    if (error) { toast.error(error.message); return; }
+    setDispositivos(prev => prev.map(d =>
+      d.id === selectedDeviceForAutomacao.id
+        ? { ...d, funcao_automacao: selectedFuncao, regra_grupo: selectedRegraGrupo || null, automacao_ativa: isActive }
+        : d
+    ));
+    toast.success(isActive ? 'Automação ativada e vinculada às regras' : 'Automação atualizada');
+    setAutomacaoDialogOpen(false);
+  };
+
+  const handleDesativarAutomacao = async (devId: string) => {
+    const { error } = await supabase
+      .from('dispositivos_iot')
+      .update({ automacao_ativa: false, funcao_automacao: 'nenhuma', regra_grupo: null })
+      .eq('id', devId);
+    if (error) { toast.error(error.message); return; }
+    setDispositivos(prev => prev.map(d =>
+      d.id === devId ? { ...d, automacao_ativa: false, funcao_automacao: 'nenhuma', regra_grupo: null } : d
+    ));
+    toast.success('Automação desativada');
+  };
+
+  const regraGrupos = [...new Set(regras.map(r => r.nome))].filter(Boolean);
+
   const handleAddRegra = async () => {
     if (!integradoId) return;
     const { dia_inicio, dia_fim, temp_min_c, temp_max_c } = newRegra;
@@ -559,6 +606,12 @@ export default function DispositivosIoT() {
                               {dev.funcao_automacao === 'aquecimento' ? 'Aquecimento' : 'Ventilação'}
                             </Badge>
                           )}
+                          {dev.regra_grupo && (
+                            <Badge variant="outline" className="text-xs gap-0.5">
+                              <Link className="h-2.5 w-2.5" />
+                              {dev.regra_grupo}
+                            </Badge>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -724,37 +777,61 @@ export default function DispositivosIoT() {
                         <TableHead>Dispositivo</TableHead>
                         <TableHead>Galpão</TableHead>
                         <TableHead>Função</TableHead>
-                        <TableHead>Automação</TableHead>
+                        <TableHead>Regras Vinculadas</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-24"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {dispositivos.map((dev) => {
                         const galpao = galpoes.find(g => g.id === dev.galpao_id);
+                        const regrasFiltradas = dev.regra_grupo ? regras.filter(r => r.nome === dev.regra_grupo) : [];
                         return (
                           <TableRow key={dev.id}>
                             <TableCell className="font-medium">{dev.nome}</TableCell>
                             <TableCell className="text-muted-foreground">{galpao?.nome || '—'}</TableCell>
                             <TableCell>
-                              <Select
-                                value={dev.funcao_automacao || 'nenhuma'}
-                                onValueChange={(v) => handleUpdateDeviceAutomation(dev.id, 'funcao_automacao', v)}
-                              >
-                                <SelectTrigger className="w-[140px] h-8">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="nenhuma">Nenhuma</SelectItem>
-                                  <SelectItem value="aquecimento">Aquecimento</SelectItem>
-                                  <SelectItem value="ventilacao">Ventilação</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              {dev.funcao_automacao !== 'nenhuma' ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  {dev.funcao_automacao === 'aquecimento' ? 'Aquecimento' : 'Ventilação'}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell>
-                              <Switch
-                                checked={dev.automacao_ativa}
-                                disabled={dev.funcao_automacao === 'nenhuma' || !dev.galpao_id}
-                                onCheckedChange={(v) => handleUpdateDeviceAutomation(dev.id, 'automacao_ativa', v)}
-                              />
+                              {dev.regra_grupo ? (
+                                <div>
+                                  <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
+                                    <Link className="h-2.5 w-2.5" />
+                                    {dev.regra_grupo}
+                                  </Badge>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {regrasFiltradas.length} faixa{regrasFiltradas.length !== 1 ? 's' : ''}
+                                  </p>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Não vinculado</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {dev.automacao_ativa ? (
+                                <Badge className="text-xs bg-primary/10 text-primary border border-primary/30">Ativa</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">Inativa</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openAutomacaoDialog(dev)}>
+                                  <Zap className="h-3 w-3 mr-1" />Configurar
+                                </Button>
+                                {dev.automacao_ativa && (
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => handleDesativarAutomacao(dev.id)}>
+                                    <Unlink className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -763,10 +840,96 @@ export default function DispositivosIoT() {
                   </Table>
                 )}
                 <p className="text-xs text-muted-foreground mt-3">
-                  Defina a função de cada dispositivo (aquecimento ou ventilação) e ative a automação. O dispositivo precisa estar vinculado a um galpão.
+                  Clique em "Configurar" para vincular o dispositivo a um grupo de regras de temperatura e definir a função (aquecimento/ventilação).
                 </p>
               </CardContent>
             </Card>
+
+            {/* Automação Dialog */}
+            <Dialog open={automacaoDialogOpen} onOpenChange={setAutomacaoDialogOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-primary" />
+                    Configurar Automação — {selectedDeviceForAutomacao?.nome}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  {!selectedDeviceForAutomacao?.galpao_id && (
+                    <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                      Este dispositivo não está vinculado a um galpão. Vincule-o primeiro na aba Dispositivos.
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Função do dispositivo</Label>
+                    <Select value={selectedFuncao} onValueChange={setSelectedFuncao}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nenhuma">Nenhuma</SelectItem>
+                        <SelectItem value="aquecimento">Aquecimento</SelectItem>
+                        <SelectItem value="ventilacao">Ventilação</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Grupo de regras de temperatura</Label>
+                    {regraGrupos.length === 0 ? (
+                      <div className="mt-2 p-3 rounded-md bg-muted text-sm text-muted-foreground text-center">
+                        Nenhum grupo de regras cadastrado.
+                        <Button variant="link" size="sm" className="ml-1 p-0 h-auto" onClick={() => { setAutomacaoDialogOpen(false); handleSeedDefaultRegras(); }}>
+                          Criar regras padrão
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedRegraGrupo} onValueChange={setSelectedRegraGrupo}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o grupo de regras" /></SelectTrigger>
+                        <SelectContent>
+                          {regraGrupos.map(grupo => (
+                            <SelectItem key={grupo} value={grupo}>{grupo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {selectedRegraGrupo && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Faixas do grupo "{selectedRegraGrupo}"</Label>
+                      <div className="mt-1 border rounded-md overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="h-8 text-xs">Período</TableHead>
+                              <TableHead className="h-8 text-xs">Mín.</TableHead>
+                              <TableHead className="h-8 text-xs">Máx.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {regras.filter(r => r.nome === selectedRegraGrupo).map(r => (
+                              <TableRow key={r.id}>
+                                <TableCell className="py-1.5 text-xs">Dia {r.dia_inicio}–{r.dia_fim}</TableCell>
+                                <TableCell className="py-1.5 text-xs">{Number(r.temp_min_c)}°C</TableCell>
+                                <TableCell className="py-1.5 text-xs">{Number(r.temp_max_c)}°C</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={handleSaveAutomacao}
+                    disabled={!selectedDeviceForAutomacao?.galpao_id || (selectedFuncao !== 'nenhuma' && !selectedRegraGrupo)}
+                  >
+                    {selectedFuncao !== 'nenhuma' && selectedRegraGrupo ? 'Ativar Automação' : 'Salvar'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Logs Tab */}
