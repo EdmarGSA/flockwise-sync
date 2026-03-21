@@ -348,7 +348,7 @@ export default function DispositivosIoT() {
     const { error } = await supabase
       .from('dispositivos_iot')
       .update({
-        funcao_automacao: selectedFuncao,
+        funcao_automacao: selectedFuncao as any,
         regra_grupo: selectedRegraGrupo || null,
         automacao_ativa: isActive,
       })
