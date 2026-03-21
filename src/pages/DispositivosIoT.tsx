@@ -335,6 +335,48 @@ export default function DispositivosIoT() {
     toast.success('Dispositivo atualizado');
   };
 
+  const openAutomacaoDialog = (dev: Dispositivo) => {
+    setSelectedDeviceForAutomacao(dev);
+    setSelectedFuncao(dev.funcao_automacao || 'nenhuma');
+    setSelectedRegraGrupo(dev.regra_grupo || '');
+    setAutomacaoDialogOpen(true);
+  };
+
+  const handleSaveAutomacao = async () => {
+    if (!selectedDeviceForAutomacao) return;
+    const isActive = selectedFuncao !== 'nenhuma' && !!selectedRegraGrupo && !!selectedDeviceForAutomacao.galpao_id;
+    const { error } = await supabase
+      .from('dispositivos_iot')
+      .update({
+        funcao_automacao: selectedFuncao,
+        regra_grupo: selectedRegraGrupo || null,
+        automacao_ativa: isActive,
+      })
+      .eq('id', selectedDeviceForAutomacao.id);
+    if (error) { toast.error(error.message); return; }
+    setDispositivos(prev => prev.map(d =>
+      d.id === selectedDeviceForAutomacao.id
+        ? { ...d, funcao_automacao: selectedFuncao, regra_grupo: selectedRegraGrupo || null, automacao_ativa: isActive }
+        : d
+    ));
+    toast.success(isActive ? 'Automação ativada e vinculada às regras' : 'Automação atualizada');
+    setAutomacaoDialogOpen(false);
+  };
+
+  const handleDesativarAutomacao = async (devId: string) => {
+    const { error } = await supabase
+      .from('dispositivos_iot')
+      .update({ automacao_ativa: false, funcao_automacao: 'nenhuma', regra_grupo: null })
+      .eq('id', devId);
+    if (error) { toast.error(error.message); return; }
+    setDispositivos(prev => prev.map(d =>
+      d.id === devId ? { ...d, automacao_ativa: false, funcao_automacao: 'nenhuma', regra_grupo: null } : d
+    ));
+    toast.success('Automação desativada');
+  };
+
+  const regraGrupos = [...new Set(regras.map(r => r.nome))].filter(Boolean);
+
   const handleAddRegra = async () => {
     if (!integradoId) return;
     const { dia_inicio, dia_fim, temp_min_c, temp_max_c } = newRegra;
