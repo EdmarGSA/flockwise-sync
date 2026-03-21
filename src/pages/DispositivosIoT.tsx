@@ -606,6 +606,12 @@ export default function DispositivosIoT() {
                               {dev.funcao_automacao === 'aquecimento' ? 'Aquecimento' : 'Ventilação'}
                             </Badge>
                           )}
+                          {dev.regra_grupo && (
+                            <Badge variant="outline" className="text-xs gap-0.5">
+                              <Link className="h-2.5 w-2.5" />
+                              {dev.regra_grupo}
+                            </Badge>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent>
