@@ -1,0 +1,1 @@
+ALTER TABLE public.dispositivos_iot ADD COLUMN regra_grupo text DEFAULT NULL;

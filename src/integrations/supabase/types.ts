@@ -1174,6 +1174,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           nome: string
+          regra_grupo: string | null
           tipo: string
           ultimo_sync: string | null
           updated_at: string
@@ -1190,6 +1191,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           nome: string
+          regra_grupo?: string | null
           tipo?: string
           ultimo_sync?: string | null
           updated_at?: string
@@ -1206,6 +1208,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           nome?: string
+          regra_grupo?: string | null
           tipo?: string
           ultimo_sync?: string | null
           updated_at?: string
