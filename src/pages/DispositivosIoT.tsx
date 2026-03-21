@@ -99,6 +99,10 @@ export default function DispositivosIoT() {
   const [loadingEwelinkDevices, setLoadingEwelinkDevices] = useState(false);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
   const [autoControlDevices, setAutoControlDevices] = useState<Set<string>>(new Set());
+  const [automacaoDialogOpen, setAutomacaoDialogOpen] = useState(false);
+  const [selectedDeviceForAutomacao, setSelectedDeviceForAutomacao] = useState<Dispositivo | null>(null);
+  const [selectedFuncao, setSelectedFuncao] = useState<string>('nenhuma');
+  const [selectedRegraGrupo, setSelectedRegraGrupo] = useState<string>('');
 
   // Automation state
   const [regras, setRegras] = useState<RegraTemperatura[]>([]);
