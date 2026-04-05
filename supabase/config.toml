@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.auto-temperatura]
 verify_jwt = false
+
+[functions.auto-sync-sensors]
+verify_jwt = false
