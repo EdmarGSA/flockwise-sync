@@ -705,6 +705,75 @@ export default function MeusLotes() {
                             )}
                           </TableCell>
                           <TableCell className="text-center">
+                            {lote.iot ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="inline-flex flex-col items-center gap-0.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <Thermometer className={`w-3.5 h-3.5 ${
+                                          lote.iot.temperaturaAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.temperaturaAtual >= 20 && lote.iot.temperaturaAtual <= 28 ? 'text-emerald-600' :
+                                          lote.iot.temperaturaAtual >= 15 && lote.iot.temperaturaAtual <= 35 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`} />
+                                        <span className={`text-xs font-medium ${
+                                          lote.iot.temperaturaAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.temperaturaAtual >= 20 && lote.iot.temperaturaAtual <= 28 ? 'text-emerald-600' :
+                                          lote.iot.temperaturaAtual >= 15 && lote.iot.temperaturaAtual <= 35 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`}>
+                                          {lote.iot.temperaturaAtual !== null ? `${lote.iot.temperaturaAtual.toFixed(1)}°C` : '--'}
+                                        </span>
+                                        <Droplets className={`w-3.5 h-3.5 ml-1 ${
+                                          lote.iot.umidadeAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.umidadeAtual >= 50 && lote.iot.umidadeAtual <= 70 ? 'text-emerald-600' :
+                                          lote.iot.umidadeAtual >= 40 && lote.iot.umidadeAtual <= 80 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`} />
+                                        <span className="text-xs text-muted-foreground">
+                                          {lote.iot.umidadeAtual !== null ? `${lote.iot.umidadeAtual.toFixed(0)}%` : '--'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {lote.iot.dispositivosOnline === lote.iot.dispositivosTotal ? (
+                                          <Wifi className="w-3 h-3 text-emerald-600" />
+                                        ) : lote.iot.dispositivosOnline > 0 ? (
+                                          <Wifi className="w-3 h-3 text-amber-500" />
+                                        ) : (
+                                          <WifiOff className="w-3 h-3 text-destructive" />
+                                        )}
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {lote.iot.dispositivosOnline}/{lote.iot.dispositivosTotal}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <div className="text-xs space-y-1">
+                                      <p className="font-medium">Dispositivos IoT</p>
+                                      {lote.iot.dispositivos.map((d, i) => (
+                                        <div key={i} className="flex items-center gap-1.5">
+                                          {d.online ? (
+                                            <Wifi className="w-3 h-3 text-emerald-600" />
+                                          ) : (
+                                            <WifiOff className="w-3 h-3 text-destructive" />
+                                          )}
+                                          <span>{d.nome}</span>
+                                          <span className={d.online ? 'text-emerald-600' : 'text-destructive'}>
+                                            {d.online ? 'Online' : 'Offline'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
                             {getStatusBadge(lote.status)}
                           </TableCell>
                           <TableCell className="text-center">
