@@ -1,40 +1,34 @@
 
 
-## Histórico Completo de Temperatura e Umidade com Análise de Divergências
+## Adicionar Indicador de Temperatura e Status dos Equipamentos na Listagem de Lotes
 
-### O que será feito
+### Objetivo
 
-Evoluir o componente `HistoricoTemperaturaLote` para incluir:
-
-1. **Umidade no histórico** — hoje só mostra temperatura; adicionar min/max de umidade por dia
-2. **Painel de divergências** — card resumo com KPIs: dias fora da faixa, maior desvio, período mais crítico, tempo total em alerta
-3. **Gráfico de umidade** — segundo gráfico (ou eixo duplo) mostrando umidade ao longo dos dias
-4. **Análise inteligente com sugestões** — bloco de insights automáticos baseados nos dados:
-   - "Temperatura noturna consistentemente abaixo da faixa nos dias 3-7 — verificar aquecimento"
-   - "Pico de calor no dia 15 às 14h — avaliar ventilação"
-   - "Umidade acima de 75% nos últimos 3 dias — risco de cama úmida"
-5. **Tabela expandida** — adicionar colunas de umidade min/max e desvio (diferença entre lido e ideal)
+Mostrar diretamente na tabela de "Meus Lotes" a temperatura atual, umidade e se os equipamentos IoT estão ligados/desligados, sem precisar entrar no detalhe do lote.
 
 ### Alterações
 
-**`src/components/lotes/HistoricoTemperaturaLote.tsx`** — Refatorar significativamente:
+**1. `src/pages/MeusLotes.tsx`**
 
-- Buscar `umidade_pct` junto com `temperatura_c` nas leituras
-- Expandir `DiaTemperatura` com campos: `umidadeMin`, `umidadeMax`, `desvioTemp` (max desvio da faixa em °C), `umidadeDentroFaixa`
-- Adicionar card de KPIs de divergência no topo (dias fora, maior desvio, streaks)
-- Adicionar gráfico de umidade (AreaChart) abaixo do de temperatura
-- Criar função `gerarInsights()` que analisa padrões:
-  - Detecta tendências (temperatura caindo/subindo ao longo de dias consecutivos)
-  - Identifica horários críticos recorrentes (manhã vs tarde vs noite)
-  - Correlação temperatura × umidade (alta umidade + alta temp = estresse térmico)
-  - Gera recomendações acionáveis em português
-- Renderizar insights como cards com ícones e severidade (info/atenção/crítico)
-- Expandir tabela com umidade e coluna de desvio
+- Expandir a interface `LoteComPesagem` com campos IoT: `temperaturaAtual`, `umidadeAtual`, `dispositivosOnline`, `dispositivosTotal`, `dispositivosLigados` (switch on)
+- No `fetchLotes`, após carregar os lotes alojados, fazer uma query batch em `dispositivos_iot` (filtrado por `galpao_id` dos lotes ativos, `ativo = true`) e para cada dispositivo buscar a última `leitura_sensores` — agregar por `galpao_id` para obter: temperatura mais recente, umidade, quantos estão online, quantos com switch ligado
+- Adicionar nova coluna **"Ambiente"** na tabela entre "Idade" e "Status"
+- Renderizar na célula:
+  - Ícone de termômetro com temperatura (colorido conforme faixa: verde/amarelo/vermelho)
+  - Ícone de gota com umidade
+  - Badge compacto mostrando dispositivos: ex. "2/3 ⚡" (2 ligados de 3) com cor verde se todos online, amarelo se parcial, vermelho se todos offline
+  - Se não houver dispositivos, mostrar "—"
 
-### Detalhes técnicos
+**2. Sem alterações no banco** — dados já disponíveis em `dispositivos_iot` e `leituras_sensores`
 
-- Dados já disponíveis: `leituras_sensores` contém `temperatura_c` e `umidade_pct`
-- Regras de umidade: usar faixa padrão 50-70% (não há tabela de regras de umidade hoje)
-- Insights gerados localmente no frontend via análise dos dados agregados (sem IA externa)
-- Sem alterações no banco de dados — tudo baseado em dados existentes
+### Detalhes visuais
+
+A célula "Ambiente" será compacta:
+```text
+🌡 28.5°C  💧 62%
+⚡ 2/3 online
+```
+- Temperatura colorida (verde = dentro da faixa, amarelo = margem, vermelho = fora)
+- Badge de equipamentos: "2/3 ⚡" indica 2 ligados de 3 dispositivos
+- Tooltip no badge mostra nomes dos dispositivos e status individual
 
