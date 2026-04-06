@@ -422,8 +422,9 @@ export default function MeusLotes() {
         jejumAtrasado,
         saidaProxima,
         percentualPostura,
-        percentualReferencia: null, // Fetched on demand if needed
+        percentualReferencia: null,
         ovosAveAlojada,
+        iot: iotMap.get(lote.galpao_id),
       };
     });
     
