@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg, LogOut } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg, LogOut, Thermometer, Droplets, Wifi, WifiOff, Zap, Power } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +63,15 @@ interface Lote {
   jejum_confirmado_em: string | null;
 }
 
+interface IoTAmbiente {
+  temperaturaAtual: number | null;
+  umidadeAtual: number | null;
+  dispositivosOnline: number;
+  dispositivosTotal: number;
+  dispositivosLigados: number;
+  dispositivos: { nome: string; online: boolean; switchOn: boolean }[];
+}
+
 interface LoteComPesagem extends Lote {
   ultimaPesagem?: string | null;
   diasDesdeAlojamento?: number;
@@ -78,6 +87,7 @@ interface LoteComPesagem extends Lote {
   percentualPostura?: number | null;
   percentualReferencia?: number | null;
   ovosAveAlojada?: number | null;
+  iot?: IoTAmbiente;
 }
 
 export default function MeusLotes() {
@@ -278,6 +288,68 @@ export default function MeusLotes() {
       });
     }
 
+    // Batch IoT query — get all devices for active lot galpoes
+    const activeLotes = lotesData.filter(l => l.status === 'alojado');
+    const galpaoIds = [...new Set(activeLotes.map(l => l.galpao_id).filter(Boolean))];
+    
+    const iotMap = new Map<string, IoTAmbiente>();
+    
+    if (galpaoIds.length > 0) {
+      const { data: devices } = await supabase
+        .from('dispositivos_iot')
+        .select('id, nome, galpao_id, device_id_ewelink')
+        .in('galpao_id', galpaoIds)
+        .eq('ativo', true);
+
+      if (devices && devices.length > 0) {
+        const deviceIds = devices.map(d => d.id);
+        
+        // Get latest reading per device using batch
+        const { data: leituras } = await supabase
+          .from('leituras_sensores')
+          .select('dispositivo_id, temperatura_c, umidade_pct, online, created_at')
+          .in('dispositivo_id', deviceIds)
+          .order('created_at', { ascending: false });
+
+        // Keep only latest per device
+        const latestLeitura = new Map<string, any>();
+        (leituras || []).forEach(l => {
+          if (!latestLeitura.has(l.dispositivo_id)) {
+            latestLeitura.set(l.dispositivo_id, l);
+          }
+        });
+
+        // Aggregate by galpao_id
+        const galpaoDevices = new Map<string, { nome: string; online: boolean; temp: number | null; hum: number | null }[]>();
+        devices.forEach(d => {
+          const reading = latestLeitura.get(d.id);
+          const list = galpaoDevices.get(d.galpao_id!) || [];
+          list.push({
+            nome: d.nome,
+            online: reading?.online ?? false,
+            temp: reading?.temperatura_c ?? null,
+            hum: reading?.umidade_pct ?? null,
+          });
+          galpaoDevices.set(d.galpao_id!, list);
+        });
+
+        galpaoDevices.forEach((devs, galpaoId) => {
+          const onlineDevs = devs.filter(d => d.online);
+          const temps = devs.map(d => d.temp).filter((t): t is number => t !== null);
+          const hums = devs.map(d => d.hum).filter((h): h is number => h !== null);
+          
+          iotMap.set(galpaoId, {
+            temperaturaAtual: temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
+            umidadeAtual: hums.length > 0 ? hums.reduce((a, b) => a + b, 0) / hums.length : null,
+            dispositivosOnline: onlineDevs.length,
+            dispositivosTotal: devs.length,
+            dispositivosLigados: onlineDevs.length, // switch state would require ewelink API call, use online as proxy
+            dispositivos: devs.map(d => ({ nome: d.nome, online: d.online, switchOn: d.online })),
+          });
+        });
+      }
+    }
+
     // Process all lotes using indexed data
     const lotesComPesagem: LoteComPesagem[] = lotesData.map(lote => {
       const recebimento = recebimentoMap.get(lote.id) || null;
@@ -350,8 +422,9 @@ export default function MeusLotes() {
         jejumAtrasado,
         saidaProxima,
         percentualPostura,
-        percentualReferencia: null, // Fetched on demand if needed
+        percentualReferencia: null,
         ovosAveAlojada,
+        iot: iotMap.get(lote.galpao_id),
       };
     });
     
@@ -584,6 +657,7 @@ export default function MeusLotes() {
                       <TableHead>Local</TableHead>
                       <TableHead className="text-center">Aves</TableHead>
                       <TableHead className="text-center">Idade</TableHead>
+                      <TableHead className="text-center">Ambiente</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-center">Alertas</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
@@ -628,6 +702,75 @@ export default function MeusLotes() {
                               <span className="text-muted-foreground text-xs">
                                 {formatDate(lote.data_prevista_alojamento)}
                               </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {lote.iot ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="inline-flex flex-col items-center gap-0.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <Thermometer className={`w-3.5 h-3.5 ${
+                                          lote.iot.temperaturaAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.temperaturaAtual >= 20 && lote.iot.temperaturaAtual <= 28 ? 'text-emerald-600' :
+                                          lote.iot.temperaturaAtual >= 15 && lote.iot.temperaturaAtual <= 35 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`} />
+                                        <span className={`text-xs font-medium ${
+                                          lote.iot.temperaturaAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.temperaturaAtual >= 20 && lote.iot.temperaturaAtual <= 28 ? 'text-emerald-600' :
+                                          lote.iot.temperaturaAtual >= 15 && lote.iot.temperaturaAtual <= 35 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`}>
+                                          {lote.iot.temperaturaAtual !== null ? `${lote.iot.temperaturaAtual.toFixed(1)}°C` : '--'}
+                                        </span>
+                                        <Droplets className={`w-3.5 h-3.5 ml-1 ${
+                                          lote.iot.umidadeAtual === null ? 'text-muted-foreground' :
+                                          lote.iot.umidadeAtual >= 50 && lote.iot.umidadeAtual <= 70 ? 'text-emerald-600' :
+                                          lote.iot.umidadeAtual >= 40 && lote.iot.umidadeAtual <= 80 ? 'text-amber-500' :
+                                          'text-destructive'
+                                        }`} />
+                                        <span className="text-xs text-muted-foreground">
+                                          {lote.iot.umidadeAtual !== null ? `${lote.iot.umidadeAtual.toFixed(0)}%` : '--'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {lote.iot.dispositivosOnline === lote.iot.dispositivosTotal ? (
+                                          <Wifi className="w-3 h-3 text-emerald-600" />
+                                        ) : lote.iot.dispositivosOnline > 0 ? (
+                                          <Wifi className="w-3 h-3 text-amber-500" />
+                                        ) : (
+                                          <WifiOff className="w-3 h-3 text-destructive" />
+                                        )}
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {lote.iot.dispositivosOnline}/{lote.iot.dispositivosTotal}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <div className="text-xs space-y-1">
+                                      <p className="font-medium">Dispositivos IoT</p>
+                                      {lote.iot.dispositivos.map((d, i) => (
+                                        <div key={i} className="flex items-center gap-1.5">
+                                          {d.online ? (
+                                            <Wifi className="w-3 h-3 text-emerald-600" />
+                                          ) : (
+                                            <WifiOff className="w-3 h-3 text-destructive" />
+                                          )}
+                                          <span>{d.nome}</span>
+                                          <span className={d.online ? 'text-emerald-600' : 'text-destructive'}>
+                                            {d.online ? 'Online' : 'Offline'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">
