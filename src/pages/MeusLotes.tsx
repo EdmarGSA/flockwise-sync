@@ -63,6 +63,15 @@ interface Lote {
   jejum_confirmado_em: string | null;
 }
 
+interface IoTAmbiente {
+  temperaturaAtual: number | null;
+  umidadeAtual: number | null;
+  dispositivosOnline: number;
+  dispositivosTotal: number;
+  dispositivosLigados: number;
+  dispositivos: { nome: string; online: boolean; switchOn: boolean }[];
+}
+
 interface LoteComPesagem extends Lote {
   ultimaPesagem?: string | null;
   diasDesdeAlojamento?: number;
@@ -78,6 +87,7 @@ interface LoteComPesagem extends Lote {
   percentualPostura?: number | null;
   percentualReferencia?: number | null;
   ovosAveAlojada?: number | null;
+  iot?: IoTAmbiente;
 }
 
 export default function MeusLotes() {
