@@ -657,6 +657,7 @@ export default function MeusLotes() {
                       <TableHead>Local</TableHead>
                       <TableHead className="text-center">Aves</TableHead>
                       <TableHead className="text-center">Idade</TableHead>
+                      <TableHead className="text-center">Ambiente</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-center">Alertas</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
