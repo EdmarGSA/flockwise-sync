@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg, LogOut } from 'lucide-react';
+import { Bird, ArrowLeft, Calendar, Users, Truck, ClipboardCheck, Scale, AlertTriangle, Skull, Target, ChevronDown, Package, Stethoscope, Clock, Lock, Egg, LogOut, Thermometer, Droplets, Wifi, WifiOff, Zap, Power } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
