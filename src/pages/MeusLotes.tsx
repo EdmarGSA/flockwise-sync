@@ -288,6 +288,68 @@ export default function MeusLotes() {
       });
     }
 
+    // Batch IoT query — get all devices for active lot galpoes
+    const activeLotes = lotesData.filter(l => l.status === 'alojado');
+    const galpaoIds = [...new Set(activeLotes.map(l => l.galpao_id).filter(Boolean))];
+    
+    const iotMap = new Map<string, IoTAmbiente>();
+    
+    if (galpaoIds.length > 0) {
+      const { data: devices } = await supabase
+        .from('dispositivos_iot')
+        .select('id, nome, galpao_id, device_id_ewelink')
+        .in('galpao_id', galpaoIds)
+        .eq('ativo', true);
+
+      if (devices && devices.length > 0) {
+        const deviceIds = devices.map(d => d.id);
+        
+        // Get latest reading per device using batch
+        const { data: leituras } = await supabase
+          .from('leituras_sensores')
+          .select('dispositivo_id, temperatura_c, umidade_pct, online, created_at')
+          .in('dispositivo_id', deviceIds)
+          .order('created_at', { ascending: false });
+
+        // Keep only latest per device
+        const latestLeitura = new Map<string, any>();
+        (leituras || []).forEach(l => {
+          if (!latestLeitura.has(l.dispositivo_id)) {
+            latestLeitura.set(l.dispositivo_id, l);
+          }
+        });
+
+        // Aggregate by galpao_id
+        const galpaoDevices = new Map<string, { nome: string; online: boolean; temp: number | null; hum: number | null }[]>();
+        devices.forEach(d => {
+          const reading = latestLeitura.get(d.id);
+          const list = galpaoDevices.get(d.galpao_id!) || [];
+          list.push({
+            nome: d.nome,
+            online: reading?.online ?? false,
+            temp: reading?.temperatura_c ?? null,
+            hum: reading?.umidade_pct ?? null,
+          });
+          galpaoDevices.set(d.galpao_id!, list);
+        });
+
+        galpaoDevices.forEach((devs, galpaoId) => {
+          const onlineDevs = devs.filter(d => d.online);
+          const temps = devs.map(d => d.temp).filter((t): t is number => t !== null);
+          const hums = devs.map(d => d.hum).filter((h): h is number => h !== null);
+          
+          iotMap.set(galpaoId, {
+            temperaturaAtual: temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
+            umidadeAtual: hums.length > 0 ? hums.reduce((a, b) => a + b, 0) / hums.length : null,
+            dispositivosOnline: onlineDevs.length,
+            dispositivosTotal: devs.length,
+            dispositivosLigados: onlineDevs.length, // switch state would require ewelink API call, use online as proxy
+            dispositivos: devs.map(d => ({ nome: d.nome, online: d.online, switchOn: d.online })),
+          });
+        });
+      }
+    }
+
     // Process all lotes using indexed data
     const lotesComPesagem: LoteComPesagem[] = lotesData.map(lote => {
       const recebimento = recebimentoMap.get(lote.id) || null;
