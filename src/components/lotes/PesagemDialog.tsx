@@ -1045,11 +1045,11 @@ export function PesagemDialog({
                 <CardContent className="pt-4 pb-2">
                   {/* Mobile: card list */}
                   <div className="block sm:hidden space-y-2">
-                    {itens.map((item, index) => (
+                    {[...itens].reverse().map((item, idx) => (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
+                            <span className="text-xs font-bold text-muted-foreground">#{itens.length - idx}</span>
                             <span className="text-sm font-medium">{item.quantidade_aves} aves</span>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
