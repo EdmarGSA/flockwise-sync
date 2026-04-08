@@ -1079,9 +1079,9 @@ export function PesagemDialog({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {itens.map((item, index) => (
+                        {[...itens].reverse().map((item, idx) => (
                           <TableRow key={item.id}>
-                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{itens.length - idx}</TableCell>
                             <TableCell>{item.quantidade_aves}</TableCell>
                             <TableCell>{item.peso_bruto_kg.toFixed(3)} kg</TableCell>
                             <TableCell>{item.peso_tara_kg.toFixed(3)} kg</TableCell>
