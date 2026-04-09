@@ -663,6 +663,9 @@ export default function GestaoConsumo() {
             Solicitações de Ração
           </Button>
         </div>
+
+        {/* NF-e Recebidas por E-mail */}
+        <NfeRacaoRevisaoTab />
       </main>
 
       {/* Dialogs */}
