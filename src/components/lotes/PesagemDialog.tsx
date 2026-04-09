@@ -595,6 +595,25 @@ export function PesagemDialog({
     }, 50);
   };
 
+  const handleConfirmOutlier = () => {
+    if (pendingItem) {
+      setItens(prev => [...prev, pendingItem]);
+      setPendingItem(null);
+      setOutlierInfo(null);
+      setShowOutlierDialog(false);
+      setPesoBruto('');
+      setTimeout(() => pesoBrutoInputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleCancelOutlier = () => {
+    setPendingItem(null);
+    setOutlierInfo(null);
+    setShowOutlierDialog(false);
+    setPesoBruto('');
+    setTimeout(() => pesoBrutoInputRef.current?.focus(), 50);
+  };
+
   const handleRemoveItem = (id: string) => {
     setItens(itens.filter(item => item.id !== id));
   };
