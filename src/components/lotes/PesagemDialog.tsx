@@ -174,6 +174,16 @@ export function PesagemDialog({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
   
+  // Outlier validation state
+  const [pendingItem, setPendingItem] = useState<PesagemItem | null>(null);
+  const [showOutlierDialog, setShowOutlierDialog] = useState(false);
+  const [outlierInfo, setOutlierInfo] = useState<{
+    pesoMedioItem: number;
+    desvioRef: number | null;
+    desvioMedia: number | null;
+    mediaItens: number | null;
+  } | null>(null);
+  
   // Refs for focus management
   const pesoBrutoInputRef = useRef<HTMLInputElement>(null);
 
