@@ -3093,6 +3093,93 @@ export type Database = {
         }
         Relationships: []
       }
+      nfe_racao_recebidas: {
+        Row: {
+          chave_nfe: string | null
+          cnpj_fornecedor: string | null
+          created_at: string
+          data_emissao: string | null
+          email_message_id: string | null
+          erro_mensagem: string | null
+          id: string
+          integrado_id: string
+          itens: Json | null
+          lote_id: string | null
+          numero_nfe: string | null
+          processado_em: string | null
+          processado_por: string | null
+          razao_social_fornecedor: string | null
+          serie: string | null
+          solicitacao_racao_id: string | null
+          status: Database["public"]["Enums"]["nfe_racao_status"]
+          updated_at: string
+          valor_frete: number | null
+          valor_total: number | null
+          xml_raw: string | null
+        }
+        Insert: {
+          chave_nfe?: string | null
+          cnpj_fornecedor?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          email_message_id?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          integrado_id: string
+          itens?: Json | null
+          lote_id?: string | null
+          numero_nfe?: string | null
+          processado_em?: string | null
+          processado_por?: string | null
+          razao_social_fornecedor?: string | null
+          serie?: string | null
+          solicitacao_racao_id?: string | null
+          status?: Database["public"]["Enums"]["nfe_racao_status"]
+          updated_at?: string
+          valor_frete?: number | null
+          valor_total?: number | null
+          xml_raw?: string | null
+        }
+        Update: {
+          chave_nfe?: string | null
+          cnpj_fornecedor?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          email_message_id?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          integrado_id?: string
+          itens?: Json | null
+          lote_id?: string | null
+          numero_nfe?: string | null
+          processado_em?: string | null
+          processado_por?: string | null
+          razao_social_fornecedor?: string | null
+          serie?: string | null
+          solicitacao_racao_id?: string | null
+          status?: Database["public"]["Enums"]["nfe_racao_status"]
+          updated_at?: string
+          valor_frete?: number | null
+          valor_total?: number | null
+          xml_raw?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfe_racao_recebidas_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfe_racao_recebidas_solicitacao_racao_id_fkey"
+            columns: ["solicitacao_racao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_racao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificacoes_fornecedor: {
         Row: {
           created_at: string
@@ -6872,6 +6959,7 @@ export type Database = {
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
       motivo_mortalidade: "natural" | "eliminado"
       natureza_conta: "devedora" | "credora"
+      nfe_racao_status: "pendente_revisao" | "confirmada" | "rejeitada" | "erro"
       nivel_acesso: "view" | "edit" | "full"
       observacao_prioridade: "alta" | "media" | "baixa"
       observacao_tipo: "observacao" | "orientacao"
@@ -7114,6 +7202,7 @@ export const Constants = {
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
       motivo_mortalidade: ["natural", "eliminado"],
       natureza_conta: ["devedora", "credora"],
+      nfe_racao_status: ["pendente_revisao", "confirmada", "rejeitada", "erro"],
       nivel_acesso: ["view", "edit", "full"],
       observacao_prioridade: ["alta", "media", "baixa"],
       observacao_tipo: ["observacao", "orientacao"],

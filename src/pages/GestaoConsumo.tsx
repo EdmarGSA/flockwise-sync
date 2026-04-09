@@ -28,6 +28,7 @@ import { AnomaliaListDialog } from '@/components/consumo/AnomaliaListDialog';
 import { RiscoEstoqueDialog } from '@/components/consumo/RiscoEstoqueDialog';
 import { LotesAbertoDialog } from '@/components/consumo/LotesAbertoDialog';
 import { SolicitacoesRacaoDialog } from '@/components/consumo/SolicitacoesRacaoDialog';
+import { NfeRacaoRevisaoTab } from '@/components/consumo/NfeRacaoRevisaoTab';
 
 interface LoteConsumo {
   id: string;
@@ -662,6 +663,9 @@ export default function GestaoConsumo() {
             Solicitações de Ração
           </Button>
         </div>
+
+        {/* NF-e Recebidas por E-mail */}
+        <NfeRacaoRevisaoTab />
       </main>
 
       {/* Dialogs */}
