@@ -555,22 +555,36 @@ export function PesagemDialog({
       peso_liquido_kg: liquido,
     };
 
-    setItens([...itens, novoItem]);
-    
-    // Check if average weight is more than 20% different from reference
+    // Check if average weight deviates >20% from references
     const pesoMedioItem = liquido / quantidade;
+    let desvioRef: number | null = null;
+    let desvioMedia: number | null = null;
+    let mediaItensAtual: number | null = null;
+
     if (pesoReferencia && pesoReferencia > 0) {
-      const diferenca = ((pesoMedioItem - pesoReferencia) / pesoReferencia) * 100;
-      if (Math.abs(diferenca) > 20) {
-        const status = diferenca > 0 ? 'acima' : 'abaixo';
-        const emoji = diferenca > 0 ? '⬆️' : '⬇️';
-        toast.warning(
-          `${emoji} Peso médio ${Math.abs(diferenca).toFixed(1)}% ${status} da referência! ` +
-          `(${pesoMedioItem.toFixed(3)} kg vs ${pesoReferencia.toFixed(3)} kg ref.)`,
-          { duration: 5000 }
-        );
+      desvioRef = ((pesoMedioItem - pesoReferencia) / pesoReferencia) * 100;
+    }
+
+    if (itens.length > 0) {
+      const totalPesoItens = itens.reduce((acc, i) => acc + i.peso_liquido_kg, 0);
+      const totalAvesItens = itens.reduce((acc, i) => acc + i.quantidade_aves, 0);
+      mediaItensAtual = totalAvesItens > 0 ? totalPesoItens / totalAvesItens : null;
+      if (mediaItensAtual && mediaItensAtual > 0) {
+        desvioMedia = ((pesoMedioItem - mediaItensAtual) / mediaItensAtual) * 100;
       }
     }
+
+    const temDesvio = (desvioRef !== null && Math.abs(desvioRef) > 20) || 
+                      (desvioMedia !== null && Math.abs(desvioMedia) > 20);
+
+    if (temDesvio) {
+      setPendingItem(novoItem);
+      setOutlierInfo({ pesoMedioItem, desvioRef, desvioMedia, mediaItens: mediaItensAtual });
+      setShowOutlierDialog(true);
+      return;
+    }
+
+    setItens([...itens, novoItem]);
     
     // Clear inputs - mantém a tara e quantidade de aves para reutilização
     setPesoBruto('');
