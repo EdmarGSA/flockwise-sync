@@ -174,6 +174,16 @@ export function PesagemDialog({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
   
+  // Outlier validation state
+  const [pendingItem, setPendingItem] = useState<PesagemItem | null>(null);
+  const [showOutlierDialog, setShowOutlierDialog] = useState(false);
+  const [outlierInfo, setOutlierInfo] = useState<{
+    pesoMedioItem: number;
+    desvioRef: number | null;
+    desvioMedia: number | null;
+    mediaItens: number | null;
+  } | null>(null);
+  
   // Refs for focus management
   const pesoBrutoInputRef = useRef<HTMLInputElement>(null);
 
@@ -545,22 +555,36 @@ export function PesagemDialog({
       peso_liquido_kg: liquido,
     };
 
-    setItens([...itens, novoItem]);
-    
-    // Check if average weight is more than 20% different from reference
+    // Check if average weight deviates >20% from references
     const pesoMedioItem = liquido / quantidade;
+    let desvioRef: number | null = null;
+    let desvioMedia: number | null = null;
+    let mediaItensAtual: number | null = null;
+
     if (pesoReferencia && pesoReferencia > 0) {
-      const diferenca = ((pesoMedioItem - pesoReferencia) / pesoReferencia) * 100;
-      if (Math.abs(diferenca) > 20) {
-        const status = diferenca > 0 ? 'acima' : 'abaixo';
-        const emoji = diferenca > 0 ? '⬆️' : '⬇️';
-        toast.warning(
-          `${emoji} Peso médio ${Math.abs(diferenca).toFixed(1)}% ${status} da referência! ` +
-          `(${pesoMedioItem.toFixed(3)} kg vs ${pesoReferencia.toFixed(3)} kg ref.)`,
-          { duration: 5000 }
-        );
+      desvioRef = ((pesoMedioItem - pesoReferencia) / pesoReferencia) * 100;
+    }
+
+    if (itens.length > 0) {
+      const totalPesoItens = itens.reduce((acc, i) => acc + i.peso_liquido_kg, 0);
+      const totalAvesItens = itens.reduce((acc, i) => acc + i.quantidade_aves, 0);
+      mediaItensAtual = totalAvesItens > 0 ? totalPesoItens / totalAvesItens : null;
+      if (mediaItensAtual && mediaItensAtual > 0) {
+        desvioMedia = ((pesoMedioItem - mediaItensAtual) / mediaItensAtual) * 100;
       }
     }
+
+    const temDesvio = (desvioRef !== null && Math.abs(desvioRef) > 20) || 
+                      (desvioMedia !== null && Math.abs(desvioMedia) > 20);
+
+    if (temDesvio) {
+      setPendingItem(novoItem);
+      setOutlierInfo({ pesoMedioItem, desvioRef, desvioMedia, mediaItens: mediaItensAtual });
+      setShowOutlierDialog(true);
+      return;
+    }
+
+    setItens([...itens, novoItem]);
     
     // Clear inputs - mantém a tara e quantidade de aves para reutilização
     setPesoBruto('');
@@ -569,6 +593,25 @@ export function PesagemDialog({
     setTimeout(() => {
       pesoBrutoInputRef.current?.focus();
     }, 50);
+  };
+
+  const handleConfirmOutlier = () => {
+    if (pendingItem) {
+      setItens(prev => [...prev, pendingItem]);
+      setPendingItem(null);
+      setOutlierInfo(null);
+      setShowOutlierDialog(false);
+      setPesoBruto('');
+      setTimeout(() => pesoBrutoInputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleCancelOutlier = () => {
+    setPendingItem(null);
+    setOutlierInfo(null);
+    setShowOutlierDialog(false);
+    setPesoBruto('');
+    setTimeout(() => pesoBrutoInputRef.current?.focus(), 50);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -1183,6 +1226,46 @@ export function PesagemDialog({
         </div>
       </DialogContent>
     </Dialog>
+    {/* Outlier confirmation dialog */}
+    <AlertDialog open={showOutlierDialog} onOpenChange={setShowOutlierDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            ⚠️ Peso atípico detectado
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3 text-sm">
+              <p>O peso médio informado diverge significativamente das referências:</p>
+              <div className="rounded-lg border p-3 space-y-2 bg-muted/50">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Peso médio informado:</span>
+                  <span className="font-bold">{outlierInfo?.pesoMedioItem.toFixed(3)} kg</span>
+                </div>
+                {outlierInfo?.desvioRef !== null && pesoReferencia && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Referência tabela (dia {diasDesdeAlojamento}):</span>
+                    <span className="font-medium">{pesoReferencia.toFixed(3)} kg <span className={Math.abs(outlierInfo?.desvioRef ?? 0) > 20 ? 'text-destructive font-bold' : ''}>({(outlierInfo?.desvioRef ?? 0) > 0 ? '+' : ''}{outlierInfo?.desvioRef?.toFixed(1)}%)</span></span>
+                  </div>
+                )}
+                {outlierInfo?.desvioMedia !== null && outlierInfo?.mediaItens && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Média das pesagens anteriores:</span>
+                    <span className="font-medium">{outlierInfo.mediaItens.toFixed(3)} kg <span className={Math.abs(outlierInfo?.desvioMedia ?? 0) > 20 ? 'text-destructive font-bold' : ''}>({(outlierInfo?.desvioMedia ?? 0) > 0 ? '+' : ''}{outlierInfo?.desvioMedia?.toFixed(1)}%)</span></span>
+                  </div>
+                )}
+              </div>
+              <p className="text-muted-foreground">Verifique se os valores estão corretos antes de confirmar.</p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleCancelOutlier}>Corrigir</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmOutlier} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Confirmar mesmo assim
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
