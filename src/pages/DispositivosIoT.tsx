@@ -110,6 +110,11 @@ export default function DispositivosIoT() {
   const [addRegraOpen, setAddRegraOpen] = useState(false);
   const [newRegra, setNewRegra] = useState({ dia_inicio: '', dia_fim: '', temp_min_c: '', temp_max_c: '' });
 
+  // Timer protection state
+  const [timersSeguranca, setTimersSeguranca] = useState<any[]>([]);
+  const [loadingTimers, setLoadingTimers] = useState(false);
+  const [resyncingTimers, setResyncingTimers] = useState(false);
+
   const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
     integradoId,
     onSuccess: () => fetchDeviceStates(),
