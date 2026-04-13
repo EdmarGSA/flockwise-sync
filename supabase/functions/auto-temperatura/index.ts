@@ -427,6 +427,16 @@ async function syncTimersForDevice(
         if (galpaoDevices.length === 0) continue;
 
         for (const device of galpaoDevices) {
+          // ── Sync safety timers (fallback offline) ──
+          try {
+            await syncTimersForDevice(
+              supabase, accessToken, appId, region,
+              device, lote.id, integradoId, ageDays
+            );
+          } catch (timerErr) {
+            console.error(`auto-temperatura: timer sync failed for device ${device.device_id_ewelink}:`, timerErr);
+          }
+
           let desiredState: "on" | "off" | null = null;
           let acao = "";
 
