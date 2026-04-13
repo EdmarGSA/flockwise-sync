@@ -77,6 +77,7 @@ interface LogAutomacao {
   temp_max_regra: number;
   acao: string;
   resultado: string;
+  tempo_resposta_ms: number | null;
   dispositivo_nome?: string;
   lote_id?: string;
 }
