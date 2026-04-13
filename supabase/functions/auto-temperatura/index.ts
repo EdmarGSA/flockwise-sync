@@ -338,6 +338,8 @@ Deno.serve(async (req) => {
 
     let totalActions = 0;
     let totalAlerts = 0;
+    let totalOfflineAlerts = 0;
+    const OFFLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
     for (const [integradoId, integradoLotes] of lotesByIntegrado) {
       const { data: tokenData } = await supabase
@@ -383,6 +385,50 @@ Deno.serve(async (req) => {
       const automationDevices = (devices || []).filter(
         (d: any) => d.automacao_ativa && d.funcao_automacao !== "nenhuma"
       );
+
+      // ── Offline detection for ALL active devices ──
+      for (const dev of (devices || [])) {
+        const { data: lastReading } = await supabase
+          .from("leituras_sensores")
+          .select("created_at, online")
+          .eq("dispositivo_id", dev.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!lastReading) continue; // No readings yet, skip
+
+        const readingAge = Date.now() - new Date(lastReading.created_at).getTime();
+        const isOffline = readingAge > OFFLINE_THRESHOLD_MS || lastReading.online === false;
+
+        if (isOffline) {
+          // Check if we already sent an offline notification in the last hour
+          const { data: recentNotif } = await supabase
+            .from("admin_notifications")
+            .select("id")
+            .eq("integrado_id", integradoId)
+            .eq("tipo", "dispositivo_offline")
+            .ilike("mensagem", `%${dev.device_id_ewelink}%`)
+            .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .limit(1)
+            .maybeSingle();
+
+          if (!recentNotif) {
+            const minutesOffline = Math.round(readingAge / 60000);
+            const galpaoName = dev.galpao_id ? `(galpão vinculado)` : `(sem galpão)`;
+            
+            await supabase.from("admin_notifications").insert({
+              integrado_id: integradoId,
+              tipo: "dispositivo_offline",
+              titulo: `📡 Dispositivo offline há ${minutesOffline} min`,
+              mensagem: `O dispositivo "${dev.device_id_ewelink}" está sem comunicação há ${minutesOffline} minutos ${galpaoName}. Verifique a conexão de internet da granja. Os timers de segurança continuam operando localmente.`,
+            });
+            
+            console.log(`offline-alert: device ${dev.device_id_ewelink} offline for ${minutesOffline} min`);
+            totalOfflineAlerts++;
+          }
+        }
+      }
 
       for (const lote of integradoLotes) {
         const ageDays = Math.floor(
@@ -486,8 +532,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`auto-temperatura: completed with ${totalActions} actions, ${totalAlerts} alert checks`);
-    return jsonResponse({ message: "Automação executada", actions: totalActions, alerts: totalAlerts });
+    console.log(`auto-temperatura: completed with ${totalActions} actions, ${totalAlerts} alert checks, ${totalOfflineAlerts} offline alerts`);
+    return jsonResponse({ message: "Automação executada", actions: totalActions, alerts: totalAlerts, offlineAlerts: totalOfflineAlerts });
 
   } catch (error) {
     console.error("auto-temperatura error:", error);
