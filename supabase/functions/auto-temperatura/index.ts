@@ -532,8 +532,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`auto-temperatura: completed with ${totalActions} actions, ${totalAlerts} alert checks`);
-    return jsonResponse({ message: "Automação executada", actions: totalActions, alerts: totalAlerts });
+    console.log(`auto-temperatura: completed with ${totalActions} actions, ${totalAlerts} alert checks, ${totalOfflineAlerts} offline alerts`);
+    return jsonResponse({ message: "Automação executada", actions: totalActions, alerts: totalAlerts, offlineAlerts: totalOfflineAlerts });
 
   } catch (error) {
     console.error("auto-temperatura error:", error);
