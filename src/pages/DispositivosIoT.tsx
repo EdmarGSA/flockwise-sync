@@ -214,6 +214,35 @@ export default function DispositivosIoT() {
     }
   };
 
+  const fetchTimers = async () => {
+    if (!integradoId) return;
+    setLoadingTimers(true);
+    const { data } = await supabase
+      .from('timers_seguranca_iot')
+      .select('*')
+      .eq('integrado_id', integradoId)
+      .order('created_at', { ascending: false });
+    if (data) setTimersSeguranca(data);
+    setLoadingTimers(false);
+  };
+
+  const handleResyncTimers = async () => {
+    if (!ewelinkConnected) { toast.error('Conta eWeLink não conectada'); return; }
+    setResyncingTimers(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-temperatura', {
+        body: {},
+      });
+      if (error) throw error;
+      toast.success('Timers de segurança resincronizados');
+      fetchTimers();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao resincronizar');
+    } finally {
+      setResyncingTimers(false);
+    }
+  };
+
   const fetchDeviceStatesForDevices = async (devices: Dispositivo[]) => {
     const states: Record<string, string | null> = {};
     const autoCtrl = new Set<string>();
