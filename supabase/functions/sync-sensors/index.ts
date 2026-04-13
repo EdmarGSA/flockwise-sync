@@ -509,7 +509,38 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: "Sync concluído", leituras: readings.length, detalhes: readings });
     }
 
-    return jsonResponse({ error: "Ação inválida. Use action=oauth-url, check-connection, list-devices, device-status, control-device ou sync" }, 400);
+    // ── set-device-timers: program safety timers on device firmware ──
+    if (action === "set-device-timers") {
+      const deviceEwelinkId = bodyParams.device_id;
+      const timers = bodyParams.timers; // array of eWeLink timer objects
+
+      if (!deviceEwelinkId || !timers || !Array.isArray(timers)) {
+        return jsonResponse({ error: "device_id e timers (array) são obrigatórios" }, 400);
+      }
+
+      if (timers.length > 8) {
+        return jsonResponse({ error: "Máximo de 8 timers por dispositivo Sonoff" }, 400);
+      }
+
+      console.log(`set-device-timers: programming ${timers.length} timers on device ${deviceEwelinkId}`);
+
+      const result = await controlEwelinkDevice(
+        accessToken, appId, appSecret, region, deviceEwelinkId, { timers }
+      );
+
+      if (result.error !== 0) {
+        console.error("set-device-timers error:", result);
+        return jsonResponse({
+          error: `Falha ao programar timers: ${result.msg || 'erro desconhecido'}`,
+          success: false,
+        }, 400);
+      }
+
+      console.log(`set-device-timers: success for device ${deviceEwelinkId}`);
+      return jsonResponse({ success: true, timersCount: timers.length });
+    }
+
+    return jsonResponse({ error: "Ação inválida. Use action=oauth-url, check-connection, list-devices, device-status, control-device, set-device-timers ou sync" }, 400);
   } catch (error) {
     console.error("Erro no sync-sensors:", error);
     return jsonResponse({ error: error instanceof Error ? error.message : "Erro interno" }, 500);
