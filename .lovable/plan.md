@@ -1,85 +1,97 @@
 
 
-## Plano: Automação de Recebimento de Ração via XML por E-mail (Gmail)
+## Plano: Automação Local Resiliente via Timers no Dispositivo Sonoff
 
-### Visão Geral
+### Problema Atual
 
-Criar um pipeline automatizado que monitora uma caixa Gmail, extrai anexos XML de NF-e de ração, faz o parse, valida contra solicitações pendentes, e registra o recebimento automaticamente -- com uma tela de revisão para o usuário confirmar.
+A automação de temperatura opera 100% na nuvem: o `pg_cron` dispara a Edge Function `auto-temperatura` a cada 5 minutos, que lê sensores do banco, avalia regras e envia comandos via API eWeLink Cloud. Se a granja perder internet, nenhum comando é enviado e os equipamentos ficam no último estado indefinidamente.
 
-### Arquitetura
+### Solução Proposta
+
+Usar os **timers embarcados nos dispositivos Sonoff** como camada de proteção. Os dispositivos Sonoff armazenam timers no firmware — eles executam localmente mesmo sem internet. O sistema vai:
+
+1. **Calcular e programar timers de segurança** nos dispositivos baseados nas regras de temperatura atuais
+2. **Atualizar os timers automaticamente** quando as regras mudarem ou o lote avançar de idade
+3. **Manter a automação cloud como primária** — os timers locais servem como fallback de emergência
 
 ```text
-Gmail (XML anexo)
-    │
-    ▼
-Edge Function "process-email-nfe"  ◄── pg_cron (a cada 5 min)
-    │
-    ├─ Conecta Gmail via API (OAuth ou App Password)
-    ├─ Busca e-mails novos com anexo .xml
-    ├─ Faz parse do XML (NF-e)
-    ├─ Valida: é ração? Match com solicitação pendente?
-    ├─ Insere em tabela "nfe_racao_recebidas" (status: pendente_revisao)
-    └─ Marca e-mail como lido
-    
-    ▼
-UI: Tela "Recebimentos Automáticos"
-    ├─ Lista NF-es recebidas por e-mail
-    ├─ Mostra match automático com solicitação
-    ├─ Botão "Confirmar Recebimento" → atualiza solicitação + kardex
-    └─ Botão "Rejeitar" → marca como rejeitada
+Arquitetura Atual vs Proposta:
+
+ATUAL (cloud-only):
+  pg_cron → auto-temperatura → eWeLink Cloud API → Dispositivo
+  (sem internet = sem controle)
+
+PROPOSTA (cloud + fallback local):
+  pg_cron → auto-temperatura → eWeLink Cloud API → Dispositivo  [primário]
+                    │
+                    └→ Sincroniza timers de segurança no firmware  [fallback]
+                       (dispositivo executa sozinho se perder internet)
 ```
+
+### Estratégia de Timers de Segurança
+
+Como sensores de temperatura não funcionam sem internet (dados não chegam ao banco), os timers locais seguem uma **programação horária fixa baseada no comportamento térmico típico**:
+
+- **Aquecimento**: liga automaticamente à noite (18h–06h) quando a idade do lote exige temperatura alta (primeiros dias)
+- **Ventilação**: liga automaticamente nas horas quentes (10h–16h) quando o lote já é mais velho
+- **Ciclos intermitentes**: para idades intermediárias, programa ciclos de liga/desliga (ex: 30min on / 30min off)
+
+A automação cloud continua sendo a inteligente (lê temperatura real). Os timers são o "piloto automático de emergência".
 
 ### Etapas de Implementação
 
-**1. Configuração Gmail (Connector ou Secret)**
-- Verificar se existe connector Gmail disponível; caso contrário, usar Gmail API com OAuth2 ou App Password do Google
-- Armazenar credenciais como secrets da Edge Function
+**1. Nova tabela: `timers_seguranca_iot`**
+- Registra os timers programados em cada dispositivo: `dispositivo_id`, `tipo_timer` (aquecimento_noturno, ventilacao_diurno, ciclo_intermitente), `hora_inicio`, `hora_fim`, `estado_desejado`, `intervalo_minutos`, `sincronizado_em`, `idade_lote_dias`
+- Permite auditar e comparar o que está programado vs o que deveria estar
 
-**2. Nova tabela: `nfe_racao_recebidas`**
-- `id`, `integrado_id`, `numero_nfe`, `serie`, `chave_nfe`, `cnpj_fornecedor`, `razao_social_fornecedor`, `data_emissao`, `valor_total`, `valor_frete`, `xml_raw` (text), `itens` (jsonb), `status` (enum: `pendente_revisao`, `confirmada`, `rejeitada`, `erro`), `solicitacao_racao_id` (FK nullable), `lote_id` (FK nullable), `erro_mensagem`, `processado_por`, `processado_em`, `email_message_id` (para evitar duplicatas), `created_at`
-- RLS: acesso por `integrado_id`
+**2. Lógica de cálculo de timers (`calcularTimersSeguranca`)**
+- Recebe a idade do lote e as regras de temperatura ativas
+- Retorna os timers adequados:
+  - Idade 1-7 dias (temp alta): aquecimento noturno ON 18h-06h
+  - Idade 8-21 dias (transição): aquecimento noturno ON 20h-04h  
+  - Idade 22+ dias (temp baixa ok): ventilação diurna ON 10h-16h
+  - Configurável por `funcao_automacao` do dispositivo
 
-**3. Edge Function: `process-email-nfe`**
-- Conecta ao Gmail via API (busca e-mails não lidos com anexo .xml)
-- Para cada anexo XML:
-  - Reutiliza a lógica de parse de NF-e já existente no `IniciarRecebimentoDialog`
-  - Verifica se é NF-e de ração (cruza itens com produtos do grupo "Ração")
-  - Tenta match automático com `solicitacoes_racao` pendentes (por CNPJ fornecedor, tipo ração, quantidade similar, data próxima)
-  - Insere em `nfe_racao_recebidas` com status `pendente_revisao`
-  - Marca e-mail como lido no Gmail
-- Executada via pg_cron a cada 5 minutos
+**3. Endpoint na Edge Function `sync-sensors` (nova action: `set-device-timers`)**
+- Recebe dispositivo + lista de timers
+- Envia para API eWeLink: `POST /v2/device/thing/status` com `params.timers`
+- Os timers ficam gravados no firmware do Sonoff e executam localmente
 
-**4. Tela de Revisão (UI)**
-- Nova tab ou seção em "Gestão de Consumo" ou "Fábrica de Ração"
-- Lista NF-es recebidas por e-mail com status
-- Cards mostrando: NF-e info, match sugerido com solicitação, desvios de quantidade/preço
-- Ações: "Confirmar Recebimento" (executa fluxo completo: atualiza solicitação, kardex, estoque) e "Rejeitar"
-- Indicador de NF-es pendentes de revisão no dashboard
+**4. Atualização automática na `auto-temperatura`**
+- Após processar cada lote, verifica se a idade mudou desde a última sincronização de timers
+- Se mudou, recalcula e re-sincroniza os timers no dispositivo
+- Registra em `timers_seguranca_iot` para auditoria
 
-**5. Confirmação automática (fase 2, opcional)**
-- Regra: se NF-e bate 100% com solicitação (fornecedor, tipo, quantidade ±5%), confirmar automaticamente
-- Flag configurável por organização
+**5. UI: Seção "Proteção Offline" na página IoT**
+- Mostra status dos timers de segurança por dispositivo
+- Indica se os timers estão sincronizados e para qual idade
+- Botão "Ressincronizar Timers" manual
+- Badge visual: "🛡️ Protegido" (timers atualizados) ou "⚠️ Desatualizado"
+
+**6. Alerta de offline prolongado**
+- Se um dispositivo ficar offline por mais de 15 minutos, criar notificação administrativa
+- Informar que os timers de segurança estão ativos como fallback
 
 ### Arquivos Afetados
 
 | Tipo | Arquivo | Ação |
 |------|---------|------|
-| DB | Migration | Criar tabela `nfe_racao_recebidas` + enum status |
-| Edge Function | `supabase/functions/process-email-nfe/index.ts` | Nova - polling Gmail + parse XML |
-| Config | `supabase/config.toml` | Adicionar `[functions.process-email-nfe]` |
-| UI | `src/components/consumo/NfeRacaoRevisaoTab.tsx` | Nova - tela de revisão |
-| UI | `src/pages/GestaoConsumo.tsx` | Adicionar tab "NF-e Recebidas" |
-| Secrets | Gmail credentials | App Password ou OAuth tokens |
+| DB | Migration | Criar `timers_seguranca_iot` |
+| Edge Function | `auto-temperatura/index.ts` | Adicionar sincronização de timers |
+| Edge Function | `sync-sensors/index.ts` | Nova action `set-device-timers` |
+| UI | `DispositivosIoT.tsx` | Seção "Proteção Offline" |
+| Lib | `src/lib/utils/calcularTimersSeguranca.ts` | Lógica de cálculo (compartilhada) |
 
-### Pré-requisitos
+### Limitações e Considerações
 
-- **Gmail App Password**: o usuário precisa gerar uma senha de app no Google (2FA habilitado) ou configurar OAuth2
-- Definir qual e-mail Gmail será monitorado
+- **Timers são "burros"**: não leem temperatura, só seguem horário. São emergência, não substituem a automação inteligente
+- **Dispositivos Sonoff suportam até 8 timers simultâneos** — suficiente para ciclos básicos
+- **A cada mudança de idade relevante** (novo range de regra), os timers são atualizados automaticamente
+- **Se a internet voltar**, a automação cloud retoma o controle imediatamente (tem prioridade sobre timers)
 
 ### Segurança
 
-- XML armazenado como texto para auditoria
-- `email_message_id` previne processamento duplicado
-- RLS por `integrado_id`
-- Credenciais Gmail armazenadas como secrets (nunca no código)
+- Timers são programados via `service_role` (sem sessão de usuário)
+- Log de todas as sincronizações para auditoria
+- RLS na tabela `timers_seguranca_iot` por `integrado_id`
 
