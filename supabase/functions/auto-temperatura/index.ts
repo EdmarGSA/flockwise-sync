@@ -514,7 +514,9 @@ Deno.serve(async (req) => {
           } catch { /* proceed */ }
 
           console.log(`auto-temperatura: ${acao} → device ${device.device_id_ewelink}`);
+          const t0 = Date.now();
           const result = await controlDevice(accessToken, appId, region, device.device_id_ewelink, { switch: desiredState });
+          const tempoRespostaMs = Date.now() - t0;
           const resultado = result.error === 0 ? "sucesso" : `erro: ${result.msg || result.error}`;
 
           await supabase.from("log_automacao_temperatura").insert({
@@ -525,6 +527,7 @@ Deno.serve(async (req) => {
             temp_max_regra: tempMax,
             acao,
             resultado,
+            tempo_resposta_ms: tempoRespostaMs,
           });
 
           totalActions++;

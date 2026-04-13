@@ -2245,6 +2245,7 @@ export type Database = {
           temp_max_regra: number | null
           temp_min_regra: number | null
           temperatura_lida: number | null
+          tempo_resposta_ms: number | null
         }
         Insert: {
           acao: string
@@ -2256,6 +2257,7 @@ export type Database = {
           temp_max_regra?: number | null
           temp_min_regra?: number | null
           temperatura_lida?: number | null
+          tempo_resposta_ms?: number | null
         }
         Update: {
           acao?: string
@@ -2267,6 +2269,7 @@ export type Database = {
           temp_max_regra?: number | null
           temp_min_regra?: number | null
           temperatura_lida?: number | null
+          tempo_resposta_ms?: number | null
         }
         Relationships: [
           {

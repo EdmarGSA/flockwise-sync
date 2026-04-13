@@ -1,0 +1,1 @@
+ALTER TABLE public.log_automacao_temperatura ADD COLUMN tempo_resposta_ms integer;
