@@ -1102,52 +1102,184 @@ export default function DispositivosIoT() {
           </TabsContent>
 
           {/* Logs Tab */}
-          <TabsContent value="logs">
+          <TabsContent value="logs" className="space-y-4">
+            {/* KPI Cards */}
+            {logs.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Zap className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total comandos</p>
+                      <p className="text-lg font-bold text-foreground">{logs.length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Sucesso</p>
+                      <p className="text-lg font-bold text-primary">{logs.filter(l => l.resultado === 'sucesso').length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-destructive/10">
+                      <XCircle className="h-4 w-4 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Falhas</p>
+                      <p className="text-lg font-bold text-destructive">{logs.filter(l => l.resultado !== 'sucesso').length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-muted">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Tempo médio</p>
+                      <p className="text-lg font-bold text-foreground">
+                        {(() => {
+                          const withTime = logs.filter(l => l.tempo_resposta_ms != null);
+                          if (withTime.length === 0) return '—';
+                          const avg = Math.round(withTime.reduce((s, l) => s + (l.tempo_resposta_ms || 0), 0) / withTime.length);
+                          return `${avg}ms`;
+                        })()}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <History className="h-5 w-5 text-primary" />
-                    Histórico de Automação
+                    Histórico de Comandos
                   </CardTitle>
-                  <Button variant="outline" size="sm" onClick={fetchLogs}>
-                    <RefreshCw className="h-4 w-4 mr-1" />Atualizar
-                  </Button>
+                  <div className="flex gap-2">
+                    <Select value={logFilter} onValueChange={(v: any) => setLogFilter(v)}>
+                      <SelectTrigger className="w-[130px] h-8 text-xs">
+                        <Filter className="h-3 w-3 mr-1" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="sucesso">✓ Sucesso</SelectItem>
+                        <SelectItem value="erro">✗ Falhas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={fetchLogs}>
+                      <RefreshCw className="h-4 w-4 mr-1" />Atualizar
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {logs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma ação automática registrada ainda.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data/Hora</TableHead>
-                        <TableHead>Dispositivo</TableHead>
-                        <TableHead>Temp. Lida</TableHead>
-                        <TableHead>Faixa</TableHead>
-                        <TableHead>Ação</TableHead>
-                        <TableHead>Resultado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {logs.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell className="text-xs">{format(new Date(log.created_at), "dd/MM HH:mm", { locale: ptBR })}</TableCell>
-                          <TableCell className="text-sm font-medium">{log.dispositivo_nome}</TableCell>
-                          <TableCell>{log.temperatura_lida != null ? `${Number(log.temperatura_lida).toFixed(1)}°C` : '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{Number(log.temp_min_regra)}–{Number(log.temp_max_regra)}°C</TableCell>
-                          <TableCell className="text-xs max-w-[200px] truncate">{log.acao}</TableCell>
-                          <TableCell>
-                            <Badge variant={log.resultado === 'sucesso' ? 'secondary' : 'destructive'} className="text-xs">
-                              {log.resultado}
-                            </Badge>
-                          </TableCell>
+                {(() => {
+                  const filtered = logFilter === 'todos' ? logs
+                    : logFilter === 'sucesso' ? logs.filter(l => l.resultado === 'sucesso')
+                    : logs.filter(l => l.resultado !== 'sucesso');
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-sm text-muted-foreground">
+                          {logFilter !== 'todos' ? 'Nenhum registro com esse filtro.' : 'Nenhuma ação automática registrada ainda.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10">Status</TableHead>
+                          <TableHead>Data/Hora</TableHead>
+                          <TableHead>Dispositivo</TableHead>
+                          <TableHead>Temp. Lida</TableHead>
+                          <TableHead>Faixa</TableHead>
+                          <TableHead>Ação</TableHead>
+                          <TableHead>Tempo</TableHead>
+                          <TableHead>Resultado</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                      </TableHeader>
+                      <TableBody>
+                        {filtered.map((log) => {
+                          const isSucesso = log.resultado === 'sucesso';
+                          const tempoMs = log.tempo_resposta_ms;
+                          const tempoColor = tempoMs == null ? 'text-muted-foreground'
+                            : tempoMs < 500 ? 'text-primary'
+                            : tempoMs < 2000 ? 'text-accent-foreground'
+                            : 'text-destructive';
+
+                          return (
+                            <TableRow key={log.id} className={!isSucesso ? 'bg-destructive/5' : ''}>
+                              <TableCell>
+                                {isSucesso ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-destructive" />
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs whitespace-nowrap">
+                                {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{log.dispositivo_nome}</TableCell>
+                              <TableCell>
+                                <span className={getTemperaturaColor(log.temperatura_lida)}>
+                                  {log.temperatura_lida != null ? `${Number(log.temperatura_lida).toFixed(1)}°C` : '—'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {Number(log.temp_min_regra)}–{Number(log.temp_max_regra)}°C
+                              </TableCell>
+                              <TableCell className="text-xs max-w-[200px]">
+                                <span className="flex items-center gap-1">
+                                  {log.acao.includes('ligar') ? (
+                                    <Power className="h-3 w-3 text-primary shrink-0" />
+                                  ) : (
+                                    <Power className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  )}
+                                  <span className="truncate">{log.acao}</span>
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                {tempoMs != null ? (
+                                  <span className={`text-xs font-mono ${tempoColor}`}>
+                                    {tempoMs}ms
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={isSucesso ? 'secondary' : 'destructive'}
+                                  className="text-xs gap-1"
+                                >
+                                  {isSucesso ? 'Sucesso' : log.resultado}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
