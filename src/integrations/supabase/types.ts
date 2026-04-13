@@ -6473,6 +6473,75 @@ export type Database = {
         }
         Relationships: []
       }
+      timers_seguranca_iot: {
+        Row: {
+          created_at: string
+          dispositivo_id: string
+          estado_desejado: string
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          idade_lote_dias: number
+          integrado_id: string
+          intervalo_minutos: number | null
+          lote_id: string | null
+          sincronizado: boolean
+          sincronizado_em: string | null
+          timer_index_ewelink: number | null
+          tipo_timer: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dispositivo_id: string
+          estado_desejado?: string
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          idade_lote_dias: number
+          integrado_id: string
+          intervalo_minutos?: number | null
+          lote_id?: string | null
+          sincronizado?: boolean
+          sincronizado_em?: string | null
+          timer_index_ewelink?: number | null
+          tipo_timer: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dispositivo_id?: string
+          estado_desejado?: string
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          idade_lote_dias?: number
+          integrado_id?: string
+          intervalo_minutos?: number | null
+          lote_id?: string | null
+          sincronizado?: boolean
+          sincronizado_em?: string | null
+          timer_index_ewelink?: number | null
+          tipo_timer?: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timers_seguranca_iot_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timers_seguranca_iot_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tratamentos_lote: {
         Row: {
           aplicacao_confirmada: boolean | null
@@ -7001,6 +7070,10 @@ export type Database = {
       tipo_pressao: "positiva" | "negativa" | "darkhouse"
       tipo_producao: "corte" | "postura"
       tipo_taxa_bancaria: "fixo" | "percentual"
+      tipo_timer_seguranca:
+        | "aquecimento_noturno"
+        | "ventilacao_diurno"
+        | "ciclo_intermitente"
       unidade_venda_ovo:
         | "UN"
         | "DZ"
@@ -7247,6 +7320,11 @@ export const Constants = {
       tipo_pressao: ["positiva", "negativa", "darkhouse"],
       tipo_producao: ["corte", "postura"],
       tipo_taxa_bancaria: ["fixo", "percentual"],
+      tipo_timer_seguranca: [
+        "aquecimento_noturno",
+        "ventilacao_diurno",
+        "ciclo_intermitente",
+      ],
       unidade_venda_ovo: [
         "UN",
         "DZ",

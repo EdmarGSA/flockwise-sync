@@ -182,6 +182,122 @@ async function manageAlerts(
   }
 }
 
+// ── Timer safety calculation (duplicated from shared lib for edge function context) ──
+function calcularTimersParaIdade(idade: number, funcao: string): { tipo: string; hora_inicio: string; hora_fim: string; estado: string; intervalo?: number }[] {
+  if (funcao === 'aquecimento') {
+    if (idade <= 7) return [{ tipo: 'aquecimento_noturno', hora_inicio: '18:00', hora_fim: '06:00', estado: 'on' }];
+    if (idade <= 14) return [{ tipo: 'aquecimento_noturno', hora_inicio: '20:00', hora_fim: '05:00', estado: 'on' }];
+    if (idade <= 21) return [{ tipo: 'ciclo_intermitente', hora_inicio: '22:00', hora_fim: '04:00', estado: 'on', intervalo: 30 }];
+    return [{ tipo: 'aquecimento_noturno', hora_inicio: '00:00', hora_fim: '23:59', estado: 'off' }];
+  }
+  if (funcao === 'ventilacao') {
+    if (idade <= 14) return [{ tipo: 'ventilacao_diurno', hora_inicio: '00:00', hora_fim: '23:59', estado: 'off' }];
+    if (idade <= 21) return [{ tipo: 'ventilacao_diurno', hora_inicio: '11:00', hora_fim: '15:00', estado: 'on' }];
+    if (idade <= 28) return [{ tipo: 'ventilacao_diurno', hora_inicio: '10:00', hora_fim: '16:00', estado: 'on' }];
+    return [{ tipo: 'ventilacao_diurno', hora_inicio: '09:00', hora_fim: '18:00', estado: 'on' }];
+  }
+  return [];
+}
+
+function getFaixaIdade(idade: number): string {
+  if (idade <= 7) return '1-7';
+  if (idade <= 14) return '8-14';
+  if (idade <= 21) return '15-21';
+  if (idade <= 28) return '22-28';
+  return '29+';
+}
+
+function buildEwelinkTimers(timers: { hora_inicio: string; hora_fim: string; estado: string }[]) {
+  const result: any[] = [];
+  for (let i = 0; i < timers.length && (i * 2 + 1) <= 7; i++) {
+    const t = timers[i];
+    const [hOn, mOn] = t.hora_inicio.split(':').map(Number);
+    const [hOff, mOff] = t.hora_fim.split(':').map(Number);
+    result.push({
+      enabled: 1, mId: `safety_on_${i * 2}`, type: 'repeat',
+      at: `${mOn} ${hOn} * * 0,1,2,3,4,5,6`,
+      do: { switch: t.estado }, coolkit_timer_type: 'repeat',
+    });
+    const offState = t.estado === 'on' ? 'off' : 'on';
+    result.push({
+      enabled: 1, mId: `safety_off_${i * 2 + 1}`, type: 'repeat',
+      at: `${mOff} ${hOff} * * 0,1,2,3,4,5,6`,
+      do: { switch: offState }, coolkit_timer_type: 'repeat',
+    });
+  }
+  return result;
+}
+
+async function syncTimersForDevice(
+  supabase: any, accessToken: string, appId: string, region: string,
+  device: any, loteId: string, integradoId: string, ageDays: number
+) {
+  // Check if timers need resync (age band changed)
+  const { data: existingTimer } = await supabase
+    .from("timers_seguranca_iot")
+    .select("idade_lote_dias")
+    .eq("dispositivo_id", device.id)
+    .eq("sincronizado", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const previousAge = existingTimer?.idade_lote_dias ?? null;
+  const faixaAtual = getFaixaIdade(ageDays);
+  const faixaAnterior = previousAge !== null ? getFaixaIdade(previousAge) : null;
+
+  if (faixaAtual === faixaAnterior) return false; // No resync needed
+
+  const timers = calcularTimersParaIdade(ageDays, device.funcao_automacao);
+  if (timers.length === 0) return false;
+
+  const ewelinkTimers = buildEwelinkTimers(timers);
+
+  // Send timers to device via eWeLink API
+  const regionUrl = getRegionUrl(region);
+  const nonce = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+  const body = { type: 1, id: device.device_id_ewelink, params: { timers: ewelinkTimers } };
+
+  const res = await fetch(`${regionUrl}/v2/device/thing/status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CK-Appid": appId,
+      "X-CK-Nonce": nonce,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const result = await res.json();
+  const success = result.error === 0;
+
+  // Clean old timers for this device
+  await supabase.from("timers_seguranca_iot").delete().eq("dispositivo_id", device.id);
+
+  // Insert new timer records
+  for (let i = 0; i < timers.length; i++) {
+    await supabase.from("timers_seguranca_iot").insert({
+      dispositivo_id: device.id,
+      integrado_id: integradoId,
+      lote_id: loteId,
+      tipo_timer: timers[i].tipo,
+      hora_inicio: timers[i].hora_inicio,
+      hora_fim: timers[i].hora_fim,
+      estado_desejado: timers[i].estado,
+      intervalo_minutos: timers[i].intervalo || null,
+      idade_lote_dias: ageDays,
+      sincronizado: success,
+      sincronizado_em: success ? new Date().toISOString() : null,
+      timer_index_ewelink: i * 2,
+    });
+  }
+
+  console.log(`timers: ${success ? 'synced' : 'FAILED'} for device ${device.device_id_ewelink} (age ${ageDays}, band ${faixaAtual})`);
+  return success;
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -312,6 +428,16 @@ Deno.serve(async (req) => {
         if (galpaoDevices.length === 0) continue;
 
         for (const device of galpaoDevices) {
+          // ── Sync safety timers (fallback offline) ──
+          try {
+            await syncTimersForDevice(
+              supabase, accessToken, appId, region,
+              device, lote.id, integradoId, ageDays
+            );
+          } catch (timerErr) {
+            console.error(`auto-temperatura: timer sync failed for device ${device.device_id_ewelink}:`, timerErr);
+          }
+
           let desiredState: "on" | "off" | null = null;
           let acao = "";
 
