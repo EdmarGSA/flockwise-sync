@@ -183,6 +183,7 @@ export default function DispositivosIoT() {
     // Fetch automation rules
     fetchRegras();
     fetchLogs();
+    fetchTimers();
 
     setLoading(false);
   };
@@ -965,6 +966,137 @@ export default function DispositivosIoT() {
                 </div>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          {/* Proteção Offline Tab */}
+          <TabsContent value="protecao" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Proteção Offline (Timers de Segurança)
+                  </CardTitle>
+                  <Button variant="outline" size="sm" onClick={handleResyncTimers} disabled={resyncingTimers || !ewelinkConnected}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${resyncingTimers ? 'animate-spin' : ''}`} />
+                    {resyncingTimers ? 'Resincronizando...' : 'Ressincronizar Timers'}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Timers de segurança são programados diretamente no firmware dos dispositivos Sonoff. 
+                  Eles executam localmente mesmo sem internet, servindo como proteção de emergência.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {loadingTimers ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+                ) : timersSeguranca.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShieldAlert className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold text-foreground">Nenhum timer de segurança programado</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Os timers são sincronizados automaticamente quando a automação está ativa. 
+                      Clique em "Ressincronizar" para forçar a atualização.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Group timers by device */}
+                    {(() => {
+                      const grouped = new Map<string, any[]>();
+                      timersSeguranca.forEach((t: any) => {
+                        const devId = t.dispositivo_id;
+                        if (!grouped.has(devId)) grouped.set(devId, []);
+                        grouped.get(devId)!.push(t);
+                      });
+                      return Array.from(grouped.entries()).map(([devId, timers]) => {
+                        const dev = dispositivos.find(d => d.id === devId);
+                        const allSynced = timers.every((t: any) => t.sincronizado);
+                        const idade = timers[0]?.idade_lote_dias;
+                        return (
+                          <Card key={devId} className={allSynced ? 'border-primary/30' : 'border-destructive/30'}>
+                            <CardContent className="py-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  {allSynced ? (
+                                    <ShieldCheck className="h-5 w-5 text-primary" />
+                                  ) : (
+                                    <ShieldAlert className="h-5 w-5 text-destructive" />
+                                  )}
+                                  <div>
+                                    <p className="font-medium text-foreground">{dev?.nome || devId}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Idade do lote: {idade} dias • {allSynced ? 'Protegido' : 'Desatualizado'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge variant={allSynced ? 'secondary' : 'destructive'} className="text-xs">
+                                  {allSynced ? '🛡️ Protegido' : '⚠️ Desatualizado'}
+                                </Badge>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Tipo</TableHead>
+                                    <TableHead>Horário</TableHead>
+                                    <TableHead>Ação</TableHead>
+                                    <TableHead>Sincronizado</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {timers.map((t: any) => (
+                                    <TableRow key={t.id}>
+                                      <TableCell className="text-sm">
+                                        {t.tipo_timer === 'aquecimento_noturno' ? '🔥 Aquecimento' :
+                                         t.tipo_timer === 'ventilacao_diurno' ? '💨 Ventilação' :
+                                         '🔄 Ciclo'}
+                                      </TableCell>
+                                      <TableCell className="text-sm font-mono">
+                                        {t.hora_inicio?.slice(0, 5)} → {t.hora_fim?.slice(0, 5)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={t.estado_desejado === 'on' ? 'default' : 'outline'} className="text-xs">
+                                          {t.estado_desejado === 'on' ? 'Ligar' : 'Desligar'}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        {t.sincronizado ? (
+                                          <span className="text-xs text-primary">
+                                            ✓ {t.sincronizado_em ? formatDistanceToNow(new Date(t.sincronizado_em), { addSuffix: true, locale: ptBR }) : ''}
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs text-destructive">✗ Pendente</span>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </CardContent>
+                          </Card>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Info card */}
+            <Card className="bg-muted/30">
+              <CardContent className="py-4">
+                <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  Como funciona a Proteção Offline?
+                </h4>
+                <ul className="text-sm text-muted-foreground space-y-1.5 list-disc ml-5">
+                  <li><strong>Automação cloud (primária):</strong> Lê temperatura real dos sensores e toma decisões inteligentes a cada 5 minutos</li>
+                  <li><strong>Timers de segurança (fallback):</strong> Programados no firmware do Sonoff, executam por horário fixo mesmo sem internet</li>
+                  <li><strong>Atualização automática:</strong> Quando o lote muda de faixa de idade, os timers são recalculados e reprogramados</li>
+                  <li><strong>Prioridade:</strong> Se a internet voltar, a automação cloud retoma o controle imediatamente</li>
+                </ul>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Logs Tab */}
