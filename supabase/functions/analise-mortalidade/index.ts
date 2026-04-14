@@ -7,6 +7,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Temperature ranges by age (days)
+function faixaTemperaturaIdeal(idadeDias: number): { min: number; max: number } {
+  if (idadeDias <= 3) return { min: 32, max: 34 };
+  if (idadeDias <= 7) return { min: 30, max: 32 };
+  if (idadeDias <= 14) return { min: 28, max: 30 };
+  if (idadeDias <= 21) return { min: 26, max: 28 };
+  if (idadeDias <= 28) return { min: 24, max: 26 };
+  return { min: 20, max: 26 };
+}
+
+function classificarIndicador(valor: number, okMax: number, alertaMax: number): "ok" | "atencao" | "critico" {
+  if (valor <= okMax) return "ok";
+  if (valor <= alertaMax) return "atencao";
+  return "critico";
+}
+
+function calcTendencia(registros: { data_registro: string; total: number }[]): "estavel" | "subindo" | "descendo" {
+  if (registros.length < 2) return "estavel";
+  const sorted = [...registros].sort((a, b) => a.data_registro.localeCompare(b.data_registro));
+  const mid = Math.floor(sorted.length / 2);
+  const primeiraMet = sorted.slice(0, mid).reduce((s, r) => s + r.total, 0) / mid;
+  const segundaMet = sorted.slice(mid).reduce((s, r) => s + r.total, 0) / (sorted.length - mid);
+  const ratio = segundaMet / (primeiraMet || 1);
+  if (ratio > 1.3) return "subindo";
+  if (ratio < 0.7) return "descendo";
+  return "estavel";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -14,19 +42,16 @@ serve(async (req) => {
     const { mortalidade_id, lote_id } = await req.json();
     if (!mortalidade_id || !lote_id) {
       return new Response(JSON.stringify({ error: "mortalidade_id e lote_id obrigatórios" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Fetch mortalidade with items
+    // 1. Fetch mortalidade + items
     const { data: mortalidade } = await supabase
       .from("mortalidade")
       .select("*, mortalidade_itens(*)")
@@ -35,25 +60,42 @@ serve(async (req) => {
 
     if (!mortalidade) {
       return new Response(JSON.stringify({ error: "Mortalidade não encontrada" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch fotos
-    const { data: fotos } = await supabase
-      .from("mortalidade_fotos")
-      .select("url, motivo")
-      .eq("mortalidade_id", mortalidade_id);
-
-    // Fetch lote info
+    // 2. Fetch lote
     const { data: lote } = await supabase
       .from("lotes")
       .select("*, galpoes(nome), nucleos(nome)")
       .eq("id", lote_id)
       .single();
 
-    // Fetch recent pesagens for GPD
+    if (!lote) {
+      return new Response(JSON.stringify({ error: "Lote não encontrado" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const dataAloj = new Date(lote.data_alojamento);
+    const dataReg = new Date(mortalidade.data_registro);
+    const idadeDias = Math.max(1, Math.round((dataReg.getTime() - dataAloj.getTime()) / 86400000));
+
+    // 3. Fetch desempenho_aves reference (closest day)
+    const { data: desempenhoRef } = await supabase
+      .from("desempenho_aves")
+      .select("dia, peso_g, ganho_medio_diario_g, consumo_diario_racao_g, conversao_alimentar_acumulada")
+      .eq("linhagem", lote.linhagem || "cobb_500")
+      .eq("sexo", lote.sexo || "misto")
+      .gte("dia", Math.max(1, idadeDias - 2))
+      .lte("dia", idadeDias + 2)
+      .order("dia", { ascending: true })
+      .limit(5);
+
+    const refDia = desempenhoRef?.reduce((best: any, d: any) =>
+      !best || Math.abs(d.dia - idadeDias) < Math.abs(best.dia - idadeDias) ? d : best, null);
+
+    // 4. Fetch last pesagens for GPD
     const { data: pesagens } = await supabase
       .from("pesagens")
       .select("data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)")
@@ -61,169 +103,235 @@ serve(async (req) => {
       .order("data_pesagem", { ascending: false })
       .limit(5);
 
-    // Calculate GPD from pesagens
-    let gpdInfo = "Sem pesagens disponíveis";
-    if (pesagens && pesagens.length >= 2) {
-      const calcPesoMedio = (p: any) => {
+    let pesoMedioReal = 0;
+    let gpdReal = 0;
+    if (pesagens && pesagens.length > 0) {
+      const calcPeso = (p: any) => {
         const items = p.pesagem_itens || [];
-        if (items.length === 0) return 0;
+        if (!items.length) return 0;
         const totalPeso = items.reduce((s: number, i: any) => s + (i.peso_bruto_g - i.peso_tara_g), 0);
         const totalAves = items.reduce((s: number, i: any) => s + i.quantidade_aves, 0);
         return totalAves > 0 ? totalPeso / totalAves : 0;
       };
-      const ultimo = pesagens[0];
-      const anterior = pesagens[1];
-      const pesoUltimo = calcPesoMedio(ultimo);
-      const pesoAnterior = calcPesoMedio(anterior);
-      const diasDiff = Math.max(1, Math.round(
-        (new Date(ultimo.data_pesagem).getTime() - new Date(anterior.data_pesagem).getTime()) / 86400000
-      ));
-      const gpd = (pesoUltimo - pesoAnterior) / diasDiff;
-      gpdInfo = `GPD calculado: ${gpd.toFixed(2)} kg/dia. Último peso médio: ${pesoUltimo.toFixed(3)} kg`;
+      pesoMedioReal = calcPeso(pesagens[0]);
+      if (pesagens.length >= 2) {
+        const pesoAnterior = calcPeso(pesagens[1]);
+        const diasDiff = Math.max(1, Math.round(
+          (new Date(pesagens[0].data_pesagem).getTime() - new Date(pesagens[1].data_pesagem).getTime()) / 86400000
+        ));
+        gpdReal = (pesoMedioReal - pesoAnterior) / diasDiff;
+      }
     }
 
-    // Fetch mortality history
+    // 5. Fetch mortalidade_media reference
+    const { data: mortMedia } = await supabase
+      .from("mortalidade_media")
+      .select("*")
+      .eq("integrado_id", lote.integrado_id)
+      .eq("linhagem", lote.linhagem || "cobb_500")
+      .eq("sexo", lote.sexo || "misto")
+      .limit(1)
+      .maybeSingle();
+
+    // 6. Fetch all mortality for this lote (for accumulated + trend)
     const { data: histMort } = await supabase
       .from("mortalidade")
       .select("data_registro, mortalidade_itens(quantidade, motivo)")
       .eq("lote_id", lote_id)
-      .order("data_registro", { ascending: false })
-      .limit(10);
+      .order("data_registro", { ascending: true });
 
-    const totalMortHistorico = (histMort || []).reduce((total: number, m: any) => {
-      return total + (m.mortalidade_itens || []).reduce((s: number, i: any) => s + (i.quantidade || 0), 0);
-    }, 0);
+    let totalMortAcum = 0;
+    let totalEliminados = 0;
+    let totalNatural = 0;
+    const registrosTrend: { data_registro: string; total: number }[] = [];
 
-    // Build prompt
-    const itensResumo = (mortalidade.mortalidade_itens || [])
-      .map((i: any) => `${i.quantidade} aves - ${i.motivo}${i.submotivo ? ` (${i.submotivo})` : ''} - peso: ${i.peso_kg || 'N/I'} kg`)
-      .join("\n");
-
-    const contextPrompt = `Você é um veterinário especialista em avicultura. Analise os dados de mortalidade abaixo e retorne uma avaliação técnica.
-
-DADOS DO LOTE:
-- Linhagem: ${lote?.linhagem || 'N/I'}
-- Sexo: ${lote?.sexo || 'N/I'}
-- Aves alojadas: ${lote?.quantidade_aves || 'N/I'}
-- Data alojamento: ${lote?.data_alojamento || 'N/I'}
-- Núcleo: ${lote?.nucleos?.nome || 'N/I'}
-- Galpão: ${lote?.galpoes?.nome || 'N/I'}
-
-REGISTRO DE MORTALIDADE (${mortalidade.data_registro}):
-${itensResumo}
-- Temperatura ambiente: ${mortalidade.temperatura_c ? mortalidade.temperatura_c + '°C' : 'Não informada'}
-- Umidade: ${mortalidade.umidade_pct ? mortalidade.umidade_pct + '%' : 'Não informada'}
-
-DESEMPENHO:
-${gpdInfo}
-
-HISTÓRICO DE MORTALIDADE DO LOTE:
-Total acumulado: ${totalMortHistorico} aves
-Mortalidade acumulada: ${lote?.quantidade_aves ? ((totalMortHistorico / lote.quantidade_aves) * 100).toFixed(2) : 'N/I'}%
-
-${fotos && fotos.length > 0 ? `\nFotos disponíveis: ${fotos.length} fotos de aves mortas foram anexadas.` : 'Nenhuma foto anexada.'}`;
-
-    // Build messages with images
-    const userContent: any[] = [{ type: "text", text: contextPrompt }];
-
-    if (fotos && fotos.length > 0) {
-      for (const foto of fotos.slice(0, 5)) {
-        userContent.push({
-          type: "image_url",
-          image_url: { url: foto.url },
-        });
-      }
-    }
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          {
-            role: "system",
-            content: "Você é um veterinário avícola especialista. Responda SEMPRE usando a tool fornecida.",
-          },
-          { role: "user", content: userContent },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "analise_mortalidade",
-              description: "Retorna análise estruturada da mortalidade avícola",
-              parameters: {
-                type: "object",
-                properties: {
-                  resumo: { type: "string", description: "Resumo geral da situação em 2-3 frases" },
-                  causas_provaveis: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Lista de 2-5 causas prováveis da mortalidade",
-                  },
-                  classificacao_risco: {
-                    type: "string",
-                    enum: ["baixo", "moderado", "alto", "critico"],
-                    description: "Classificação de risco",
-                  },
-                  sugestoes_acao: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Lista de 3-5 ações recomendadas",
-                  },
-                  gpd_avaliacao: {
-                    type: "string",
-                    description: "Avaliação do ganho de peso diário das aves",
-                  },
-                },
-                required: ["resumo", "causas_provaveis", "classificacao_risco", "sugestoes_acao"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "analise_mortalidade" } },
-      }),
+    (histMort || []).forEach((m: any) => {
+      let totalReg = 0;
+      (m.mortalidade_itens || []).forEach((i: any) => {
+        totalReg += i.quantidade || 0;
+        if (i.motivo === "eliminado") totalEliminados += i.quantidade || 0;
+        else totalNatural += i.quantidade || 0;
+      });
+      totalMortAcum += totalReg;
+      registrosTrend.push({ data_registro: m.data_registro, total: totalReg });
     });
 
-    if (!aiResponse.ok) {
-      const status = aiResponse.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limits exceeded. Tente novamente em alguns minutos." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    const mortPercentual = lote.quantidade_aves > 0 ? (totalMortAcum / lote.quantidade_aves) * 100 : 0;
+
+    // 7. IoT sensor data
+    let tempAtual: number | null = mortalidade.temperatura_c;
+    let umidAtual: number | null = mortalidade.umidade_pct;
+
+    if (!tempAtual && lote.galpao_id) {
+      const { data: device } = await supabase
+        .from("dispositivos_iot")
+        .select("id")
+        .eq("galpao_id", lote.galpao_id)
+        .eq("ativo", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (device) {
+        const { data: leitura } = await supabase
+          .from("leituras_sensores")
+          .select("temperatura_c, umidade_pct")
+          .eq("dispositivo_id", device.id)
+          .order("lido_em", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (leitura) {
+          tempAtual = tempAtual ?? leitura.temperatura_c;
+          umidAtual = umidAtual ?? leitura.umidade_pct;
+        }
       }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes (402)." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await aiResponse.text();
-      console.error("AI error:", status, errText);
-      throw new Error(`AI gateway error: ${status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    // ========== DETERMINISTIC ANALYSIS ==========
+    const alertas: string[] = [];
+    const causas: string[] = [];
+    const sugestoes: string[] = [];
+    let pontuacaoRisco = 0; // 0-10
 
-    let analise;
-    if (toolCall?.function?.arguments) {
-      analise = JSON.parse(toolCall.function.arguments);
-    } else {
-      // Fallback: parse from content
-      analise = {
-        resumo: aiData.choices?.[0]?.message?.content || "Análise inconclusiva",
-        causas_provaveis: ["Dados insuficientes para determinar causa"],
-        classificacao_risco: "moderado",
-        sugestoes_acao: ["Coletar mais dados e fotos para análise futura"],
-      };
+    // A) Weight comparison
+    const pesoEsperado = refDia?.peso_g || 0;
+    let pesoStatus = "sem_dados";
+    if (pesoMedioReal > 0 && pesoEsperado > 0) {
+      const ratioPeso = pesoMedioReal / pesoEsperado;
+      if (ratioPeso >= 0.95) {
+        pesoStatus = "ok";
+      } else if (ratioPeso >= 0.80) {
+        pesoStatus = "atencao";
+        pontuacaoRisco += 2;
+        alertas.push(`Peso ${((1 - ratioPeso) * 100).toFixed(1)}% abaixo do esperado (${(pesoMedioReal).toFixed(0)}g vs ${pesoEsperado.toFixed(0)}g ref.)`);
+        sugestoes.push("Revisar qualidade e quantidade da ração fornecida");
+      } else {
+        pesoStatus = "critico";
+        pontuacaoRisco += 4;
+        causas.push("Peso significativamente abaixo do padrão da linhagem — possível problema nutricional ou sanitário");
+        sugestoes.push("Avaliar formulação de ração e verificar presença de doenças subclínicas");
+        sugestoes.push("Realizar exame laboratorial de amostras de ração");
+      }
     }
+
+    // B) GPD comparison
+    const gpdRef = refDia?.ganho_medio_diario_g || 0;
+    if (gpdReal > 0 && gpdRef > 0) {
+      const ratioGpd = gpdReal / gpdRef;
+      if (ratioGpd < 0.80) {
+        pontuacaoRisco += 2;
+        alertas.push(`GPD real ${gpdReal.toFixed(1)}g/dia vs ${gpdRef.toFixed(1)}g/dia esperado`);
+        causas.push("Ganho de peso diário abaixo do esperado");
+      }
+    }
+
+    // C) Mortality vs reference
+    let mortEsperada = 0;
+    if (mortMedia) {
+      if (idadeDias <= 7) mortEsperada = mortMedia.mortalidade_7_dias || 0;
+      else if (idadeDias <= 14) mortEsperada = (mortMedia.mortalidade_7_dias || 0) + (mortMedia.mortalidade_14_dias || 0);
+      else if (idadeDias <= 21) mortEsperada = (mortMedia.mortalidade_7_dias || 0) + (mortMedia.mortalidade_14_dias || 0) + (mortMedia.mortalidade_21_dias || 0);
+      else if (idadeDias <= 28) mortEsperada = (mortMedia.mortalidade_7_dias || 0) + (mortMedia.mortalidade_14_dias || 0) + (mortMedia.mortalidade_21_dias || 0) + (mortMedia.mortalidade_28_dias || 0);
+      else if (idadeDias <= 35) mortEsperada = (mortMedia.mortalidade_7_dias || 0) + (mortMedia.mortalidade_14_dias || 0) + (mortMedia.mortalidade_21_dias || 0) + (mortMedia.mortalidade_28_dias || 0) + (mortMedia.mortalidade_35_dias || 0);
+      else mortEsperada = (mortMedia.mortalidade_7_dias || 0) + (mortMedia.mortalidade_14_dias || 0) + (mortMedia.mortalidade_21_dias || 0) + (mortMedia.mortalidade_28_dias || 0) + (mortMedia.mortalidade_35_dias || 0) + (mortMedia.mortalidade_42_dias || 0);
+    }
+
+    if (mortEsperada > 0) {
+      const ratioMort = mortPercentual / mortEsperada;
+      if (ratioMort > 1.5) {
+        pontuacaoRisco += 3;
+        causas.push(`Mortalidade acumulada ${mortPercentual.toFixed(2)}% está ${((ratioMort - 1) * 100).toFixed(0)}% acima da referência (${mortEsperada.toFixed(2)}%)`);
+        sugestoes.push("Investigar causas sanitárias — considerar necropsia e exames laboratoriais");
+      } else if (ratioMort > 1.0) {
+        pontuacaoRisco += 1;
+        alertas.push(`Mortalidade acumulada ${mortPercentual.toFixed(2)}% levemente acima da referência (${mortEsperada.toFixed(2)}%)`);
+      }
+    }
+
+    // D) Temperature
+    if (tempAtual != null) {
+      const faixa = faixaTemperaturaIdeal(idadeDias);
+      if (tempAtual > faixa.max + 5) {
+        pontuacaoRisco += 3;
+        causas.push(`Temperatura ${tempAtual}°C muito acima da faixa ideal (${faixa.min}-${faixa.max}°C) — estresse térmico por calor`);
+        sugestoes.push("Ativar ventiladores e nebulizadores; verificar sistema de resfriamento");
+      } else if (tempAtual > faixa.max) {
+        pontuacaoRisco += 1;
+        alertas.push(`Temperatura ${tempAtual}°C acima da faixa ideal (${faixa.min}-${faixa.max}°C)`);
+        sugestoes.push("Monitorar temperatura e ajustar ventilação");
+      } else if (tempAtual < faixa.min - 5) {
+        pontuacaoRisco += 3;
+        causas.push(`Temperatura ${tempAtual}°C muito abaixo da faixa ideal (${faixa.min}-${faixa.max}°C) — hipotermia`);
+        sugestoes.push("Verificar sistema de aquecimento; ajustar campânulas/fornalhas");
+      } else if (tempAtual < faixa.min) {
+        pontuacaoRisco += 1;
+        alertas.push(`Temperatura ${tempAtual}°C abaixo da faixa ideal (${faixa.min}-${faixa.max}°C)`);
+        sugestoes.push("Aumentar aquecimento no galpão");
+      }
+    }
+
+    // E) Humidity
+    if (umidAtual != null) {
+      if (umidAtual > 80) {
+        pontuacaoRisco += 1;
+        alertas.push(`Umidade ${umidAtual}% acima do ideal (máx 70%)`);
+        sugestoes.push("Melhorar ventilação para reduzir umidade da cama");
+      } else if (umidAtual < 40) {
+        alertas.push(`Umidade ${umidAtual}% abaixo do ideal (mín 40%)`);
+      }
+    }
+
+    // F) Mortality trend
+    const tendencia = calcTendencia(registrosTrend);
+    if (tendencia === "subindo") {
+      pontuacaoRisco += 2;
+      causas.push("Tendência de mortalidade crescente nos últimos registros");
+      sugestoes.push("Intensificar monitoramento diário e investigar mudanças recentes no manejo");
+    }
+
+    // G) Eliminados vs Natural ratio
+    if (totalEliminados > 0 && totalNatural > 0 && totalEliminados > totalNatural * 1.5) {
+      alertas.push("Proporção de eliminados muito maior que mortes naturais");
+      causas.push("Padrão de descarte elevado — revisar critérios de seleção e manejo sanitário");
+    }
+
+    // Build classification
+    let classificacao_risco: "baixo" | "moderado" | "alto" | "critico";
+    if (pontuacaoRisco <= 1) classificacao_risco = "baixo";
+    else if (pontuacaoRisco <= 4) classificacao_risco = "moderado";
+    else if (pontuacaoRisco <= 7) classificacao_risco = "alto";
+    else classificacao_risco = "critico";
+
+    // Default messages if nothing flagged
+    if (causas.length === 0 && alertas.length === 0) {
+      causas.push("Nenhuma anomalia significativa identificada com os dados disponíveis");
+    }
+    if (sugestoes.length === 0) {
+      sugestoes.push("Manter monitoramento padrão de manejo");
+      sugestoes.push("Continuar pesagens regulares para acompanhar desempenho");
+    }
+
+    // Build summary
+    const partes: string[] = [];
+    partes.push(`Lote com ${idadeDias} dias de idade (${lote.linhagem || "N/I"}, ${lote.sexo || "N/I"}).`);
+    partes.push(`Mortalidade acumulada: ${totalMortAcum} aves (${mortPercentual.toFixed(2)}%).`);
+    if (pesoMedioReal > 0) partes.push(`Peso médio atual: ${pesoMedioReal.toFixed(0)}g${pesoEsperado > 0 ? ` (ref: ${pesoEsperado.toFixed(0)}g)` : ""}.`);
+    if (tendencia !== "estavel") partes.push(`Tendência de mortalidade: ${tendencia}.`);
+
+    // GPD evaluation
+    let gpd_avaliacao: string | undefined;
+    if (gpdReal > 0) {
+      gpd_avaliacao = `GPD real: ${gpdReal.toFixed(1)}g/dia`;
+      if (gpdRef > 0) gpd_avaliacao += ` | Referência: ${gpdRef.toFixed(1)}g/dia (${((gpdReal / gpdRef) * 100).toFixed(0)}%)`;
+    }
+
+    const analise = {
+      resumo: partes.join(" "),
+      causas_provaveis: [...causas, ...alertas],
+      classificacao_risco,
+      sugestoes_acao: sugestoes,
+      gpd_avaliacao,
+    };
 
     // Save to DB
     await supabase
