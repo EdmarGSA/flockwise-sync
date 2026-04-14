@@ -29,7 +29,6 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import MortalidadeSemanaDetalheDialog from './MortalidadeSemanaDetalheDialog';
 import { getDateDisabledFunction, isRetroactiveDate, MAX_RETROACTIVE_DAYS } from '@/lib/dateValidation';
-import MortalidadeFotoUpload, { FotoMortalidade, uploadMortalidadeFotos } from './MortalidadeFotoUpload';
 import AnaliseIAMortalidadeCard from './AnaliseIAMortalidadeCard';
 
 interface MortalidadeDialogProps {
@@ -92,7 +91,6 @@ export function MortalidadeDialog({
     diaInicio: number;
     diaFim: number;
   } | null>(null);
-  const [fotos, setFotos] = useState<FotoMortalidade[]>([]);
   const [savedMortalidadeId, setSavedMortalidadeId] = useState<string | null>(null);
 
   const getSemanaRange = (semana: number): { diaInicio: number; diaFim: number } => {
@@ -252,26 +250,9 @@ export function MortalidadeDialog({
   const getTotalEliminados = () => items.filter(i => i.motivo === 'eliminado').reduce((acc, i) => acc + i.quantidade, 0);
   const getTotalGeral = () => items.reduce((acc, i) => acc + i.quantidade, 0);
 
-  // Check if foto requirements are met
-  const fotosAtendidas = () => {
-    const motivoTotals: Record<string, number> = {};
-    items.forEach(i => { motivoTotals[i.motivo] = (motivoTotals[i.motivo] || 0) + i.quantidade; });
-    
-    for (const [motivo, qty] of Object.entries(motivoTotals)) {
-      const needed = Math.max(1, Math.ceil(qty * 0.1));
-      const current = fotos.filter(f => f.motivo === motivo).length;
-      if (current < needed) return false;
-    }
-    return true;
-  };
-
   const handleSave = async () => {
     if (items.length === 0) {
       toast.error('Adicione pelo menos um registro de mortalidade');
-      return;
-    }
-    if (!fotosAtendidas()) {
-      toast.error('Adicione as fotos obrigatórias (10% por motivo)');
       return;
     }
 
@@ -318,21 +299,6 @@ export function MortalidadeDialog({
 
       if (itensError) throw itensError;
 
-      // Upload and save fotos
-      if (fotos.length > 0) {
-        const uploaded = await uploadMortalidadeFotos(fotos, mortalidadeData.id);
-        if (uploaded.length > 0) {
-          const { error: fotosError } = await supabase
-            .from('mortalidade_fotos')
-            .insert(uploaded.map(f => ({
-              mortalidade_id: mortalidadeData.id,
-              motivo: f.motivo,
-              url: f.url,
-            })));
-          if (fotosError) console.error('Erro ao salvar fotos:', fotosError);
-        }
-      }
-
       toast.success('Mortalidade registrada com sucesso!');
       setSavedMortalidadeId(mortalidadeData.id);
       onSuccess();
@@ -354,7 +320,6 @@ export function MortalidadeDialog({
     setSubmotivos([]);
     setTemperaturaC('');
     setUmidadePct('');
-    setFotos([]);
     setSavedMortalidadeId(null);
     onOpenChange(false);
   };
@@ -572,16 +537,6 @@ export function MortalidadeDialog({
                 </div>
               </CardContent>
             </Card>
-          )}
-
-          {/* Foto Upload */}
-          {items.length > 0 && (
-            <MortalidadeFotoUpload
-              items={items.map(i => ({ motivo: i.motivo, quantidade: i.quantidade }))}
-              fotos={fotos}
-              onChange={setFotos}
-              disabled={saving}
-            />
           )}
 
           {/* Summary */}
