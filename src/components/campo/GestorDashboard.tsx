@@ -4,6 +4,7 @@ import { GestorCardsExecutivos } from './GestorCardsExecutivos';
 import { GestorTabelaRisco } from './GestorTabelaRisco';
 import { GestorIndicadoresEstrategicos } from './GestorIndicadoresEstrategicos';
 import { GestorCentralAtencao } from './GestorCentralAtencao';
+import { GestorMortalidadeSemanal } from './GestorMortalidadeSemanal';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
