@@ -4,6 +4,7 @@ import { GestorCardsExecutivos } from './GestorCardsExecutivos';
 import { GestorTabelaRisco } from './GestorTabelaRisco';
 import { GestorIndicadoresEstrategicos } from './GestorIndicadoresEstrategicos';
 import { GestorCentralAtencao } from './GestorCentralAtencao';
+import { GestorMortalidadeSemanal } from './GestorMortalidadeSemanal';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -56,6 +57,13 @@ export function GestorDashboard({ integradoId }: GestorDashboardProps) {
       <GestorIndicadoresEstrategicos 
         summary={summary} 
         analytics={analytics} 
+        loading={loading} 
+      />
+
+      {/* Camada 3.5: Mortalidade Semanal Consolidada */}
+      <GestorMortalidadeSemanal 
+        analytics={analytics} 
+        integradoId={integradoId} 
         loading={loading} 
       />
 
