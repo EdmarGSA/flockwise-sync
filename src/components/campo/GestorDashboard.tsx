@@ -60,6 +60,13 @@ export function GestorDashboard({ integradoId }: GestorDashboardProps) {
         loading={loading} 
       />
 
+      {/* Camada 3.5: Mortalidade Semanal Consolidada */}
+      <GestorMortalidadeSemanal 
+        analytics={analytics} 
+        integradoId={integradoId} 
+        loading={loading} 
+      />
+
       {/* Camada 4: Central de Atenção */}
       <GestorCentralAtencao analytics={analytics} loading={loading} />
     </div>
