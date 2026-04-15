@@ -474,6 +474,37 @@ function gerarAlertas(
         lote: loteLabel,
       });
     }
+    // --- NEW: Environmental divergence + mortality correlation ---
+    const mortInfo = mortalidadeMap[lote.loteId];
+    if (mortInfo?.emAlerta && lote.idadeDias > 3) {
+      // Check if mortality is significantly above reference
+      const mortRatio = mortInfo.limiar && mortInfo.limiar > 0 ? mortInfo.percentual / mortInfo.limiar : 0;
+      if (mortRatio > 1.5) {
+        alertas.push({
+          severity: 'critico',
+          icon: <Thermometer className="w-4 h-4" />,
+          titulo: `Mortalidade elevada — verificar ambiente`,
+          descricao: `${loteLabel} — mortalidade ${mortInfo.percentual.toFixed(2)}% é ${((mortRatio - 1) * 100).toFixed(0)}% acima do limiar. Investigar correlação com temperatura/umidade.`,
+          recomendacao: 'Verificar histórico ambiental (temperatura e umidade) dos últimos dias. Usar o Diagnóstico do Lote para análise detalhada.',
+          lote: loteLabel,
+        });
+      }
+    }
+
+    // Weight discrepancy alert (if weight data available from analytics)
+    if (lote.pesoAtual > 0 && lote.pesoReferencia > 0) {
+      const pesoDeviation = ((lote.pesoAtual - lote.pesoReferencia) / lote.pesoReferencia) * 100;
+      if (pesoDeviation < -15 && mortInfo?.emAlerta) {
+        alertas.push({
+          severity: 'critico',
+          icon: <Scale className="w-4 h-4" />,
+          titulo: `Peso baixo + mortalidade elevada`,
+          descricao: `${loteLabel} — peso ${Math.abs(pesoDeviation).toFixed(1)}% abaixo da referência combinado com mortalidade acima do limiar.`,
+          recomendacao: 'Padrão pode indicar problema sanitário ou nutricional grave. Solicitar autopsia e análise laboratorial.',
+          lote: loteLabel,
+        });
+      }
+    }
   }
 
   // Carências próximas do vencimento

@@ -19,6 +19,7 @@ import TratamentosDialog from '@/components/veterinario/TratamentosDialog';
 import AutopsiasDialog from '@/components/veterinario/AutopsiasDialog';
 import MetasDialog from '@/components/veterinario/MetasDialog';
 import ConsumoDialog from '@/components/veterinario/ConsumoDialog';
+import DiagnosticoLoteCard from '@/components/veterinario/DiagnosticoLoteCard';
 
 interface Lote {
   id: string;
@@ -30,6 +31,7 @@ interface Lote {
   sexo: string;
   status: string;
   peso_medio_pintinhos: number | null;
+  galpao_id: string | null;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
 }
@@ -86,6 +88,7 @@ export default function VeterinarioLote() {
         sexo,
         status,
         peso_medio_pintinhos,
+        galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome)
       `)
@@ -248,6 +251,17 @@ export default function VeterinarioLote() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Diagnóstico do Lote */}
+        <DiagnosticoLoteCard
+          loteId={lote.id}
+          galpaoId={lote.galpao_id || undefined}
+          dataAlojamento={lote.data_alojamento}
+          linhagem={lote.linhagem}
+          sexo={lote.sexo}
+          quantidadeAves={lote.quantidade_aves}
+          idadeDias={dias}
+        />
 
         {/* Info Cards 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2">

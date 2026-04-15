@@ -158,33 +158,88 @@ serve(async (req) => {
 
     const mortPercentual = lote.quantidade_aves > 0 ? (totalMortAcum / lote.quantidade_aves) * 100 : 0;
 
-    // 7. IoT sensor data
+    // 7. IoT sensor data — fetch 3-day history instead of just latest
     let tempAtual: number | null = mortalidade.temperatura_c;
     let umidAtual: number | null = mortalidade.umidade_pct;
+    let diasForaFaixa = 0;
+    let amplitudeTermica = 0;
+    let tempMedia3d: number | null = null;
 
-    if (!tempAtual && lote.galpao_id) {
-      const { data: device } = await supabase
+    if (lote.galpao_id) {
+      const { data: devices } = await supabase
         .from("dispositivos_iot")
         .select("id")
         .eq("galpao_id", lote.galpao_id)
-        .eq("ativo", true)
-        .limit(1)
-        .maybeSingle();
+        .eq("ativo", true);
 
-      if (device) {
-        const { data: leitura } = await supabase
+      if (devices && devices.length > 0) {
+        const deviceIds = devices.map((d: any) => d.id);
+        const threeDaysAgo = new Date(dataReg);
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        const { data: leituras3d } = await supabase
           .from("leituras_sensores")
-          .select("temperatura_c, umidade_pct")
-          .eq("dispositivo_id", device.id)
-          .order("lido_em", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .select("temperatura_c, umidade_pct, created_at")
+          .in("dispositivo_id", deviceIds)
+          .gte("created_at", threeDaysAgo.toISOString())
+          .lte("created_at", dataReg.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(500);
 
-        if (leitura) {
-          tempAtual = tempAtual ?? leitura.temperatura_c;
-          umidAtual = umidAtual ?? leitura.umidade_pct;
+        if (leituras3d && leituras3d.length > 0) {
+          // Set current temp/humidity from latest reading if not already set
+          if (!tempAtual) tempAtual = leituras3d[0].temperatura_c;
+          if (!umidAtual) umidAtual = leituras3d[0].umidade_pct;
+
+          // Calculate 3-day stats
+          const temps = leituras3d.filter((l: any) => l.temperatura_c != null).map((l: any) => Number(l.temperatura_c));
+          if (temps.length > 0) {
+            tempMedia3d = temps.reduce((s: number, t: number) => s + t, 0) / temps.length;
+            amplitudeTermica = Math.max(...temps) - Math.min(...temps);
+          }
+
+          // Group by day and check against ideal range
+          const byDay: Record<string, number[]> = {};
+          leituras3d.forEach((l: any) => {
+            if (l.temperatura_c == null) return;
+            const dateStr = l.created_at.substring(0, 10);
+            if (!byDay[dateStr]) byDay[dateStr] = [];
+            byDay[dateStr].push(Number(l.temperatura_c));
+          });
+
+          // Fetch regras for this integrado
+          const { data: regras } = await supabase
+            .from("regras_temperatura_lote")
+            .select("dia_inicio, dia_fim, temp_min_c, temp_max_c")
+            .eq("integrado_id", lote.integrado_id)
+            .eq("ativo", true)
+            .order("dia_inicio");
+
+          const alojDate = new Date(lote.data_alojamento);
+          Object.entries(byDay).forEach(([dateStr, dayTemps]) => {
+            const currentDate = new Date(dateStr + "T00:00:00");
+            const dia = Math.max(1, Math.round((currentDate.getTime() - alojDate.getTime()) / 86400000));
+            const regra = (regras || []).find((r: any) => dia >= Number(r.dia_inicio) && dia <= Number(r.dia_fim));
+            const faixa = regra
+              ? { min: Number(regra.temp_min_c), max: Number(regra.temp_max_c) }
+              : faixaTemperaturaIdeal(dia);
+            const minT = Math.min(...dayTemps);
+            const maxT = Math.max(...dayTemps);
+            if (minT < faixa.min || maxT > faixa.max) diasForaFaixa++;
+          });
         }
       }
+    }
+
+    // 7b. Compare peso_kg from mortality item vs lote average
+    let pesoMortVsLote: { pesoMort: number; pesoLote: number; desvio: number } | null = null;
+    const itensComPeso = (mortalidade.mortalidade_itens || []).filter((i: any) => i.peso_kg && i.peso_kg > 0);
+    if (itensComPeso.length > 0 && pesoMedioReal > 0) {
+      const pesoMortMedio = itensComPeso.reduce((s: number, i: any) => s + i.peso_kg * (i.quantidade || 1), 0) /
+        itensComPeso.reduce((s: number, i: any) => s + (i.quantidade || 1), 0);
+      const pesoMortG = pesoMortMedio * 1000; // kg to g
+      const desvio = ((pesoMortG - pesoMedioReal) / pesoMedioReal) * 100;
+      pesoMortVsLote = { pesoMort: pesoMortG, pesoLote: pesoMedioReal, desvio };
     }
 
     // ========== DETERMINISTIC ANALYSIS ==========
@@ -270,6 +325,37 @@ serve(async (req) => {
       }
     }
 
+    // E-bis) Environmental history (3-day window)
+    if (diasForaFaixa > 0) {
+      if (diasForaFaixa >= 3) {
+        pontuacaoRisco += 3;
+        causas.push(`Ambiente esteve fora da faixa em ${diasForaFaixa} dos últimos 3 dias — estresse ambiental persistente`);
+        sugestoes.push("Revisão urgente do sistema de climatização. Verificar automação de ventiladores e aquecedores.");
+      } else {
+        pontuacaoRisco += 1;
+        alertas.push(`Temperatura fora da faixa em ${diasForaFaixa} dos últimos 3 dias`);
+        sugestoes.push("Monitorar condições ambientais mais frequentemente");
+      }
+    }
+
+    if (amplitudeTermica > 8) {
+      pontuacaoRisco += 1;
+      alertas.push(`Amplitude térmica de ${amplitudeTermica.toFixed(1)}°C nos últimos 3 dias — pode causar estresse`);
+    }
+
+    // E-ter) Peso mortalidade vs lote
+    if (pesoMortVsLote) {
+      if (pesoMortVsLote.desvio < -20) {
+        pontuacaoRisco += 2;
+        causas.push(`Peso das aves mortas (${(pesoMortVsLote.pesoMort).toFixed(0)}g) é ${Math.abs(pesoMortVsLote.desvio).toFixed(1)}% menor que o peso médio do lote (${pesoMortVsLote.pesoLote.toFixed(0)}g) — mortalidade seletiva em aves menores`);
+        sugestoes.push("Avaliar uniformidade do lote. Aves menores podem ter dificuldade de acesso a comedouros/bebedouros.");
+      } else if (pesoMortVsLote.desvio > 20) {
+        pontuacaoRisco += 1;
+        alertas.push(`Peso das aves mortas ${pesoMortVsLote.desvio.toFixed(1)}% maior que a média do lote — aves maiores morrendo`);
+        sugestoes.push("Investigar síndrome de morte súbita ou problemas cardiovasculares em aves de maior peso.");
+      }
+    }
+
     // E) Humidity
     if (umidAtual != null) {
       if (umidAtual > 80) {
@@ -317,6 +403,9 @@ serve(async (req) => {
     partes.push(`Mortalidade acumulada: ${totalMortAcum} aves (${mortPercentual.toFixed(2)}%).`);
     if (pesoMedioReal > 0) partes.push(`Peso médio atual: ${pesoMedioReal.toFixed(0)}g${pesoEsperado > 0 ? ` (ref: ${pesoEsperado.toFixed(0)}g)` : ""}.`);
     if (tendencia !== "estavel") partes.push(`Tendência de mortalidade: ${tendencia}.`);
+    if (diasForaFaixa > 0) partes.push(`Ambiente fora da faixa em ${diasForaFaixa}/3 dias.`);
+    if (amplitudeTermica > 5) partes.push(`Amplitude térmica: ${amplitudeTermica.toFixed(1)}°C.`);
+    if (pesoMortVsLote) partes.push(`Peso mortalidade ${pesoMortVsLote.desvio > 0 ? '+' : ''}${pesoMortVsLote.desvio.toFixed(1)}% vs lote.`);
 
     // GPD evaluation
     let gpd_avaliacao: string | undefined;
