@@ -31,6 +31,7 @@ interface Lote {
   sexo: string;
   status: string;
   peso_medio_pintinhos: number | null;
+  galpao_id: string | null;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
 }
@@ -87,6 +88,7 @@ export default function VeterinarioLote() {
         sexo,
         status,
         peso_medio_pintinhos,
+        galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome)
       `)
