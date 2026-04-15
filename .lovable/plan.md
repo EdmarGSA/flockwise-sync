@@ -1,85 +1,51 @@
 
 
-## Plano: Análise de Mortalidade sem IA — Briefing Local com Dados Cruzados
+## Plano: Dashboard Consolidado de Mortalidade por Semana
 
-### Problema
+### O que será construído
 
-Chamar a IA (LLM) a cada registro de mortalidade é caro e insustentável quando há dezenas de lotes lançando dados diariamente. Cada chamada consome créditos do AI Gateway.
+Um novo componente `GestorMortalidadeSemanal` inserido no `GestorDashboard` (entre Indicadores Estratégicos e Central de Atenção) que mostra uma **matriz visual semana × lote** com indicadores de risco coloridos.
 
-### Solução
-
-**Substituir a chamada de IA por lógica determinística no próprio Edge Function.** O sistema já possui todos os dados necessários no banco — basta cruzá-los e gerar um briefing com regras fixas, sem LLM.
-
-O briefing será gerado 100% com código (sem custo de IA), comparando:
+### Estrutura Visual
 
 ```text
-┌─────────────────────────────────────────────┐
-│  DADOS CRUZADOS (já existem no banco)       │
-├─────────────────────────────────────────────┤
-│ 1. Peso real (última pesagem)               │
-│    vs peso esperado (desempenho_aves)        │
-│ 2. GPD real vs GPD referência               │
-│ 3. Mortalidade acumulada vs mortalidade_media│
-│ 4. Temperatura/Umidade (IoT ou manual)      │
-│ 5. Tendência mortalidade (subindo/estável)   │
-│ 6. Idade do lote e fase                     │
-└─────────────────────────────────────────────┘
-         ↓
-   Regras determinísticas
-         ↓
-┌─────────────────────────────────────────────┐
-│  BRIEFING GERADO                            │
-│ • Classificação de risco (baixo/mod/alto)   │
-│ • Causas prováveis (baseado em regras)      │
-│ • Sugestões de ação (lookup table)          │
-│ • Resumo comparativo                        │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  📊 Mortalidade Semanal Consolidada                      │
+│                                                          │
+│  Lote          │ S1    │ S2    │ S3    │ S4    │ Acum.   │
+│  ──────────────┼───────┼───────┼───────┼───────┼─────────│
+│  Núcleo A1/G1  │ 🟢0.3%│ 🟡0.6%│ 🔴1.2%│  —    │ 0.71%  │
+│  Núcleo A1/G2  │ 🟢0.2%│ 🟢0.3%│  —    │  —    │ 0.22%  │
+│  Núcleo A2/G3  │ 🟢0.4%│  —    │  —    │  —    │ 0.23%  │
+│                                                          │
+│  Legenda: 🟢 ≤ meta OK  🟡 meta OK–alerta  🔴 > alerta │
+│                                                          │
+│  [Barra de mortalidade por motivo: Natural | Eliminado]  │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### Regras de Classificação (exemplos)
+### Dados
 
-| Indicador | OK | Atenção | Crítico |
-|-----------|-----|---------|---------|
-| Mortalidade vs referência | ≤ 100% | 100-150% | > 150% |
-| Peso vs esperado | ≥ 95% | 80-95% | < 80% |
-| Temperatura | 20-30°C (ajustado por idade) | fora 5°C | fora 10°C |
-| Tendência mortalidade | estável/caindo | subindo leve | subindo forte |
+Os dados já existem — o hook `useLoteAnalytics` carrega `mortalidade` e `mortalidade_itens` por lote. O novo componente fará uma query adicional para agrupar mortalidade **por semana** de cada lote ativo, cruzando com `mortalidade_media` para colorir os indicadores.
 
 ### Arquivos Afetados
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/analise-mortalidade/index.ts` | Reescrever: remover chamada ao AI Gateway, implementar lógica determinística que cruza dados e gera o briefing estruturado |
-| `src/components/lotes/MortalidadeDialog.tsx` | Remover fotos (componente, validação, upload), disparar análise automaticamente após salvar |
-| `src/components/lotes/AnaliseIAMortalidadeCard.tsx` | Auto-disparar ao montar, remover botão manual "Analisar com IA", ajustar labels (tirar "IA" do título) |
+| `src/components/campo/GestorMortalidadeSemanal.tsx` | **Novo** — componente com tabela matriz semana×lote, cells coloridas por risco, barra de motivos, e totais acumulados |
+| `src/components/campo/GestorDashboard.tsx` | Importar e renderizar `GestorMortalidadeSemanal` entre camadas 3 e 4 |
 
 ### Detalhes Técnicos
 
-**Edge Function `analise-mortalidade` — nova lógica sem LLM:**
+**`GestorMortalidadeSemanal`** recebe `analytics: LoteAnalytics[]` e `integradoId`:
 
-1. Busca `desempenho_aves` filtrando por `linhagem`, `sexo`, dia mais próximo da idade do lote → peso esperado
-2. Busca `mortalidade_media` para o `integrado_id` com mesma linhagem/sexo → mortalidade esperada
-3. Busca `leituras_sensores` via `dispositivos_iot` do galpão → temperatura/umidade reais
-4. Busca últimas 5 pesagens → calcula GPD real
-5. Busca mortalidades recentes → calcula tendência (crescente/estável/decrescente)
-6. Aplica regras determinísticas → classifica risco, lista causas prováveis, gera sugestões
-7. Salva resultado no campo `analise_ia` (jsonb) como antes — mesma interface, zero custo de IA
-
-**Causas prováveis — tabela de lookup:**
-- Peso baixo + mortalidade alta → "Provável problema nutricional ou sanitário"
-- Temperatura alta + mortalidade alta → "Estresse térmico por calor"
-- Temperatura baixa + aves jovens → "Hipotermia — verificar aquecimento"
-- Mortalidade subindo + eliminados > naturais → "Padrão de descarte elevado — revisar critérios"
-
-**MortalidadeDialog — simplificação:**
-- Remove `MortalidadeFotoUpload`, `uploadMortalidadeFotos`, validação `fotosAtendidas()`
-- Após `handleSave` com sucesso, exibe `AnaliseIAMortalidadeCard` que auto-dispara
-
-### Benefícios
-
-- **Custo zero** — nenhuma chamada de IA, apenas queries SQL + lógica
-- **Velocidade** — resposta em < 500ms (vs 5-15s com LLM)
-- **Escala infinita** — 100 lotes/dia sem impacto no custo
-- **Mesma interface** — o card de análise mantém o mesmo visual e estrutura de dados
-- **Determinístico** — resultados consistentes e auditáveis
+1. Query `mortalidade` + `mortalidade_itens` de todos os lotes ativos, agrupando por semana (dia 1-7 = S1, 8-14 = S2, etc.)
+2. Query `mortalidade_media` para obter referência esperada por semana/linhagem/sexo
+3. Cada célula mostra o % de mortalidade da semana com cor:
+   - Verde: ≤ referência esperada
+   - Amarelo: até 150% da referência
+   - Vermelho: > 150% da referência
+4. Coluna final "Acumulado" com % total e badge de status
+5. Linha de resumo inferior com totais por motivo (natural vs eliminado) em mini-barras
+6. Clique na célula abre `MortalidadeSemanaDetalheDialog` já existente
 
