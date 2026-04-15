@@ -403,6 +403,9 @@ serve(async (req) => {
     partes.push(`Mortalidade acumulada: ${totalMortAcum} aves (${mortPercentual.toFixed(2)}%).`);
     if (pesoMedioReal > 0) partes.push(`Peso médio atual: ${pesoMedioReal.toFixed(0)}g${pesoEsperado > 0 ? ` (ref: ${pesoEsperado.toFixed(0)}g)` : ""}.`);
     if (tendencia !== "estavel") partes.push(`Tendência de mortalidade: ${tendencia}.`);
+    if (diasForaFaixa > 0) partes.push(`Ambiente fora da faixa em ${diasForaFaixa}/3 dias.`);
+    if (amplitudeTermica > 5) partes.push(`Amplitude térmica: ${amplitudeTermica.toFixed(1)}°C.`);
+    if (pesoMortVsLote) partes.push(`Peso mortalidade ${pesoMortVsLote.desvio > 0 ? '+' : ''}${pesoMortVsLote.desvio.toFixed(1)}% vs lote.`);
 
     // GPD evaluation
     let gpd_avaliacao: string | undefined;
