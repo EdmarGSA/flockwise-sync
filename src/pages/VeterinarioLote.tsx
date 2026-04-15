@@ -255,7 +255,7 @@ export default function VeterinarioLote() {
         {/* Diagnóstico do Lote */}
         <DiagnosticoLoteCard
           loteId={lote.id}
-          galpaoId={(lote as any).galpao_id}
+          galpaoId={lote.galpao_id || undefined}
           dataAlojamento={lote.data_alojamento}
           linhagem={lote.linhagem}
           sexo={lote.sexo}
