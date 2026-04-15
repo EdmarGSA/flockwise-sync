@@ -325,6 +325,37 @@ serve(async (req) => {
       }
     }
 
+    // E-bis) Environmental history (3-day window)
+    if (diasForaFaixa > 0) {
+      if (diasForaFaixa >= 3) {
+        pontuacaoRisco += 3;
+        causas.push(`Ambiente esteve fora da faixa em ${diasForaFaixa} dos últimos 3 dias — estresse ambiental persistente`);
+        sugestoes.push("Revisão urgente do sistema de climatização. Verificar automação de ventiladores e aquecedores.");
+      } else {
+        pontuacaoRisco += 1;
+        alertas.push(`Temperatura fora da faixa em ${diasForaFaixa} dos últimos 3 dias`);
+        sugestoes.push("Monitorar condições ambientais mais frequentemente");
+      }
+    }
+
+    if (amplitudeTermica > 8) {
+      pontuacaoRisco += 1;
+      alertas.push(`Amplitude térmica de ${amplitudeTermica.toFixed(1)}°C nos últimos 3 dias — pode causar estresse`);
+    }
+
+    // E-ter) Peso mortalidade vs lote
+    if (pesoMortVsLote) {
+      if (pesoMortVsLote.desvio < -20) {
+        pontuacaoRisco += 2;
+        causas.push(`Peso das aves mortas (${(pesoMortVsLote.pesoMort).toFixed(0)}g) é ${Math.abs(pesoMortVsLote.desvio).toFixed(1)}% menor que o peso médio do lote (${pesoMortVsLote.pesoLote.toFixed(0)}g) — mortalidade seletiva em aves menores`);
+        sugestoes.push("Avaliar uniformidade do lote. Aves menores podem ter dificuldade de acesso a comedouros/bebedouros.");
+      } else if (pesoMortVsLote.desvio > 20) {
+        pontuacaoRisco += 1;
+        alertas.push(`Peso das aves mortas ${pesoMortVsLote.desvio.toFixed(1)}% maior que a média do lote — aves maiores morrendo`);
+        sugestoes.push("Investigar síndrome de morte súbita ou problemas cardiovasculares em aves de maior peso.");
+      }
+    }
+
     // E) Humidity
     if (umidAtual != null) {
       if (umidAtual > 80) {
