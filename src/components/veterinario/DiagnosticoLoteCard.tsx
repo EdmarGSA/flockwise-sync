@@ -104,8 +104,8 @@ export default function DiagnosticoLoteCard({
         .from('mortalidade_media')
         .select('*')
         .eq('integrado_id', integradoId)
-        .eq('linhagem', linhagem || 'cobb_500')
-        .eq('sexo', sexo || 'misto')
+        .eq('linhagem', (linhagem || 'cobb_500') as any)
+        .eq('sexo', (sexo || 'misto') as any)
         .maybeSingle();
 
       let mortRef = 0;
