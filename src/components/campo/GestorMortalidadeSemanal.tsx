@@ -272,7 +272,7 @@ export function GestorMortalidadeSemanal({ analytics, integradoId, loading }: Ge
                     </TableCell>
                     {Array.from({ length: maxSemanas }, (_, i) => {
                       const sem = lote.semanas[i];
-                      if (!sem || sem.mortes === 0 && i + 1 > lote.semana) {
+                      if (!sem || (sem.mortes === 0 && i + 1 > lote.semanas.length)) {
                         return <TableCell key={i} className="text-center text-muted-foreground text-xs">—</TableCell>;
                       }
                       return (
