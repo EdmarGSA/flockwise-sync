@@ -282,6 +282,65 @@ export type Database = {
           },
         ]
       }
+      canais_dispositivo: {
+        Row: {
+          ativo: boolean
+          automacao_ativa: boolean
+          canal_numero: number
+          created_at: string
+          dispositivo_id: string
+          estado_atual: string | null
+          funcao_automacao: Database["public"]["Enums"]["funcao_automacao"]
+          id: string
+          integrado_id: string
+          nome: string
+          observacoes: string | null
+          tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento_canal"]
+          ultimo_comando_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          automacao_ativa?: boolean
+          canal_numero: number
+          created_at?: string
+          dispositivo_id: string
+          estado_atual?: string | null
+          funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
+          id?: string
+          integrado_id: string
+          nome: string
+          observacoes?: string | null
+          tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
+          ultimo_comando_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          automacao_ativa?: boolean
+          canal_numero?: number
+          created_at?: string
+          dispositivo_id?: string
+          estado_atual?: string | null
+          funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
+          id?: string
+          integrado_id?: string
+          nome?: string
+          observacoes?: string | null
+          tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
+          ultimo_comando_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canais_dispositivo_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias: {
         Row: {
           ativo: boolean
@@ -1164,9 +1223,12 @@ export type Database = {
       dispositivos_iot: {
         Row: {
           ativo: boolean
+          auth_token: string | null
           automacao_ativa: boolean
           created_at: string
           device_id_ewelink: string
+          driver: Database["public"]["Enums"]["driver_iot"]
+          endpoint_local: string | null
           funcao_automacao: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id: string | null
           id: string
@@ -1174,6 +1236,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           nome: string
+          num_canais: number
           regra_grupo: string | null
           tipo: string
           ultimo_sync: string | null
@@ -1181,9 +1244,12 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          auth_token?: string | null
           automacao_ativa?: boolean
           created_at?: string
           device_id_ewelink: string
+          driver?: Database["public"]["Enums"]["driver_iot"]
+          endpoint_local?: string | null
           funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id?: string | null
           id?: string
@@ -1191,6 +1257,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           nome: string
+          num_canais?: number
           regra_grupo?: string | null
           tipo?: string
           ultimo_sync?: string | null
@@ -1198,9 +1265,12 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          auth_token?: string | null
           automacao_ativa?: boolean
           created_at?: string
           device_id_ewelink?: string
+          driver?: Database["public"]["Enums"]["driver_iot"]
+          endpoint_local?: string | null
           funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           galpao_id?: string | null
           id?: string
@@ -1208,6 +1278,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           nome?: string
+          num_canais?: number
           regra_grupo?: string | null
           tipo?: string
           ultimo_sync?: string | null
@@ -5699,6 +5770,90 @@ export type Database = {
           },
         ]
       }
+      regras_automacao_avancada: {
+        Row: {
+          acao: string
+          ativo: boolean
+          canal_alvo_id: string | null
+          created_at: string
+          descricao: string | null
+          dia_fim: number | null
+          dia_inicio: number | null
+          duracao_minutos: number | null
+          galpao_id: string | null
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          integrado_id: string
+          nome: string
+          prioridade: number
+          temp_max_c: number | null
+          temp_min_c: number | null
+          umidade_max_pct: number | null
+          umidade_min_pct: number | null
+          updated_at: string
+        }
+        Insert: {
+          acao?: string
+          ativo?: boolean
+          canal_alvo_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          dia_fim?: number | null
+          dia_inicio?: number | null
+          duracao_minutos?: number | null
+          galpao_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          integrado_id: string
+          nome: string
+          prioridade?: number
+          temp_max_c?: number | null
+          temp_min_c?: number | null
+          umidade_max_pct?: number | null
+          umidade_min_pct?: number | null
+          updated_at?: string
+        }
+        Update: {
+          acao?: string
+          ativo?: boolean
+          canal_alvo_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          dia_fim?: number | null
+          dia_inicio?: number | null
+          duracao_minutos?: number | null
+          galpao_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          integrado_id?: string
+          nome?: string
+          prioridade?: number
+          temp_max_c?: number | null
+          temp_min_c?: number | null
+          umidade_max_pct?: number | null
+          umidade_min_pct?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regras_automacao_avancada_canal_alvo_id_fkey"
+            columns: ["canal_alvo_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regras_automacao_avancada_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       regras_temperatura_lote: {
         Row: {
           ativo: boolean
@@ -7010,6 +7165,7 @@ export type Database = {
         | "preco"
         | "condicao_pagamento"
         | "produto_nao_previsto"
+      driver_iot: "ewelink" | "esp32_mqtt" | "esp32_http"
       fase_postura: "cria" | "recria" | "producao"
       forma_pagamento:
         | "boleto"
@@ -7067,6 +7223,15 @@ export type Database = {
       tipo_centro_custo: "lote" | "nucleo" | "geral" | "projeto"
       tipo_comedouro: "manual" | "automatico"
       tipo_conta_bancaria: "corrente" | "poupanca" | "investimento"
+      tipo_equipamento_canal:
+        | "ventilador"
+        | "nebulizador"
+        | "iluminacao"
+        | "aquecimento"
+        | "cortina"
+        | "alarme"
+        | "exaustor"
+        | "outro"
       tipo_ovo: "branco" | "castanho" | "vermelho" | "caipira"
       tipo_pessoa: "pf" | "pj" | "produtor_rural"
       tipo_plano_conta: "receita" | "custo" | "despesa" | "investimento"
@@ -7255,6 +7420,7 @@ export const Constants = {
         "condicao_pagamento",
         "produto_nao_previsto",
       ],
+      driver_iot: ["ewelink", "esp32_mqtt", "esp32_http"],
       fase_postura: ["cria", "recria", "producao"],
       forma_pagamento: [
         "boleto",
@@ -7317,6 +7483,16 @@ export const Constants = {
       tipo_centro_custo: ["lote", "nucleo", "geral", "projeto"],
       tipo_comedouro: ["manual", "automatico"],
       tipo_conta_bancaria: ["corrente", "poupanca", "investimento"],
+      tipo_equipamento_canal: [
+        "ventilador",
+        "nebulizador",
+        "iluminacao",
+        "aquecimento",
+        "cortina",
+        "alarme",
+        "exaustor",
+        "outro",
+      ],
       tipo_ovo: ["branco", "castanho", "vermelho", "caipira"],
       tipo_pessoa: ["pf", "pj", "produtor_rural"],
       tipo_plano_conta: ["receita", "custo", "despesa", "investimento"],
