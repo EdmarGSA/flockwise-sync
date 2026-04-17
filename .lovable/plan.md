@@ -1,80 +1,104 @@
 
+# Análise: Expansão IoT para Múltiplos Equipamentos (ESP32-S3 + Sonoff)
 
-## Plano: Melhorias no Acompanhamento Veterinário de Lotes
+## Análise do Hardware Proposto
 
-### Problema Atual
+O **ESP32-S3-Relé-6CH** é uma excelente opção complementar ao Sonoff atual. Comparativo:
 
-O módulo veterinário apresenta alertas básicos de mortalidade (apenas % acumulado vs limiar) sem cruzar dados ambientais, pesagens e padrões de mortalidade para identificar divergências e discrepâncias. Falta:
-1. Alertas que correlacionem picos de mortalidade com divergências de temperatura/umidade no período
-2. Detecção de discrepâncias nas pesagens de mortalidade (peso registrado vs esperado pela linhagem/idade)
-3. Visão consolidada de divergências ambientais durante períodos de mortalidade elevada
+| Característica | Sonoff (atual) | ESP32-S3 6CH | Medidor Custom |
+|----------------|----------------|--------------|----------------|
+| Canais de relé | 1-4 | **6 isolados** | 0 (só sensor) |
+| Sensores | TH integrado | DS18B20/SHT40 via RS485 | DS18B20/SHT40 |
+| Corrente máx | 10A | **10A 250VAC isolado** | N/A |
+| Conexão | Cloud eWeLink | **Wi-Fi direto MQTT/HTTP** | Wi-Fi MQTT/HTTP |
+| Multi-equipamento | ❌ 1 carga/device | ✅ **6 cargas/device** | ❌ |
+| Custo por carga | Alto (1 device por equipamento) | **Baixo (6 cargas em 1 device)** | N/A |
 
-### O Que Será Construído
+## Vantagens Estratégicas do ESP32-S3
 
-#### 1. Painel de Divergências por Lote (novo componente)
-Card expandível em `VeterinarioLote.tsx` que mostra:
+1. **Consolidação física**: 1 device controla ventilador + nebulizador + iluminação + aquecedor + cortina + alarme — sem precisar de 6 Sonoffs por galpão
+2. **Independência da nuvem eWeLink**: comunica direto com nosso backend via MQTT/HTTP — elimina dependência da Coolkit
+3. **RS485 industrial**: permite expansão para sensores avançados (CO₂, NH₃, pressão diferencial — cruciais para postura)
+4. **Isolamento óptico**: muito mais seguro para ambiente de granja (umidade, picos elétricos)
+5. **Sem limite de App ID**: o eWeLink limita 100 dispositivos por App ID (memória existente). ESP32 não tem esse teto.
+
+## Arquitetura Proposta — Multi-Driver IoT
 
 ```text
-┌─────────────────────────────────────────────────┐
-│ 🔍 Diagnóstico do Lote                         │
-├─────────────────────────────────────────────────┤
-│ MORTALIDADE                                     │
-│ Acumulada: 1.2% (ref: 0.8%) ⚠️                 │
-│ Tendência: ↗ Subindo  │  Ratio Elim/Nat: 1.8x  │
-├─────────────────────────────────────────────────┤
-│ PESAGEM vs MORTALIDADE                          │
-│ Peso médio mortalidade: 0.95 kg                 │
-│ Peso médio lote (última pesagem): 1.55 kg       │
-│ Discrepância: -38.7% ⚠️ aves menores morrendo  │
-├─────────────────────────────────────────────────┤
-│ AMBIENTE (últimos 7 dias)                       │
-│ Temp fora da faixa: 3 dias  🔴                  │
-│ Umidade fora da faixa: 2 dias                   │
-│ Pior desvio: +5.2°C em 12/04                    │
-│ Correlação: mortalidade subiu 40% nos dias com  │
-│ temperatura fora da faixa                       │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  PAINEL IoT — Lovable (atual)                    │
+└──────────────────────────────────────────────────┘
+              ↓                    ↓
+    ┌──────────────────┐  ┌──────────────────┐
+    │  Driver eWeLink  │  │  Driver MQTT/HTTP│
+    │  (Sonoff atual)  │  │  (ESP32 novo)    │
+    └──────────────────┘  └──────────────────┘
+              ↓                    ↓
+       Cloud eWeLink         Broker MQTT
+              ↓                    ↓
+         Sonoff TH           ESP32-S3 6CH
+                                   ↓
+                         ┌─────────┼─────────┐
+                       Vent.  Nebuliz.  Iluminação
+                      Aqueced. Cortina   Alarme
 ```
 
-#### 2. Alertas Inteligentes Enriquecidos (VeterinarioDashboard)
-Novos tipos de alertas no dashboard geral:
-- **Divergência ambiental + mortalidade**: "Lote X teve 3 dias com temperatura fora da faixa na última semana e mortalidade 50% acima da referência"
-- **Discrepância peso mortalidade**: "Peso médio das aves mortas (0.95kg) é 38% menor que o peso do lote (1.55kg) — mortalidade seletiva em aves menores"
-- **Correlação temporal**: detectar se picos de mortalidade coincidem com períodos de divergência ambiental
+## O Que Precisa Ser Construído
 
-#### 3. Enriquecimento da Análise de Mortalidade (Edge Function)
-Adicionar no briefing determinístico:
-- Buscar leituras IoT dos últimos 3 dias (não apenas instantânea) para detectar padrões
-- Comparar peso registrado na mortalidade (`pesoKg`) com peso médio do lote pela última pesagem
-- Incluir contagem de dias com temperatura fora da faixa na semana
+### Fase 1 — Fundação Multi-Driver (DB + UI)
 
-### Arquivos Afetados
+| Item | Descrição |
+|------|-----------|
+| **Tabela `dispositivos_iot`** | Adicionar coluna `driver` (`ewelink` \| `esp32_mqtt` \| `esp32_http`) e `endpoint_local` (IP/MQTT topic) |
+| **Tabela `canais_dispositivo`** | Nova — 1 device pode ter N canais. Campos: `dispositivo_id`, `canal_numero` (1-6), `nome` (ex: "Ventilador Lateral"), `tipo_equipamento` (`ventilador`/`nebulizador`/`iluminacao`/`aquecimento`/`cortina`/`alarme`), `funcao_automacao` |
+| **Tabela `regras_automacao_avancada`** | Estende `regras_temperatura_lote` para suportar regras por **umidade, CO₂, horário, idade** acionando equipamentos específicos |
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/veterinario/DiagnosticoLoteCard.tsx` | **Novo** — componente que busca e exibe divergências de mortalidade, peso e ambiente para um lote específico |
-| `src/pages/VeterinarioLote.tsx` | Importar e renderizar `DiagnosticoLoteCard` entre os alertas e os cards de info |
-| `src/components/veterinario/VeterinarioDashboard.tsx` | Enriquecer `gerarAlertas()` com novos tipos: divergência ambiental correlacionada com mortalidade, discrepância de peso na mortalidade |
-| `supabase/functions/analise-mortalidade/index.ts` | Buscar leituras IoT dos últimos 3 dias (não só instantânea), comparar peso da mortalidade vs peso médio do lote, incluir dias fora da faixa na análise |
+### Fase 2 — Driver MQTT/HTTP para ESP32
 
-### Detalhes Técnicos
+| Item | Descrição |
+|------|-----------|
+| **Edge Function `esp32-bridge`** | Recebe webhook de telemetria do ESP32 (POST /telemetry) e envia comandos (POST /command) |
+| **Firmware ESP32 (template)** | Documentação Arduino/PlatformIO com payload padrão JSON: `{deviceId, channels[], temp, humidity, online}` |
+| **Configuração MQTT broker** | Recomendar HiveMQ Cloud ou Mosquitto para receber telemetria local (alternativa ao webhook) |
 
-**`DiagnosticoLoteCard`** — queries no mount:
-1. `mortalidade` + `mortalidade_itens` do lote → acumulado, tendência, ratio eliminados/naturais, peso médio das aves mortas (campo `peso_kg` dos itens)
-2. Última `pesagens` + `pesagem_itens` → peso médio atual do lote
-3. `desempenho_aves` → peso referência para linhagem/sexo/dia
-4. `leituras_sensores` via `dispositivos_iot` do galpão (últimos 7 dias) → contagem de dias fora da faixa, pior desvio
-5. `regras_temperatura_lote` → faixa ideal por idade
-6. Correlação: cruzar datas com mortalidade alta vs datas com temperatura fora da faixa
+### Fase 3 — UI Multi-Equipamento
 
-**`VeterinarioDashboard` — novos alertas**:
-- Query adicional de `leituras_sensores` agrupada por lote/galpão nos últimos 7 dias
-- Detectar lotes onde dias fora da faixa > 2 E mortalidade > referência → alerta de correlação ambiental
-- Comparar peso médio mortalidade vs peso médio lote → alerta de discrepância
+| Item | Descrição |
+|------|-----------|
+| **DispositivosIoT.tsx** | Nova aba "Equipamentos" — lista canais com tipo (ícones distintos: ventilador, nebulizador, etc.) |
+| **TemperaturaUmidadeCard.tsx** | Mostrar todos os canais ativos com toggle individual e badge do tipo de equipamento |
+| **Regras Automação** | Suportar múltiplos triggers: "Se temp > 30°C **E** umidade < 60% → ligar nebulizador canal 3" |
 
-**Edge Function `analise-mortalidade`** — enriquecimentos:
-- Buscar `leituras_sensores` dos 3 dias anteriores ao registro (não só última leitura)
-- Calcular: dias fora da faixa, temperatura média, amplitude térmica
-- Comparar `peso_kg` do item de mortalidade vs `pesoMedioReal` da última pesagem
-- Adicionar ao briefing: "Ambiente esteve fora da faixa em X dos últimos 3 dias" e "Peso das aves mortas Y% diferente do peso médio do lote"
+### Fase 4 — Automação Cruzada
 
+| Equipamento | Trigger Automático |
+|-------------|-------------------|
+| **Aquecedor** | Temp < faixa ideal (já existe) |
+| **Ventilador** | Temp > faixa ideal (já existe) |
+| **Nebulizador** | Temp alta **+ umidade baixa** (novo) |
+| **Iluminação** | Programa de luz por idade (postura — crítico para Lohmann) |
+| **Cortina** | Temp + horário (manhã/tarde) |
+| **Alarme** | Falha em qualquer regra crítica > 10min (offline ou desvio) |
+
+## Impacto na Memória Existente
+
+- ✅ Mantém compatibilidade com Sonoff atual (driver eWeLink continua funcionando)
+- ✅ Aproveita lógica `pg_cron` 5min de automação por idade
+- ✅ Aproveita timers offline já implementados (precisa adaptar firmware ESP32)
+- ✅ Aproveita sistema de alertas de temperatura existente
+- 🆕 Adiciona suporte a **programa de luz para postura** (gap atual!)
+- 🆕 Adiciona suporte a sensores avançados via RS485 (CO₂, NH₃)
+
+## Recomendação Final
+
+**SIM, implementar — em fases.** O ESP32-S3 6CH é estrategicamente superior ao Sonoff para granjas industriais:
+
+1. **Início (Fase 1+2)**: Adicionar suporte multi-driver no DB e criar bridge para ESP32
+2. **Meio (Fase 3)**: UI para gerenciar canais por equipamento
+3. **Fim (Fase 4)**: Regras de automação cruzadas (temp+umidade, programa de luz)
+
+O **medidor de temperatura/energia** mencionado é **complementar** mas não essencial — ele é mais útil para controle de custo energético (kWh por lote) do que para automação. Pode ser uma **Fase 5 opcional**.
+
+## Pergunta Antes de Implementar
+
+Para dimensionar o trabalho, preciso saber por onde começar.
