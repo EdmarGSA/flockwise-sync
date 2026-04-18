@@ -430,6 +430,21 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Load all channels for ESP32-S3 / multi-channel devices in this integrado
+      const { data: canais } = await supabase
+        .from("canais_dispositivo")
+        .select("id, dispositivo_id, canal_numero, tipo_equipamento, funcao_automacao, automacao_ativa, ativo, estado_atual")
+        .eq("integrado_id", integradoId)
+        .eq("ativo", true)
+        .eq("automacao_ativa", true);
+
+      const canaisByDevice = new Map<string, any[]>();
+      for (const c of (canais || [])) {
+        const arr = canaisByDevice.get(c.dispositivo_id) || [];
+        arr.push(c);
+        canaisByDevice.set(c.dispositivo_id, arr);
+      }
+
       for (const lote of integradoLotes) {
         const ageDays = Math.floor(
           (Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)
@@ -447,7 +462,7 @@ Deno.serve(async (req) => {
 
         const { data: leitura } = await supabase
           .from("leituras_sensores")
-          .select("temperatura_c, created_at")
+          .select("temperatura_c, umidade_percent, created_at")
           .in("dispositivo_id", allGalpaoDeviceIds)
           .not("temperatura_c", "is", null)
           .order("created_at", { ascending: false })
@@ -460,12 +475,44 @@ Deno.serve(async (req) => {
         if (readingAge > 15 * 60 * 1000) continue;
 
         const temp = Number(leitura.temperatura_c);
+        const umid = leitura.umidade_percent !== null ? Number(leitura.umidade_percent) : null;
         const tempMin = Number(regra.temp_min_c);
         const tempMax = Number(regra.temp_max_c);
+        const umidMax = regra.umidade_max_percent !== null && regra.umidade_max_percent !== undefined
+          ? Number(regra.umidade_max_percent) : 70;
 
         // ── Manage alerts (works even without eWeLink token) ──
         await manageAlerts(supabase, integradoId, lote.id, lote.galpao_id, temp, tempMin, tempMax);
         totalAlerts++;
+
+        // ── Multi-channel automation (ESP32-S3 / multi-relay devices) ──
+        // Channels are queued via canais_dispositivo.estado_atual; ESP32 polls the bridge.
+        for (const dev of (devices || []).filter((d: any) => d.galpao_id === lote.galpao_id)) {
+          const devCanais = canaisByDevice.get(dev.id) || [];
+          for (const canal of devCanais) {
+            const desired = decideChannelState(canal.funcao_automacao, ageDays, temp, tempMin, tempMax, umid, umidMax);
+            if (!desired) continue;
+            if (canal.estado_atual === desired.state) continue;
+
+            await supabase.from("canais_dispositivo").update({
+              estado_atual: desired.state,
+              ultimo_comando_em: new Date().toISOString(),
+            }).eq("id", canal.id);
+
+            await supabase.from("log_automacao_temperatura").insert({
+              dispositivo_id: dev.id,
+              lote_id: lote.id,
+              temperatura_lida: temp,
+              temp_min_regra: tempMin,
+              temp_max_regra: tempMax,
+              acao: `canal_${canal.canal_numero}_${canal.funcao_automacao}_${desired.state}: ${desired.reason}`,
+              resultado: "enfileirado",
+              tempo_resposta_ms: 0,
+            });
+            totalActions++;
+            console.log(`channel-auto: dev=${dev.device_id_ewelink} canal=${canal.canal_numero} → ${desired.state} (${desired.reason})`);
+          }
+        }
 
         // ── Device automation (requires eWeLink token) ──
         if (!accessToken) continue;
