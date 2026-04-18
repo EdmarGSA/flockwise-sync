@@ -544,8 +544,8 @@ Deno.serve(async (req) => {
         const umid = leitura.umidade_percent !== null ? Number(leitura.umidade_percent) : null;
         const tempMin = Number(regra.temp_min_c);
         const tempMax = Number(regra.temp_max_c);
-        const umidMax = regra.umidade_max_percent !== null && regra.umidade_max_percent !== undefined
-          ? Number(regra.umidade_max_percent) : 70;
+        const umidMax = regra.umidade_max_pct !== null && regra.umidade_max_pct !== undefined
+          ? Number(regra.umidade_max_pct) : 70;
 
         // ── Manage alerts (works even without eWeLink token) ──
         await manageAlerts(supabase, integradoId, lote.id, lote.galpao_id, temp, tempMin, tempMax);
