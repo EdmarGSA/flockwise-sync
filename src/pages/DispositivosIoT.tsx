@@ -120,6 +120,10 @@ export default function DispositivosIoT() {
   const [resyncingTimers, setResyncingTimers] = useState(false);
   const [logFilter, setLogFilter] = useState<'todos' | 'sucesso' | 'erro'>('todos');
 
+  // Canais dialog
+  const [canaisDialogOpen, setCanaisDialogOpen] = useState(false);
+  const [selectedDeviceForCanais, setSelectedDeviceForCanais] = useState<Dispositivo | null>(null);
+
   const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
     integradoId,
     onSuccess: () => fetchDeviceStates(),
