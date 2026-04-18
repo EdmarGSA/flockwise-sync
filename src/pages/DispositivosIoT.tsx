@@ -638,9 +638,20 @@ export default function DispositivosIoT() {
                             {isOnline ? <Wifi className="h-4 w-4 text-primary" /> : <WifiOff className="h-4 w-4 text-destructive" />}
                             {dev.nome}
                           </CardTitle>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDevice(dev.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              title="Gerenciar canais"
+                              onClick={() => { setSelectedDeviceForCanais(dev); setCanaisDialogOpen(true); }}
+                            >
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDevice(dev.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="flex gap-1.5 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{dev.device_id_ewelink}</Badge>
