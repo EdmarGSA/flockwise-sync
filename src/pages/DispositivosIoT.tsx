@@ -33,6 +33,8 @@ interface Dispositivo {
   funcao_automacao: string;
   automacao_ativa: boolean;
   regra_grupo: string | null;
+  driver?: string;
+  num_canais?: number;
 }
 
 interface Leitura {
