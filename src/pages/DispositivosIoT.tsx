@@ -1318,6 +1318,16 @@ export default function DispositivosIoT() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Channel management dialog */}
+      <CanaisDispositivoDialog
+        open={canaisDialogOpen}
+        onOpenChange={(o) => { setCanaisDialogOpen(o); if (!o) setSelectedDeviceForCanais(null); }}
+        dispositivoId={selectedDeviceForCanais?.id ?? null}
+        dispositivoNome={selectedDeviceForCanais?.nome ?? ''}
+        integradoId={integradoId}
+        numCanais={selectedDeviceForCanais?.num_canais ?? 1}
+      />
     </div>
   );
 }
