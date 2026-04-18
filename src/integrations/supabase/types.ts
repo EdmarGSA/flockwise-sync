@@ -7174,7 +7174,14 @@ export type Database = {
         | "dinheiro"
         | "cheque"
         | "cartao"
-      funcao_automacao: "aquecimento" | "ventilacao" | "nenhuma"
+      funcao_automacao:
+        | "aquecimento"
+        | "ventilacao"
+        | "nenhuma"
+        | "nebulizacao"
+        | "iluminacao"
+        | "cortina"
+        | "alarme"
       linhagem_aves: "cobb_500" | "ross_308" | "hubbard"
       linhagem_postura:
         | "lohmann_brown_lite"
@@ -7430,7 +7437,15 @@ export const Constants = {
         "cheque",
         "cartao",
       ],
-      funcao_automacao: ["aquecimento", "ventilacao", "nenhuma"],
+      funcao_automacao: [
+        "aquecimento",
+        "ventilacao",
+        "nenhuma",
+        "nebulizacao",
+        "iluminacao",
+        "cortina",
+        "alarme",
+      ],
       linhagem_aves: ["cobb_500", "ross_308", "hubbard"],
       linhagem_postura: [
         "lohmann_brown_lite",
