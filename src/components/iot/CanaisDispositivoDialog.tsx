@@ -132,7 +132,7 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
       if (ativosParaUpsert.length > 0) {
         const { error } = await supabase
           .from('canais_dispositivo')
-          .upsert(ativosParaUpsert, { onConflict: 'dispositivo_id,canal_numero' });
+          .upsert(ativosParaUpsert as any, { onConflict: 'dispositivo_id,canal_numero' });
         if (error) throw error;
       }
 

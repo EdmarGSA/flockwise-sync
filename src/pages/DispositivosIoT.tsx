@@ -14,9 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink, Power, Loader2, Zap, History, Shield, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Filter } from 'lucide-react';
+import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink, Power, Loader2, Zap, History, Shield, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Filter, SlidersHorizontal } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialog';
 
 interface Dispositivo {
   id: string;
@@ -32,6 +33,8 @@ interface Dispositivo {
   funcao_automacao: string;
   automacao_ativa: boolean;
   regra_grupo: string | null;
+  driver?: string;
+  num_canais?: number;
 }
 
 interface Leitura {
@@ -116,6 +119,10 @@ export default function DispositivosIoT() {
   const [loadingTimers, setLoadingTimers] = useState(false);
   const [resyncingTimers, setResyncingTimers] = useState(false);
   const [logFilter, setLogFilter] = useState<'todos' | 'sucesso' | 'erro'>('todos');
+
+  // Canais dialog
+  const [canaisDialogOpen, setCanaisDialogOpen] = useState(false);
+  const [selectedDeviceForCanais, setSelectedDeviceForCanais] = useState<Dispositivo | null>(null);
 
   const { toggleDevice, isControlling, fetchDeviceStatus } = useDeviceControl({
     integradoId,
@@ -631,9 +638,20 @@ export default function DispositivosIoT() {
                             {isOnline ? <Wifi className="h-4 w-4 text-primary" /> : <WifiOff className="h-4 w-4 text-destructive" />}
                             {dev.nome}
                           </CardTitle>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDevice(dev.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              title="Gerenciar canais"
+                              onClick={() => { setSelectedDeviceForCanais(dev); setCanaisDialogOpen(true); }}
+                            >
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDevice(dev.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="flex gap-1.5 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{dev.device_id_ewelink}</Badge>
@@ -1300,6 +1318,16 @@ export default function DispositivosIoT() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Channel management dialog */}
+      <CanaisDispositivoDialog
+        open={canaisDialogOpen}
+        onOpenChange={(o) => { setCanaisDialogOpen(o); if (!o) setSelectedDeviceForCanais(null); }}
+        dispositivoId={selectedDeviceForCanais?.id ?? null}
+        dispositivoNome={selectedDeviceForCanais?.nome ?? ''}
+        integradoId={integradoId}
+        numCanais={selectedDeviceForCanais?.num_canais ?? 1}
+      />
     </div>
   );
 }
