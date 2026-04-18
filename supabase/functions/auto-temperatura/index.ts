@@ -297,6 +297,72 @@ async function syncTimersForDevice(
   return success;
 }
 
+// ── Channel-level decision engine (Phase 4: cross-rule automation) ──
+// Returns the desired state for a single channel based on its function,
+// bird age, current temp/humidity. Returns null if function is not handled
+// (e.g. 'nenhuma' or 'alarme' which is event-driven).
+function decideChannelState(
+  funcao: string,
+  ageDays: number,
+  temp: number,
+  tempMin: number,
+  tempMax: number,
+  umid: number | null,
+  umidMax: number,
+): { state: "on" | "off"; reason: string } | null {
+  switch (funcao) {
+    case "aquecimento":
+      return temp < tempMin
+        ? { state: "on", reason: `temp ${temp}°C < min ${tempMin}°C` }
+        : { state: "off", reason: `temp ${temp}°C >= min ${tempMin}°C` };
+
+    case "ventilacao":
+      return temp > tempMax
+        ? { state: "on", reason: `temp ${temp}°C > max ${tempMax}°C` }
+        : { state: "off", reason: `temp ${temp}°C <= max ${tempMax}°C` };
+
+    case "nebulizacao": {
+      // Only nebulize when hot AND humidity below ceiling (avoid over-saturating)
+      if (temp > tempMax && umid !== null && umid < umidMax) {
+        return { state: "on", reason: `temp ${temp}°C alta + umid ${umid}% < ${umidMax}%` };
+      }
+      return { state: "off", reason: `cond. nebulização não atendida (temp ${temp}, umid ${umid})` };
+    }
+
+    case "iluminacao": {
+      // Lighting program by bird age (broiler standard, expand for layers later)
+      // Day 1-7: 23h light; 8-14: 20h; 15-21: 18h; 22+: 16h light/8h dark
+      const hour = new Date().getHours();
+      let darkStart: number, darkEnd: number;
+      if (ageDays <= 7) { darkStart = 23; darkEnd = 0; }       // 1h dark
+      else if (ageDays <= 14) { darkStart = 22; darkEnd = 2; } // 4h dark
+      else if (ageDays <= 21) { darkStart = 22; darkEnd = 4; } // 6h dark
+      else { darkStart = 22; darkEnd = 6; }                    // 8h dark
+      const isDark = darkStart < darkEnd
+        ? hour >= darkStart && hour < darkEnd
+        : hour >= darkStart || hour < darkEnd;
+      return {
+        state: isDark ? "off" : "on",
+        reason: `idade ${ageDays}d, hora ${hour}h, ${isDark ? "escuro" : "claro"}`,
+      };
+    }
+
+    case "cortina": {
+      // Curtain: open (off relay = aberta) when hot, close (on = fechada) when cold or at night
+      const hour = new Date().getHours();
+      const isNight = hour >= 19 || hour < 6;
+      if (temp > tempMax) return { state: "off", reason: `temp ${temp}°C alta → abrir cortina` };
+      if (temp < tempMin || isNight) return { state: "on", reason: `temp ${temp}°C baixa ou noite (${hour}h) → fechar` };
+      return null;
+    }
+
+    case "alarme":
+    case "nenhuma":
+    default:
+      return null;
+  }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
