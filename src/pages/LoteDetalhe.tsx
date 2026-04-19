@@ -73,6 +73,7 @@ export default function LoteDetalhe() {
   const [lote, setLote] = useState<LoteData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState<number | null>(null);
+  const [mortalidadeAcumulada, setMortalidadeAcumulada] = useState(0);
   const [diasDesdeAlojamento, setDiasDesdeAlojamento] = useState(0);
   const [semanasVida, setSemanasVida] = useState(0);
   const [precisaPesar, setPrecisaPesar] = useState(false);
@@ -154,6 +155,19 @@ export default function LoteDetalhe() {
       const eliminadosClassificacao = recebimentoData.quantidade_eliminados_classificacao || 0;
       setQuantidadeAlojada(loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao);
     }
+
+    // Fetch accumulated daily mortality
+    const { data: mortalidadeData } = await supabase
+      .from('mortalidade')
+      .select('mortalidade_itens(quantidade)')
+      .eq('lote_id', loteData.id);
+
+    const totalMortalidade = (mortalidadeData || []).reduce((total, m) => {
+      const itens = (m as any).mortalidade_itens as Array<{ quantidade: number }> | null;
+      if (!itens) return total;
+      return total + itens.reduce((sum, item) => sum + (item.quantidade || 0), 0);
+    }, 0);
+    setMortalidadeAcumulada(totalMortalidade);
 
     // Calculate days since alojamento - Dia 1 = dia do alojamento
     if (loteData.data_alojamento) {
