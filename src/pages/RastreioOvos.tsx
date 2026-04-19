@@ -46,18 +46,31 @@ export default function RastreioOvos() {
 
   const fetchRastreio = async () => {
     try {
-      const { data: result, error: err } = await supabase
-        .from('rastreio_ovos' as any)
-        .select('*')
-        .eq('lote_interno', lote)
-        .maybeSingle();
+      const { data: result, error: err } = await supabase.functions.invoke(
+        'rastreio-publico',
+        { method: 'GET' as any, body: undefined }
+      );
+      // supabase-js não suporta query params em invoke GET diretamente;
+      // usar fetch direto para preservar o param ?lote=
+      const projectUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+      const res = await fetch(
+        `${projectUrl}/functions/v1/rastreio-publico?lote=${encodeURIComponent(lote!)}`,
+        {
+          headers: {
+            apikey: (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
 
-      if (err) throw err;
-      if (!result) {
+      if (res.status === 404) {
         setError('Lote não encontrado');
-      } else {
-        setData(result as any);
+        return;
       }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setData(json);
+      // suprime warnings de variáveis não usadas
+      void result; void err;
     } catch (e: any) {
       setError('Erro ao consultar rastreabilidade');
       console.error(e);

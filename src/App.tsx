@@ -371,13 +371,6 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
-    <Route path="/configuracoes/silo" element={
-      <ProtectedRoute>
-        <ModuleProtectedRoute moduleCode="configuracoes">
-          <ConfiguracaoSilo />
-        </ModuleProtectedRoute>
-      </ProtectedRoute>
-    } />
     <Route path="/configuracoes/fechamento" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">

@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.esp32-bridge]
 verify_jwt = false
+
+[functions.rastreio-publico]
+verify_jwt = false
