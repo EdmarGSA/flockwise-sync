@@ -73,6 +73,7 @@ export default function LoteDetalhe() {
   const [lote, setLote] = useState<LoteData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [quantidadeAlojada, setQuantidadeAlojada] = useState<number | null>(null);
+  const [mortalidadeAcumulada, setMortalidadeAcumulada] = useState(0);
   const [diasDesdeAlojamento, setDiasDesdeAlojamento] = useState(0);
   const [semanasVida, setSemanasVida] = useState(0);
   const [precisaPesar, setPrecisaPesar] = useState(false);
@@ -155,6 +156,19 @@ export default function LoteDetalhe() {
       setQuantidadeAlojada(loteData.quantidade_aves - mortos - eliminadosLocomotor - eliminadosClassificacao);
     }
 
+    // Fetch accumulated daily mortality
+    const { data: mortalidadeData } = await supabase
+      .from('mortalidade')
+      .select('mortalidade_itens(quantidade)')
+      .eq('lote_id', loteData.id);
+
+    const totalMortalidade = (mortalidadeData || []).reduce((total, m) => {
+      const itens = (m as any).mortalidade_itens as Array<{ quantidade: number }> | null;
+      if (!itens) return total;
+      return total + itens.reduce((sum, item) => sum + (item.quantidade || 0), 0);
+    }, 0);
+    setMortalidadeAcumulada(totalMortalidade);
+
     // Calculate days since alojamento - Dia 1 = dia do alojamento
     if (loteData.data_alojamento) {
       const dias = calcularIdadeLote(loteData.data_alojamento);
@@ -232,9 +246,9 @@ export default function LoteDetalhe() {
   }
 
   const isPostura = lote.linhagem_postura !== null && lote.linhagem_postura !== undefined;
-  // avesVivas: use quantidadeAlojada (which already discounts DOA) 
-  // TODO: also subtract accumulated daily mortality for full accuracy
-  const avesVivas = quantidadeAlojada ?? lote.quantidade_aves;
+  // avesVivas: aves alojadas (descontados DOA/eliminados no recebimento) menos mortalidade acumulada diária
+  const baseAlojadas = quantidadeAlojada ?? lote.quantidade_aves;
+  const avesVivas = Math.max(0, baseAlojadas - mortalidadeAcumulada);
 
   const getStatusBadge = (status: string) => {
     const config = getStatusBadgeConfig(status);
