@@ -232,9 +232,9 @@ export default function LoteDetalhe() {
   }
 
   const isPostura = lote.linhagem_postura !== null && lote.linhagem_postura !== undefined;
-  // avesVivas: use quantidadeAlojada (which already discounts DOA) 
-  // TODO: also subtract accumulated daily mortality for full accuracy
-  const avesVivas = quantidadeAlojada ?? lote.quantidade_aves;
+  // avesVivas: aves alojadas (descontados DOA/eliminados no recebimento) menos mortalidade acumulada diária
+  const baseAlojadas = quantidadeAlojada ?? lote.quantidade_aves;
+  const avesVivas = Math.max(0, baseAlojadas - mortalidadeAcumulada);
 
   const getStatusBadge = (status: string) => {
     const config = getStatusBadgeConfig(status);
