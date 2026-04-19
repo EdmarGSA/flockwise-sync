@@ -213,16 +213,41 @@ export const useFornecedorData = () => {
 
     if (!produtosFornecedor) return [];
 
+    // Calcula consumo médio real (últimos 30 dias) via kardex de saídas
+    const produtoIds = Array.from(new Set(produtosFornecedor.map(pf => pf.produto_id)));
+    const integradoIds = Array.from(new Set(
+      produtosFornecedor.map(pf => (pf.parceiros as any)?.integrado_id).filter(Boolean)
+    ));
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - 30);
+
+    const { data: kardexSaidas } = await supabase
+      .from('kardex')
+      .select('produto_id, integrado_id, quantidade')
+      .in('produto_id', produtoIds)
+      .in('integrado_id', integradoIds)
+      .eq('tipo_movimento', 'saida')
+      .gte('data_movimento', dataLimite.toISOString());
+
+    // Agrega total de saídas por (produto_id|integrado_id)
+    const consumoMap = new Map<string, number>();
+    (kardexSaidas || []).forEach(k => {
+      const key = `${k.produto_id}|${k.integrado_id}`;
+      consumoMap.set(key, (consumoMap.get(key) || 0) + Number(k.quantidade || 0));
+    });
+
     const estoqueData: ClienteEstoque[] = produtosFornecedor.map(pf => {
       const produto = pf.produtos as any;
       const parceiro = pf.parceiros as any;
       const estoqueAtual = produto?.estoque_atual || 0;
       const estoqueMinimo = produto?.estoque_minimo || 0;
-      const consumoMedio = 10; // TODO: calcular real
+      const integradoId = parceiro?.integrado_id || '';
+      const totalSaidas30d = consumoMap.get(`${pf.produto_id}|${integradoId}`) || 0;
+      const consumoMedio = totalSaidas30d / 30;
       const diasEstoque = consumoMedio > 0 ? Math.floor(estoqueAtual / consumoMedio) : 999;
 
       return {
-        integrado_id: parceiro?.integrado_id || '',
+        integrado_id: integradoId,
         integrado_nome: parceiroMap.get(pf.parceiro_id) || 'Cliente',
         produto_id: pf.produto_id,
         produto_nome: produto?.nome || 'Produto',
