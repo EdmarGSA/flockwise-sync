@@ -1,104 +1,94 @@
 
-# Análise: Expansão IoT para Múltiplos Equipamentos (ESP32-S3 + Sonoff)
 
-## Análise do Hardware Proposto
+## Auditoria do Sistema — Resultados Consolidados
 
-O **ESP32-S3-Relé-6CH** é uma excelente opção complementar ao Sonoff atual. Comparativo:
+Auditoria realizada em DB (linter + security scan), código (órfãos, duplicações, qualidade) e arquitetura. Total de **22 problemas reais** detectados, agrupados por severidade.
 
-| Característica | Sonoff (atual) | ESP32-S3 6CH | Medidor Custom |
-|----------------|----------------|--------------|----------------|
-| Canais de relé | 1-4 | **6 isolados** | 0 (só sensor) |
-| Sensores | TH integrado | DS18B20/SHT40 via RS485 | DS18B20/SHT40 |
-| Corrente máx | 10A | **10A 250VAC isolado** | N/A |
-| Conexão | Cloud eWeLink | **Wi-Fi direto MQTT/HTTP** | Wi-Fi MQTT/HTTP |
-| Multi-equipamento | ❌ 1 carga/device | ✅ **6 cargas/device** | ❌ |
-| Custo por carga | Alto (1 device por equipamento) | **Baixo (6 cargas em 1 device)** | N/A |
+---
 
-## Vantagens Estratégicas do ESP32-S3
+### 🔴 CRÍTICOS — Segurança (corrigir já)
 
-1. **Consolidação física**: 1 device controla ventilador + nebulizador + iluminação + aquecedor + cortina + alarme — sem precisar de 6 Sonoffs por galpão
-2. **Independência da nuvem eWeLink**: comunica direto com nosso backend via MQTT/HTTP — elimina dependência da Coolkit
-3. **RS485 industrial**: permite expansão para sensores avançados (CO₂, NH₃, pressão diferencial — cruciais para postura)
-4. **Isolamento óptico**: muito mais seguro para ambiente de granja (umidade, picos elétricos)
-5. **Sem limite de App ID**: o eWeLink limita 100 dispositivos por App ID (memória existente). ESP32 não tem esse teto.
+| # | Problema | Tabela/Local | Risco |
+|---|---|---|---|
+| 1 | RLS `USING (true)` para **anônimos** em `organizacoes` | expõe CNPJ, email, telefone, endereço | Vazamento dados PJ |
+| 2 | RLS `USING (true)` anon em `nucleos` | expõe GPS, endereço completo das fazendas | Geolocalização exposta |
+| 3 | RLS `USING (true)` anon em `lotes` e `galpoes` | quantidades, custos, infraestrutura | Espionagem competitiva |
+| 4 | RLS `USING (ativo=true)` anon em `estoque_ovos` | inventário, custos, lotes | Exposição de estoque |
+| 5 | Policy `Allow profile creation` em `profiles` com `WITH CHECK true` para **public** | qualquer anônimo pode criar profile com `id` arbitrário | Privilege escalation |
+| 6 | Bucket `mortalidade-fotos` SELECT aberto a `public` sem ownership | fotos de todas organizações | Vazamento de dados sensíveis |
+| 7 | Bucket `veterinario-midias` sem checagem de organização em SELECT/UPDATE/DELETE | qualquer auth lê/altera/apaga arquivos | Multi-tenant quebrado |
+| 8 | Sem RLS em `realtime.messages` para tabelas publicadas (`solicitacoes_racao`, `leituras_sensores`, `alertas_temperatura`) | qualquer auth assina topics de outras orgs | Cross-tenant leak via Realtime |
 
-## Arquitetura Proposta — Multi-Driver IoT
+### 🟡 MÉDIOS — Configuração & Boas práticas
 
-```text
-┌──────────────────────────────────────────────────┐
-│  PAINEL IoT — Lovable (atual)                    │
-└──────────────────────────────────────────────────┘
-              ↓                    ↓
-    ┌──────────────────┐  ┌──────────────────┐
-    │  Driver eWeLink  │  │  Driver MQTT/HTTP│
-    │  (Sonoff atual)  │  │  (ESP32 novo)    │
-    └──────────────────┘  └──────────────────┘
-              ↓                    ↓
-       Cloud eWeLink         Broker MQTT
-              ↓                    ↓
-         Sonoff TH           ESP32-S3 6CH
-                                   ↓
-                         ┌─────────┼─────────┐
-                       Vent.  Nebuliz.  Iluminação
-                      Aqueced. Cortina   Alarme
-```
+| # | Problema | Detalhe |
+|---|---|---|
+| 9 | Função `update_updated_at_column` sem `SET search_path` | warning linter, único caso restante (28 funções já corrigidas) |
+| 10 | `Service role full access` com `USING true` em `nfe_racao_recebidas` e `timers_seguranca_iot` | Service role já bypassa RLS — policy redundante e confunde linter |
+| 11 | `silos_modelo`, `modulos`, `role_modulos` com `USING true` para authenticated | aceitável (catálogo público), mas merece revisão |
 
-## O Que Precisa Ser Construído
+### 🟠 Código órfão (remover)
 
-### Fase 1 — Fundação Multi-Driver (DB + UI)
+**11 componentes nunca importados:**
+- `src/components/TutorialOverlay.tsx`
+- `src/components/cadastro/FormulacaoDialog.tsx`
+- `src/components/cockpit/{CompassIndicator,GaugeChart,SparklineChart}.tsx`
+- `src/components/comercial/{NovoPedidoDialog,RomaneioEntregaDialog}.tsx`
+- `src/components/fabrica/ContasPagarTable.tsx` (818 linhas — substituído pela versão em `financeiro/`)
+- `src/components/lotes/{MortalidadeFotoUpload,NivelSiloSelector}.tsx`
+- `src/components/ovos/TransferirEstoqueOvosDialog.tsx`
 
-| Item | Descrição |
-|------|-----------|
-| **Tabela `dispositivos_iot`** | Adicionar coluna `driver` (`ewelink` \| `esp32_mqtt` \| `esp32_http`) e `endpoint_local` (IP/MQTT topic) |
-| **Tabela `canais_dispositivo`** | Nova — 1 device pode ter N canais. Campos: `dispositivo_id`, `canal_numero` (1-6), `nome` (ex: "Ventilador Lateral"), `tipo_equipamento` (`ventilador`/`nebulizador`/`iluminacao`/`aquecimento`/`cortina`/`alarme`), `funcao_automacao` |
-| **Tabela `regras_automacao_avancada`** | Estende `regras_temperatura_lote` para suportar regras por **umidade, CO₂, horário, idade** acionando equipamentos específicos |
+**3 hooks órfãos:** `useOnlineStatus`, `useTipoProducao`, `useWebhooksFornecedor`
 
-### Fase 2 — Driver MQTT/HTTP para ESP32
+**1 página órfã:** `src/pages/backoffice/BackofficeSidebar.tsx` (deveria estar em `components/`)
 
-| Item | Descrição |
-|------|-----------|
-| **Edge Function `esp32-bridge`** | Recebe webhook de telemetria do ESP32 (POST /telemetry) e envia comandos (POST /command) |
-| **Firmware ESP32 (template)** | Documentação Arduino/PlatformIO com payload padrão JSON: `{deviceId, channels[], temp, humidity, online}` |
-| **Configuração MQTT broker** | Recomendar HiveMQ Cloud ou Mosquitto para receber telemetria local (alternativa ao webhook) |
+**4 edge functions sem invocação no código:**
+- `auto-sync-sensors`, `esp32-bridge`, `sensor-webhook`, `create-demo-user` 
+- *(podem ser chamadas externamente — confirmar antes de remover. `auto-sync-sensors` roda via cron e está ativa nos logs ✅)*
 
-### Fase 3 — UI Multi-Equipamento
+### 🟣 Inconsistências
 
-| Item | Descrição |
-|------|-----------|
-| **DispositivosIoT.tsx** | Nova aba "Equipamentos" — lista canais com tipo (ícones distintos: ventilador, nebulizador, etc.) |
-| **TemperaturaUmidadeCard.tsx** | Mostrar todos os canais ativos com toggle individual e badge do tipo de equipamento |
-| **Regras Automação** | Suportar múltiplos triggers: "Se temp > 30°C **E** umidade < 60% → ligar nebulizador canal 3" |
+| # | Problema | Impacto |
+|---|---|---|
+| 12 | Rota duplicada: `/configuracoes/silos` **e** `/configuracoes/silo` | Confusão de navegação |
+| 13 | `NovoPedidoDialog` (1083 linhas) órfão **e** `NovoPedidoStepper` ativo | Código morto |
+| 14 | 408 ocorrências de `: any` / `as any` | Type safety degradada |
+| 15 | 359 `console.log/error/warn` no código de produção | Performance + leak de info |
+| 16 | 7 arquivos > 1000 linhas (`MetasPesoLote` 1546, `DispositivosIoT` 1333, `PesagemDialog` 1271…) | Manutenibilidade |
+| 17 | TODO em `useFornecedorData.tsx:221` (consumo médio hardcoded = 10) e `LoteDetalhe.tsx:236` (mortalidade não subtraída) | Cálculos imprecisos |
 
-### Fase 4 — Automação Cruzada
+---
 
-| Equipamento | Trigger Automático |
-|-------------|-------------------|
-| **Aquecedor** | Temp < faixa ideal (já existe) |
-| **Ventilador** | Temp > faixa ideal (já existe) |
-| **Nebulizador** | Temp alta **+ umidade baixa** (novo) |
-| **Iluminação** | Programa de luz por idade (postura — crítico para Lohmann) |
-| **Cortina** | Temp + horário (manhã/tarde) |
-| **Alarme** | Falha em qualquer regra crítica > 10min (offline ou desvio) |
+### 📋 Plano de Correção (ordem sugerida)
 
-## Impacto na Memória Existente
+**Fase 1 — Segurança crítica (migration única):**
+1. DROP das 4 policies anônimas (`organizacoes`, `nucleos`, `lotes`, `galpoes`, `estoque_ovos`) — substituir por filtro `integrado_id` autenticado. Manter acesso público via rota `/rastreio/:lote` por edge function dedicada com filtro pontual (não por RLS aberta).
+2. DROP `Allow profile creation` em `profiles` (a policy `Users can insert own profile` já cobre).
+3. Reescrever policies dos buckets `mortalidade-fotos` e `veterinario-midias` exigindo path `{integrado_id}/...`.
+4. Adicionar policies em `realtime.messages` por `integrado_id`.
 
-- ✅ Mantém compatibilidade com Sonoff atual (driver eWeLink continua funcionando)
-- ✅ Aproveita lógica `pg_cron` 5min de automação por idade
-- ✅ Aproveita timers offline já implementados (precisa adaptar firmware ESP32)
-- ✅ Aproveita sistema de alertas de temperatura existente
-- 🆕 Adiciona suporte a **programa de luz para postura** (gap atual!)
-- 🆕 Adiciona suporte a sensores avançados via RS485 (CO₂, NH₃)
+**Fase 2 — Limpeza:**
+5. Remover 11 componentes + 3 hooks + 1 página órfãos.
+6. Remover rota duplicada `/configuracoes/silo` (manter `/silos`).
+7. `SET search_path = public` em `update_updated_at_column`.
+8. Remover policies redundantes de `service_role` (2 tabelas).
 
-## Recomendação Final
+**Fase 3 — Qualidade (incremental):**
+9. Resolver os 2 TODOs (cálculo correto de consumo e mortalidade).
+10. Substituir `console.log` por logger condicional (DEV only) — script automatizado.
 
-**SIM, implementar — em fases.** O ESP32-S3 6CH é estrategicamente superior ao Sonoff para granjas industriais:
+**Fase 4 — Refatoração (opcional):**
+11. Quebrar arquivos > 1000 linhas em subcomponentes.
 
-1. **Início (Fase 1+2)**: Adicionar suporte multi-driver no DB e criar bridge para ESP32
-2. **Meio (Fase 3)**: UI para gerenciar canais por equipamento
-3. **Fim (Fase 4)**: Regras de automação cruzadas (temp+umidade, programa de luz)
+---
 
-O **medidor de temperatura/energia** mencionado é **complementar** mas não essencial — ele é mais útil para controle de custo energético (kWh por lote) do que para automação. Pode ser uma **Fase 5 opcional**.
+### Arquivos da Fase 1 (escopo da próxima execução)
 
-## Pergunta Antes de Implementar
+- 1 nova migration SQL (correções RLS + buckets + realtime)
+- 1 nova edge function `rastreio-publico` (substituir RLS aberta de `lotes`/`organizacoes` para a página pública `/rastreio/:lote`)
+- Atualizar `src/pages/RastreioOvos.tsx` para chamar edge function em vez de query direta
+- Deletar 15 arquivos órfãos
+- `src/App.tsx`: remover rota `/configuracoes/silo`
 
-Para dimensionar o trabalho, preciso saber por onde começar.
+Aprovar para eu executar a **Fase 1 + Fase 2** numa única passada (mais impactante e segura), deixando Fases 3-4 para depois.
+
