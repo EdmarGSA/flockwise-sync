@@ -47,6 +47,73 @@ export type Database = {
         }
         Relationships: []
       }
+      alarmes_disparados: {
+        Row: {
+          acionado_em: string
+          canal_id: string | null
+          contexto: Json | null
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          lote_id: string | null
+          mensagem: string
+          resolvido: boolean
+          resolvido_em: string | null
+          severidade: string
+          tipo: string
+        }
+        Insert: {
+          acionado_em?: string
+          canal_id?: string | null
+          contexto?: Json | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          lote_id?: string | null
+          mensagem: string
+          resolvido?: boolean
+          resolvido_em?: string | null
+          severidade?: string
+          tipo: string
+        }
+        Update: {
+          acionado_em?: string
+          canal_id?: string | null
+          contexto?: Json | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          lote_id?: string | null
+          mensagem?: string
+          resolvido?: boolean
+          resolvido_em?: string | null
+          severidade?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alarmes_disparados_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alarmes_disparados_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alarmes_disparados_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_temperatura: {
         Row: {
           created_at: string
@@ -532,6 +599,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      config_alarme_lote: {
+        Row: {
+          alarme_duracao_seg: number
+          ativo: boolean
+          comando_falha_count: number
+          created_at: string
+          id: string
+          integrado_id: string
+          internet_offline_min: number
+          mortalidade_subita_pct: number
+          sensor_offline_min: number
+          temp_critica_c: number
+          temp_fora_faixa_min: number
+          umid_critica_max_pct: number
+          umid_critica_min_pct: number
+          updated_at: string
+        }
+        Insert: {
+          alarme_duracao_seg?: number
+          ativo?: boolean
+          comando_falha_count?: number
+          created_at?: string
+          id?: string
+          integrado_id: string
+          internet_offline_min?: number
+          mortalidade_subita_pct?: number
+          sensor_offline_min?: number
+          temp_critica_c?: number
+          temp_fora_faixa_min?: number
+          umid_critica_max_pct?: number
+          umid_critica_min_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          alarme_duracao_seg?: number
+          ativo?: boolean
+          comando_falha_count?: number
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          internet_offline_min?: number
+          mortalidade_subita_pct?: number
+          sensor_offline_min?: number
+          temp_critica_c?: number
+          temp_fora_faixa_min?: number
+          umid_critica_max_pct?: number
+          umid_critica_min_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       config_custo_postura: {
         Row: {
@@ -2017,6 +2135,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      historico_estado_canal: {
+        Row: {
+          canal_id: string
+          contexto: Json | null
+          created_at: string
+          desligado_em: string | null
+          estado: string
+          id: string
+          integrado_id: string
+          ligado_em: string | null
+          motivo: string | null
+        }
+        Insert: {
+          canal_id: string
+          contexto?: Json | null
+          created_at?: string
+          desligado_em?: string | null
+          estado: string
+          id?: string
+          integrado_id: string
+          ligado_em?: string | null
+          motivo?: string | null
+        }
+        Update: {
+          canal_id?: string
+          contexto?: Json | null
+          created_at?: string
+          desligado_em?: string | null
+          estado?: string
+          id?: string
+          integrado_id?: string
+          ligado_em?: string | null
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_estado_canal_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       historico_nivel_silo: {
         Row: {
@@ -5471,6 +5633,45 @@ export type Database = {
           },
         ]
       }
+      programa_cortina_lote: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          dia_fim: number
+          dia_inicio: number
+          hora_abrir: string
+          hora_fechar: string
+          id: string
+          integrado_id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          dia_fim: number
+          dia_inicio: number
+          hora_abrir?: string
+          hora_fechar?: string
+          id?: string
+          integrado_id: string
+          nome?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          dia_fim?: number
+          dia_inicio?: number
+          hora_abrir?: string
+          hora_fechar?: string
+          id?: string
+          integrado_id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       promocoes_fornecedor: {
         Row: {
           ativo: boolean
@@ -5862,6 +6063,10 @@ export type Database = {
           dia_inicio: number
           id: string
           integrado_id: string
+          nebulizador_cooldown_seg: number | null
+          nebulizador_min_duracao_seg: number | null
+          nebulizador_temp_off_c: number | null
+          nebulizador_umid_off_pct: number | null
           nome: string
           temp_max_c: number
           temp_min_c: number
@@ -5876,6 +6081,10 @@ export type Database = {
           dia_inicio: number
           id?: string
           integrado_id: string
+          nebulizador_cooldown_seg?: number | null
+          nebulizador_min_duracao_seg?: number | null
+          nebulizador_temp_off_c?: number | null
+          nebulizador_umid_off_pct?: number | null
           nome?: string
           temp_max_c: number
           temp_min_c: number
@@ -5890,6 +6099,10 @@ export type Database = {
           dia_inicio?: number
           id?: string
           integrado_id?: string
+          nebulizador_cooldown_seg?: number | null
+          nebulizador_min_duracao_seg?: number | null
+          nebulizador_temp_off_c?: number | null
+          nebulizador_umid_off_pct?: number | null
           nome?: string
           temp_max_c?: number
           temp_min_c?: number
