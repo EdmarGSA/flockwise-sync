@@ -328,6 +328,12 @@ export default function DispositivosIoT() {
         body: { action: 'list-devices', integrado_id: integradoId },
       });
       if (error) throw error;
+      if (data?.error === 'NOT_CONNECTED' || data?.error === 'REAUTH_REQUIRED') {
+        setEwelinkConnected(false);
+        setShowDevicePicker(false);
+        toast.error(data.message || 'Reconecte sua conta eWeLink');
+        return;
+      }
       if (data?.error) { toast.error(data.message || 'Erro ao buscar dispositivos'); setEwelinkDevices([]); return; }
       setEwelinkDevices(data?.devices || []);
       if (!data?.devices?.length) toast.info('Nenhum dispositivo encontrado na conta eWeLink');

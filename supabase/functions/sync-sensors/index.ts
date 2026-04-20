@@ -335,10 +335,12 @@ Deno.serve(async (req) => {
 
     const token = await getTokenForIntegrado(supabase, integradoId);
     if (!token) {
+      // Return 200 so supabase-js delivers the payload to the client
+      // (a non-2xx status causes invoke() to surface an error and drop `data`).
       return jsonResponse({
         error: "NOT_CONNECTED",
-        message: "Conta eWeLink não conectada. Informe email e senha para conectar.",
-      }, 401);
+        message: "Conta eWeLink não conectada. Clique em 'Conectar' para autorizar.",
+      });
     }
 
     let accessToken: string;
@@ -350,7 +352,7 @@ Deno.serve(async (req) => {
         return jsonResponse({
           error: "REAUTH_REQUIRED",
           message: "Token expirado. Reconecte sua conta eWeLink clicando em 'Conectar'.",
-        }, 401);
+        });
       }
       throw err;
     }
