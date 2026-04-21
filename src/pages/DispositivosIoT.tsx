@@ -754,6 +754,15 @@ export default function DispositivosIoT() {
                           </div>
                         </div>
                         <div className="flex gap-1.5 flex-wrap">
+                          {dev.driver === 'esp32_http' || dev.driver === 'esp32_mqtt' ? (
+                            <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
+                              <Cpu className="h-2.5 w-2.5" /> ESP32 · {dev.num_canais ?? 6} canais
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Wifi className="h-2.5 w-2.5" /> Sonoff
+                            </Badge>
+                          )}
                           <Badge variant="secondary" className="text-xs">{dev.device_id_ewelink}</Badge>
                           {galpao && <Badge variant="outline" className="text-xs">{galpao.nome}</Badge>}
                           {dev.automacao_ativa && dev.funcao_automacao !== 'nenhuma' && (
@@ -801,7 +810,8 @@ export default function DispositivosIoT() {
                           <p className="text-sm text-muted-foreground py-4 text-center">Sem leituras. Clique em "Sincronizar".</p>
                         )}
 
-                        {currentSwitch !== undefined && (
+                        {/* Sonoff: single device-level switch */}
+                        {dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt' && currentSwitch !== undefined && (
                           <div className="mt-3 pt-3 border-t flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               {isControlling(dev.device_id_ewelink) ? (
@@ -820,6 +830,19 @@ export default function DispositivosIoT() {
                               checked={currentSwitch === 'on'}
                               disabled={isControlling(dev.device_id_ewelink) || !isOnline}
                               onCheckedChange={() => toggleDevice(dev.device_id_ewelink, currentSwitch)}
+                            />
+                          </div>
+                        )}
+
+                        {/* ESP32: per-channel control list */}
+                        {(dev.driver === 'esp32_http' || dev.driver === 'esp32_mqtt') && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs font-medium text-muted-foreground mb-1.5">Canais</p>
+                            <CanaisDispositivoList
+                              dispositivoId={dev.id}
+                              integradoId={integradoId}
+                              driver={dev.driver}
+                              online={isOnline}
                             />
                           </div>
                         )}
