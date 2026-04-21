@@ -354,7 +354,7 @@ export default function DispositivosIoT() {
   };
 
   const handleSelectEwelinkDevice = (dev: EwelinkApiDevice) => {
-    setNewDevice({ device_id_ewelink: dev.deviceId, nome: dev.name, galpao_id: newDevice.galpao_id });
+    setNewDevice((prev) => ({ ...prev, device_id_ewelink: dev.deviceId, nome: dev.name }));
     setShowDevicePicker(false);
     toast.success(`Dispositivo "${dev.name}" selecionado`);
   };
