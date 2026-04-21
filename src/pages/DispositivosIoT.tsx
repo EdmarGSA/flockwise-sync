@@ -552,16 +552,36 @@ export default function DispositivosIoT() {
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-2" />Adicionar</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Adicionar Dispositivo Sonoff</DialogTitle></DialogHeader>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Adicionar Dispositivo IoT</DialogTitle></DialogHeader>
                 <div className="space-y-4 pt-4">
-                  {ewelinkConnected && (
+                  <div>
+                    <Label>Tipo de dispositivo</Label>
+                    <Select
+                      value={newDevice.driver}
+                      onValueChange={(v) => setNewDevice({ ...newDevice, driver: v as 'ewelink' | 'esp32_http', device_id_ewelink: '', nome: '', auth_token: '' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ewelink">
+                          <span className="flex items-center gap-2"><Wifi className="h-3.5 w-3.5" /> Sonoff (eWeLink)</span>
+                        </SelectItem>
+                        <SelectItem value="esp32_http">
+                          <span className="flex items-center gap-2"><Cpu className="h-3.5 w-3.5" /> ESP32-S3 (HTTP Bridge)</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {newDevice.driver === 'ewelink' && ewelinkConnected && (
                     <Button type="button" variant="outline" className="w-full" onClick={handleFetchEwelinkDevices} disabled={loadingEwelinkDevices}>
                       <Search className="h-4 w-4 mr-2" />
                       {loadingEwelinkDevices ? 'Buscando...' : 'Buscar dispositivos da conta eWeLink'}
                     </Button>
                   )}
-                  {showDevicePicker && (
+                  {newDevice.driver === 'ewelink' && showDevicePicker && (
                     <div className="border rounded-md max-h-48 overflow-y-auto">
                       {loadingEwelinkDevices ? (
                         <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
@@ -583,14 +603,55 @@ export default function DispositivosIoT() {
                       )}
                     </div>
                   )}
+
                   <div>
-                    <Label>ID do Dispositivo (eWeLink)</Label>
-                    <Input placeholder="Ex: 1000abcdef" value={newDevice.device_id_ewelink} onChange={(e) => setNewDevice({ ...newDevice, device_id_ewelink: e.target.value })} />
+                    <Label>{newDevice.driver === 'esp32_http' ? 'Device ID (livre, ex: MAC ou serial)' : 'ID do Dispositivo (eWeLink)'}</Label>
+                    <Input
+                      placeholder={newDevice.driver === 'esp32_http' ? 'Ex: esp32-galpao1-001' : 'Ex: 1000abcdef'}
+                      value={newDevice.device_id_ewelink}
+                      onChange={(e) => setNewDevice({ ...newDevice, device_id_ewelink: e.target.value })}
+                    />
                   </div>
                   <div>
                     <Label>Nome</Label>
                     <Input placeholder="Ex: Sensor Galpão 1" value={newDevice.nome} onChange={(e) => setNewDevice({ ...newDevice, nome: e.target.value })} />
                   </div>
+
+                  {newDevice.driver === 'esp32_http' && (
+                    <>
+                      <div>
+                        <Label>Número de canais (relés)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={8}
+                          value={newDevice.num_canais}
+                          onChange={(e) => setNewDevice({ ...newDevice, num_canais: Math.max(1, Math.min(8, Number(e.target.value) || 1)) })}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Padrão ESP32-S3 6CH Relay = 6.</p>
+                      </div>
+                      <div>
+                        <Label>Token de autenticação</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Clique em Gerar para criar"
+                            value={newDevice.auth_token}
+                            onChange={(e) => setNewDevice({ ...newDevice, auth_token: e.target.value })}
+                            readOnly={!!newDevice.auth_token}
+                          />
+                          {!newDevice.auth_token ? (
+                            <Button type="button" variant="outline" onClick={handleGenerateToken}>Gerar</Button>
+                          ) : (
+                            <Button type="button" variant="outline" onClick={handleCopyToken}>
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Use este token no header <code className="bg-muted px-1 rounded text-[10px]">x-device-token</code> do firmware.</p>
+                      </div>
+                    </>
+                  )}
+
                   <div>
                     <Label>Galpão (opcional)</Label>
                     <Select value={newDevice.galpao_id} onValueChange={(v) => setNewDevice({ ...newDevice, galpao_id: v })}>
