@@ -14,10 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink, Power, Loader2, Zap, History, Shield, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Filter, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Thermometer, Droplets, Wifi, WifiOff, RefreshCw, Plus, Trash2, Activity, Link, Unlink, Search, ExternalLink, Power, Loader2, Zap, History, Shield, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Filter, SlidersHorizontal, Cpu, Copy } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialog';
+import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
 
 interface Dispositivo {
   id: string;
@@ -95,7 +96,14 @@ export default function DispositivosIoT() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [newDevice, setNewDevice] = useState({ device_id_ewelink: '', nome: '', galpao_id: '' });
+  const [newDevice, setNewDevice] = useState<{
+    driver: 'ewelink' | 'esp32_http';
+    device_id_ewelink: string;
+    nome: string;
+    galpao_id: string;
+    auth_token: string;
+    num_canais: number;
+  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -355,17 +363,42 @@ export default function DispositivosIoT() {
     if (!integradoId || !newDevice.device_id_ewelink || !newDevice.nome) {
       toast.error('Preencha ID do dispositivo e nome'); return;
     }
+    const isEsp32 = newDevice.driver === 'esp32_http';
+    if (isEsp32 && !newDevice.auth_token) {
+      toast.error('Gere um token de autenticação para o ESP32'); return;
+    }
     const { error } = await supabase.from('dispositivos_iot').insert({
       integrado_id: integradoId,
       device_id_ewelink: newDevice.device_id_ewelink,
       nome: newDevice.nome,
       galpao_id: newDevice.galpao_id || null,
+      driver: newDevice.driver as any,
+      auth_token: isEsp32 ? newDevice.auth_token : null,
+      num_canais: isEsp32 ? newDevice.num_canais : 1,
+      marca: isEsp32 ? 'ESP32-S3' : 'Sonoff',
+      modelo: isEsp32 ? `${newDevice.num_canais}CH Relay` : null,
     });
     if (error) { toast.error(error.message.includes('duplicate') ? 'Dispositivo já cadastrado' : error.message); return; }
     toast.success('Dispositivo cadastrado');
     setAddDialogOpen(false);
-    setNewDevice({ device_id_ewelink: '', nome: '', galpao_id: '' });
+    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
     fetchData();
+  };
+
+  const handleGenerateToken = () => {
+    const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    setNewDevice((prev) => ({ ...prev, auth_token: token }));
+    toast.success('Token gerado');
+  };
+
+  const handleCopyToken = async () => {
+    if (!newDevice.auth_token) return;
+    try {
+      await navigator.clipboard.writeText(newDevice.auth_token);
+      toast.success('Token copiado');
+    } catch {
+      toast.error('Erro ao copiar');
+    }
   };
 
   const handleDeleteDevice = async (id: string) => {
@@ -507,7 +540,7 @@ export default function DispositivosIoT() {
                 <Activity className="h-6 w-6 text-primary" />
                 Dispositivos IoT
               </h1>
-              <p className="text-sm text-muted-foreground">Monitoramento, controle e automação de dispositivos Sonoff</p>
+              <p className="text-sm text-muted-foreground">Monitoramento, controle e automação de dispositivos IoT (Sonoff + ESP32)</p>
             </div>
           </div>
           <div className="flex gap-2">
