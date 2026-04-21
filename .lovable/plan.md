@@ -1,94 +1,66 @@
 
 
-## Auditoria do Sistema — Resultados Consolidados
+## Plano — Fase 3 ESP32-S3 (UI + Roteamento + Correções)
 
-Auditoria realizada em DB (linter + security scan), código (órfãos, duplicações, qualidade) e arquitetura. Total de **22 problemas reais** detectados, agrupados por severidade.
+Objetivo: deixar o sistema 100% pronto para receber clientes com Sonoff **ou** ESP32-S3, validável sem hardware via curl.
 
----
+### 1. UI de cadastro multi-driver (`DispositivosIoT.tsx`)
 
-### 🔴 CRÍTICOS — Segurança (corrigir já)
+- Trocar título "Adicionar Dispositivo Sonoff" → "Adicionar Dispositivo IoT"
+- Adicionar `<Select>` no dialog "Adicionar Dispositivo" com 2 opções:
+  - **Sonoff (eWeLink)** — fluxo atual (busca devices via OAuth)
+  - **ESP32-S3 6CH** — novos campos: `device_id` (livre, ex: MAC), `auth_token` (gerado via `crypto.randomUUID()` com botão copiar), `num_canais` (default 6, range 1-8)
+- Subtítulo da página: "Monitoramento, controle e automação de dispositivos IoT (Sonoff + ESP32)"
+- Badge no card do device mostrando driver (`Sonoff` azul / `ESP32` roxo)
 
-| # | Problema | Tabela/Local | Risco |
-|---|---|---|---|
-| 1 | RLS `USING (true)` para **anônimos** em `organizacoes` | expõe CNPJ, email, telefone, endereço | Vazamento dados PJ |
-| 2 | RLS `USING (true)` anon em `nucleos` | expõe GPS, endereço completo das fazendas | Geolocalização exposta |
-| 3 | RLS `USING (true)` anon em `lotes` e `galpoes` | quantidades, custos, infraestrutura | Espionagem competitiva |
-| 4 | RLS `USING (ativo=true)` anon em `estoque_ovos` | inventário, custos, lotes | Exposição de estoque |
-| 5 | Policy `Allow profile creation` em `profiles` com `WITH CHECK true` para **public** | qualquer anônimo pode criar profile com `id` arbitrário | Privilege escalation |
-| 6 | Bucket `mortalidade-fotos` SELECT aberto a `public` sem ownership | fotos de todas organizações | Vazamento de dados sensíveis |
-| 7 | Bucket `veterinario-midias` sem checagem de organização em SELECT/UPDATE/DELETE | qualquer auth lê/altera/apaga arquivos | Multi-tenant quebrado |
-| 8 | Sem RLS em `realtime.messages` para tabelas publicadas (`solicitacoes_racao`, `leituras_sensores`, `alertas_temperatura`) | qualquer auth assina topics de outras orgs | Cross-tenant leak via Realtime |
+### 2. Visualização de canais por dispositivo
 
-### 🟡 MÉDIOS — Configuração & Boas práticas
+- No card de cada dispositivo ESP32, exibir lista expandível com os canais ativos (nome + ícone do tipo + estado on/off + switch)
+- Para Sonoff (1 canal único), manter UI atual sem mudança visual
+- Reaproveitar `tipoIcon()` de `CanaisDispositivoDialog.tsx`
 
-| # | Problema | Detalhe |
-|---|---|---|
-| 9 | Função `update_updated_at_column` sem `SET search_path` | warning linter, único caso restante (28 funções já corrigidas) |
-| 10 | `Service role full access` com `USING true` em `nfe_racao_recebidas` e `timers_seguranca_iot` | Service role já bypassa RLS — policy redundante e confunde linter |
-| 11 | `silos_modelo`, `modulos`, `role_modulos` com `USING true` para authenticated | aceitável (catálogo público), mas merece revisão |
+### 3. Roteamento driver-aware (`useDeviceControl.tsx`)
 
-### 🟠 Código órfão (remover)
+- Aceitar novo parâmetro `driver: 'ewelink' | 'esp32_http'` e `canalId?: string`
+- Se `driver === 'esp32_http'`: chamar `esp32-bridge/command` com `{ canalId, acao }`
+- Se `driver === 'ewelink'`: comportamento atual (`sync-sensors/control-device`)
+- `fetchDeviceStatus` retorna `null` para ESP32 (estado vem via telemetria, não via consulta)
 
-**11 componentes nunca importados:**
-- `src/components/TutorialOverlay.tsx`
-- `src/components/cadastro/FormulacaoDialog.tsx`
-- `src/components/cockpit/{CompassIndicator,GaugeChart,SparklineChart}.tsx`
-- `src/components/comercial/{NovoPedidoDialog,RomaneioEntregaDialog}.tsx`
-- `src/components/fabrica/ContasPagarTable.tsx` (818 linhas — substituído pela versão em `financeiro/`)
-- `src/components/lotes/{MortalidadeFotoUpload,NivelSiloSelector}.tsx`
-- `src/components/ovos/TransferirEstoqueOvosDialog.tsx`
+### 4. Correção do bug `umidade_percent` em `auto-temperatura/index.ts`
 
-**3 hooks órfãos:** `useOnlineStatus`, `useTipoProducao`, `useWebhooksFornecedor`
+- Linha ~531: trocar `umidade_percent` → `umidade_pct` (matching real column name)
+- Sem isso, decisões de nebulização nunca consideram umidade
 
-**1 página órfã:** `src/pages/backoffice/BackofficeSidebar.tsx` (deveria estar em `components/`)
+### 5. Realtime para `canais_dispositivo`
 
-**4 edge functions sem invocação no código:**
-- `auto-sync-sensors`, `esp32-bridge`, `sensor-webhook`, `create-demo-user` 
-- *(podem ser chamadas externamente — confirmar antes de remover. `auto-sync-sensors` roda via cron e está ativa nos logs ✅)*
+- Habilitar publication realtime
+- Subscrever na página IoT e em `TemperaturaUmidadeCard` para refletir instantaneamente quando ESP32 manda telemetry
 
-### 🟣 Inconsistências
+### 6. Validação E2E sem hardware
 
-| # | Problema | Impacto |
-|---|---|---|
-| 12 | Rota duplicada: `/configuracoes/silos` **e** `/configuracoes/silo` | Confusão de navegação |
-| 13 | `NovoPedidoDialog` (1083 linhas) órfão **e** `NovoPedidoStepper` ativo | Código morto |
-| 14 | 408 ocorrências de `: any` / `as any` | Type safety degradada |
-| 15 | 359 `console.log/error/warn` no código de produção | Performance + leak de info |
-| 16 | 7 arquivos > 1000 linhas (`MetasPesoLote` 1546, `DispositivosIoT` 1333, `PesagemDialog` 1271…) | Manutenibilidade |
-| 17 | TODO em `useFornecedorData.tsx:221` (consumo médio hardcoded = 10) e `LoteDetalhe.tsx:236` (mortalidade não subtraída) | Cálculos imprecisos |
+- Cadastrar 1 ESP32 fake via UI (`device_id = test-esp32-001`, `num_canais = 6`)
+- Configurar 6 canais via `CanaisDispositivoDialog` (ventilador, nebulizador, aquecimento, etc.)
+- Curl simulando firmware:
+  ```bash
+  POST /telemetry com temp=27.5, hum=58, channels[]
+  GET  /config?deviceId=test-esp32-001
+  ```
+- Verificar: leitura aparece em `TemperaturaUmidadeCard`, estados batem, automação cron escolhe estados corretos
 
----
+### 7. Documentação para o cliente
 
-### 📋 Plano de Correção (ordem sugerida)
+- Atualizar `docs/ESP32-S3-BRIDGE.md` com: passo-a-passo de cadastro pela UI, exemplo de teste com curl, tabela comparativa "Quando escolher Sonoff vs ESP32"
 
-**Fase 1 — Segurança crítica (migration única):**
-1. DROP das 4 policies anônimas (`organizacoes`, `nucleos`, `lotes`, `galpoes`, `estoque_ovos`) — substituir por filtro `integrado_id` autenticado. Manter acesso público via rota `/rastreio/:lote` por edge function dedicada com filtro pontual (não por RLS aberta).
-2. DROP `Allow profile creation` em `profiles` (a policy `Users can insert own profile` já cobre).
-3. Reescrever policies dos buckets `mortalidade-fotos` e `veterinario-midias` exigindo path `{integrado_id}/...`.
-4. Adicionar policies em `realtime.messages` por `integrado_id`.
+### Detalhes técnicos
 
-**Fase 2 — Limpeza:**
-5. Remover 11 componentes + 3 hooks + 1 página órfãos.
-6. Remover rota duplicada `/configuracoes/silo` (manter `/silos`).
-7. `SET search_path = public` em `update_updated_at_column`.
-8. Remover policies redundantes de `service_role` (2 tabelas).
+- **Arquivos editados:** `src/pages/DispositivosIoT.tsx`, `src/hooks/useDeviceControl.tsx`, `src/components/lotes/TemperaturaUmidadeCard.tsx`, `supabase/functions/auto-temperatura/index.ts`, `docs/ESP32-S3-BRIDGE.md`
+- **Migration SQL:** 1 comando — `ALTER PUBLICATION supabase_realtime ADD TABLE public.canais_dispositivo`
+- **Sem breaking changes** — todos os Sonoff atuais continuam funcionando idêntico
+- **Firmware** fica de fora deste plano (responsabilidade hardware, paralelo)
 
-**Fase 3 — Qualidade (incremental):**
-9. Resolver os 2 TODOs (cálculo correto de consumo e mortalidade).
-10. Substituir `console.log` por logger condicional (DEV only) — script automatizado.
+### Fora do escopo (Fase 4 futura)
 
-**Fase 4 — Refatoração (opcional):**
-11. Quebrar arquivos > 1000 linhas em subcomponentes.
-
----
-
-### Arquivos da Fase 1 (escopo da próxima execução)
-
-- 1 nova migration SQL (correções RLS + buckets + realtime)
-- 1 nova edge function `rastreio-publico` (substituir RLS aberta de `lotes`/`organizacoes` para a página pública `/rastreio/:lote`)
-- Atualizar `src/pages/RastreioOvos.tsx` para chamar edge function em vez de query direta
-- Deletar 15 arquivos órfãos
-- `src/App.tsx`: remover rota `/configuracoes/silo`
-
-Aprovar para eu executar a **Fase 1 + Fase 2** numa única passada (mais impactante e segura), deixando Fases 3-4 para depois.
+- MQTT broker para comandos sub-segundo
+- Programa de luz para postura (timer por horário)
+- Hierarquia/exclusão quando galpão tem Sonoff + ESP32 simultâneos
 
