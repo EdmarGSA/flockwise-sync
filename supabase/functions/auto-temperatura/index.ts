@@ -528,7 +528,7 @@ Deno.serve(async (req) => {
 
         const { data: leitura } = await supabase
           .from("leituras_sensores")
-          .select("temperatura_c, umidade_percent, created_at")
+          .select("temperatura_c, umidade_pct, created_at")
           .in("dispositivo_id", allGalpaoDeviceIds)
           .not("temperatura_c", "is", null)
           .order("created_at", { ascending: false })
@@ -541,7 +541,7 @@ Deno.serve(async (req) => {
         if (readingAge > 15 * 60 * 1000) continue;
 
         const temp = Number(leitura.temperatura_c);
-        const umid = leitura.umidade_percent !== null ? Number(leitura.umidade_percent) : null;
+        const umid = leitura.umidade_pct !== null ? Number(leitura.umidade_pct) : null;
         const tempMin = Number(regra.temp_min_c);
         const tempMax = Number(regra.temp_max_c);
         const umidMax = regra.umidade_max_pct !== null && regra.umidade_max_pct !== undefined
