@@ -266,6 +266,8 @@ export default function DispositivosIoT() {
     const autoCtrl = new Set<string>();
     await Promise.all(
       devices.map(async (dev) => {
+        // Skip eWeLink polling for ESP32 — state comes via telemetry
+        if (dev.driver === 'esp32_http' || dev.driver === 'esp32_mqtt') return;
         const params = await fetchDeviceStatus(dev.device_id_ewelink);
         states[dev.id] = params?.switch ?? null;
         if (params?.autoControlEnabled === 1) autoCtrl.add(dev.id);
