@@ -441,15 +441,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Get automation-enabled devices
+      // Get automation-enabled devices (incl. driver to route correctly)
       const { data: devices } = await supabase
         .from("dispositivos_iot")
-        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa")
+        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver")
         .eq("integrado_id", integradoId)
         .eq("ativo", true);
 
+      // eWeLink-only automation: skip ESP32 devices here, they are driven via canais_dispositivo
       const automationDevices = (devices || []).filter(
-        (d: any) => d.automacao_ativa && d.funcao_automacao !== "nenhuma"
+        (d: any) =>
+          d.automacao_ativa &&
+          d.funcao_automacao !== "nenhuma" &&
+          (d.driver ?? "ewelink") === "ewelink"
       );
 
       // ── Offline detection for ALL active devices ──
@@ -469,13 +473,14 @@ Deno.serve(async (req) => {
 
         if (isOffline) {
           // Check if we already sent an offline notification in the last hour
+          // Dedup: only one offline notification per device every 6 hours
           const { data: recentNotif } = await supabase
             .from("admin_notifications")
             .select("id")
             .eq("integrado_id", integradoId)
             .eq("tipo", "dispositivo_offline")
             .ilike("mensagem", `%${dev.device_id_ewelink}%`)
-            .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .gte("created_at", new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
             .limit(1)
             .maybeSingle();
 
