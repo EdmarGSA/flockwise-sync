@@ -473,13 +473,14 @@ Deno.serve(async (req) => {
 
         if (isOffline) {
           // Check if we already sent an offline notification in the last hour
+          // Dedup: only one offline notification per device every 6 hours
           const { data: recentNotif } = await supabase
             .from("admin_notifications")
             .select("id")
             .eq("integrado_id", integradoId)
             .eq("tipo", "dispositivo_offline")
             .ilike("mensagem", `%${dev.device_id_ewelink}%`)
-            .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .gte("created_at", new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
             .limit(1)
             .maybeSingle();
 
