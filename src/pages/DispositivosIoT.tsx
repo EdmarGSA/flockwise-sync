@@ -19,6 +19,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialog';
 import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
+import { SaudeIoTPanel } from '@/components/iot/SaudeIoTPanel';
+import { HeartPulse } from 'lucide-react';
 
 interface Dispositivo {
   id: string;
@@ -706,13 +708,23 @@ export default function DispositivosIoT() {
         </Card>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="dispositivos">
+        <Tabs defaultValue="saude">
           <TabsList>
+            <TabsTrigger value="saude" className="gap-1"><HeartPulse className="h-4 w-4" />Saúde</TabsTrigger>
             <TabsTrigger value="dispositivos" className="gap-1"><Activity className="h-4 w-4" />Dispositivos</TabsTrigger>
             <TabsTrigger value="automacao" className="gap-1"><Zap className="h-4 w-4" />Automação</TabsTrigger>
             <TabsTrigger value="protecao" className="gap-1"><Shield className="h-4 w-4" />Proteção Offline</TabsTrigger>
             <TabsTrigger value="logs" className="gap-1"><History className="h-4 w-4" />Histórico</TabsTrigger>
           </TabsList>
+
+          {/* Saúde Tab */}
+          <TabsContent value="saude">
+            <SaudeIoTPanel
+              integradoId={integradoId}
+              dispositivos={dispositivos as any}
+              galpoes={galpoes}
+            />
+          </TabsContent>
 
           {/* Dispositivos Tab */}
           <TabsContent value="dispositivos">
