@@ -441,15 +441,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Get automation-enabled devices
+      // Get automation-enabled devices (incl. driver to route correctly)
       const { data: devices } = await supabase
         .from("dispositivos_iot")
-        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa")
+        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver")
         .eq("integrado_id", integradoId)
         .eq("ativo", true);
 
+      // eWeLink-only automation: skip ESP32 devices here, they are driven via canais_dispositivo
       const automationDevices = (devices || []).filter(
-        (d: any) => d.automacao_ativa && d.funcao_automacao !== "nenhuma"
+        (d: any) =>
+          d.automacao_ativa &&
+          d.funcao_automacao !== "nenhuma" &&
+          (d.driver ?? "ewelink") === "ewelink"
       );
 
       // ── Offline detection for ALL active devices ──
