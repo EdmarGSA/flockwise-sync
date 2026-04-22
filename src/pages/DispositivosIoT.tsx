@@ -19,6 +19,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialog';
 import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
+import { SaudeIoTPanel } from '@/components/iot/SaudeIoTPanel';
+import { HeartPulse } from 'lucide-react';
 
 interface Dispositivo {
   id: string;
