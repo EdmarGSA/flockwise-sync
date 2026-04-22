@@ -726,7 +726,8 @@ export default function DispositivosIoT() {
             />
           </TabsContent>
 
-
+          {/* Dispositivos Tab */}
+          <TabsContent value="dispositivos">
             {dispositivos.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
