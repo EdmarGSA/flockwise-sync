@@ -3460,6 +3460,51 @@ export type Database = {
           },
         ]
       }
+      notificacoes_usuario: {
+        Row: {
+          contexto: Json | null
+          created_at: string
+          id: string
+          integrado_id: string | null
+          lida: boolean
+          lida_em: string | null
+          link: string | null
+          mensagem: string | null
+          severidade: string
+          tipo_evento_codigo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          contexto?: Json | null
+          created_at?: string
+          id?: string
+          integrado_id?: string | null
+          lida?: boolean
+          lida_em?: string | null
+          link?: string | null
+          mensagem?: string | null
+          severidade?: string
+          tipo_evento_codigo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          contexto?: Json | null
+          created_at?: string
+          id?: string
+          integrado_id?: string | null
+          lida?: boolean
+          lida_em?: string | null
+          link?: string | null
+          mensagem?: string | null
+          severidade?: string
+          tipo_evento_codigo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nucleos: {
         Row: {
           area_id: string | null
@@ -4977,6 +5022,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "fornecedores_globais"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      preferencias_notificacao: {
+        Row: {
+          created_at: string
+          email_ativo: boolean
+          id: string
+          push_ativo: boolean
+          tipo_evento_codigo: string
+          updated_at: string
+          user_id: string
+          whatsapp_ativo: boolean
+        }
+        Insert: {
+          created_at?: string
+          email_ativo?: boolean
+          id?: string
+          push_ativo?: boolean
+          tipo_evento_codigo: string
+          updated_at?: string
+          user_id: string
+          whatsapp_ativo?: boolean
+        }
+        Update: {
+          created_at?: string
+          email_ativo?: boolean
+          id?: string
+          push_ativo?: boolean
+          tipo_evento_codigo?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp_ativo?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preferencias_notificacao_tipo_evento_codigo_fkey"
+            columns: ["tipo_evento_codigo"]
+            isOneToOne: false
+            referencedRelation: "tipos_evento_notificacao"
+            referencedColumns: ["codigo"]
           },
         ]
       }
@@ -6913,6 +6999,42 @@ export type Database = {
           },
         ]
       }
+      tipos_evento_notificacao: {
+        Row: {
+          ativo: boolean
+          canais_padrao: string[]
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          roles_padrao: Database["public"]["Enums"]["app_role"][]
+          severidade_padrao: string
+        }
+        Insert: {
+          ativo?: boolean
+          canais_padrao?: string[]
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          roles_padrao?: Database["public"]["Enums"]["app_role"][]
+          severidade_padrao?: string
+        }
+        Update: {
+          ativo?: boolean
+          canais_padrao?: string[]
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          roles_padrao?: Database["public"]["Enums"]["app_role"][]
+          severidade_padrao?: string
+        }
+        Relationships: []
+      }
       tratamentos_lote: {
         Row: {
           aplicacao_confirmada: boolean | null
@@ -7250,6 +7372,18 @@ export type Database = {
         Returns: Database["public"]["Enums"]["fase_postura"]
       }
       can_modify_data: { Args: never; Returns: boolean }
+      dispatch_notificacao: {
+        Args: {
+          p_codigo: string
+          p_contexto?: Json
+          p_integrado_id: string
+          p_link?: string
+          p_mensagem?: string
+          p_severidade?: string
+          p_titulo: string
+        }
+        Returns: number
+      }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
       gerar_lote_interno_ovos: {
         Args: { p_integrado_id: string }
