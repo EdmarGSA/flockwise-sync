@@ -16,9 +16,11 @@ import {
   Clock,
   Cpu,
   AlertTriangle,
+  Bell,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AlertasNotificacaoDialog } from './AlertasNotificacaoDialog';
 
 interface Dispositivo {
   id: string;
@@ -71,6 +73,7 @@ export function SaudeIoTPanel({
   const [comandos, setComandos] = useState<ComandoLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [alertasOpen, setAlertasOpen] = useState(false);
 
   const fetchData = async () => {
     if (!integradoId || dispositivos.length === 0) {
@@ -217,13 +220,19 @@ export function SaudeIoTPanel({
         </Card>
       </div>
 
-      {/* Refresh */}
-      <div className="flex justify-end">
+      {/* Ações */}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setAlertasOpen(true)}>
+          <Bell className="h-3.5 w-3.5 mr-2" />
+          Configurar alertas
+        </Button>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={refreshing}>
           <RefreshCw className={`h-3.5 w-3.5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
           Atualizar
         </Button>
       </div>
+
+      <AlertasNotificacaoDialog open={alertasOpen} onOpenChange={setAlertasOpen} />
 
       {/* Tabela de status por dispositivo */}
       <Card>
