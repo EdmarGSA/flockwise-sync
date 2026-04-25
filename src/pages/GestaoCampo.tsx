@@ -793,6 +793,10 @@ export default function GestaoCampo() {
             </div>
           </TabsContent>
 
+          <TabsContent value="mapeamento" className="space-y-4">
+            {integradoId && <MapeamentoGPS integradoId={integradoId} />}
+          </TabsContent>
+
           <TabsContent value="desempenho" className="space-y-6">
             {showForm && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
