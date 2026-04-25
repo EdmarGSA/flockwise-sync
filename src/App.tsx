@@ -48,6 +48,7 @@ import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import DispositivosIoT from "./pages/DispositivosIoT";
+import ConfiguracaoMapbox from "./pages/ConfiguracaoMapbox";
 import PortalFornecedor from "./pages/PortalFornecedor";
 import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
 import VitrineFornecedor from "./pages/VitrineFornecedor";
@@ -412,6 +413,15 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <DispositivosIoT />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
+    {/* Configuração Mapbox */}
+    <Route path="/configuracoes/mapbox" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoMapbox />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
