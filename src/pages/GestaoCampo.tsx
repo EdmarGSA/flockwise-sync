@@ -73,6 +73,8 @@ interface Galpao {
   ventilador_quantidade: number;
   caixa_agua_quantidade: number;
   caixa_agua_volume_total: number | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
   updated_at: string;
 }
