@@ -1944,6 +1944,8 @@ export type Database = {
           created_at: string
           id: string
           largura: number
+          latitude: number | null
+          longitude: number | null
           nome: string
           nucleo_id: string
           silo_id: string | null
@@ -1968,6 +1970,8 @@ export type Database = {
           created_at?: string
           id?: string
           largura: number
+          latitude?: number | null
+          longitude?: number | null
           nome: string
           nucleo_id: string
           silo_id?: string | null
@@ -1992,6 +1996,8 @@ export type Database = {
           created_at?: string
           id?: string
           largura?: number
+          latitude?: number | null
+          longitude?: number | null
           nome?: string
           nucleo_id?: string
           silo_id?: string | null
@@ -2724,6 +2730,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mapbox_config: {
+        Row: {
+          created_at: string
+          default_lat: number | null
+          default_lng: number | null
+          default_zoom: number | null
+          id: string
+          integrado_id: string
+          public_token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_lat?: number | null
+          default_lng?: number | null
+          default_zoom?: number | null
+          id?: string
+          integrado_id: string
+          public_token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_lat?: number | null
+          default_lng?: number | null
+          default_zoom?: number | null
+          id?: string
+          integrado_id?: string
+          public_token?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       medicamentos_config: {
         Row: {

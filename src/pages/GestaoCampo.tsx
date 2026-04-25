@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil, Filter, LayoutDashboard } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil, Filter, LayoutDashboard, Map as MapIcon } from 'lucide-react';
 import { getLinhagemLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
@@ -26,6 +26,7 @@ import { DesempenhoEditForm } from '@/components/campo/DesempenhoEditForm';
 import { DesempenhoTable } from '@/components/campo/DesempenhoTable';
 import { DesempenhoCSVImport } from '@/components/campo/DesempenhoCSVImport';
 import { GestorDashboard } from '@/components/campo/GestorDashboard';
+import { MapeamentoGPS } from '@/components/campo/MapeamentoGPS';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Database } from '@/integrations/supabase/types';
@@ -73,6 +74,8 @@ interface Galpao {
   ventilador_quantidade: number;
   caixa_agua_quantidade: number;
   caixa_agua_volume_total: number | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -283,7 +286,7 @@ export default function GestaoCampo() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex w-auto min-w-full sm:w-auto sm:grid sm:grid-cols-6">
+              <TabsList className="inline-flex w-auto min-w-full sm:w-auto sm:grid sm:grid-cols-7">
                 <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
                   <LayoutDashboard className="h-4 w-4" />
                   <span className="hidden sm:inline">Dashboard</span>
@@ -304,6 +307,10 @@ export default function GestaoCampo() {
                   <MapPin className="h-4 w-4" />
                   <span className="hidden sm:inline">Áreas</span>
                 </TabsTrigger>
+                <TabsTrigger value="mapeamento" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
+                  <MapIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mapa GPS</span>
+                </TabsTrigger>
                 <TabsTrigger value="desempenho" className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4">
                   <BarChart3 className="h-4 w-4" />
                   <span className="hidden sm:inline">Desemp.</span>
@@ -311,7 +318,7 @@ export default function GestaoCampo() {
               </TabsList>
             </div>
 
-            {activeTab === 'dashboard' ? null : activeTab === 'lotes' ? (
+            {activeTab === 'dashboard' || activeTab === 'mapeamento' ? null : activeTab === 'lotes' ? (
               <Dialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
@@ -784,6 +791,10 @@ export default function GestaoCampo() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="mapeamento" className="space-y-4">
+            {integradoId && <MapeamentoGPS integradoId={integradoId} />}
           </TabsContent>
 
           <TabsContent value="desempenho" className="space-y-6">

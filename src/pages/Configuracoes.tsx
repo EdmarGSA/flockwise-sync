@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine, Activity } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine, Activity, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -111,6 +111,12 @@ const Configuracoes = () => {
       description: "Sensores de temperatura e umidade (Sonoff)",
       icon: Activity,
       path: "/configuracoes/dispositivos-iot"
+    },
+    {
+      title: "Mapeamento (Mapbox)",
+      description: "Token do mapa para localizar núcleos e galpões",
+      icon: MapPin,
+      path: "/configuracoes/mapbox"
     }
   ];
 
