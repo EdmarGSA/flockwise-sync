@@ -8,6 +8,10 @@ interface MapboxConfig {
   default_lat: number | null;
   default_lng: number | null;
   default_zoom: number | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useMapboxToken() {
@@ -23,7 +27,9 @@ export function useMapboxToken() {
     setLoading(true);
     const { data, error } = await supabase
       .from('mapbox_config')
-      .select('id, public_token, default_lat, default_lng, default_zoom')
+      .select(
+        'id, public_token, default_lat, default_lng, default_zoom, created_by, updated_by, created_at, updated_at',
+      )
       .eq('integrado_id', integradoId)
       .maybeSingle();
 

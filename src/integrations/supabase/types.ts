@@ -2734,6 +2734,7 @@ export type Database = {
       mapbox_config: {
         Row: {
           created_at: string
+          created_by: string | null
           default_lat: number | null
           default_lng: number | null
           default_zoom: number | null
@@ -2741,9 +2742,11 @@ export type Database = {
           integrado_id: string
           public_token: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           default_lat?: number | null
           default_lng?: number | null
           default_zoom?: number | null
@@ -2751,9 +2754,11 @@ export type Database = {
           integrado_id: string
           public_token: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           default_lat?: number | null
           default_lng?: number | null
           default_zoom?: number | null
@@ -2761,6 +2766,7 @@ export type Database = {
           integrado_id?: string
           public_token?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

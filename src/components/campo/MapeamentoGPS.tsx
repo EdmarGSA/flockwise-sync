@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/useTheme';
+import { useCanManageMapbox } from '@/hooks/useCanManageMapbox';
 
 interface NucleoGeo {
   id: string;
@@ -49,6 +50,7 @@ type EditTarget =
 
 export function MapeamentoGPS({ integradoId }: MapeamentoGPSProps) {
   const { config, loading: loadingConfig } = useMapboxToken();
+  const { canManage } = useCanManageMapbox();
   const { theme } = useTheme();
 
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -299,18 +301,32 @@ export function MapeamentoGPS({ integradoId }: MapeamentoGPSProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert>
-            <AlertDescription>
-              Você ainda não configurou o token público do Mapbox para sua organização.
-              <br />
-              <Link
-                to="/configuracoes/mapbox"
-                className="inline-flex items-center gap-2 mt-3 text-primary hover:underline font-medium"
-              >
-                <Settings2 className="h-4 w-4" /> Configurar token Mapbox
-              </Link>
-            </AlertDescription>
-          </Alert>
+          {canManage ? (
+            <Alert>
+              <AlertDescription>
+                Sua organização ainda não tem o token Mapbox configurado. Configure
+                agora para ativar o mapeamento GPS de núcleos e galpões.
+                <br />
+                <Link
+                  to="/configuracoes/mapbox"
+                  className="inline-flex items-center gap-2 mt-3 text-primary hover:underline font-medium"
+                >
+                  <Settings2 className="h-4 w-4" /> Configurar token Mapbox agora
+                </Link>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert className="border-amber-500/50 bg-amber-500/10">
+              <AlertDescription>
+                O mapeamento GPS está desativado para sua organização.
+                <br />
+                <span className="text-sm text-muted-foreground mt-2 block">
+                  Peça ao <strong>administrador da fazenda</strong> para
+                  configurar o token Mapbox em Configurações → Mapeamento.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     );
