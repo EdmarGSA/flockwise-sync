@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/useTheme';
+import { useCanManageMapbox } from '@/hooks/useCanManageMapbox';
 
 interface NucleoGeo {
   id: string;
