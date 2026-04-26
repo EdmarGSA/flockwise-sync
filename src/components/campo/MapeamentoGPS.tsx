@@ -50,6 +50,7 @@ type EditTarget =
 
 export function MapeamentoGPS({ integradoId }: MapeamentoGPSProps) {
   const { config, loading: loadingConfig } = useMapboxToken();
+  const { canManage } = useCanManageMapbox();
   const { theme } = useTheme();
 
   const mapContainer = useRef<HTMLDivElement>(null);
