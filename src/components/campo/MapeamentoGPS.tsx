@@ -301,18 +301,32 @@ export function MapeamentoGPS({ integradoId }: MapeamentoGPSProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert>
-            <AlertDescription>
-              Você ainda não configurou o token público do Mapbox para sua organização.
-              <br />
-              <Link
-                to="/configuracoes/mapbox"
-                className="inline-flex items-center gap-2 mt-3 text-primary hover:underline font-medium"
-              >
-                <Settings2 className="h-4 w-4" /> Configurar token Mapbox
-              </Link>
-            </AlertDescription>
-          </Alert>
+          {canManage ? (
+            <Alert>
+              <AlertDescription>
+                Sua organização ainda não tem o token Mapbox configurado. Configure
+                agora para ativar o mapeamento GPS de núcleos e galpões.
+                <br />
+                <Link
+                  to="/configuracoes/mapbox"
+                  className="inline-flex items-center gap-2 mt-3 text-primary hover:underline font-medium"
+                >
+                  <Settings2 className="h-4 w-4" /> Configurar token Mapbox agora
+                </Link>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert className="border-amber-500/50 bg-amber-500/10">
+              <AlertDescription>
+                O mapeamento GPS está desativado para sua organização.
+                <br />
+                <span className="text-sm text-muted-foreground mt-2 block">
+                  Peça ao <strong>administrador da fazenda</strong> para
+                  configurar o token Mapbox em Configurações → Mapeamento.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     );
