@@ -7417,6 +7417,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["fase_postura"]
       }
       can_modify_data: { Args: never; Returns: boolean }
+      cleanup_orphan_identities_for_email: {
+        Args: { p_email: string }
+        Returns: number
+      }
       dispatch_notificacao: {
         Args: {
           p_codigo: string
