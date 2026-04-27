@@ -108,9 +108,7 @@ Deno.serve(async (req) => {
       // Se for erro de validação de email, tenta limpar identidades órfãs e retry
       if (isCheckingEmailError(error.message) && attempt < maxAttempts) {
         try {
-          // Limpa identidades órfãs (sem usuário correspondente) que possam estar
-          // bloqueando este email específico
-          await supabaseAdmin.rpc('cleanup_orphan_identities_for_email' as any, { p_email: email }).catch(() => {})
+          await supabaseAdmin.rpc('cleanup_orphan_identities_for_email' as any, { p_email: email })
         } catch (e) {
           console.warn('Cleanup attempt failed (non-fatal):', e)
         }
