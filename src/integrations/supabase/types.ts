@@ -1096,6 +1096,54 @@ export type Database = {
           },
         ]
       }
+      create_user_audit_log: {
+        Row: {
+          attempt: number
+          created_at: string
+          created_user_id: string | null
+          error_message: string | null
+          error_type: string | null
+          id: string
+          integrado_id: string | null
+          max_attempts: number
+          metadata: Json | null
+          request_id: string
+          requested_by: string | null
+          status: string
+          target_email: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          created_user_id?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          id?: string
+          integrado_id?: string | null
+          max_attempts?: number
+          metadata?: Json | null
+          request_id: string
+          requested_by?: string | null
+          status: string
+          target_email: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          created_user_id?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          id?: string
+          integrado_id?: string | null
+          max_attempts?: number
+          metadata?: Json | null
+          request_id?: string
+          requested_by?: string | null
+          status?: string
+          target_email?: string
+        }
+        Relationships: []
+      }
       credito_cliente: {
         Row: {
           ativo: boolean | null
