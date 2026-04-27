@@ -115,79 +115,105 @@ const MembroForm = ({ onSuccess }: MembroFormProps) => {
   }, []);
 
 
+  const submitCadastro = async (values: z.infer<typeof formSchema>) => {
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email: values.email,
+        password: values.password,
+        full_name: values.full_name,
+        integrado_id: adminIntegradoId,
+      },
+    });
+
+    if (error) {
+      console.error("Edge function error:", error);
+      // Tenta extrair payload com flag retryable do FunctionsHttpError
+      let payload: any = null;
+      try {
+        payload = await (error as any).context?.json?.();
+      } catch {}
+      return {
+        success: false as const,
+        message: payload?.error || translateAuthError(error.message || "Erro ao criar usuário"),
+        retryable: !!payload?.retryable,
+      };
+    }
+
+    if (data?.error) {
+      return {
+        success: false as const,
+        message: data.error,
+        retryable: !!data.retryable,
+      };
+    }
+
+    const newUserId = data?.user?.id;
+    if (!newUserId) {
+      return { success: false as const, message: "Erro ao criar usuário", retryable: false };
+    }
+
+    // Update profile
+    const profileUpdate: Record<string, any> = {
+      full_name: values.full_name,
+      company_name: values.company_name || null,
+      phone: values.phone || null,
+      role: values.role,
+    };
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update(profileUpdate)
+      .eq("id", newUserId);
+
+    if (profileError) console.error("Profile update error:", profileError);
+
+    if (values.roles.length > 0) {
+      const roleInserts = values.roles.map((role) => ({
+        user_id: newUserId,
+        role: role as "admin" | "integrado" | "veterinario" | "tecnico",
+      }));
+
+      const { error: rolesError } = await supabase
+        .from("user_roles")
+        .insert(roleInserts);
+
+      if (rolesError) console.error("Roles insert error:", rolesError);
+    }
+
+    return { success: true as const };
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
 
     try {
-      // Create user via Edge Function (does NOT change current session)
-      // Passa o integrado_id do admin para vincular o novo membro à organização
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: values.email,
-          password: values.password,
-          full_name: values.full_name,
-          integrado_id: adminIntegradoId,
-        },
-      });
+      const result = await submitCadastro(values);
 
-      if (error) {
-        console.error("Edge function error:", error);
-        toast.error(translateAuthError(error.message || "Erro ao criar usuário"));
-        setLoading(false);
-        return;
+      if (result.success) {
+        toast.success("Membro cadastrado com sucesso!");
+        onSuccess();
+      } else if (result.retryable) {
+        // Erro transitório: mostra toast com botão de reenviar
+        toast.error(result.message, {
+          duration: 10000,
+          action: {
+            label: "Reenviar",
+            onClick: async () => {
+              setLoading(true);
+              const retry = await submitCadastro(values);
+              if (retry.success) {
+                toast.success("Membro cadastrado com sucesso!");
+                onSuccess();
+              } else {
+                toast.error(retry.message);
+              }
+              setLoading(false);
+            },
+          },
+        });
+      } else {
+        toast.error(result.message);
       }
-
-      if (data?.error) {
-        toast.error(data.error);
-        setLoading(false);
-        return;
-      }
-
-      const newUserId = data?.user?.id;
-
-      if (!newUserId) {
-        toast.error("Erro ao criar usuário");
-        setLoading(false);
-        return;
-      }
-
-      // Update profile with additional data
-      const profileUpdate: Record<string, any> = {
-        full_name: values.full_name,
-        company_name: values.company_name || null,
-        phone: values.phone || null,
-        role: values.role,
-      };
-      
-      // Fornecedores não são cadastrados aqui - são criados via CadastroParceiros
-      
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update(profileUpdate)
-        .eq("id", newUserId);
-
-      if (profileError) {
-        console.error("Profile update error:", profileError);
-      }
-
-      // Assign roles
-      if (values.roles.length > 0) {
-        const roleInserts = values.roles.map((role) => ({
-          user_id: newUserId,
-          role: role as "admin" | "integrado" | "veterinario" | "tecnico",
-        }));
-
-        const { error: rolesError } = await supabase
-          .from("user_roles")
-          .insert(roleInserts);
-
-        if (rolesError) {
-          console.error("Roles insert error:", rolesError);
-        }
-      }
-
-      toast.success("Membro cadastrado com sucesso!");
-      onSuccess();
     } catch (error) {
       console.error(error);
       toast.error("Erro ao cadastrar membro");
