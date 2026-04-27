@@ -79,32 +79,69 @@ Deno.serve(async (req) => {
 
     console.log('Creating user with email:', email, 'for org:', targetIntegradoId)
 
-    // Create user using admin API (does NOT log in the new user)
-    // Passa o integrado_id no metadata para o trigger handle_new_user
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: { full_name, integrado_id: targetIntegradoId }
-    })
+    // Helper: tenta criar usuário com retry automático em erros transitórios
+    const tryCreateUser = async () => {
+      return await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name, integrado_id: targetIntegradoId }
+      })
+    }
+
+    const isCheckingEmailError = (msg: string) =>
+      msg.includes('Database error checking email') || msg.toLowerCase().includes('checking email')
+
+    let data: any = null
+    let error: any = null
+    const maxAttempts = 3
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await tryCreateUser()
+      data = result.data
+      error = result.error
+
+      if (!error) break
+
+      console.warn(`Attempt ${attempt}/${maxAttempts} failed:`, error.message)
+
+      // Se for erro de validação de email, tenta limpar identidades órfãs e retry
+      if (isCheckingEmailError(error.message) && attempt < maxAttempts) {
+        try {
+          // Limpa identidades órfãs (sem usuário correspondente) que possam estar
+          // bloqueando este email específico
+          await supabaseAdmin.rpc('cleanup_orphan_identities_for_email' as any, { p_email: email }).catch(() => {})
+        } catch (e) {
+          console.warn('Cleanup attempt failed (non-fatal):', e)
+        }
+        // Backoff: 500ms, 1000ms
+        await new Promise((r) => setTimeout(r, 500 * attempt))
+        continue
+      }
+
+      // Erro não-retryable: sai do loop
+      break
+    }
 
     if (error) {
-      console.error('Error creating user:', error)
-      
+      console.error('Error creating user after retries:', error)
+
       // Translate common errors
       let errorMessage = error.message
+      let retryable = false
       if (error.message.includes('already been registered') || error.message.includes('already registered')) {
         errorMessage = 'Este email já está cadastrado'
       } else if (error.message.includes('invalid email')) {
         errorMessage = 'Email inválido'
       } else if (error.message.toLowerCase().includes('password')) {
         errorMessage = 'Senha deve ter no mínimo 6 caracteres'
-      } else if (error.message.includes('Database error checking email') || error.message.includes('checking email')) {
-        errorMessage = 'Não foi possível validar este email no momento. Tente novamente em instantes ou use outro email.'
+      } else if (isCheckingEmailError(error.message)) {
+        errorMessage = 'Não conseguimos validar este email no momento. Aguarde alguns segundos e tente reenviar o cadastro.'
+        retryable = true
       }
-      
+
       return new Response(
-        JSON.stringify({ error: errorMessage }),
+        JSON.stringify({ error: errorMessage, retryable }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
