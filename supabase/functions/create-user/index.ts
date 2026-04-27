@@ -93,12 +93,14 @@ Deno.serve(async (req) => {
       
       // Translate common errors
       let errorMessage = error.message
-      if (error.message.includes('already been registered')) {
+      if (error.message.includes('already been registered') || error.message.includes('already registered')) {
         errorMessage = 'Este email já está cadastrado'
       } else if (error.message.includes('invalid email')) {
         errorMessage = 'Email inválido'
-      } else if (error.message.includes('password')) {
+      } else if (error.message.toLowerCase().includes('password')) {
         errorMessage = 'Senha deve ter no mínimo 6 caracteres'
+      } else if (error.message.includes('Database error checking email') || error.message.includes('checking email')) {
+        errorMessage = 'Não foi possível validar este email no momento. Tente novamente em instantes ou use outro email.'
       }
       
       return new Response(
