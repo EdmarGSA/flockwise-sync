@@ -1,117 +1,115 @@
-## Contexto: o que já existe
+# Integração Câmeras Intelbras DVR 16 canais
 
-A infraestrutura **por organização** já está implementada na migração anterior. Cada `integrado_id` (organização) pode ter **um único token** público Mapbox isolado.
+## Análise técnica — o desafio
 
-- Tabela `public.mapbox_config` com `UNIQUE(integrado_id)` — garante 1 token por org.
-- RLS ativa: SELECT/INSERT/UPDATE/DELETE restritos a `integrado_id = get_my_integrado_id()` ou superadmin.
-- Hook `useMapboxToken` lê via `integrado_id` do perfil logado.
-- Tela `/configuracoes/mapbox` faz upsert por `integrado_id`.
-- Componente `MapeamentoGPS` consome `config.public_token`.
+O DVR Intelbras é um equipamento **on-premise** (na granja), atrás do roteador local (IP `192.168.1.104`, portas 80/443/554/37777 — visíveis no print da tela "Rede"). A nuvem do Lovable **não tem rota direta** até esse IP privado, então existem 3 caminhos viáveis. Cada um tem trade-offs reais e precisa de uma escolha de arquitetura ANTES de codar.
 
-**Atualmente: 0 tokens cadastrados na base.** Nenhuma organização ainda configurou.
+### Caminho A — Cloud Intelbras (mais simples, depende do produto)
 
-## Lacunas identificadas
+A Intelbras tem nuvens próprias (**Intelbras Cloud / iSIC / Mibo Cam**). Alguns DVRs novos publicam streams/snapshots para essas nuvens com API REST/MQTT. Funciona como o eWeLink hoje:
+- usuário autentica conta Intelbras → obtemos token → chamamos cloud → recebemos snapshots/eventos.
+- **Problema**: a maioria dos DVRs MHDX/iMHDX **não** expõe API pública documentada na nuvem; a nuvem é fechada para o app oficial. Confirmar modelo do DVR antes de prometer esse caminho.
 
-1. **Descoberta**: usuário precisa abrir Configurações → Mapbox para saber que existe. A aba "Mapa GPS" em /gestao-campo mostra apenas erro genérico se não houver token.
-2. **Permissão**: hoje qualquer usuário da org com RLS pode salvar/apagar o token. Deveria ser restrito a `admin`/`integrado` (dono da org).
-3. **Validação**: o token é aceito apenas com prefixo `pk.`. Não há teste real contra a API Mapbox para verificar se é válido e se tem escopo correto.
-4. **Visibilidade do token**: campo exibido em texto puro. Token público é seguro, mas UX de "show/hide" + "copiar" + "mascarar" melhora confiança.
-5. **Auditoria**: sem `created_by` / `updated_by` para rastrear quem alterou.
-6. **Multi-org / superadmin**: superadmin pode ler/escrever via RLS, mas não há UI para listar tokens de todas as orgs no Backoffice.
-7. **Onboarding**: novo integrado não tem nenhum hint de que precisa configurar Mapbox para usar mapas.
+### Caminho B — DDNS + acesso direto via API CGI/ONVIF (recomendado)
 
-## Plano
+DVRs Intelbras (linha MHDX, NVD, iMHDX) usam o stack **Dahua** por baixo, expondo:
+- **HTTP CGI** (porta 80/443): `/cgi-bin/snapshot.cgi?channel=N` — retorna JPEG do canal N.
+- **ONVIF** (porta 80): perfil S — descoberta de canais, snapshots, eventos de motion (PullPointSubscription).
+- **RTSP** (porta 554): `rtsp://user:pass@host:554/cam/realmonitor?channel=N&subtype=1` — stream H.264/H.265 ao vivo.
 
-### 1. Banco: auditoria e proteção por papel
+Para a nuvem alcançar esse IP privado, o cliente precisa:
+1. **Port forwarding** no roteador (80/443/554 → DVR), ou
+2. **DDNS** Intelbras (`xxxx.ddns-intelbras.com.br`) que resolve para o IP público da granja, ou
+3. Um **agente local (ESP32/Raspberry/PC)** que faz bridge — mesmo padrão do `esp32-bridge` atual.
 
-Migração para adicionar campos de auditoria e endurecer RLS:
+Edge function `intelbras-bridge` chama o CGI/ONVIF, recebe JPEG, sobe pro Storage do Lovable Cloud, salva URL em `cameras_snapshots`. Stream RTSP **não roda em browser nativo** — precisa de transcodificação para HLS (servidor go2rtc/MediaMTX local) OU usar apenas snapshots a cada N segundos.
 
-- Adicionar colunas `created_by uuid`, `updated_by uuid` em `mapbox_config`.
-- Trigger `BEFORE INSERT/UPDATE` que preenche `created_by`/`updated_by` com `auth.uid()`.
-- Substituir policies `INSERT/UPDATE/DELETE` para exigir, além do match de organização, `has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'integrado') OR is_superadmin()`. Policy de SELECT permanece aberta a todos da org (hook precisa ler).
+### Caminho C — Agente local (mais robusto, alinhado com arquitetura atual)
 
-### 2. UI Configurações: experiência de gestão
+Estende o conceito **Cloud Agent** já adotado no projeto. Um pequeno serviço rodando em um Raspberry Pi / mini-PC na granja:
+- Consulta o DVR via CGI/RTSP a cada X segundos.
+- Faz upload de snapshots para Supabase Storage.
+- Encaminha eventos de alarme/motion via webhook para `sensor-webhook`.
+- Funciona sem expor o DVR pra internet (só o agente faz HTTPS de saída).
 
-Em `src/pages/ConfiguracaoMapbox.tsx`:
+Esse caminho **resolve segurança** (nada exposto), **resiliência** (buffer offline) e segue o padrão `esp32-bridge` que já existe.
 
-- Mostrar token mascarado por padrão (`pk.eyJ1•••••••xyz`) com botões 👁 mostrar / 📋 copiar.
-- Botão **"Testar token"** que faz `fetch('https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=...')`. Se 200 → toast verde "Token válido". Se 401 → toast vermelho explicando.
-- Exibir **quem cadastrou e quando** (a partir de `created_by`/`updated_by` + join leve com `profiles.full_name`).
-- Bloquear botões Salvar/Remover quando o usuário não for admin/integrado/superadmin (mensagem: "Apenas administradores podem alterar o token desta organização").
-- Mini-mapa de preview (200px) usando o token e coords default ao salvar com sucesso, para validação visual.
+## Recomendação
 
-### 3. UX Gestão de Campo: prompt contextual
+**Caminho B + C combinados, em duas fases:**
 
-Em `src/components/campo/MapeamentoGPS.tsx`:
+- **Fase 1 (MVP)**: snapshots via CGI usando DDNS — funciona em qualquer DVR Intelbras/Dahua sem hardware extra. Usuário configura DDNS + libera porta 443 com HTTPS no DVR. Cobre 80% do caso de uso (ver galpão sob demanda + galeria histórica).
+- **Fase 2 (produção)**: agente local opcional para granjas que não querem expor DVR. Reaproveita pattern do ESP32 bridge.
+- **Fase 3 (live view)**: HLS via MediaMTX local, exibido em `<video>` HTML5 no PWA.
 
-- Quando `config` é `null` e usuário é admin: card amigável com CTA **"Configurar token Mapbox agora"** que leva direto a `/configuracoes/mapbox`.
-- Quando `config` é `null` e usuário **não** é admin: card explicando "Peça ao administrador da fazenda para configurar o token Mapbox".
+Não construir computer vision agora — fica como evolução depois que o histórico de snapshots tiver volume suficiente para treinar (lembrando da decisão registrada: pesagem por foto foi abandonada por margem 8-15% inviável; **observação ambiental e contagem de aves é viável e é o foco aqui**).
 
-### 4. Backoffice (superadmin): visão multi-org
+## O que será construído (Fase 1 — MVP)
 
-Nova aba/seção em `src/pages/backoffice/BackofficeFerramentas.tsx` (ou `BackofficeGranjas.tsx`):
+### 1. Nova entidade no banco
 
-- Lista de organizações com status do token: ✅ Configurado / ❌ Sem token / ⚠️ Token inválido (testado on-demand).
-- Coluna com prefixo do token, data de atualização e responsável.
-- Permite superadmin disparar reset/remoção em casos de suporte.
+- `cameras_dvr` (1 DVR por organização/galpão):
+  - `id`, `integrado_id`, `galpao_id?`, `nome`, `marca` (default 'intelbras'),
+  - `modelo`, `host` (DDNS ou IP público), `porta_https` (443), `porta_rtsp` (554),
+  - `usuario`, `senha_encrypted`, `num_canais` (16), `ativo`, `ultimo_sync`.
+- `cameras_canais` (1 DVR → N canais, 16 no caso):
+  - `id`, `dvr_id`, `canal_numero` (1..16), `nome` (ex: "Galpão 3 - Entrada"),
+  - `galpao_id?`, `lote_id?`, `funcao` (monitoramento, contagem, ambiente),
+  - `ativo`, `snapshot_intervalo_seg` (default 300 = 5 min).
+- `cameras_snapshots` (galeria histórica):
+  - `id`, `canal_id`, `lote_id?`, `storage_path`, `capturado_em`,
+  - `tipo` (agendado, manual, evento_motion), `metadata jsonb`.
+- Bucket Storage privado `camera-snapshots/` com RLS por `integrado_id`.
 
-### 5. Onboarding (opcional, leve)
+RLS: filtros padrão por `integrado_id` via `useIntegradoId` + `is_superadmin()` bypass — segue o padrão multi-tenant do projeto.
 
-- Banner discreto no topo de `/gestao-campo` (apenas para admins) quando a aba "Mapa GPS" existe mas não há token: "Mapeamento GPS desativado. Configure seu token Mapbox em Configurações." Dispensável com X (salvo em `localStorage`).
+### 2. Edge function `intelbras-bridge`
 
-## Detalhes técnicos
+Endpoints (roteamento Hono, padrão já usado em `esp32-bridge` e `sync-erp-docs`):
+- `POST /test-connection` — valida credenciais + descobre canais via ONVIF/CGI.
+- `POST /snapshot` `{ canal_id }` — chama CGI `snapshot.cgi`, sobe JPEG no Storage, retorna URL assinada.
+- `POST /snapshot-all` — captura os 16 canais em paralelo (`Promise.all`).
+- `GET /stream-url` `{ canal_id }` — devolve URL RTSP **assinada** (para reprodução via player externo na fase 2/3).
 
-### Migração SQL (resumo)
+Segredos por organização salvos cifrados em `cameras_dvr.senha_encrypted` (pgsodium / Vault).
 
-```sql
-ALTER TABLE public.mapbox_config
-  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id),
-  ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES auth.users(id);
+### 3. Cron job de captura agendada
 
-CREATE OR REPLACE FUNCTION public.set_mapbox_config_audit()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-BEGIN
-  IF TG_OP = 'INSERT' THEN NEW.created_by := COALESCE(NEW.created_by, auth.uid()); END IF;
-  NEW.updated_by := auth.uid();
-  RETURN NEW;
-END $$;
+`pg_cron` a cada 5 minutos chama `intelbras-bridge/snapshot-all` para todos os DVRs ativos — segue o padrão de `auto-temperatura` e `auto-sync-sensors`. Respeita `snapshot_intervalo_seg` por canal.
 
-CREATE TRIGGER trg_mapbox_config_audit
-BEFORE INSERT OR UPDATE ON public.mapbox_config
-FOR EACH ROW EXECUTE FUNCTION public.set_mapbox_config_audit();
+### 4. UI — Nova página `/cameras` + integração no Lote
 
--- Endurecer policies: exigir papel admin/integrado/superadmin para escrita
-DROP POLICY mapbox_config_insert_own_org ON public.mapbox_config;
-CREATE POLICY mapbox_config_insert_own_org ON public.mapbox_config
-FOR INSERT TO authenticated
-WITH CHECK (
-  (integrado_id = get_my_integrado_id())
-  AND (has_role(auth.uid(),'admin') OR has_role(auth.uid(),'integrado') OR is_superadmin())
-);
--- (idem para UPDATE e DELETE)
-```
+- **`/cameras`** (CadastroCameras): listar DVRs, adicionar/editar, testar conexão, preview ao vivo dos 16 canais em grid 4×4.
+- **No detalhe do lote** (`LoteDetalhe.tsx`): nova aba **"Câmeras"** mostrando os canais vinculados a este lote/galpão, com último snapshot + botão "Atualizar agora".
+- **Galeria histórica**: timeline de snapshots por canal, filtros por data e tipo (agendado/manual/evento).
+- **Mobile-first**: cards empilhados no mobile, grid no desktop (segue padrão de UX do projeto).
 
-### Teste de token (client-side)
+### 5. Webhook de eventos (opcional Fase 1.5)
 
-```ts
-const r = await fetch(
-  `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${encodeURIComponent(token)}`
-);
-if (r.status === 200) toast.success('Token válido');
-else if (r.status === 401) toast.error('Token inválido ou sem permissão');
-else toast.error(`Erro ${r.status} ao validar`);
-```
+DVRs Intelbras suportam **HTTP Listener** para eventos de motion/alarme. Configurar o DVR para POST em `sensor-webhook` extendido (ou nova `camera-event-webhook`) — quando motion é detectado fora do horário esperado (ex: madrugada), gera alerta no painel veterinário/gestor.
 
-### Arquivos afetados
+## O que **não** entra agora
 
-- **Nova migração** `supabase/migrations/<timestamp>_mapbox_audit_and_role.sql`
-- **Editar** `src/pages/ConfiguracaoMapbox.tsx` (mascarar, testar, auditoria, gating por papel)
-- **Editar** `src/components/campo/MapeamentoGPS.tsx` (CTA quando sem token)
-- **Editar** `src/pages/backoffice/BackofficeFerramentas.tsx` (lista multi-org para superadmin)
-- **Reusar** hooks existentes: `useMapboxToken`, `useAuth`, `has_role` via consulta a `user_roles`
+- Live view RTSP em browser (precisa transcoder HLS — Fase 3).
+- Visão computacional / contagem automática de aves (decisão registrada: aguardar volume de dados).
+- Agente local Raspberry (Fase 2 — só se cliente recusar expor o DVR).
+- Gravação contínua de vídeo na nuvem (custo de Storage proibitivo — DVR já grava local).
 
-## Fora de escopo (decisões a confirmar depois)
+## Pré-requisitos do cliente (precisamos avisar)
 
-- **Token global de fallback** (single token compartilhado entre todas as orgs como plano free do app): não recomendado — explode quota de 50k/mês rapidamente e impossibilita atribuir custo. Mantemos 1 token por org.
-- **Edge function proxy** para esconder o token do client: desnecessário para tokens **públicos** `pk.*` (são desenhados para uso no browser). Só faria sentido se fôssemos usar token secreto `sk.*`.
-- **Restrição de URL no Mapbox** (allowlist de domínios no painel Mapbox): orientação a ser dada na tela ao usuário, mas é configuração externa.
+1. DVR com firmware atualizado e API CGI/ONVIF habilitada (padrão na linha MHDX/iMHDX).
+2. Configurar **DDNS Intelbras grátis** (`xxxx.ddns-intelbras.com.br`) ou IP fixo.
+3. Liberar **porta 443** (HTTPS) no roteador apontando pro DVR — **não usar porta 80 sem TLS**.
+4. Criar **usuário read-only** no DVR exclusivo para integração (não usar admin).
+5. Confirmar modelo do DVR — se for muito antigo (linha VD/HDCVI legada), só RTSP funciona, sem CGI snapshot.
+
+## Riscos
+
+- **Segurança**: expor DVR na internet é vetor de ataque comum. Mitigação: forçar HTTPS, usuário restrito, recomendar Caminho C (agente local) para granjas grandes.
+- **Confiabilidade DDNS**: se IP público mudar e DDNS demorar pra atualizar, captura falha. Mitigação: alerta de "câmera offline há > 30min" no painel.
+- **Custo de Storage**: 16 canais × snapshot a cada 5min × 24h ≈ 4.600 imagens/dia/DVR. A ~80KB/JPG = ~370 MB/dia. Mitigação: política de retenção (ex: 30 dias) + compressão WebP.
+- **Modelos sem API**: alguns DVRs antigos só falam RTSP. Mitigação: detectar no `test-connection` e desabilitar features incompatíveis.
+
+## Perguntas antes de começar
+
+Vou fazer 2-3 perguntas críticas (modelo do DVR, modo de exposição preferido, escopo da fase 1) assim que o plano for aprovado, pra calibrar a implementação.
