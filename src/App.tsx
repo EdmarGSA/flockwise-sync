@@ -419,6 +419,15 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
+    {/* Câmeras Intelbras */}
+    <Route path="/cameras" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="cameras">
+          <Cameras />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
     {/* Configuração Mapbox */}
     <Route path="/configuracoes/mapbox" element={
       <ProtectedRoute>
