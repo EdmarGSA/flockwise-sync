@@ -166,6 +166,73 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // ============================================================
+    // POST /snapshot-all-cron — acionado pelo pg_cron, sem JWT de usuário
+    // Itera todos os DVRs ativos e captura snapshots de todos os canais
+    // ============================================================
+    if (req.method === "POST" && path === "/snapshot-all-cron") {
+      const { data: dvrs } = await supabase
+        .from("cameras_dvr")
+        .select("*")
+        .eq("ativo", true);
+
+      let totalOk = 0, totalFail = 0, dvrsProcessados = 0;
+
+      for (const dvr of dvrs || []) {
+        const { data: canais } = await supabase
+          .from("cameras_canais")
+          .select("*")
+          .eq("dvr_id", dvr.id)
+          .eq("ativo", true);
+        if (!canais || canais.length === 0) continue;
+
+        // Respeita snapshot_intervalo_seg por canal
+        const agora = Date.now();
+        const canaisDevidos = canais.filter((c: any) => {
+          if (!c.ultimo_snapshot_em) return true;
+          const ultimoMs = new Date(c.ultimo_snapshot_em).getTime();
+          const intervaloMs = (c.snapshot_intervalo_seg || 300) * 1000;
+          return (agora - ultimoMs) >= intervaloMs;
+        });
+        if (canaisDevidos.length === 0) continue;
+
+        const senha = decryptPassword(dvr.senha_encrypted);
+        const results = await Promise.allSettled(
+          canaisDevidos.map(async (c: any) => {
+            const buf = await fetchSnapshot(
+              dvr.host, dvr.porta_https, dvr.usuario, senha, c.canal_numero,
+            );
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const storagePath = `${dvr.integrado_id}/${c.id}/${dateStr}/${now.getTime()}.jpg`;
+            await supabase.storage.from("camera-snapshots")
+              .upload(storagePath, buf, { contentType: "image/jpeg" });
+            await supabase.from("cameras_snapshots").insert({
+              canal_id: c.id, lote_id: c.lote_id, storage_path: storagePath,
+              tipo: "agendado", tamanho_bytes: buf.length, capturado_em: now.toISOString(),
+            });
+            await supabase.from("cameras_canais")
+              .update({ ultimo_snapshot_em: now.toISOString() }).eq("id", c.id);
+          }),
+        );
+        const ok = results.filter((r) => r.status === "fulfilled").length;
+        const fail = results.length - ok;
+        totalOk += ok; totalFail += fail; dvrsProcessados++;
+
+        await supabase.from("cameras_dvr").update({
+          ultimo_sync: new Date().toISOString(),
+          status_conexao: fail === results.length ? "erro" : "online",
+          ultimo_erro: fail > 0 ? `${fail}/${results.length} canal(is) falharam` : null,
+        }).eq("id", dvr.id);
+      }
+
+      console.log(`intelbras-cron: ${dvrsProcessados} DVRs, ${totalOk} ok, ${totalFail} falhas`);
+      return new Response(
+        JSON.stringify({ dvrs: dvrsProcessados, ok: totalOk, fail: totalFail }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Extrai user da JWT
     const authHeader = req.headers.get("authorization") || "";
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
