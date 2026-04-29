@@ -349,6 +349,235 @@ export type Database = {
           },
         ]
       }
+      cameras_canais: {
+        Row: {
+          ativo: boolean
+          canal_numero: number
+          created_at: string
+          dvr_id: string
+          funcao: Database["public"]["Enums"]["camera_funcao"]
+          galpao_id: string | null
+          id: string
+          lote_id: string | null
+          nome: string
+          snapshot_intervalo_seg: number
+          ultimo_snapshot_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          canal_numero: number
+          created_at?: string
+          dvr_id: string
+          funcao?: Database["public"]["Enums"]["camera_funcao"]
+          galpao_id?: string | null
+          id?: string
+          lote_id?: string | null
+          nome: string
+          snapshot_intervalo_seg?: number
+          ultimo_snapshot_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          canal_numero?: number
+          created_at?: string
+          dvr_id?: string
+          funcao?: Database["public"]["Enums"]["camera_funcao"]
+          galpao_id?: string | null
+          id?: string
+          lote_id?: string | null
+          nome?: string
+          snapshot_intervalo_seg?: number
+          ultimo_snapshot_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cameras_canais_dvr_id_fkey"
+            columns: ["dvr_id"]
+            isOneToOne: false
+            referencedRelation: "cameras_dvr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_canais_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_canais_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cameras_dvr: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          host: string
+          id: string
+          integrado_id: string
+          marca: string
+          modelo: string | null
+          nome: string
+          num_canais: number
+          observacoes: string | null
+          porta_https: number
+          porta_rtsp: number
+          senha_encrypted: string
+          status_conexao: Database["public"]["Enums"]["camera_status"]
+          ultimo_erro: string | null
+          ultimo_sync: string | null
+          updated_at: string
+          usuario: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          host: string
+          id?: string
+          integrado_id: string
+          marca?: string
+          modelo?: string | null
+          nome: string
+          num_canais?: number
+          observacoes?: string | null
+          porta_https?: number
+          porta_rtsp?: number
+          senha_encrypted: string
+          status_conexao?: Database["public"]["Enums"]["camera_status"]
+          ultimo_erro?: string | null
+          ultimo_sync?: string | null
+          updated_at?: string
+          usuario: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          host?: string
+          id?: string
+          integrado_id?: string
+          marca?: string
+          modelo?: string | null
+          nome?: string
+          num_canais?: number
+          observacoes?: string | null
+          porta_https?: number
+          porta_rtsp?: number
+          senha_encrypted?: string
+          status_conexao?: Database["public"]["Enums"]["camera_status"]
+          ultimo_erro?: string | null
+          ultimo_sync?: string | null
+          updated_at?: string
+          usuario?: string
+        }
+        Relationships: []
+      }
+      cameras_eventos: {
+        Row: {
+          canal_id: string
+          created_at: string
+          id: string
+          ocorrido_em: string
+          payload: Json | null
+          processado: boolean
+          snapshot_id: string | null
+          tipo_evento: Database["public"]["Enums"]["camera_evento_tipo"]
+        }
+        Insert: {
+          canal_id: string
+          created_at?: string
+          id?: string
+          ocorrido_em?: string
+          payload?: Json | null
+          processado?: boolean
+          snapshot_id?: string | null
+          tipo_evento: Database["public"]["Enums"]["camera_evento_tipo"]
+        }
+        Update: {
+          canal_id?: string
+          created_at?: string
+          id?: string
+          ocorrido_em?: string
+          payload?: Json | null
+          processado?: boolean
+          snapshot_id?: string | null
+          tipo_evento?: Database["public"]["Enums"]["camera_evento_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cameras_eventos_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "cameras_canais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_eventos_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "cameras_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cameras_snapshots: {
+        Row: {
+          canal_id: string
+          capturado_em: string
+          created_at: string
+          id: string
+          lote_id: string | null
+          metadata: Json | null
+          storage_path: string
+          tamanho_bytes: number | null
+          tipo: Database["public"]["Enums"]["camera_snapshot_tipo"]
+        }
+        Insert: {
+          canal_id: string
+          capturado_em?: string
+          created_at?: string
+          id?: string
+          lote_id?: string | null
+          metadata?: Json | null
+          storage_path: string
+          tamanho_bytes?: number | null
+          tipo?: Database["public"]["Enums"]["camera_snapshot_tipo"]
+        }
+        Update: {
+          canal_id?: string
+          capturado_em?: string
+          created_at?: string
+          id?: string
+          lote_id?: string | null
+          metadata?: Json | null
+          storage_path?: string
+          tamanho_bytes?: number | null
+          tipo?: Database["public"]["Enums"]["camera_snapshot_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cameras_snapshots_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "cameras_canais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_snapshots_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canais_dispositivo: {
         Row: {
           ativo: boolean
@@ -7578,6 +7807,10 @@ export type Database = {
         | "fornecedor"
         | "vendedor_fornecedor"
         | "superadmin"
+      camera_evento_tipo: "motion" | "alarm" | "video_loss" | "tampering"
+      camera_funcao: "monitoramento" | "seguranca" | "ambiente" | "contagem"
+      camera_snapshot_tipo: "agendado" | "manual" | "evento_motion"
+      camera_status: "online" | "offline" | "erro" | "nao_testado"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo:
         | "medio"
@@ -7841,6 +8074,10 @@ export const Constants = {
         "vendedor_fornecedor",
         "superadmin",
       ],
+      camera_evento_tipo: ["motion", "alarm", "video_loss", "tampering"],
+      camera_funcao: ["monitoramento", "seguranca", "ambiente", "contagem"],
+      camera_snapshot_tipo: ["agendado", "manual", "evento_motion"],
+      camera_status: ["online", "offline", "erro", "nao_testado"],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo", "quebrado"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
