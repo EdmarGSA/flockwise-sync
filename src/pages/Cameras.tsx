@@ -4,18 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIntegradoId } from "@/hooks/useIntegradoId";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import {
   ArrowLeft, Camera, Plus, RefreshCw, Loader2, Trash2,
-  Wifi, WifiOff, AlertTriangle, ShieldAlert, Image as ImageIcon, Eye,
+  Wifi, WifiOff, AlertTriangle, Image as ImageIcon, Eye,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -57,16 +51,6 @@ const Cameras = () => {
   const [capturingAll, setCapturingAll] = useState(false);
   const [capturing, setCapturing] = useState<Record<string, boolean>>({});
 
-  // Form state
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({
-    nome: "", host: "", porta_https: 443, porta_rtsp: 554,
-    usuario: "", senha: "", num_canais: 16,
-  });
-  const [testando, setTestando] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
-  const [salvando, setSalvando] = useState(false);
-
   const loadDvrs = useCallback(async () => {
     if (!integradoId) return;
     setLoading(true);
@@ -97,7 +81,6 @@ const Cameras = () => {
     }
     let lista = (data || []) as any as CanalRow[];
 
-    // Auto-cria canais ausentes (1..num_canais)
     const dvr = dvrs.find((d) => d.id === dvrId);
     if (dvr && lista.length < dvr.num_canais) {
       const existentes = new Set(lista.map((c) => c.canal_numero));
@@ -126,7 +109,6 @@ const Cameras = () => {
     }
     setCanais(lista);
 
-    // Carrega últimos snapshots
     const { data: snaps } = await supabase
       .from("cameras_snapshots" as any)
       .select("canal_id, storage_path, capturado_em")
@@ -153,65 +135,6 @@ const Cameras = () => {
   const openDvrDetail = (dvr: DvrRow) => {
     setSelectedDvr(dvr);
     loadCanais(dvr.id);
-  };
-
-  const handleTestar = async () => {
-    setTestando(true);
-    setTestResult(null);
-    const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
-      body: {
-        host: form.host, porta_https: form.porta_https,
-        usuario: form.usuario, senha: form.senha,
-      },
-    });
-    setTestando(false);
-    if (error) {
-      setTestResult({ ok: false, mensagem: error.message });
-      return;
-    }
-    setTestResult({
-      ok: data?.ok,
-      mensagem: data?.ok ? data?.mensagem : (data?.error || "Falha na conexão"),
-    });
-  };
-
-  const handleSalvar = async () => {
-    if (!form.nome || !form.host || !form.usuario || !form.senha) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-    if (!integradoId) return;
-    setSalvando(true);
-    try {
-      // Cifra a senha via edge function
-      const { data: encData, error: encErr } = await supabase.functions.invoke(
-        "intelbras-bridge/encrypt-password",
-        { body: { senha: form.senha } },
-      );
-      if (encErr || !encData?.encrypted) throw new Error(encErr?.message || "Falha ao cifrar senha");
-
-      const { error } = await supabase.from("cameras_dvr" as any).insert({
-        integrado_id: integradoId,
-        nome: form.nome,
-        host: form.host,
-        porta_https: form.porta_https,
-        porta_rtsp: form.porta_rtsp,
-        usuario: form.usuario,
-        senha_encrypted: encData.encrypted,
-        num_canais: form.num_canais,
-        marca: "intelbras",
-      });
-      if (error) throw error;
-      toast.success("DVR cadastrado!");
-      setDialogOpen(false);
-      setForm({ nome: "", host: "", porta_https: 443, porta_rtsp: 554, usuario: "", senha: "", num_canais: 16 });
-      setTestResult(null);
-      loadDvrs();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setSalvando(false);
-    }
   };
 
   const handleDelete = async (dvr: DvrRow) => {
@@ -293,114 +216,10 @@ const Cameras = () => {
               </p>
             </div>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo DVR
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Cadastrar DVR Intelbras</DialogTitle>
-                <DialogDescription>
-                  Informe o endereço DDNS, porta HTTPS e credenciais do DVR.
-                </DialogDescription>
-              </DialogHeader>
-
-              <Alert className="mb-2">
-                <ShieldAlert className="h-4 w-4" />
-                <AlertTitle>Pré-requisitos</AlertTitle>
-                <AlertDescription className="text-xs space-y-1 mt-2">
-                  <div>1. Configure DDNS Intelbras (ex: <code>xxxx.ddns-intelbras.com.br</code>)</div>
-                  <div>2. Libere a porta HTTPS (443) no roteador apontando para o DVR</div>
-                  <div>3. Crie um usuário <strong>read-only</strong> exclusivo no DVR</div>
-                  <div>4. Habilite acesso CGI/HTTP no DVR (padrão linha MHDX)</div>
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-3">
-                <div>
-                  <Label>Nome *</Label>
-                  <Input
-                    placeholder="Ex: DVR Granja Norte"
-                    value={form.nome}
-                    onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Host (DDNS ou IP público) *</Label>
-                  <Input
-                    placeholder="granja.ddns-intelbras.com.br"
-                    value={form.host}
-                    onChange={(e) => setForm({ ...form, host: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Porta HTTPS</Label>
-                    <Input
-                      type="number"
-                      value={form.porta_https}
-                      onChange={(e) => setForm({ ...form, porta_https: +e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Porta RTSP</Label>
-                    <Input
-                      type="number"
-                      value={form.porta_rtsp}
-                      onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Usuário *</Label>
-                  <Input
-                    value={form.usuario}
-                    onChange={(e) => setForm({ ...form, usuario: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Senha *</Label>
-                  <Input
-                    type="password"
-                    value={form.senha}
-                    onChange={(e) => setForm({ ...form, senha: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Número de canais</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={64}
-                    value={form.num_canais}
-                    onChange={(e) => setForm({ ...form, num_canais: +e.target.value })}
-                  />
-                </div>
-
-                {testResult && (
-                  <Alert variant={testResult.ok ? "default" : "destructive"}>
-                    <AlertDescription className="text-sm">
-                      {testResult.mensagem}
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={handleTestar} disabled={testando || !form.host}>
-                  {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
-                  Testar conexão
-                </Button>
-                <Button onClick={handleSalvar} disabled={salvando}>
-                  {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Salvar
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => navigate("/cameras/novo")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo DVR
+          </Button>
         </div>
 
         {/* Conteúdo */}
@@ -493,7 +312,7 @@ const Cameras = () => {
               <p className="text-muted-foreground mb-4">
                 Nenhum DVR cadastrado. Adicione um para começar.
               </p>
-              <Button onClick={() => setDialogOpen(true)}>
+              <Button onClick={() => navigate("/cameras/novo")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar primeiro DVR
               </Button>
