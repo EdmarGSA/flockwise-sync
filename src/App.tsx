@@ -49,6 +49,7 @@ import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import DispositivosIoT from "./pages/DispositivosIoT";
 import Cameras from "./pages/Cameras";
+import CameraNovoDvr from "./pages/CameraNovoDvr";
 import ConfiguracaoMapbox from "./pages/ConfiguracaoMapbox";
 import PortalFornecedor from "./pages/PortalFornecedor";
 import MeusPedidosFornecedor from "./pages/MeusPedidosFornecedor";
@@ -424,6 +425,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="cameras">
           <Cameras />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/cameras/novo" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="cameras">
+          <CameraNovoDvr />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
