@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Camera, Plus, RefreshCw, Loader2, Trash2,
+  ArrowLeft, Camera, Plus, RefreshCw, Loader2, Trash2, Pencil,
   Wifi, WifiOff, AlertTriangle, Image as ImageIcon, Eye,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -252,6 +252,9 @@ const Cameras = () => {
                       ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       : <RefreshCw className="h-4 w-4 mr-2" />}
                     Capturar todos
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => navigate(`/cameras/${selectedDvr.id}`)} title="Editar DVR">
+                    <Pencil className="h-4 w-4" />
                   </Button>
                   <Button variant="destructive" size="icon" onClick={() => handleDelete(selectedDvr)}>
                     <Trash2 className="h-4 w-4" />
