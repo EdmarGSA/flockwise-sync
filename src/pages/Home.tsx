@@ -18,7 +18,8 @@ import {
   Plane,
   Egg,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -132,6 +133,15 @@ const modules: ModuleCard[] = [
     icon: Plane,
     path: '/cockpit',
     color: 'from-slate-600 to-slate-800',
+    systemAvailable: true,
+  },
+  {
+    id: 'cameras',
+    title: 'Câmeras',
+    description: 'DVRs Intelbras e snapshots dos galpões',
+    icon: Camera,
+    path: '/cameras',
+    color: 'from-cyan-500 to-cyan-700',
     systemAvailable: true,
   },
 ];
