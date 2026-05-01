@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   ArrowLeft, Camera, Plus, RefreshCw, Loader2, Trash2, Pencil,
-  Wifi, WifiOff, AlertTriangle, Image as ImageIcon, Eye,
+  Wifi, WifiOff, AlertTriangle, Image as ImageIcon, Eye, Search, X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -50,6 +52,8 @@ const Cameras = () => {
   const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
   const [capturingAll, setCapturingAll] = useState(false);
   const [capturing, setCapturing] = useState<Record<string, boolean>>({});
+  const [filtroBusca, setFiltroBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
 
   const loadDvrs = useCallback(async () => {
     if (!integradoId) return;
@@ -322,34 +326,111 @@ const Cameras = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dvrs.map((dvr) => (
-              <Card key={dvr.id} className="cursor-pointer hover:shadow-md transition" onClick={() => openDvrDetail(dvr)}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{dvr.nome}</CardTitle>
-                    {renderStatusBadge(dvr.status_conexao)}
-                  </div>
-                  <CardDescription className="text-xs truncate">
-                    {dvr.host}:{dvr.porta_https}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm text-muted-foreground">
-                    {dvr.num_canais} canais
-                  </div>
-                  {dvr.ultimo_sync && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Última sync {formatDistanceToNow(new Date(dvr.ultimo_sync), { locale: ptBR, addSuffix: true })}
-                    </div>
-                  )}
-                  <Button variant="link" size="sm" className="mt-2 px-0">
-                    <Eye className="h-3 w-3 mr-1" /> Ver canais
+          <>
+            {/* Filtros */}
+            <Card>
+              <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome, host ou usuário..."
+                    value={filtroBusca}
+                    onChange={(e) => setFiltroBusca(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                    <SelectItem value="offline">Offline</SelectItem>
+                    <SelectItem value="erro">Erro</SelectItem>
+                    <SelectItem value="nao_testado">Não testado</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(filtroBusca || filtroStatus !== "todos") && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => { setFiltroBusca(""); setFiltroStatus("todos"); }}
+                  >
+                    <X className="h-4 w-4 mr-1" /> Limpar
                   </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {(() => {
+              const termo = filtroBusca.trim().toLowerCase();
+              const filtrados = dvrs.filter((d) => {
+                const okStatus = filtroStatus === "todos" || d.status_conexao === filtroStatus;
+                const okBusca = !termo
+                  || d.nome.toLowerCase().includes(termo)
+                  || d.host.toLowerCase().includes(termo)
+                  || d.usuario.toLowerCase().includes(termo);
+                return okStatus && okBusca;
+              });
+
+              if (filtrados.length === 0) {
+                return (
+                  <Card>
+                    <CardContent className="py-12 text-center text-muted-foreground">
+                      Nenhum DVR encontrado com os filtros aplicados.
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              return (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    {filtrados.length} de {dvrs.length} DVR{dvrs.length > 1 ? "s" : ""}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtrados.map((dvr) => (
+                      <Card key={dvr.id} className="hover:shadow-md transition">
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base cursor-pointer" onClick={() => openDvrDetail(dvr)}>
+                              {dvr.nome}
+                            </CardTitle>
+                            {renderStatusBadge(dvr.status_conexao)}
+                          </div>
+                          <CardDescription className="text-xs truncate">
+                            {dvr.host}:{dvr.porta_https} • {dvr.usuario}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-sm text-muted-foreground">
+                            {dvr.num_canais} canais
+                          </div>
+                          {dvr.ultimo_sync && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Última sync {formatDistanceToNow(new Date(dvr.ultimo_sync), { locale: ptBR, addSuffix: true })}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mt-3 gap-2">
+                            <Button variant="link" size="sm" className="px-0" onClick={() => openDvrDetail(dvr)}>
+                              <Eye className="h-3 w-3 mr-1" /> Ver canais
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/cameras/${dvr.id}`); }}
+                            >
+                              <Pencil className="h-3 w-3 mr-1" /> Editar
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </>
         )}
       </div>
     </div>
