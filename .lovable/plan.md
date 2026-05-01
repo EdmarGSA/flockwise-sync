@@ -1,44 +1,30 @@
-## Objetivo
+# Adicionar card "Câmeras" na Home
 
-Substituir o diálogo modal de cadastro de DVR por uma página dedicada acessível em `/cameras/novo`, mantendo todos os campos atuais e o botão **Testar conexão** antes de salvar.
+## Problema
+O módulo `cameras` está cadastrado no backend e as rotas `/cameras`, `/cameras/novo` e `/cameras/:id` funcionam, mas o card não aparece na Home porque não foi incluído no array `modules` em `src/pages/Home.tsx`.
 
-## Alterações
+## Mudança
 
-### 1. Nova página `src/pages/CameraNovoDvr.tsx`
-- Header com botão **Voltar** que navega para `/cameras` (usando `navigate("/cameras")`).
-- Título "Novo DVR Intelbras" + descrição.
-- Card com o `Alert` de pré-requisitos (DDNS, porta 443, usuário read-only, CGI).
-- Formulário com os mesmos campos do modal atual:
-  - Nome, Host (DDNS), Porta HTTPS (default 443), Porta RTSP (default 554), Usuário, Senha, Nº de canais.
-- Ações no rodapé do card:
-  - **Cancelar** (volta para `/cameras`).
-  - **Testar conexão** (chama `intelbras-bridge/test-connection`, exibe `Alert` com resultado).
-  - **Salvar** (cifra senha via `intelbras-bridge/encrypt-password`, insere em `cameras_dvr`, toast de sucesso, redireciona para `/cameras`).
-- Usa `useIntegradoId` para o `integrado_id` ao inserir.
-- Estilo consistente com o restante (mesmo layout `min-h-screen bg-background p-4 sm:p-6 max-w-2xl mx-auto`).
+**Arquivo:** `src/pages/Home.tsx`
 
-### 2. Rota em `src/App.tsx`
-- Importar `CameraNovoDvr`.
-- Adicionar rota protegida logo abaixo de `/cameras`:
-  ```tsx
-  <Route path="/cameras/novo" element={
-    <ProtectedRoute>
-      <ModuleProtectedRoute moduleCode="cameras">
-        <CameraNovoDvr />
-      </ModuleProtectedRoute>
-    </ProtectedRoute>
-  } />
-  ```
+1. Importar o ícone `Camera` de `lucide-react` (junto com os outros já importados).
 
-### 3. Atualizar `src/pages/Cameras.tsx`
-- Remover o `Dialog` inteiro de cadastro e os estados associados (`dialogOpen`, `form`, `testando`, `testResult`, `salvando`, `handleTestar`, `handleSalvar`).
-- Substituir o `<DialogTrigger>` do header por `<Button onClick={() => navigate("/cameras/novo")}>` mantendo "Novo DVR".
-- Substituir o `<Button onClick={() => setDialogOpen(true)}>` do empty state por `navigate("/cameras/novo")`.
-- Manter `loadDvrs`, detalhe do DVR, captura de snapshots, exclusão — sem alteração.
+2. Adicionar uma nova entrada ao array `modules`, logo após o item "Cockpit Thoth":
 
-## Comportamento final
+```ts
+{
+  id: 'cameras',
+  title: 'Câmeras',
+  description: 'DVRs Intelbras e snapshots dos galpões',
+  icon: Camera,
+  path: '/cameras',
+  color: 'from-cyan-500 to-cyan-700',
+  systemAvailable: true,
+}
+```
 
-- Em `/cameras`, clicar em **+ Novo DVR** navega para `/cameras/novo`.
-- Em `/cameras/novo`, o usuário preenche o formulário, pode **Testar conexão** (resultado inline) e **Salvar**.
-- Após salvar com sucesso, retorna automaticamente para `/cameras` com a lista atualizada.
-- Botão **Voltar** no topo e **Cancelar** no rodapé permitem retornar sem salvar.
+O `id: 'cameras'` faz o cruzamento automático com o módulo já cadastrado no backend (`modulos.codigo = 'cameras'`), então o controle de permissão por papel (admin/integrado/criador/veterinario) já funciona via `useModuleAccess`.
+
+## Resultado esperado
+- Card "Câmeras" aparece na grade de módulos da Home para usuários com permissão.
+- Clique navega para `/cameras` (lista de DVRs), com botão "+ Novo DVR" → `/cameras/novo`, e botão "Editar" no detalhe do DVR → `/cameras/:id`.
