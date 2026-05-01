@@ -52,6 +52,8 @@ const Cameras = () => {
   const [snapshotUrls, setSnapshotUrls] = useState<Record<string, string>>({});
   const [capturingAll, setCapturingAll] = useState(false);
   const [capturing, setCapturing] = useState<Record<string, boolean>>({});
+  const [filtroBusca, setFiltroBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
 
   const loadDvrs = useCallback(async () => {
     if (!integradoId) return;
