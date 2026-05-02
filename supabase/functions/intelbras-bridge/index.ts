@@ -403,12 +403,14 @@ Deno.serve(async (req) => {
       }
 
       const senha = decryptPassword(dvr.senha_encrypted);
+      const { protocol: dvrProto, port: dvrPort } = resolveDvrConn(dvr);
       const buf = await fetchSnapshot(
         dvr.host,
-        dvr.porta_https,
+        dvrPort,
         dvr.usuario,
         senha,
         canal.canal_numero,
+        dvrProto,
       );
 
       const now = new Date();
