@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner";
 import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
+import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
 
 type Protocolo = "http" | "https";
 
@@ -31,6 +32,7 @@ const CameraNovoDvr = () => {
     num_canais: 16,
   });
   const [hostError, setHostError] = useState<string | null>(null);
+  const [portaError, setPortaError] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -52,10 +54,24 @@ const CameraNovoDvr = () => {
     return false;
   };
 
+  const validarProtocoloPorta = (
+    protocolo: Protocolo = form.protocolo,
+    porta_http: number = form.porta_http,
+    porta_https: number = form.porta_https,
+  ) => {
+    const v = validateProtocoloPorta({ protocolo, porta_http, porta_https });
+    setPortaError(v.ok ? null : v.motivo ?? "Porta incompatível com o protocolo");
+    return v.ok;
+  };
+
   const handleTestar = async () => {
     setTestResult(null);
     if (!validarHost(form.host)) {
       toast.error("Corrija o host antes de testar");
+      return;
+    }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
     setTestando(true);
@@ -87,6 +103,10 @@ const CameraNovoDvr = () => {
     }
     if (!validarHost(form.host)) {
       toast.error("Host inválido — veja a mensagem abaixo do campo");
+      return;
+    }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
     if (!integradoId) {
