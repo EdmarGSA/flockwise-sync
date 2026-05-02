@@ -113,20 +113,24 @@ const CameraEditarDvr = () => {
     })();
   }, [id, navigate]);
 
-  const handleTestar = async () => {
+  /**
+   * Executa o teste de conexão. Retorna true se a conexão foi validada.
+   * Em modo silencioso, suprime toasts de validação prévia (auto-reteste no salvar).
+   */
+  const executarTeste = async (silencioso = false): Promise<boolean> => {
     setTestResult(null);
     setTestedSignature(null);
     if (!validarHost(form.host)) {
-      toast.error("Corrija o host antes de testar");
-      return;
+      if (!silencioso) toast.error("Corrija o host antes de testar");
+      return false;
     }
     if (!validarProtocoloPorta()) {
-      toast.error("Porta incompatível com o protocolo selecionado");
-      return;
+      if (!silencioso) toast.error("Porta incompatível com o protocolo selecionado");
+      return false;
     }
     if (trocarSenha && !form.senha) {
-      toast.error("Informe a nova senha ou desmarque a opção");
-      return;
+      if (!silencioso) toast.error("Informe a nova senha ou desmarque a opção");
+      return false;
     }
     const signature = currentSignature;
     setTestando(true);
@@ -143,7 +147,7 @@ const CameraEditarDvr = () => {
     setTestando(false);
     if (error) {
       setTestResult({ ok: false, mensagem: error.message });
-      return;
+      return false;
     }
     const ok = !!data?.ok;
     setTestResult({
@@ -152,9 +156,12 @@ const CameraEditarDvr = () => {
     });
     if (ok) {
       setTestedSignature(signature);
-      toast.success("Conexão validada — você já pode salvar");
+      if (!silencioso) toast.success("Conexão validada — você já pode salvar");
     }
+    return ok;
   };
+
+  const handleTestar = () => executarTeste(false);
 
   const handleSalvar = async () => {
     if (!form.nome || !form.host || !form.usuario) {
@@ -173,13 +180,17 @@ const CameraEditarDvr = () => {
       toast.error("Informe a nova senha ou desmarque a opção");
       return;
     }
+    // Auto-reteste se o teste estiver obsoleto ou nunca tiver sido feito
     if (!testeValido) {
-      toast.error(
-        testeObsoleto
-          ? "A configuração foi alterada — teste a conexão novamente"
-          : "Teste a conexão antes de salvar",
-      );
-      return;
+      const aviso = testeObsoleto
+        ? "Configuração alterada — revalidando conexão antes de salvar..."
+        : "Validando conexão antes de salvar...";
+      toast.info(aviso);
+      const ok = await executarTeste(true);
+      if (!ok) {
+        toast.error("Não foi possível validar a conexão — corrija e tente novamente");
+        return;
+      }
     }
     setSalvando(true);
     try {
