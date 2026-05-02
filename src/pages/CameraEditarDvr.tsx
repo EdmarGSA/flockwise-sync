@@ -36,6 +36,7 @@ const CameraEditarDvr = () => {
   const [trocarSenha, setTrocarSenha] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
+  const [testedSignature, setTestedSignature] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
   const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
@@ -46,6 +47,18 @@ const CameraEditarDvr = () => {
   } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
+
+  // Assinatura da configuração testada — invalida o teste ao alterar qualquer campo
+  const currentSignature = JSON.stringify({
+    host: form.host.trim(),
+    protocolo: form.protocolo,
+    porta: portaAtiva,
+    usuario: form.usuario,
+    // se trocarSenha está ativa, considera a nova senha; senão usa o id do registro
+    senhaRef: trocarSenha ? `nova:${form.senha}` : `dvr:${id ?? ""}`,
+  });
+  const testeValido = testResult?.ok === true && testedSignature === currentSignature;
+  const testeObsoleto = testResult?.ok === true && testedSignature !== currentSignature;
 
   const validarHost = (host: string) => {
     if (!host) {
@@ -102,6 +115,7 @@ const CameraEditarDvr = () => {
 
   const handleTestar = async () => {
     setTestResult(null);
+    setTestedSignature(null);
     if (!validarHost(form.host)) {
       toast.error("Corrija o host antes de testar");
       return;
@@ -110,6 +124,11 @@ const CameraEditarDvr = () => {
       toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
+    if (trocarSenha && !form.senha) {
+      toast.error("Informe a nova senha ou desmarque a opção");
+      return;
+    }
+    const signature = currentSignature;
     setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
@@ -126,10 +145,15 @@ const CameraEditarDvr = () => {
       setTestResult({ ok: false, mensagem: error.message });
       return;
     }
+    const ok = !!data?.ok;
     setTestResult({
-      ok: !!data?.ok,
-      mensagem: data?.ok ? data?.mensagem : (data?.error || "Falha na conexão"),
+      ok,
+      mensagem: ok ? data?.mensagem : (data?.error || "Falha na conexão"),
     });
+    if (ok) {
+      setTestedSignature(signature);
+      toast.success("Conexão validada — você já pode salvar");
+    }
   };
 
   const handleSalvar = async () => {
@@ -147,6 +171,14 @@ const CameraEditarDvr = () => {
     }
     if (trocarSenha && !form.senha) {
       toast.error("Informe a nova senha ou desmarque a opção");
+      return;
+    }
+    if (!testeValido) {
+      toast.error(
+        testeObsoleto
+          ? "A configuração foi alterada — teste a conexão novamente"
+          : "Teste a conexão antes de salvar",
+      );
       return;
     }
     setSalvando(true);
