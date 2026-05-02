@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner";
 import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
+import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
 
 type Protocolo = "http" | "https";
 
@@ -31,6 +32,7 @@ const CameraNovoDvr = () => {
     num_canais: 16,
   });
   const [hostError, setHostError] = useState<string | null>(null);
+  const [portaError, setPortaError] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -52,10 +54,24 @@ const CameraNovoDvr = () => {
     return false;
   };
 
+  const validarProtocoloPorta = (
+    protocolo: Protocolo = form.protocolo,
+    porta_http: number = form.porta_http,
+    porta_https: number = form.porta_https,
+  ) => {
+    const v = validateProtocoloPorta({ protocolo, porta_http, porta_https });
+    setPortaError(v.ok ? null : v.motivo ?? "Porta incompatível com o protocolo");
+    return v.ok;
+  };
+
   const handleTestar = async () => {
     setTestResult(null);
     if (!validarHost(form.host)) {
       toast.error("Corrija o host antes de testar");
+      return;
+    }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
     setTestando(true);
@@ -87,6 +103,10 @@ const CameraNovoDvr = () => {
     }
     if (!validarHost(form.host)) {
       toast.error("Host inválido — veja a mensagem abaixo do campo");
+      return;
+    }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
     if (!integradoId) {
@@ -232,7 +252,18 @@ const CameraNovoDvr = () => {
                 <Label>Protocolo</Label>
                 <Select
                   value={form.protocolo}
-                  onValueChange={(v) => setForm({ ...form, protocolo: v as Protocolo })}
+                  onValueChange={(v) => {
+                    const protocolo = v as Protocolo;
+                    // Auto-corrige a porta para o padrão ao trocar protocolo
+                    const next = {
+                      ...form,
+                      protocolo,
+                      porta_http: protocolo === "http" ? 80 : form.porta_http,
+                      porta_https: protocolo === "https" ? 443 : form.porta_https,
+                    };
+                    setForm(next);
+                    validarProtocoloPorta(protocolo, next.porta_http, next.porta_https);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -248,17 +279,25 @@ const CameraNovoDvr = () => {
                 <Input
                   type="number"
                   value={form.protocolo === "http" ? form.porta_http : form.porta_https}
-                  onChange={(e) =>
-                    setForm({
+                  onChange={(e) => {
+                    const valor = +e.target.value;
+                    const next = {
                       ...form,
                       ...(form.protocolo === "http"
-                        ? { porta_http: +e.target.value }
-                        : { porta_https: +e.target.value }),
-                    })
-                  }
+                        ? { porta_http: valor }
+                        : { porta_https: valor }),
+                    };
+                    setForm(next);
+                    validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
+                  }}
+                  aria-invalid={!!portaError}
+                  className={portaError ? "border-destructive" : ""}
                 />
               </div>
             </div>
+            {portaError && (
+              <p className="text-xs text-destructive -mt-2">{portaError}</p>
+            )}
 
             <div>
               <Label>Porta RTSP</Label>
@@ -324,13 +363,13 @@ const CameraNovoDvr = () => {
             <Button
               variant="outline"
               onClick={handleTestar}
-              disabled={testando || !form.host || !form.usuario || !form.senha || !!hostError}
+              disabled={testando || !form.host || !form.usuario || !form.senha || !!hostError || !!portaError}
               className="w-full sm:w-auto"
             >
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando || !!hostError} className="w-full sm:w-auto">
+            <Button onClick={handleSalvar} disabled={salvando || !!hostError || !!portaError} className="w-full sm:w-auto">
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar DVR
             </Button>
