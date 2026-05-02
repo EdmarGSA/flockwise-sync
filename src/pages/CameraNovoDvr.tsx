@@ -44,8 +44,12 @@ const CameraNovoDvr = () => {
       return true;
     }
     const v = validateDvrHost(host);
-    setHostError(v.ok ? null : v.motivo);
-    return v.ok;
+    if (v.ok) {
+      setHostError(null);
+      return true;
+    }
+    setHostError(v.motivo);
+    return false;
   };
 
   const handleTestar = async () => {
