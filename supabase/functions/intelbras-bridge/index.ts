@@ -492,10 +492,11 @@ Deno.serve(async (req) => {
         .eq("ativo", true);
 
       const senha = decryptPassword(dvr.senha_encrypted);
+      const { protocol: dvrProto, port: dvrPort } = resolveDvrConn(dvr);
       const results = await Promise.allSettled(
         (canais || []).map(async (c: any) => {
           const buf = await fetchSnapshot(
-            dvr.host, dvr.porta_https, dvr.usuario, senha, c.canal_numero,
+            dvr.host, dvrPort, dvr.usuario, senha, c.canal_numero, dvrProto,
           );
           const now = new Date();
           const dateStr = now.toISOString().slice(0, 10);
