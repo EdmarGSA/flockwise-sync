@@ -420,9 +420,13 @@ const CameraNovoDvr = () => {
             </div>
 
             {testResult && (
-              <Alert variant={testResult.ok ? "default" : "destructive"}>
+              <Alert variant={testResult.ok && !testeObsoleto ? "default" : "destructive"}>
                 <AlertDescription className="text-sm space-y-2">
-                  <div>{testResult.mensagem}</div>
+                  <div>
+                    {testeObsoleto
+                      ? "A configuração foi alterada após o teste — execute o teste novamente antes de salvar."
+                      : testResult.mensagem}
+                  </div>
                   {!testResult.ok && (
                     <div className="text-xs opacity-80 space-y-1 mt-2">
                       <div className="font-semibold">Possíveis causas:</div>
@@ -440,6 +444,14 @@ const CameraNovoDvr = () => {
                 </AlertDescription>
               </Alert>
             )}
+            {!testResult && (
+              <Alert>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Para salvar, você precisa testar a conexão e obter sucesso. Preencha host,
+                  protocolo, porta, usuário e senha e clique em <strong>Testar conexão</strong>.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
             <Button variant="ghost" onClick={() => navigate("/cameras")} className="w-full sm:w-auto">
@@ -454,7 +466,12 @@ const CameraNovoDvr = () => {
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando || !!hostError || !!portaError} className="w-full sm:w-auto">
+            <Button
+              onClick={handleSalvar}
+              disabled={salvando || !!hostError || !!portaError || !testeValido}
+              className="w-full sm:w-auto"
+              title={!testeValido ? "Teste a conexão com sucesso antes de salvar" : undefined}
+            >
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar DVR
             </Button>
