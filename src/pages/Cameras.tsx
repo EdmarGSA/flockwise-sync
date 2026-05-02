@@ -368,6 +368,10 @@ const Cameras = () => {
                     <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
                     <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
+                    <SelectItem value="host_asc">Host/IP (A-Z)</SelectItem>
+                    <SelectItem value="host_desc">Host/IP (Z-A)</SelectItem>
+                    <SelectItem value="usuario_asc">Usuário (A-Z)</SelectItem>
+                    <SelectItem value="usuario_desc">Usuário (Z-A)</SelectItem>
                     <SelectItem value="sync_desc">Última sync (mais recente)</SelectItem>
                     <SelectItem value="sync_asc">Última sync (mais antiga)</SelectItem>
                   </SelectContent>
@@ -403,6 +407,10 @@ const Cameras = () => {
                     const diff = (statusOrder[a.status_conexao] ?? 99) - (statusOrder[b.status_conexao] ?? 99);
                     return diff !== 0 ? diff : a.nome.localeCompare(b.nome, "pt-BR");
                   }
+                  case "host_asc": return a.host.localeCompare(b.host, "pt-BR", { numeric: true, sensitivity: "base" });
+                  case "host_desc": return b.host.localeCompare(a.host, "pt-BR", { numeric: true, sensitivity: "base" });
+                  case "usuario_asc": return a.usuario.localeCompare(b.usuario, "pt-BR", { sensitivity: "base" });
+                  case "usuario_desc": return b.usuario.localeCompare(a.usuario, "pt-BR", { sensitivity: "base" });
                   case "sync_desc": {
                     const ta = a.ultimo_sync ? new Date(a.ultimo_sync).getTime() : 0;
                     const tb = b.ultimo_sync ? new Date(b.ultimo_sync).getTime() : 0;
