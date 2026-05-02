@@ -296,11 +296,32 @@ Deno.serve(async (req) => {
     const integradoId = profile?.integrado_id || user.id;
 
     // ============================================================
-    // POST /test-connection { host, porta_https, usuario, senha }
+    // POST /test-connection
+    //   Modo 1 (cadastro novo): { host, protocolo, porta_https, porta_http, usuario, senha }
+    //   Modo 2 (edição):       { dvr_id, [host, protocolo, porta_https, porta_http, usuario] }
+    //                          → reusa senha já cifrada e mescla campos do registro
     // ============================================================
     if (req.method === "POST" && path === "/test-connection") {
       const body = await req.json();
-      const { host, porta_https = 443, usuario, senha } = body;
+      let { host, protocolo, porta_https, porta_http, usuario, senha } = body;
+      const dvrId = body?.dvr_id;
+
+      if (dvrId) {
+        const { data: dvr, error: dErr } = await supabase
+          .from("cameras_dvr").select("*").eq("id", dvrId).single();
+        if (dErr || !dvr || dvr.integrado_id !== integradoId) {
+          return new Response(JSON.stringify({ error: "DVR não encontrado" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        host = host ?? dvr.host;
+        protocolo = protocolo ?? dvr.protocolo;
+        porta_https = porta_https ?? dvr.porta_https;
+        porta_http = porta_http ?? dvr.porta_http;
+        usuario = usuario ?? dvr.usuario;
+        senha = senha ?? decryptPassword(dvr.senha_encrypted);
+      }
+
       if (!host || !usuario || !senha) {
         return new Response(JSON.stringify({ error: "host, usuario e senha são obrigatórios" }), {
           status: 400,
@@ -308,13 +329,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      const proto: "http" | "https" = protocolo === "http" ? "http" : "https";
+      const port = proto === "http" ? Number(porta_http ?? 80) : Number(porta_https ?? 443);
+
       try {
-        // Tenta capturar snapshot do canal 1
-        const buf = await fetchSnapshot(host, porta_https, usuario, senha, 1);
+        const buf = await fetchSnapshot(host, port, usuario, senha, 1, proto);
         return new Response(
           JSON.stringify({
             ok: true,
-            mensagem: "Conexão bem-sucedida",
+            mensagem: `Conexão bem-sucedida via ${proto.toUpperCase()}:${port}`,
             tamanho_bytes: buf.length,
             preview_base64: btoa(String.fromCharCode(...buf.slice(0, 50000))),
           }),
@@ -324,7 +347,7 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ ok: false, error: (e as Error).message }),
           {
-            status: 200, // 200 com ok=false para o front tratar
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
