@@ -541,12 +541,16 @@ const CameraEditarDvr = () => {
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={salvando || !!hostError || !!portaError || !testeValido}
+              disabled={salvando || testando || !!hostError || !!portaError}
               className="w-full sm:w-auto"
-              title={!testeValido ? "Teste a conexão com sucesso antes de salvar" : undefined}
+              title={
+                !testeValido
+                  ? "Conexão será testada automaticamente antes de salvar"
+                  : undefined
+              }
             >
-              {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Salvar alterações
+              {(salvando || testando) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {testando ? "Validando..." : salvando ? "Salvando..." : "Salvar alterações"}
             </Button>
           </CardFooter>
         </Card>
