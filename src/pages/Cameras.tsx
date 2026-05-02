@@ -368,6 +368,10 @@ const Cameras = () => {
                     <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
                     <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
+                    <SelectItem value="host_asc">Host/IP (A-Z)</SelectItem>
+                    <SelectItem value="host_desc">Host/IP (Z-A)</SelectItem>
+                    <SelectItem value="usuario_asc">Usuário (A-Z)</SelectItem>
+                    <SelectItem value="usuario_desc">Usuário (Z-A)</SelectItem>
                     <SelectItem value="sync_desc">Última sync (mais recente)</SelectItem>
                     <SelectItem value="sync_asc">Última sync (mais antiga)</SelectItem>
                   </SelectContent>
