@@ -38,6 +38,12 @@ const CameraEditarDvr = () => {
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
+  const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
+    protocoloAnterior: Protocolo;
+    portaAnterior: number;
+    protocoloNovo: Protocolo;
+    portaNova: number;
+  } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
 
