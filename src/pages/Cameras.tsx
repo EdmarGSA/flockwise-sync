@@ -67,6 +67,40 @@ const Cameras = () => {
     }
   }, [ordenacao]);
 
+  const isRetryableError = (err: any) => {
+    if (!err) return false;
+    const msg = (err.message || "").toLowerCase();
+    // Network/timeout patterns: fetch failed, network, timeout, 5xx, abort
+    return (
+      msg.includes("fetch") ||
+      msg.includes("network") ||
+      msg.includes("timeout") ||
+      msg.includes("timed out") ||
+      msg.includes("aborted") ||
+      msg.includes("failed to fetch") ||
+      msg.includes("load failed") ||
+      err.code === "PGRST301" ||
+      err.code === "57014" ||
+      (typeof err.status === "number" && err.status >= 500)
+    );
+  };
+
+  const fetchDvrsWithTimeout = async (id: string, timeoutMs = 10000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await supabase
+        .from("cameras_dvr" as any)
+        .select("*")
+        .eq("integrado_id", id)
+        .order("created_at", { ascending: false })
+        .abortSignal(controller.signal);
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   const loadDvrs = useCallback(async () => {
     if (loadingIntegradoId) return;
     if (!integradoId) {
@@ -75,16 +109,36 @@ const Cameras = () => {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("cameras_dvr" as any)
-      .select("*")
-      .eq("integrado_id", integradoId)
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast.error("Erro ao carregar DVRs: " + error.message);
-    } else {
-      setDvrs((data || []) as any);
+
+    const maxAttempts = 4;
+    const baseDelay = 600; // ms
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const { data, error } = await fetchDvrsWithTimeout(integradoId);
+        if (error) {
+          lastError = error;
+          if (!isRetryableError(error) || attempt === maxAttempts) break;
+        } else {
+          setDvrs((data || []) as any);
+          setLoading(false);
+          return;
+        }
+      } catch (err: any) {
+        lastError = err;
+        if (!isRetryableError(err) || attempt === maxAttempts) break;
+      }
+
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 250);
+      toast.message(`Tentando reconectar... (${attempt}/${maxAttempts - 1})`, {
+        description: "Falha de rede ao carregar DVRs.",
+      });
+      await new Promise((r) => setTimeout(r, delay));
     }
+
+    toast.error("Erro ao carregar DVRs: " + (lastError?.message || "falha desconhecida"));
     setLoading(false);
   }, [integradoId, loadingIntegradoId]);
 
