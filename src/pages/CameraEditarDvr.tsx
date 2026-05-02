@@ -6,8 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Camera, Loader2, Wifi } from "lucide-react";
+import { validateDvrHost } from "@/lib/utils/validateHost";
+
+type Protocolo = "http" | "https";
 
 const CameraEditarDvr = () => {
   const navigate = useNavigate();
@@ -17,16 +21,35 @@ const CameraEditarDvr = () => {
   const [form, setForm] = useState({
     nome: "",
     host: "",
+    protocolo: "https" as Protocolo,
     porta_https: 443,
+    porta_http: 80,
     porta_rtsp: 554,
     usuario: "",
     senha: "",
     num_canais: 16,
   });
+  const [hostError, setHostError] = useState<string | null>(null);
   const [trocarSenha, setTrocarSenha] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+
+  const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
+
+  const validarHost = (host: string) => {
+    if (!host) {
+      setHostError(null);
+      return true;
+    }
+    const v = validateDvrHost(host);
+    if (v.ok) {
+      setHostError(null);
+      return true;
+    }
+    setHostError(v.motivo ?? "Host inválido");
+    return false;
+  };
 
   useEffect(() => {
     (async () => {
@@ -45,7 +68,9 @@ const CameraEditarDvr = () => {
       setForm({
         nome: d.nome ?? "",
         host: d.host ?? "",
+        protocolo: (d.protocolo ?? "https") as Protocolo,
         porta_https: d.porta_https ?? 443,
+        porta_http: d.porta_http ?? 80,
         porta_rtsp: d.porta_rtsp ?? 554,
         usuario: d.usuario ?? "",
         senha: "",
@@ -56,14 +81,19 @@ const CameraEditarDvr = () => {
   }, [id, navigate]);
 
   const handleTestar = async () => {
-    setTestando(true);
     setTestResult(null);
+    if (!validarHost(form.host)) {
+      toast.error("Corrija o host antes de testar");
+      return;
+    }
+    setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
-        host: form.host,
+        host: form.host.trim(),
+        protocolo: form.protocolo,
         porta_https: form.porta_https,
+        porta_http: form.porta_http,
         usuario: form.usuario,
-        // Se não trocou senha, manda dvr_id para a função usar a senha já cifrada
         ...(trocarSenha && form.senha ? { senha: form.senha } : { dvr_id: id }),
       },
     });
@@ -83,6 +113,10 @@ const CameraEditarDvr = () => {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
+    if (!validarHost(form.host)) {
+      toast.error("Host inválido — veja a mensagem abaixo do campo");
+      return;
+    }
     if (trocarSenha && !form.senha) {
       toast.error("Informe a nova senha ou desmarque a opção");
       return;
@@ -91,8 +125,10 @@ const CameraEditarDvr = () => {
     try {
       const update: Record<string, any> = {
         nome: form.nome,
-        host: form.host,
+        host: form.host.trim(),
+        protocolo: form.protocolo,
         porta_https: form.porta_https,
+        porta_http: form.porta_http,
         porta_rtsp: form.porta_rtsp,
         usuario: form.usuario,
         num_canais: form.num_canais,
@@ -166,27 +202,61 @@ const CameraEditarDvr = () => {
               <Label>Host (DDNS ou IP público) *</Label>
               <Input
                 value={form.host}
-                onChange={(e) => setForm({ ...form, host: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, host: e.target.value });
+                  validarHost(e.target.value);
+                }}
+                onBlur={(e) => validarHost(e.target.value)}
+                aria-invalid={!!hostError}
+                className={hostError ? "border-destructive" : ""}
               />
+              {hostError && (
+                <p className="text-xs text-destructive mt-1">{hostError}</p>
+              )}
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Porta HTTPS</Label>
-                <Input
-                  type="number"
-                  value={form.porta_https}
-                  onChange={(e) => setForm({ ...form, porta_https: +e.target.value })}
-                />
+                <Label>Protocolo</Label>
+                <Select
+                  value={form.protocolo}
+                  onValueChange={(v) => setForm({ ...form, protocolo: v as Protocolo })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="https">HTTPS (porta 443)</SelectItem>
+                    <SelectItem value="http">HTTP (porta 80) — recomendado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label>Porta RTSP</Label>
+                <Label>{form.protocolo === "http" ? "Porta HTTP" : "Porta HTTPS"}</Label>
                 <Input
                   type="number"
-                  value={form.porta_rtsp}
-                  onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
+                  value={form.protocolo === "http" ? form.porta_http : form.porta_https}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      ...(form.protocolo === "http"
+                        ? { porta_http: +e.target.value }
+                        : { porta_https: +e.target.value }),
+                    })
+                  }
                 />
               </div>
             </div>
+
+            <div>
+              <Label>Porta RTSP</Label>
+              <Input
+                type="number"
+                value={form.porta_rtsp}
+                onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
+              />
+            </div>
+
             <div>
               <Label>Usuário *</Label>
               <Input
@@ -237,8 +307,20 @@ const CameraEditarDvr = () => {
 
             {testResult && (
               <Alert variant={testResult.ok ? "default" : "destructive"}>
-                <AlertDescription className="text-sm">
-                  {testResult.mensagem}
+                <AlertDescription className="text-sm space-y-2">
+                  <div>{testResult.mensagem}</div>
+                  {!testResult.ok && (
+                    <div className="text-xs opacity-80 space-y-1 mt-2">
+                      <div className="font-semibold">Possíveis causas:</div>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Host informado é IP privado da LAN (use DDNS)</li>
+                        <li>DDNS do DVR não está habilitado / está "IP Desatualizado"</li>
+                        <li>Porta {portaAtiva} não está redirecionada no roteador</li>
+                        <li>Firewall/operadora bloqueia a porta {portaAtiva}</li>
+                        <li>Usando HTTPS com certificado auto-assinado — tente HTTP na porta 80</li>
+                      </ul>
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
@@ -250,13 +332,13 @@ const CameraEditarDvr = () => {
             <Button
               variant="outline"
               onClick={handleTestar}
-              disabled={testando || !form.host || !form.usuario || (trocarSenha && !form.senha)}
+              disabled={testando || !form.host || !form.usuario || (trocarSenha && !form.senha) || !!hostError}
               className="w-full sm:w-auto"
             >
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando} className="w-full sm:w-auto">
+            <Button onClick={handleSalvar} disabled={salvando || !!hostError} className="w-full sm:w-auto">
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar alterações
             </Button>
