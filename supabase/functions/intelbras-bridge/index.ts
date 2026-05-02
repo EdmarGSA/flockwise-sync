@@ -44,10 +44,19 @@ async function digestFetch(
   const u = new URL(url);
   const path = u.pathname + u.search;
 
-  // Primeira request - espera 401 com challenge
+  // Primeira request - espera 401 com challenge (timeout curto: falha rápido se host inalcançável)
+  const firstTimeout = Math.min(timeoutMs, 8000);
   const ctrl1 = new AbortController();
-  const t1 = setTimeout(() => ctrl1.abort(), timeoutMs);
+  const t1 = setTimeout(() => ctrl1.abort(), firstTimeout);
   const first = await fetch(url, { signal: ctrl1.signal }).catch((e) => {
+    const isAbort = e?.name === "AbortError" || /aborted/i.test(e?.message || "");
+    if (isAbort) {
+      throw new Error(
+        `Não foi possível conectar a ${u.host} em ${firstTimeout / 1000}s. ` +
+        `Verifique se o DDNS do DVR está ativo, se a porta ${u.port || (u.protocol === "https:" ? 443 : 80)} ` +
+        `está redirecionada no roteador para o DVR e se o firewall não está bloqueando.`,
+      );
+    }
     throw new Error(`Conexão falhou: ${e.message}`);
   });
   clearTimeout(t1);
@@ -127,6 +136,26 @@ function decryptPassword(enc: string): string {
 }
 
 // ============================================================
+// Validação de host (defesa em profundidade)
+// ============================================================
+const PRIVATE_IPV4_REGEX = [
+  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^192\.168\.\d{1,3}\.\d{1,3}$/,
+  /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/,
+  /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^169\.254\.\d{1,3}\.\d{1,3}$/,
+  /^0\.0\.0\.0$/,
+];
+function isPrivateHost(host: string): boolean {
+  const h = (host || "").trim().toLowerCase();
+  if (!h || h === "localhost") return true;
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(h)) {
+    return PRIVATE_IPV4_REGEX.some((r) => r.test(h));
+  }
+  return false;
+}
+
+// ============================================================
 // Snapshot CGI
 // ============================================================
 async function fetchSnapshot(
@@ -135,10 +164,15 @@ async function fetchSnapshot(
   user: string,
   pass: string,
   channel: number,
+  protocol: "http" | "https" = "https",
 ): Promise<Uint8Array> {
-  const protocol = port === 80 ? "http" : "https";
-  const url =
-    `${protocol}://${host}:${port}/cgi-bin/snapshot.cgi?channel=${channel}`;
+  if (isPrivateHost(host)) {
+    throw new Error(
+      `Host "${host}" é endereço privado/local — inacessível a partir da nuvem. ` +
+      `Configure o DDNS Intelbras no DVR e use o domínio público (ex: granja.ddns-intelbras.com.br).`,
+    );
+  }
+  const url = `${protocol}://${host}:${port}/cgi-bin/snapshot.cgi?channel=${channel}`;
 
   const res = await digestFetch(url, user, pass);
   if (!res.ok) {
@@ -152,8 +186,15 @@ async function fetchSnapshot(
   return buf;
 }
 
-// ============================================================
-// Handler
+// Resolve protocolo+porta a partir do registro do DVR (com defaults para retro-compat)
+function resolveDvrConn(dvr: any): { protocol: "http" | "https"; port: number } {
+  const protocol: "http" | "https" = dvr?.protocolo === "http" ? "http" : "https";
+  const port = protocol === "http"
+    ? Number(dvr?.porta_http ?? 80)
+    : Number(dvr?.porta_https ?? 443);
+  return { protocol, port };
+}
+
 // ============================================================
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -197,10 +238,11 @@ Deno.serve(async (req) => {
         if (canaisDevidos.length === 0) continue;
 
         const senha = decryptPassword(dvr.senha_encrypted);
+        const { protocol: dvrProto, port: dvrPort } = resolveDvrConn(dvr);
         const results = await Promise.allSettled(
           canaisDevidos.map(async (c: any) => {
             const buf = await fetchSnapshot(
-              dvr.host, dvr.porta_https, dvr.usuario, senha, c.canal_numero,
+              dvr.host, dvrPort, dvr.usuario, senha, c.canal_numero, dvrProto,
             );
             const now = new Date();
             const dateStr = now.toISOString().slice(0, 10);
@@ -254,11 +296,32 @@ Deno.serve(async (req) => {
     const integradoId = profile?.integrado_id || user.id;
 
     // ============================================================
-    // POST /test-connection { host, porta_https, usuario, senha }
+    // POST /test-connection
+    //   Modo 1 (cadastro novo): { host, protocolo, porta_https, porta_http, usuario, senha }
+    //   Modo 2 (edição):       { dvr_id, [host, protocolo, porta_https, porta_http, usuario] }
+    //                          → reusa senha já cifrada e mescla campos do registro
     // ============================================================
     if (req.method === "POST" && path === "/test-connection") {
       const body = await req.json();
-      const { host, porta_https = 443, usuario, senha } = body;
+      let { host, protocolo, porta_https, porta_http, usuario, senha } = body;
+      const dvrId = body?.dvr_id;
+
+      if (dvrId) {
+        const { data: dvr, error: dErr } = await supabase
+          .from("cameras_dvr").select("*").eq("id", dvrId).single();
+        if (dErr || !dvr || dvr.integrado_id !== integradoId) {
+          return new Response(JSON.stringify({ error: "DVR não encontrado" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        host = host ?? dvr.host;
+        protocolo = protocolo ?? dvr.protocolo;
+        porta_https = porta_https ?? dvr.porta_https;
+        porta_http = porta_http ?? dvr.porta_http;
+        usuario = usuario ?? dvr.usuario;
+        senha = senha ?? decryptPassword(dvr.senha_encrypted);
+      }
+
       if (!host || !usuario || !senha) {
         return new Response(JSON.stringify({ error: "host, usuario e senha são obrigatórios" }), {
           status: 400,
@@ -266,13 +329,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      const proto: "http" | "https" = protocolo === "http" ? "http" : "https";
+      const port = proto === "http" ? Number(porta_http ?? 80) : Number(porta_https ?? 443);
+
       try {
-        // Tenta capturar snapshot do canal 1
-        const buf = await fetchSnapshot(host, porta_https, usuario, senha, 1);
+        const buf = await fetchSnapshot(host, port, usuario, senha, 1, proto);
         return new Response(
           JSON.stringify({
             ok: true,
-            mensagem: "Conexão bem-sucedida",
+            mensagem: `Conexão bem-sucedida via ${proto.toUpperCase()}:${port}`,
             tamanho_bytes: buf.length,
             preview_base64: btoa(String.fromCharCode(...buf.slice(0, 50000))),
           }),
@@ -282,7 +347,7 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ ok: false, error: (e as Error).message }),
           {
-            status: 200, // 200 com ok=false para o front tratar
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
@@ -338,12 +403,14 @@ Deno.serve(async (req) => {
       }
 
       const senha = decryptPassword(dvr.senha_encrypted);
+      const { protocol: dvrProto, port: dvrPort } = resolveDvrConn(dvr);
       const buf = await fetchSnapshot(
         dvr.host,
-        dvr.porta_https,
+        dvrPort,
         dvr.usuario,
         senha,
         canal.canal_numero,
+        dvrProto,
       );
 
       const now = new Date();
@@ -425,10 +492,11 @@ Deno.serve(async (req) => {
         .eq("ativo", true);
 
       const senha = decryptPassword(dvr.senha_encrypted);
+      const { protocol: dvrProto, port: dvrPort } = resolveDvrConn(dvr);
       const results = await Promise.allSettled(
         (canais || []).map(async (c: any) => {
           const buf = await fetchSnapshot(
-            dvr.host, dvr.porta_https, dvr.usuario, senha, c.canal_numero,
+            dvr.host, dvrPort, dvr.usuario, senha, c.canal_numero, dvrProto,
           );
           const now = new Date();
           const dateStr = now.toISOString().slice(0, 10);

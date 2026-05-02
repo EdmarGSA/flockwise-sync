@@ -7,33 +7,64 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, Loader2, ShieldAlert, Wifi } from "lucide-react";
+import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
+import { validateDvrHost } from "@/lib/utils/validateHost";
+
+type Protocolo = "http" | "https";
 
 const CameraNovoDvr = () => {
   const navigate = useNavigate();
-  const integradoId = useIntegradoId();
+  const { integradoId } = useIntegradoId();
 
   const [form, setForm] = useState({
     nome: "",
     host: "",
+    protocolo: "https" as Protocolo,
     porta_https: 443,
+    porta_http: 80,
     porta_rtsp: 554,
     usuario: "",
     senha: "",
     num_canais: 16,
   });
+  const [hostError, setHostError] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [ajudaAberta, setAjudaAberta] = useState(false);
+
+  const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
+
+  const validarHost = (host: string) => {
+    if (!host) {
+      setHostError(null);
+      return true;
+    }
+    const v = validateDvrHost(host);
+    if (v.ok) {
+      setHostError(null);
+      return true;
+    }
+    setHostError(v.motivo);
+    return false;
+  };
 
   const handleTestar = async () => {
-    setTestando(true);
     setTestResult(null);
+    if (!validarHost(form.host)) {
+      toast.error("Corrija o host antes de testar");
+      return;
+    }
+    setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
-        host: form.host,
+        host: form.host.trim(),
+        protocolo: form.protocolo,
         porta_https: form.porta_https,
+        porta_http: form.porta_http,
         usuario: form.usuario,
         senha: form.senha,
       },
@@ -54,6 +85,10 @@ const CameraNovoDvr = () => {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
+    if (!validarHost(form.host)) {
+      toast.error("Host inválido — veja a mensagem abaixo do campo");
+      return;
+    }
     if (!integradoId) {
       toast.error("Organização não identificada");
       return;
@@ -71,8 +106,10 @@ const CameraNovoDvr = () => {
       const { error } = await supabase.from("cameras_dvr" as any).insert({
         integrado_id: integradoId,
         nome: form.nome,
-        host: form.host,
+        host: form.host.trim(),
+        protocolo: form.protocolo,
         porta_https: form.porta_https,
+        porta_http: form.porta_http,
         porta_rtsp: form.porta_rtsp,
         usuario: form.usuario,
         senha_encrypted: encData.encrypted,
@@ -107,16 +144,56 @@ const CameraNovoDvr = () => {
           </div>
         </div>
 
-        <Alert>
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Pré-requisitos</AlertTitle>
-          <AlertDescription className="text-xs space-y-1 mt-2">
-            <div>1. Configure DDNS Intelbras (ex: <code>xxxx.ddns-intelbras.com.br</code>)</div>
-            <div>2. Libere a porta HTTPS (443) no roteador apontando para o DVR</div>
-            <div>3. Crie um usuário <strong>read-only</strong> exclusivo no DVR</div>
-            <div>4. Habilite acesso CGI/HTTP no DVR (padrão linha MHDX)</div>
-          </AlertDescription>
-        </Alert>
+        <Collapsible open={ajudaAberta} onOpenChange={setAjudaAberta}>
+          <Alert>
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle className="flex items-center justify-between">
+              <span>Como configurar meu DVR</span>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2">
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${ajudaAberta ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+            </AlertTitle>
+            <CollapsibleContent>
+              <AlertDescription className="text-xs space-y-3 mt-2">
+                <div>
+                  <strong>1. Habilite o DDNS Intelbras no DVR</strong>
+                  <div className="text-muted-foreground">
+                    Menu → Rede → DDNS → marque "Habilitar", escolha "Intelbras DDNS" e
+                    defina um nome de domínio único (ex: <code>granjamarcia</code>). O status
+                    deve mudar de "IP Desatualizado" para "Conectado". O host final fica{" "}
+                    <code>granjamarcia.ddns-intelbras.com.br</code>.
+                  </div>
+                </div>
+                <div>
+                  <strong>2. Redirecione a porta no roteador da granja</strong>
+                  <div className="text-muted-foreground">
+                    No roteador, faça port forwarding da porta externa <code>80</code> (HTTP)
+                    ou <code>443</code> (HTTPS) para o IP local do DVR (ex:{" "}
+                    <code>192.168.1.105</code>). Se possível, prefira HTTP/80 para evitar
+                    problemas com o certificado auto-assinado do DVR.
+                  </div>
+                </div>
+                <div>
+                  <strong>3. Use o DDNS aqui no formulário</strong>
+                  <div className="text-muted-foreground">
+                    No campo "Host" abaixo, informe o domínio DDNS — <em>nunca</em> o IP
+                    da rede local (192.168.x.x), porque a nuvem não enxerga sua LAN.
+                  </div>
+                </div>
+                <div>
+                  <strong>4. Crie um usuário read-only no DVR</strong>
+                  <div className="text-muted-foreground">
+                    Recomendado por segurança, para esta integração não precisar do usuário admin.
+                  </div>
+                </div>
+              </AlertDescription>
+            </CollapsibleContent>
+          </Alert>
+        </Collapsible>
 
         <Card>
           <CardHeader>
@@ -137,27 +214,61 @@ const CameraNovoDvr = () => {
               <Input
                 placeholder="granja.ddns-intelbras.com.br"
                 value={form.host}
-                onChange={(e) => setForm({ ...form, host: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, host: e.target.value });
+                  validarHost(e.target.value);
+                }}
+                onBlur={(e) => validarHost(e.target.value)}
+                aria-invalid={!!hostError}
+                className={hostError ? "border-destructive" : ""}
               />
+              {hostError && (
+                <p className="text-xs text-destructive mt-1">{hostError}</p>
+              )}
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Porta HTTPS</Label>
-                <Input
-                  type="number"
-                  value={form.porta_https}
-                  onChange={(e) => setForm({ ...form, porta_https: +e.target.value })}
-                />
+                <Label>Protocolo</Label>
+                <Select
+                  value={form.protocolo}
+                  onValueChange={(v) => setForm({ ...form, protocolo: v as Protocolo })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="https">HTTPS (porta 443)</SelectItem>
+                    <SelectItem value="http">HTTP (porta 80) — recomendado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label>Porta RTSP</Label>
+                <Label>{form.protocolo === "http" ? "Porta HTTP" : "Porta HTTPS"}</Label>
                 <Input
                   type="number"
-                  value={form.porta_rtsp}
-                  onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
+                  value={form.protocolo === "http" ? form.porta_http : form.porta_https}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      ...(form.protocolo === "http"
+                        ? { porta_http: +e.target.value }
+                        : { porta_https: +e.target.value }),
+                    })
+                  }
                 />
               </div>
             </div>
+
+            <div>
+              <Label>Porta RTSP</Label>
+              <Input
+                type="number"
+                value={form.porta_rtsp}
+                onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
+              />
+            </div>
+
             <div>
               <Label>Usuário *</Label>
               <Input
@@ -186,8 +297,22 @@ const CameraNovoDvr = () => {
 
             {testResult && (
               <Alert variant={testResult.ok ? "default" : "destructive"}>
-                <AlertDescription className="text-sm">
-                  {testResult.mensagem}
+                <AlertDescription className="text-sm space-y-2">
+                  <div>{testResult.mensagem}</div>
+                  {!testResult.ok && (
+                    <div className="text-xs opacity-80 space-y-1 mt-2">
+                      <div className="font-semibold">Possíveis causas:</div>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Host informado é IP privado da LAN (use DDNS)</li>
+                        <li>DDNS do DVR não está habilitado / está "IP Desatualizado"</li>
+                        <li>Porta {portaAtiva} não está redirecionada no roteador</li>
+                        <li>Firewall/operadora bloqueia a porta {portaAtiva}</li>
+                        <li>
+                          Usando HTTPS com certificado auto-assinado — tente HTTP na porta 80
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
@@ -199,13 +324,13 @@ const CameraNovoDvr = () => {
             <Button
               variant="outline"
               onClick={handleTestar}
-              disabled={testando || !form.host || !form.usuario || !form.senha}
+              disabled={testando || !form.host || !form.usuario || !form.senha || !!hostError}
               className="w-full sm:w-auto"
             >
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando} className="w-full sm:w-auto">
+            <Button onClick={handleSalvar} disabled={salvando || !!hostError} className="w-full sm:w-auto">
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar DVR
             </Button>
