@@ -407,6 +407,10 @@ const Cameras = () => {
                     const diff = (statusOrder[a.status_conexao] ?? 99) - (statusOrder[b.status_conexao] ?? 99);
                     return diff !== 0 ? diff : a.nome.localeCompare(b.nome, "pt-BR");
                   }
+                  case "host_asc": return a.host.localeCompare(b.host, "pt-BR", { numeric: true, sensitivity: "base" });
+                  case "host_desc": return b.host.localeCompare(a.host, "pt-BR", { numeric: true, sensitivity: "base" });
+                  case "usuario_asc": return a.usuario.localeCompare(b.usuario, "pt-BR", { sensitivity: "base" });
+                  case "usuario_desc": return b.usuario.localeCompare(a.usuario, "pt-BR", { sensitivity: "base" });
                   case "sync_desc": {
                     const ta = a.ultimo_sync ? new Date(a.ultimo_sync).getTime() : 0;
                     const tb = b.ultimo_sync ? new Date(b.ultimo_sync).getTime() : 0;
