@@ -370,13 +370,13 @@ const CameraEditarDvr = () => {
             <Button
               variant="outline"
               onClick={handleTestar}
-              disabled={testando || !form.host || !form.usuario || (trocarSenha && !form.senha) || !!hostError}
+              disabled={testando || !form.host || !form.usuario || (trocarSenha && !form.senha) || !!hostError || !!portaError}
               className="w-full sm:w-auto"
             >
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando || !!hostError} className="w-full sm:w-auto">
+            <Button onClick={handleSalvar} disabled={salvando || !!hostError || !!portaError} className="w-full sm:w-auto">
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar alterações
             </Button>
