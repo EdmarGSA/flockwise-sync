@@ -60,7 +60,11 @@ const Cameras = () => {
   });
 
   useEffect(() => {
-    try { localStorage.setItem("cameras:ordenacao", ordenacao); } catch {}
+    try {
+      localStorage.setItem("cameras:ordenacao", ordenacao);
+    } catch {
+      // LocalStorage may be unavailable in restricted browser contexts.
+    }
   }, [ordenacao]);
 
   const loadDvrs = useCallback(async () => {
