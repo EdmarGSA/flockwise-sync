@@ -38,6 +38,12 @@ const CameraEditarDvr = () => {
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
+  const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
+    protocoloAnterior: Protocolo;
+    portaAnterior: number;
+    protocoloNovo: Protocolo;
+    portaNova: number;
+  } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
 
@@ -294,15 +300,25 @@ const CameraEditarDvr = () => {
                 <Select
                   value={form.protocolo}
                   onValueChange={(v) => {
-                    const protocolo = v as Protocolo;
+                    const protocoloNovo = v as Protocolo;
+                    if (protocoloNovo === form.protocolo) return;
+                    const portaAnterior =
+                      form.protocolo === "http" ? form.porta_http : form.porta_https;
+                    const portaPadrao = protocoloNovo === "http" ? 80 : 443;
                     const next = {
                       ...form,
-                      protocolo,
-                      porta_http: protocolo === "http" ? 80 : form.porta_http,
-                      porta_https: protocolo === "https" ? 443 : form.porta_https,
+                      protocolo: protocoloNovo,
+                      porta_http: protocoloNovo === "http" ? 80 : form.porta_http,
+                      porta_https: protocoloNovo === "https" ? 443 : form.porta_https,
                     };
                     setForm(next);
-                    validarProtocoloPorta(protocolo, next.porta_http, next.porta_https);
+                    setPortaAutoAjuste({
+                      protocoloAnterior: form.protocolo,
+                      portaAnterior,
+                      protocoloNovo,
+                      portaNova: portaPadrao,
+                    });
+                    validarProtocoloPorta(protocoloNovo, next.porta_http, next.porta_https);
                   }}
                 >
                   <SelectTrigger>
@@ -328,6 +344,7 @@ const CameraEditarDvr = () => {
                         : { porta_https: valor }),
                     };
                     setForm(next);
+                    setPortaAutoAjuste(null);
                     validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
                   }}
                   aria-invalid={!!portaError}
@@ -335,6 +352,44 @@ const CameraEditarDvr = () => {
                 />
               </div>
             </div>
+            {portaAutoAjuste && (
+              <Alert>
+                <AlertDescription className="text-xs flex items-center justify-between gap-3">
+                  <span>
+                    Porta ajustada automaticamente de{" "}
+                    <strong>{portaAutoAjuste.portaAnterior}</strong> para{" "}
+                    <strong>{portaAutoAjuste.portaNova}</strong> (padrão{" "}
+                    {portaAutoAjuste.protocoloNovo.toUpperCase()}).
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 shrink-0"
+                    onClick={() => {
+                      const restore = portaAutoAjuste;
+                      const next = {
+                        ...form,
+                        protocolo: restore.protocoloAnterior,
+                        porta_http:
+                          restore.protocoloAnterior === "http"
+                            ? restore.portaAnterior
+                            : form.porta_http,
+                        porta_https:
+                          restore.protocoloAnterior === "https"
+                            ? restore.portaAnterior
+                            : form.porta_https,
+                      };
+                      setForm(next);
+                      setPortaAutoAjuste(null);
+                      validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
+                    }}
+                  >
+                    Desfazer
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
             {portaError && (
               <p className="text-xs text-destructive -mt-2">{portaError}</p>
             )}
