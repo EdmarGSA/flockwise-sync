@@ -35,6 +35,7 @@ const CameraNovoDvr = () => {
   const [portaError, setPortaError] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
+  const [testedSignature, setTestedSignature] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
   const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
@@ -45,6 +46,17 @@ const CameraNovoDvr = () => {
   } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
+
+  // Assinatura da configuração de conexão; muda invalida o teste anterior
+  const currentSignature = JSON.stringify({
+    host: form.host.trim(),
+    protocolo: form.protocolo,
+    porta: portaAtiva,
+    usuario: form.usuario,
+    senha: form.senha,
+  });
+  const testeValido = testResult?.ok === true && testedSignature === currentSignature;
+  const testeObsoleto = testResult?.ok === true && testedSignature !== currentSignature;
 
   const validarHost = (host: string) => {
     if (!host) {
@@ -72,6 +84,7 @@ const CameraNovoDvr = () => {
 
   const handleTestar = async () => {
     setTestResult(null);
+    setTestedSignature(null);
     if (!validarHost(form.host)) {
       toast.error("Corrija o host antes de testar");
       return;
@@ -80,6 +93,11 @@ const CameraNovoDvr = () => {
       toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
+    if (!form.usuario || !form.senha) {
+      toast.error("Informe usuário e senha antes de testar");
+      return;
+    }
+    const signature = currentSignature;
     setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
@@ -96,10 +114,15 @@ const CameraNovoDvr = () => {
       setTestResult({ ok: false, mensagem: error.message });
       return;
     }
+    const ok = !!data?.ok;
     setTestResult({
-      ok: !!data?.ok,
-      mensagem: data?.ok ? data?.mensagem : (data?.error || "Falha na conexão"),
+      ok,
+      mensagem: ok ? data?.mensagem : (data?.error || "Falha na conexão"),
     });
+    if (ok) {
+      setTestedSignature(signature);
+      toast.success("Conexão validada — você já pode salvar");
+    }
   };
 
   const handleSalvar = async () => {
@@ -113,6 +136,14 @@ const CameraNovoDvr = () => {
     }
     if (!validarProtocoloPorta()) {
       toast.error("Porta incompatível com o protocolo selecionado");
+      return;
+    }
+    if (!testeValido) {
+      toast.error(
+        testeObsoleto
+          ? "A configuração foi alterada — teste a conexão novamente"
+          : "Teste a conexão antes de salvar",
+      );
       return;
     }
     if (!integradoId) {
