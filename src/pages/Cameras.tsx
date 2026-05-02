@@ -54,7 +54,14 @@ const Cameras = () => {
   const [capturing, setCapturing] = useState<Record<string, boolean>>({});
   const [filtroBusca, setFiltroBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [ordenacao, setOrdenacao] = useState<string>("recentes");
+  const [ordenacao, setOrdenacao] = useState<string>(() => {
+    if (typeof window === "undefined") return "recentes";
+    return localStorage.getItem("cameras:ordenacao") || "recentes";
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("cameras:ordenacao", ordenacao); } catch {}
+  }, [ordenacao]);
 
   const loadDvrs = useCallback(async () => {
     if (!integradoId) return;
