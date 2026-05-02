@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Camera, Loader2, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
+import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
 
 type Protocolo = "http" | "https";
 
@@ -30,6 +31,7 @@ const CameraEditarDvr = () => {
     num_canais: 16,
   });
   const [hostError, setHostError] = useState<string | null>(null);
+  const [portaError, setPortaError] = useState<string | null>(null);
   const [trocarSenha, setTrocarSenha] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
@@ -49,6 +51,16 @@ const CameraEditarDvr = () => {
     }
     setHostError(v.motivo ?? "Host inválido");
     return false;
+  };
+
+  const validarProtocoloPorta = (
+    protocolo: Protocolo = form.protocolo,
+    porta_http: number = form.porta_http,
+    porta_https: number = form.porta_https,
+  ) => {
+    const v = validateProtocoloPorta({ protocolo, porta_http, porta_https });
+    setPortaError(v.ok ? null : v.motivo ?? "Porta incompatível com o protocolo");
+    return v.ok;
   };
 
   useEffect(() => {
