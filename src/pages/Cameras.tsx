@@ -426,7 +426,7 @@ const Cameras = () => {
                     {filtrados.length} de {dvrs.length} DVR{dvrs.length > 1 ? "s" : ""}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filtrados.map((dvr) => (
+                    {ordenados.map((dvr) => (
                       <Card key={dvr.id} className="hover:shadow-md transition">
                         <CardHeader>
                           <div className="flex items-start justify-between gap-2">
