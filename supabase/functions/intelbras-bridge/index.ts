@@ -186,8 +186,15 @@ async function fetchSnapshot(
   return buf;
 }
 
-// ============================================================
-// Handler
+// Resolve protocolo+porta a partir do registro do DVR (com defaults para retro-compat)
+function resolveDvrConn(dvr: any): { protocol: "http" | "https"; port: number } {
+  const protocol: "http" | "https" = dvr?.protocolo === "http" ? "http" : "https";
+  const port = protocol === "http"
+    ? Number(dvr?.porta_http ?? 80)
+    : Number(dvr?.porta_https ?? 443);
+  return { protocol, port };
+}
+
 // ============================================================
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
