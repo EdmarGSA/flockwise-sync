@@ -35,6 +35,7 @@ const CameraNovoDvr = () => {
   const [portaError, setPortaError] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
+  const [testedSignature, setTestedSignature] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
   const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
@@ -45,6 +46,17 @@ const CameraNovoDvr = () => {
   } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
+
+  // Assinatura da configuração de conexão; muda invalida o teste anterior
+  const currentSignature = JSON.stringify({
+    host: form.host.trim(),
+    protocolo: form.protocolo,
+    porta: portaAtiva,
+    usuario: form.usuario,
+    senha: form.senha,
+  });
+  const testeValido = testResult?.ok === true && testedSignature === currentSignature;
+  const testeObsoleto = testResult?.ok === true && testedSignature !== currentSignature;
 
   const validarHost = (host: string) => {
     if (!host) {
@@ -72,6 +84,7 @@ const CameraNovoDvr = () => {
 
   const handleTestar = async () => {
     setTestResult(null);
+    setTestedSignature(null);
     if (!validarHost(form.host)) {
       toast.error("Corrija o host antes de testar");
       return;
@@ -80,6 +93,11 @@ const CameraNovoDvr = () => {
       toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
+    if (!form.usuario || !form.senha) {
+      toast.error("Informe usuário e senha antes de testar");
+      return;
+    }
+    const signature = currentSignature;
     setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
@@ -96,10 +114,15 @@ const CameraNovoDvr = () => {
       setTestResult({ ok: false, mensagem: error.message });
       return;
     }
+    const ok = !!data?.ok;
     setTestResult({
-      ok: !!data?.ok,
-      mensagem: data?.ok ? data?.mensagem : (data?.error || "Falha na conexão"),
+      ok,
+      mensagem: ok ? data?.mensagem : (data?.error || "Falha na conexão"),
     });
+    if (ok) {
+      setTestedSignature(signature);
+      toast.success("Conexão validada — você já pode salvar");
+    }
   };
 
   const handleSalvar = async () => {
@@ -113,6 +136,14 @@ const CameraNovoDvr = () => {
     }
     if (!validarProtocoloPorta()) {
       toast.error("Porta incompatível com o protocolo selecionado");
+      return;
+    }
+    if (!testeValido) {
+      toast.error(
+        testeObsoleto
+          ? "A configuração foi alterada — teste a conexão novamente"
+          : "Teste a conexão antes de salvar",
+      );
       return;
     }
     if (!integradoId) {
@@ -389,9 +420,13 @@ const CameraNovoDvr = () => {
             </div>
 
             {testResult && (
-              <Alert variant={testResult.ok ? "default" : "destructive"}>
+              <Alert variant={testResult.ok && !testeObsoleto ? "default" : "destructive"}>
                 <AlertDescription className="text-sm space-y-2">
-                  <div>{testResult.mensagem}</div>
+                  <div>
+                    {testeObsoleto
+                      ? "A configuração foi alterada após o teste — execute o teste novamente antes de salvar."
+                      : testResult.mensagem}
+                  </div>
                   {!testResult.ok && (
                     <div className="text-xs opacity-80 space-y-1 mt-2">
                       <div className="font-semibold">Possíveis causas:</div>
@@ -409,6 +444,14 @@ const CameraNovoDvr = () => {
                 </AlertDescription>
               </Alert>
             )}
+            {!testResult && (
+              <Alert>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Para salvar, você precisa testar a conexão e obter sucesso. Preencha host,
+                  protocolo, porta, usuário e senha e clique em <strong>Testar conexão</strong>.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
             <Button variant="ghost" onClick={() => navigate("/cameras")} className="w-full sm:w-auto">
@@ -423,7 +466,12 @@ const CameraNovoDvr = () => {
               {testando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar conexão
             </Button>
-            <Button onClick={handleSalvar} disabled={salvando || !!hostError || !!portaError} className="w-full sm:w-auto">
+            <Button
+              onClick={handleSalvar}
+              disabled={salvando || !!hostError || !!portaError || !testeValido}
+              className="w-full sm:w-auto"
+              title={!testeValido ? "Teste a conexão com sucesso antes de salvar" : undefined}
+            >
               {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar DVR
             </Button>
