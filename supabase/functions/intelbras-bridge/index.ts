@@ -44,10 +44,19 @@ async function digestFetch(
   const u = new URL(url);
   const path = u.pathname + u.search;
 
-  // Primeira request - espera 401 com challenge
+  // Primeira request - espera 401 com challenge (timeout curto: falha rápido se host inalcançável)
+  const firstTimeout = Math.min(timeoutMs, 8000);
   const ctrl1 = new AbortController();
-  const t1 = setTimeout(() => ctrl1.abort(), timeoutMs);
+  const t1 = setTimeout(() => ctrl1.abort(), firstTimeout);
   const first = await fetch(url, { signal: ctrl1.signal }).catch((e) => {
+    const isAbort = e?.name === "AbortError" || /aborted/i.test(e?.message || "");
+    if (isAbort) {
+      throw new Error(
+        `Não foi possível conectar a ${u.host} em ${firstTimeout / 1000}s. ` +
+        `Verifique se o DDNS do DVR está ativo, se a porta ${u.port || (u.protocol === "https:" ? 443 : 80)} ` +
+        `está redirecionada no roteador para o DVR e se o firewall não está bloqueando.`,
+      );
+    }
     throw new Error(`Conexão falhou: ${e.message}`);
   });
   clearTimeout(t1);
