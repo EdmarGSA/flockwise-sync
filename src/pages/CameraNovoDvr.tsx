@@ -252,7 +252,18 @@ const CameraNovoDvr = () => {
                 <Label>Protocolo</Label>
                 <Select
                   value={form.protocolo}
-                  onValueChange={(v) => setForm({ ...form, protocolo: v as Protocolo })}
+                  onValueChange={(v) => {
+                    const protocolo = v as Protocolo;
+                    // Auto-corrige a porta para o padrão ao trocar protocolo
+                    const next = {
+                      ...form,
+                      protocolo,
+                      porta_http: protocolo === "http" ? 80 : form.porta_http,
+                      porta_https: protocolo === "https" ? 443 : form.porta_https,
+                    };
+                    setForm(next);
+                    validarProtocoloPorta(protocolo, next.porta_http, next.porta_https);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -268,17 +279,25 @@ const CameraNovoDvr = () => {
                 <Input
                   type="number"
                   value={form.protocolo === "http" ? form.porta_http : form.porta_https}
-                  onChange={(e) =>
-                    setForm({
+                  onChange={(e) => {
+                    const valor = +e.target.value;
+                    const next = {
                       ...form,
                       ...(form.protocolo === "http"
-                        ? { porta_http: +e.target.value }
-                        : { porta_https: +e.target.value }),
-                    })
-                  }
+                        ? { porta_http: valor }
+                        : { porta_https: valor }),
+                    };
+                    setForm(next);
+                    validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
+                  }}
+                  aria-invalid={!!portaError}
+                  className={portaError ? "border-destructive" : ""}
                 />
               </div>
             </div>
+            {portaError && (
+              <p className="text-xs text-destructive -mt-2">{portaError}</p>
+            )}
 
             <div>
               <Label>Porta RTSP</Label>
