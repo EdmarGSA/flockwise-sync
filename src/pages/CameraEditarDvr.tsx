@@ -98,6 +98,10 @@ const CameraEditarDvr = () => {
       toast.error("Corrija o host antes de testar");
       return;
     }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
+      return;
+    }
     setTestando(true);
     const { data, error } = await supabase.functions.invoke("intelbras-bridge/test-connection", {
       body: {
@@ -127,6 +131,10 @@ const CameraEditarDvr = () => {
     }
     if (!validarHost(form.host)) {
       toast.error("Host inválido — veja a mensagem abaixo do campo");
+      return;
+    }
+    if (!validarProtocoloPorta()) {
+      toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
     if (trocarSenha && !form.senha) {
