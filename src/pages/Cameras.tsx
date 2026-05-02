@@ -43,7 +43,7 @@ interface CanalRow {
 
 const Cameras = () => {
   const navigate = useNavigate();
-  const integradoId = useIntegradoId();
+  const { integradoId, loading: loadingIntegradoId } = useIntegradoId();
 
   const [dvrs, setDvrs] = useState<DvrRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,12 @@ const Cameras = () => {
   }, [ordenacao]);
 
   const loadDvrs = useCallback(async () => {
-    if (!integradoId) return;
+    if (loadingIntegradoId) return;
+    if (!integradoId) {
+      setDvrs([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from("cameras_dvr" as any)
@@ -77,7 +82,7 @@ const Cameras = () => {
       setDvrs((data || []) as any);
     }
     setLoading(false);
-  }, [integradoId]);
+  }, [integradoId, loadingIntegradoId]);
 
   useEffect(() => { loadDvrs(); }, [loadDvrs]);
 
