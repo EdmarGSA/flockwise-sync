@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, Loader2, Wifi } from "lucide-react";
+import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
 import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
 
@@ -36,6 +37,7 @@ const CameraEditarDvr = () => {
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [ajudaAberta, setAjudaAberta] = useState(false);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
 
@@ -204,6 +206,57 @@ const CameraEditarDvr = () => {
             </p>
           </div>
         </div>
+
+        <Collapsible open={ajudaAberta} onOpenChange={setAjudaAberta}>
+          <Alert>
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle className="flex items-center justify-between">
+              <span>Como configurar meu DVR</span>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2">
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${ajudaAberta ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+            </AlertTitle>
+            <CollapsibleContent>
+              <AlertDescription className="text-xs space-y-3 mt-2">
+                <div>
+                  <strong>1. Habilite o DDNS Intelbras no DVR</strong>
+                  <div className="text-muted-foreground">
+                    Menu → Rede → DDNS → marque "Habilitar", escolha "Intelbras DDNS" e
+                    defina um nome de domínio único (ex: <code>granjamarcia</code>). O status
+                    deve mudar de "IP Desatualizado" para "Conectado". O host final fica{" "}
+                    <code>granjamarcia.ddns-intelbras.com.br</code>.
+                  </div>
+                </div>
+                <div>
+                  <strong>2. Redirecione a porta no roteador da granja</strong>
+                  <div className="text-muted-foreground">
+                    No roteador, faça port forwarding da porta externa <code>80</code> (HTTP)
+                    ou <code>443</code> (HTTPS) para o IP local do DVR (ex:{" "}
+                    <code>192.168.1.105</code>). Se possível, prefira HTTP/80 para evitar
+                    problemas com o certificado auto-assinado do DVR.
+                  </div>
+                </div>
+                <div>
+                  <strong>3. Use o DDNS aqui no formulário</strong>
+                  <div className="text-muted-foreground">
+                    No campo "Host" abaixo, informe o domínio DDNS — <em>nunca</em> o IP
+                    da rede local (192.168.x.x), porque a nuvem não enxerga sua LAN.
+                  </div>
+                </div>
+                <div>
+                  <strong>4. Crie um usuário read-only no DVR</strong>
+                  <div className="text-muted-foreground">
+                    Recomendado por segurança, para esta integração não precisar do usuário admin.
+                  </div>
+                </div>
+              </AlertDescription>
+            </CollapsibleContent>
+          </Alert>
+        </Collapsible>
 
         <Card>
           <CardHeader>
