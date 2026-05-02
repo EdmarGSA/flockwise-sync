@@ -428,8 +428,10 @@ export type Database = {
           nome: string
           num_canais: number
           observacoes: string | null
+          porta_http: number
           porta_https: number
           porta_rtsp: number
+          protocolo: string
           senha_encrypted: string
           status_conexao: Database["public"]["Enums"]["camera_status"]
           ultimo_erro: string | null
@@ -448,8 +450,10 @@ export type Database = {
           nome: string
           num_canais?: number
           observacoes?: string | null
+          porta_http?: number
           porta_https?: number
           porta_rtsp?: number
+          protocolo?: string
           senha_encrypted: string
           status_conexao?: Database["public"]["Enums"]["camera_status"]
           ultimo_erro?: string | null
@@ -468,8 +472,10 @@ export type Database = {
           nome?: string
           num_canais?: number
           observacoes?: string | null
+          porta_http?: number
           porta_https?: number
           porta_rtsp?: number
+          protocolo?: string
           senha_encrypted?: string
           status_conexao?: Database["public"]["Enums"]["camera_status"]
           ultimo_erro?: string | null
