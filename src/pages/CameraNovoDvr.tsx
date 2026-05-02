@@ -82,20 +82,24 @@ const CameraNovoDvr = () => {
     return v.ok;
   };
 
-  const handleTestar = async () => {
+  /**
+   * Executa o teste de conexão. Retorna true se a conexão foi validada.
+   * Se `silencioso` for true, suprime toasts de validação prévia (usado no auto-reteste do salvar).
+   */
+  const executarTeste = async (silencioso = false): Promise<boolean> => {
     setTestResult(null);
     setTestedSignature(null);
     if (!validarHost(form.host)) {
-      toast.error("Corrija o host antes de testar");
-      return;
+      if (!silencioso) toast.error("Corrija o host antes de testar");
+      return false;
     }
     if (!validarProtocoloPorta()) {
-      toast.error("Porta incompatível com o protocolo selecionado");
-      return;
+      if (!silencioso) toast.error("Porta incompatível com o protocolo selecionado");
+      return false;
     }
     if (!form.usuario || !form.senha) {
-      toast.error("Informe usuário e senha antes de testar");
-      return;
+      if (!silencioso) toast.error("Informe usuário e senha antes de testar");
+      return false;
     }
     const signature = currentSignature;
     setTestando(true);
@@ -112,7 +116,7 @@ const CameraNovoDvr = () => {
     setTestando(false);
     if (error) {
       setTestResult({ ok: false, mensagem: error.message });
-      return;
+      return false;
     }
     const ok = !!data?.ok;
     setTestResult({
@@ -121,9 +125,12 @@ const CameraNovoDvr = () => {
     });
     if (ok) {
       setTestedSignature(signature);
-      toast.success("Conexão validada — você já pode salvar");
+      if (!silencioso) toast.success("Conexão validada — você já pode salvar");
     }
+    return ok;
   };
+
+  const handleTestar = () => executarTeste(false);
 
   const handleSalvar = async () => {
     if (!form.nome || !form.host || !form.usuario || !form.senha) {
@@ -138,13 +145,17 @@ const CameraNovoDvr = () => {
       toast.error("Porta incompatível com o protocolo selecionado");
       return;
     }
+    // Se o teste está obsoleto ou nunca foi feito, executa automaticamente antes de salvar
     if (!testeValido) {
-      toast.error(
-        testeObsoleto
-          ? "A configuração foi alterada — teste a conexão novamente"
-          : "Teste a conexão antes de salvar",
-      );
-      return;
+      const aviso = testeObsoleto
+        ? "Configuração alterada — revalidando conexão antes de salvar..."
+        : "Validando conexão antes de salvar...";
+      toast.info(aviso);
+      const ok = await executarTeste(true);
+      if (!ok) {
+        toast.error("Não foi possível validar a conexão — corrija e tente novamente");
+        return;
+      }
     }
     if (!integradoId) {
       toast.error("Organização não identificada");
@@ -468,12 +479,16 @@ const CameraNovoDvr = () => {
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={salvando || !!hostError || !!portaError || !testeValido}
+              disabled={salvando || testando || !!hostError || !!portaError}
               className="w-full sm:w-auto"
-              title={!testeValido ? "Teste a conexão com sucesso antes de salvar" : undefined}
+              title={
+                !testeValido
+                  ? "Conexão será testada automaticamente antes de salvar"
+                  : undefined
+              }
             >
-              {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Salvar DVR
+              {(salvando || testando) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {testando ? "Validando..." : salvando ? "Salvando..." : "Salvar DVR"}
             </Button>
           </CardFooter>
         </Card>
