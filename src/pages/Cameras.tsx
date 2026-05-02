@@ -54,6 +54,7 @@ const Cameras = () => {
   const [capturing, setCapturing] = useState<Record<string, boolean>>({});
   const [filtroBusca, setFiltroBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [ordenacao, setOrdenacao] = useState<string>("recentes");
 
   const loadDvrs = useCallback(async () => {
     if (!integradoId) return;
@@ -351,10 +352,23 @@ const Cameras = () => {
                     <SelectItem value="nao_testado">Não testado</SelectItem>
                   </SelectContent>
                 </Select>
-                {(filtroBusca || filtroStatus !== "todos") && (
+                <Select value={ordenacao} onValueChange={setOrdenacao}>
+                  <SelectTrigger className="w-full sm:w-56">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recentes">Mais recentes</SelectItem>
+                    <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
+                    <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
+                    <SelectItem value="status">Status</SelectItem>
+                    <SelectItem value="sync_desc">Última sync (mais recente)</SelectItem>
+                    <SelectItem value="sync_asc">Última sync (mais antiga)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(filtroBusca || filtroStatus !== "todos" || ordenacao !== "recentes") && (
                   <Button
                     variant="ghost"
-                    onClick={() => { setFiltroBusca(""); setFiltroStatus("todos"); }}
+                    onClick={() => { setFiltroBusca(""); setFiltroStatus("todos"); setOrdenacao("recentes"); }}
                   >
                     <X className="h-4 w-4 mr-1" /> Limpar
                   </Button>
@@ -373,6 +387,29 @@ const Cameras = () => {
                 return okStatus && okBusca;
               });
 
+              const statusOrder: Record<string, number> = { online: 0, erro: 1, offline: 2, nao_testado: 3 };
+              const ordenados = [...filtrados].sort((a, b) => {
+                switch (ordenacao) {
+                  case "nome_asc": return a.nome.localeCompare(b.nome, "pt-BR");
+                  case "nome_desc": return b.nome.localeCompare(a.nome, "pt-BR");
+                  case "status": {
+                    const diff = (statusOrder[a.status_conexao] ?? 99) - (statusOrder[b.status_conexao] ?? 99);
+                    return diff !== 0 ? diff : a.nome.localeCompare(b.nome, "pt-BR");
+                  }
+                  case "sync_desc": {
+                    const ta = a.ultimo_sync ? new Date(a.ultimo_sync).getTime() : 0;
+                    const tb = b.ultimo_sync ? new Date(b.ultimo_sync).getTime() : 0;
+                    return tb - ta;
+                  }
+                  case "sync_asc": {
+                    const ta = a.ultimo_sync ? new Date(a.ultimo_sync).getTime() : Infinity;
+                    const tb = b.ultimo_sync ? new Date(b.ultimo_sync).getTime() : Infinity;
+                    return ta - tb;
+                  }
+                  default: return 0;
+                }
+              });
+
               if (filtrados.length === 0) {
                 return (
                   <Card>
@@ -389,7 +426,7 @@ const Cameras = () => {
                     {filtrados.length} de {dvrs.length} DVR{dvrs.length > 1 ? "s" : ""}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filtrados.map((dvr) => (
+                    {ordenados.map((dvr) => (
                       <Card key={dvr.id} className="hover:shadow-md transition">
                         <CardHeader>
                           <div className="flex items-start justify-between gap-2">
