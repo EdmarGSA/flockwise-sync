@@ -136,6 +136,26 @@ function decryptPassword(enc: string): string {
 }
 
 // ============================================================
+// Validação de host (defesa em profundidade)
+// ============================================================
+const PRIVATE_IPV4_REGEX = [
+  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^192\.168\.\d{1,3}\.\d{1,3}$/,
+  /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/,
+  /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^169\.254\.\d{1,3}\.\d{1,3}$/,
+  /^0\.0\.0\.0$/,
+];
+function isPrivateHost(host: string): boolean {
+  const h = (host || "").trim().toLowerCase();
+  if (!h || h === "localhost") return true;
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(h)) {
+    return PRIVATE_IPV4_REGEX.some((r) => r.test(h));
+  }
+  return false;
+}
+
+// ============================================================
 // Snapshot CGI
 // ============================================================
 async function fetchSnapshot(
@@ -144,10 +164,15 @@ async function fetchSnapshot(
   user: string,
   pass: string,
   channel: number,
+  protocol: "http" | "https" = "https",
 ): Promise<Uint8Array> {
-  const protocol = port === 80 ? "http" : "https";
-  const url =
-    `${protocol}://${host}:${port}/cgi-bin/snapshot.cgi?channel=${channel}`;
+  if (isPrivateHost(host)) {
+    throw new Error(
+      `Host "${host}" é endereço privado/local — inacessível a partir da nuvem. ` +
+      `Configure o DDNS Intelbras no DVR e use o domínio público (ex: granja.ddns-intelbras.com.br).`,
+    );
+  }
+  const url = `${protocol}://${host}:${port}/cgi-bin/snapshot.cgi?channel=${channel}`;
 
   const res = await digestFetch(url, user, pass);
   if (!res.ok) {
