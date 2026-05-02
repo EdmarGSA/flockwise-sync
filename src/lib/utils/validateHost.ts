@@ -3,7 +3,7 @@
  * Bloqueia IPs privados/loopback e hostnames locais que a edge function
  * (rodando na nuvem) não consegue alcançar.
  */
-export type HostValidation = { ok: true } | { ok: false; motivo: string };
+export type HostValidation = { ok: boolean; motivo?: string };
 
 const PRIVATE_IPV4_REGEXES: RegExp[] = [
   /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
