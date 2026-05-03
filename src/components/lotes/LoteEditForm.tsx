@@ -17,6 +17,8 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
 import { SaidaLoteSection } from './SaidaLoteSection';
+import { PreviewAjusteAlojamento } from './PreviewAjusteAlojamento';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 
 // Labels for lineages
 const linhagemCorteLabels: Record<string, string> = {
@@ -64,6 +66,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
+  const { integradoId } = useIntegradoId();
   
   // Saída de Lote fields
   const [dataPrevistaSaida, setDataPrevistaSaida] = useState<string | null>(
@@ -552,6 +555,17 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
               </FormItem>
             )}
           />
+
+          {!isEditable && modoEdicaoAvancada && (
+            <PreviewAjusteAlojamento
+              dataAlojamentoAtual={lote.data_alojamento}
+              novaDataAlojamento={form.watch('data_alojamento')}
+              programaAtualId={(lote as any).programa_iluminacao_id ?? null}
+              novoProgramaId={form.watch('programa_iluminacao_id')}
+              integradoId={integradoId}
+              tipoProducao={isPostura ? 'postura' : 'frango_corte'}
+            />
+          )}
 
           <FormField
             control={form.control}
