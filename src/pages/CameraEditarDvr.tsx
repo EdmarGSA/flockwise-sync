@@ -33,18 +33,13 @@ const CameraEditarDvr = () => {
   });
   const [hostError, setHostError] = useState<string | null>(null);
   const [portaError, setPortaError] = useState<string | null>(null);
+  const [portaAviso, setPortaAviso] = useState<string | null>(null);
   const [trocarSenha, setTrocarSenha] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [testedSignature, setTestedSignature] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
-  const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
-    protocoloAnterior: Protocolo;
-    portaAnterior: number;
-    protocoloNovo: Protocolo;
-    portaNova: number;
-  } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
 
@@ -80,7 +75,8 @@ const CameraEditarDvr = () => {
     porta_https: number = form.porta_https,
   ) => {
     const v = validateProtocoloPorta({ protocolo, porta_http, porta_https });
-    setPortaError(v.ok ? null : v.motivo ?? "Porta incompatível com o protocolo");
+    setPortaError(v.ok ? null : v.motivo ?? "Porta inválida");
+    setPortaAviso(v.ok && v.aviso ? v.aviso : null);
     return v.ok;
   };
 
@@ -345,22 +341,8 @@ const CameraEditarDvr = () => {
                   onValueChange={(v) => {
                     const protocoloNovo = v as Protocolo;
                     if (protocoloNovo === form.protocolo) return;
-                    const portaAnterior =
-                      form.protocolo === "http" ? form.porta_http : form.porta_https;
-                    const portaPadrao = protocoloNovo === "http" ? 80 : 443;
-                    const next = {
-                      ...form,
-                      protocolo: protocoloNovo,
-                      porta_http: protocoloNovo === "http" ? 80 : form.porta_http,
-                      porta_https: protocoloNovo === "https" ? 443 : form.porta_https,
-                    };
+                    const next = { ...form, protocolo: protocoloNovo };
                     setForm(next);
-                    setPortaAutoAjuste({
-                      protocoloAnterior: form.protocolo,
-                      portaAnterior,
-                      protocoloNovo,
-                      portaNova: portaPadrao,
-                    });
                     validarProtocoloPorta(protocoloNovo, next.porta_http, next.porta_https);
                   }}
                 >
@@ -387,7 +369,6 @@ const CameraEditarDvr = () => {
                         : { porta_https: valor }),
                     };
                     setForm(next);
-                    setPortaAutoAjuste(null);
                     validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
                   }}
                   aria-invalid={!!portaError}
@@ -395,47 +376,17 @@ const CameraEditarDvr = () => {
                 />
               </div>
             </div>
-            {portaAutoAjuste && (
-              <Alert>
-                <AlertDescription className="text-xs flex items-center justify-between gap-3">
-                  <span>
-                    Porta ajustada automaticamente de{" "}
-                    <strong>{portaAutoAjuste.portaAnterior}</strong> para{" "}
-                    <strong>{portaAutoAjuste.portaNova}</strong> (padrão{" "}
-                    {portaAutoAjuste.protocoloNovo.toUpperCase()}).
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 shrink-0"
-                    onClick={() => {
-                      const restore = portaAutoAjuste;
-                      const next = {
-                        ...form,
-                        protocolo: restore.protocoloAnterior,
-                        porta_http:
-                          restore.protocoloAnterior === "http"
-                            ? restore.portaAnterior
-                            : form.porta_http,
-                        porta_https:
-                          restore.protocoloAnterior === "https"
-                            ? restore.portaAnterior
-                            : form.porta_https,
-                      };
-                      setForm(next);
-                      setPortaAutoAjuste(null);
-                      validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
-                    }}
-                  >
-                    Desfazer
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
             {portaError && (
               <p className="text-xs text-destructive -mt-2">{portaError}</p>
             )}
+            {!portaError && portaAviso && (
+              <p className="text-xs text-muted-foreground -mt-2">{portaAviso}</p>
+            )}
+            <p className="text-xs text-muted-foreground -mt-2">
+              Use a porta externa configurada no redirecionamento NAT do roteador — não precisa
+              ser 80/443. Se o painel do roteador já ocupa a porta 80, use uma porta alternativa
+              (ex.: 8080) e redirecione para a porta interna do DVR.
+            </p>
 
             <div>
               <Label>Porta RTSP</Label>
@@ -508,9 +459,19 @@ const CameraEditarDvr = () => {
                       <ul className="list-disc list-inside space-y-0.5">
                         <li>Host informado é IP privado da LAN (use DDNS)</li>
                         <li>DDNS do DVR não está habilitado / está "IP Desatualizado"</li>
-                        <li>Porta {portaAtiva} não está redirecionada no roteador</li>
+                        <li>
+                          A porta externa <strong>{portaAtiva}</strong> não está redirecionada no
+                          roteador para o IP do DVR
+                        </li>
                         <li>Firewall/operadora bloqueia a porta {portaAtiva}</li>
-                        <li>Usando HTTPS com certificado auto-assinado — tente HTTP na porta 80</li>
+                        <li>
+                          Se a porta 80 do roteador já é usada pelo painel admin, escolha outra
+                          porta externa (ex.: 8080) e redirecione para a porta 80 ou 443 do DVR
+                        </li>
+                        <li>
+                          Usando HTTPS com certificado auto-assinado — tente HTTP em uma porta
+                          alternativa
+                        </li>
                       </ul>
                     </div>
                   )}
