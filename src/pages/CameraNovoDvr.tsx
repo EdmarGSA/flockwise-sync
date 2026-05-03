@@ -360,6 +360,14 @@ const CameraNovoDvr = () => {
               />
             </div>
 
+            <NATRedirectExample
+              protocolo={form.protocolo}
+              portaExternaHttp={form.porta_http}
+              portaExternaHttps={form.porta_https}
+              portaRtsp={form.porta_rtsp}
+            />
+
+
             <div>
               <Label>Usuário *</Label>
               <Input
