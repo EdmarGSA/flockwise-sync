@@ -32,8 +32,12 @@ const PORTAS_PADRAO: Record<Protocolo, number> = {
 export function validateProtocoloPorta(
   input: ProtocoloPortaInput,
 ): ProtocoloPortaResult {
-  const { protocolo } = input ?? ({} as ProtocoloPortaInput);
-  const padrao = protocolo ? PORTAS_PADRAO[protocolo] : undefined;
+  const raw = input ?? ({} as ProtocoloPortaInput);
+  // Normaliza protocolo para lowercase para aceitar 'HTTP', 'Https', etc.
+  const protocoloNorm = (
+    typeof raw.protocolo === "string" ? raw.protocolo.toLowerCase() : raw.protocolo
+  ) as Protocolo | undefined;
+  const padrao = protocoloNorm ? PORTAS_PADRAO[protocoloNorm] : undefined;
 
   if (!padrao) {
     return {
@@ -42,7 +46,7 @@ export function validateProtocoloPorta(
     };
   }
 
-  const portaRaw: unknown = protocolo === "http" ? input.porta_http : input.porta_https;
+  const portaRaw: unknown = protocoloNorm === "http" ? raw.porta_http : raw.porta_https;
   const portaAtiva = typeof portaRaw === "number" ? portaRaw : Number(portaRaw);
 
   if (
