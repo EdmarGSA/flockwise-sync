@@ -1464,6 +1464,7 @@ export default function DispositivosIoT() {
         dispositivoNome={selectedDeviceForCanais?.nome ?? ''}
         integradoId={integradoId}
         numCanais={selectedDeviceForCanais?.num_canais ?? 1}
+        dispositivoGalpaoId={selectedDeviceForCanais?.galpao_id ?? null}
       />
     </div>
   );
