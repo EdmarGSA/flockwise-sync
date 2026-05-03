@@ -63,6 +63,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [programasIluminacao, setProgramasIluminacao] = useState<{ id: string; nome: string; is_default: boolean }[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
+  const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
   
   // Saída de Lote fields
   const [dataPrevistaSaida, setDataPrevistaSaida] = useState<string | null>(
