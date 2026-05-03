@@ -182,7 +182,21 @@ export default function DispositivosIoT() {
       supabase.from('galpoes').select('id, nome, nucleo_id').eq('ativo', true),
     ]);
 
-    if (devRes.data) setDispositivos(devRes.data as Dispositivo[]);
+    if (devRes.data) {
+      setDispositivos(devRes.data as Dispositivo[]);
+      const devIds = (devRes.data as Dispositivo[]).map((d) => d.id);
+      if (devIds.length) {
+        const { data: canais } = await supabase
+          .from('canais_dispositivo')
+          .select('dispositivo_id')
+          .in('dispositivo_id', devIds)
+          .eq('tipo_equipamento', 'iluminacao')
+          .eq('ativo', true);
+        setIluminacaoDeviceIds(new Set((canais ?? []).map((c: any) => c.dispositivo_id)));
+      } else {
+        setIluminacaoDeviceIds(new Set());
+      }
+    }
     if (galpRes.data) setGalpoes(galpRes.data);
 
     if (devRes.data && devRes.data.length > 0) {
