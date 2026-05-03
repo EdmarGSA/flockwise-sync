@@ -12,7 +12,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { toast } from 'sonner';
-import AppLayout from '@/components/AppLayout';
+
 
 const cfgSchema = z.object({
   idade_min_semanas: z.number().int('Use valor inteiro').min(10, 'Idade mínima >= 10 semanas').max(40, 'Idade mínima <= 40 semanas'),
