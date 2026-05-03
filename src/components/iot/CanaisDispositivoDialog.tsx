@@ -34,6 +34,7 @@ interface Props {
   dispositivoNome: string;
   integradoId: string | null;
   numCanais: number;
+  dispositivoGalpaoId?: string | null;
 }
 
 const TIPOS: { value: TipoEquipamento; label: string; icon: typeof Fan }[] = [
