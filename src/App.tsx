@@ -433,6 +433,15 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
+    {/* Estímulo de Postura */}
+    <Route path="/configuracoes/estimulo-postura" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <EstimuloPostura />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
 
     {/* Câmeras Intelbras */}
     <Route path="/cameras" element={
