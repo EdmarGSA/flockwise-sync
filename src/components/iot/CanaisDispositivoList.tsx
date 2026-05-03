@@ -120,6 +120,17 @@ export function CanaisDispositivoList({ dispositivoId, integradoId, driver, onli
               {c.automacao_ativa && (
                 <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-300 px-1 py-0">Auto</Badge>
               )}
+              {c.tipo_equipamento === 'iluminacao' && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  title="Forçar iluminação"
+                  onClick={() => { setOverrideCanalId(c.id); setOverrideOpen(true); }}
+                >
+                  <Hand className="w-3.5 h-3.5" />
+                </Button>
+              )}
               {busy ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
               ) : (
@@ -136,6 +147,12 @@ export function CanaisDispositivoList({ dispositivoId, integradoId, driver, onli
           </div>
         );
       })}
+      <OverridesIluminacaoDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        dispositivoId={dispositivoId}
+        canalIdInicial={overrideCanalId}
+      />
     </div>
   );
 }
