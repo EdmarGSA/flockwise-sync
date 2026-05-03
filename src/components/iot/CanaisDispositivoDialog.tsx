@@ -175,6 +175,17 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           </div>
         ) : (
           <div className="space-y-3 pt-2">
+            {!dispositivoGalpaoId && canais.some((c) => c.ativo && c.tipo_equipamento === 'iluminacao') && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 text-destructive" />
+                <div>
+                  <p className="font-medium text-destructive">Dispositivo sem galpão vinculado</p>
+                  <p className="text-xs text-muted-foreground">
+                    A automação de iluminação só funciona quando o dispositivo está vinculado a um galpão (a função <code>auto-iluminacao</code> usa o lote ativo do galpão para decidir o programa). Edite o dispositivo e selecione um galpão.
+                  </p>
+                </div>
+              </div>
+            )}
             {canais.map((canal, idx) => {
               const Icon = tipoIcon(canal.tipo_equipamento);
               return (
