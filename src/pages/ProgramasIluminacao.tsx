@@ -174,7 +174,22 @@ export default function ProgramasIluminacao() {
                       </CardTitle>
                       <CardDescription>{selecionado.descricao || "Sem descrição"}</CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={selecionado.is_default}
+                          onCheckedChange={async (v) => {
+                            const { error } = await supabase
+                              .from("programa_iluminacao_lote")
+                              .update({ is_default: v })
+                              .eq("id", selecionado.id);
+                            if (error) { toast.error(error.message); return; }
+                            toast.success(v ? "Definido como padrão" : "Removido do padrão");
+                            await fetchProgramas();
+                          }}
+                        />
+                        <Label className="text-xs">Padrão p/ {selecionado.tipo_producao}</Label>
+                      </div>
                       <Button variant="outline" size="sm" onClick={adicionarFaixa}>
                         <Plus className="w-4 h-4 mr-2" />Faixa
                       </Button>
