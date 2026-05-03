@@ -489,6 +489,35 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
           <FormField
             control={form.control}
+            name="programa_iluminacao_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Programa de Iluminação</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um programa" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="default">Usar programa padrão da organização</SelectItem>
+                    {programasIluminacao.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}{p.is_default ? ' (padrão)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define o fotoperíodo automático aplicado por <a href="/configuracoes/iluminacao" className="underline">auto-iluminacao</a>.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="observacoes"
             render={({ field }) => (
               <FormItem>
