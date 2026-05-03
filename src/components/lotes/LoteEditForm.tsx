@@ -102,12 +102,14 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       sexo: lote.sexo,
       status: lote.status,
       veterinario_id: lote.veterinario_id || 'none',
+      programa_iluminacao_id: (lote as any).programa_iluminacao_id || 'default',
       observacoes: lote.observacoes || '',
     },
   });
 
   useEffect(() => {
     fetchVeterinarios();
+    fetchProgramasIluminacao();
     if (isAlojado) {
       fetchMortalidade();
       fetchUltimoPeso();
@@ -121,6 +123,18 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       return;
     }
     setVeterinarios(data || []);
+  };
+
+  const fetchProgramasIluminacao = async () => {
+    const tipo = isPostura ? 'postura' : 'frango_corte';
+    const { data } = await supabase
+      .from('programa_iluminacao_lote')
+      .select('id, nome, is_default, tipo_producao')
+      .eq('ativo', true)
+      .eq('tipo_producao', tipo)
+      .order('is_default', { ascending: false })
+      .order('nome');
+    setProgramasIluminacao((data || []) as any);
   };
 
   const fetchMortalidade = async () => {
