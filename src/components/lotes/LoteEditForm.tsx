@@ -19,6 +19,16 @@ import { Database } from '@/integrations/supabase/types';
 import { SaidaLoteSection } from './SaidaLoteSection';
 import { PreviewAjusteAlojamento } from './PreviewAjusteAlojamento';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Labels for lineages
 const linhagemCorteLabels: Record<string, string> = {
