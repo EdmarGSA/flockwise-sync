@@ -129,6 +129,7 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           automacao_ativa: c.automacao_ativa && c.funcao_automacao !== 'nenhuma',
           ativo: c.ativo,
           observacoes: c.observacoes,
+          suporta_dimer: c.tipo_equipamento === 'iluminacao' ? !!c.suporta_dimer : false,
         }));
 
       if (ativosParaUpsert.length > 0) {
