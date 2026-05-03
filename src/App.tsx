@@ -48,6 +48,7 @@ import EstoqueOvos from "./pages/EstoqueOvos";
 import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import DispositivosIoT from "./pages/DispositivosIoT";
+import ProgramasIluminacao from "./pages/ProgramasIluminacao";
 import Cameras from "./pages/Cameras";
 import CameraNovoDvr from "./pages/CameraNovoDvr";
 import CameraEditarDvr from "./pages/CameraEditarDvr";
@@ -420,6 +421,16 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+
+    {/* Programas de Iluminação */}
+    <Route path="/configuracoes/iluminacao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ProgramasIluminacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
 
     {/* Câmeras Intelbras */}
     <Route path="/cameras" element={

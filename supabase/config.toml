@@ -53,3 +53,5 @@ verify_jwt = false
 
 [functions.rastreio-publico]
 verify_jwt = false
+[functions.auto-iluminacao]
+verify_jwt = false

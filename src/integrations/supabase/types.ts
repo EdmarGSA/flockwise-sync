@@ -595,8 +595,10 @@ export type Database = {
           funcao_automacao: Database["public"]["Enums"]["funcao_automacao"]
           id: string
           integrado_id: string
+          intensidade_atual: number | null
           nome: string
           observacoes: string | null
+          suporta_dimer: boolean
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em: string | null
           updated_at: string
@@ -611,8 +613,10 @@ export type Database = {
           funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           id?: string
           integrado_id: string
+          intensidade_atual?: number | null
           nome: string
           observacoes?: string | null
+          suporta_dimer?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
           updated_at?: string
@@ -627,8 +631,10 @@ export type Database = {
           funcao_automacao?: Database["public"]["Enums"]["funcao_automacao"]
           id?: string
           integrado_id?: string
+          intensidade_atual?: number | null
           nome?: string
           observacoes?: string | null
+          suporta_dimer?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
           updated_at?: string
@@ -2834,6 +2840,7 @@ export type Database = {
           nucleo_id: string
           observacoes: string | null
           peso_medio_pintinhos: number | null
+          programa_iluminacao_id: string | null
           quantidade_aves: number
           saida_abate: number | null
           saida_venda_externa: number | null
@@ -2868,6 +2875,7 @@ export type Database = {
           nucleo_id: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
+          programa_iluminacao_id?: string | null
           quantidade_aves: number
           saida_abate?: number | null
           saida_venda_externa?: number | null
@@ -2902,6 +2910,7 @@ export type Database = {
           nucleo_id?: string
           observacoes?: string | null
           peso_medio_pintinhos?: number | null
+          programa_iluminacao_id?: string | null
           quantidade_aves?: number
           saida_abate?: number | null
           saida_venda_externa?: number | null
@@ -2924,6 +2933,13 @@ export type Database = {
             columns: ["nucleo_id"]
             isOneToOne: false
             referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lotes_programa_iluminacao_id_fkey"
+            columns: ["programa_iluminacao_id"]
+            isOneToOne: false
+            referencedRelation: "programa_iluminacao_lote"
             referencedColumns: ["id"]
           },
         ]
@@ -4512,6 +4528,50 @@ export type Database = {
         }
         Relationships: []
       }
+      override_iluminacao_canal: {
+        Row: {
+          ate_quando: string
+          canal_id: string
+          created_at: string
+          created_by: string | null
+          estado_forcado: string
+          id: string
+          integrado_id: string
+          intensidade_pct: number | null
+          motivo: string | null
+        }
+        Insert: {
+          ate_quando: string
+          canal_id: string
+          created_at?: string
+          created_by?: string | null
+          estado_forcado: string
+          id?: string
+          integrado_id: string
+          intensidade_pct?: number | null
+          motivo?: string | null
+        }
+        Update: {
+          ate_quando?: string
+          canal_id?: string
+          created_at?: string
+          created_by?: string | null
+          estado_forcado?: string
+          id?: string
+          integrado_id?: string
+          intensidade_pct?: number | null
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "override_iluminacao_canal_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parceiros: {
         Row: {
           ativo: boolean
@@ -6082,6 +6142,92 @@ export type Database = {
           id?: string
           integrado_id?: string
           nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      programa_iluminacao_faixa: {
+        Row: {
+          blocos: Json
+          created_at: string
+          dia_fim: number
+          dia_inicio: number
+          horas_luz: number
+          id: string
+          intensidade_pct: number
+          observacoes: string | null
+          programa_id: string
+          ramp_down_min: number
+          ramp_up_min: number
+        }
+        Insert: {
+          blocos?: Json
+          created_at?: string
+          dia_fim: number
+          dia_inicio: number
+          horas_luz: number
+          id?: string
+          intensidade_pct?: number
+          observacoes?: string | null
+          programa_id: string
+          ramp_down_min?: number
+          ramp_up_min?: number
+        }
+        Update: {
+          blocos?: Json
+          created_at?: string
+          dia_fim?: number
+          dia_inicio?: number
+          horas_luz?: number
+          id?: string
+          intensidade_pct?: number
+          observacoes?: string | null
+          programa_id?: string
+          ramp_down_min?: number
+          ramp_up_min?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programa_iluminacao_faixa_programa_id_fkey"
+            columns: ["programa_id"]
+            isOneToOne: false
+            referencedRelation: "programa_iluminacao_lote"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programa_iluminacao_lote: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          integrado_id: string
+          is_default: boolean
+          nome: string
+          tipo_producao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id: string
+          is_default?: boolean
+          nome: string
+          tipo_producao?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          integrado_id?: string
+          is_default?: boolean
+          nome?: string
+          tipo_producao?: string
           updated_at?: string
         }
         Relationships: []
@@ -7784,6 +7930,10 @@ export type Database = {
         }[]
       }
       same_organization: { Args: { _user_id: string }; Returns: boolean }
+      seed_programas_iluminacao_default: {
+        Args: { p_integrado_id: string }
+        Returns: undefined
+      }
       user_can_access_module: {
         Args: {
           _module_code: string
