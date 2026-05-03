@@ -21,6 +21,78 @@ interface Props {
   tipoProducao: 'frango_corte' | 'postura';
 }
 
+// ---- Module-level caches (lifetime = page session) ----
+const TTL_MS = 60_000;
+type CacheEntry<T> = { value: T; expires: number };
+const programCache = new Map<string, CacheEntry<{ id: string; nome: string } | null>>();
+const defaultProgramCache = new Map<string, CacheEntry<{ id: string; nome: string } | null>>();
+const faixasCache = new Map<string, CacheEntry<Faixa[]>>();
+
+function getCached<T>(map: Map<string, CacheEntry<T>>, key: string): T | undefined {
+  const e = map.get(key);
+  if (!e) return undefined;
+  if (e.expires < Date.now()) {
+    map.delete(key);
+    return undefined;
+  }
+  return e.value;
+}
+function setCached<T>(map: Map<string, CacheEntry<T>>, key: string, value: T) {
+  map.set(key, { value, expires: Date.now() + TTL_MS });
+}
+
+async function fetchProgramaById(programaId: string): Promise<{ id: string; nome: string } | null> {
+  const cached = getCached(programCache, programaId);
+  if (cached !== undefined) return cached;
+  const { data } = await supabase
+    .from('programa_iluminacao_lote')
+    .select('id, nome')
+    .eq('id', programaId)
+    .maybeSingle();
+  const value = data ? { id: data.id, nome: data.nome } : null;
+  setCached(programCache, programaId, value);
+  return value;
+}
+
+async function fetchProgramaDefault(
+  integradoId: string,
+  tipoProducao: string,
+): Promise<{ id: string; nome: string } | null> {
+  const key = `${integradoId}::${tipoProducao}`;
+  const cached = getCached(defaultProgramCache, key);
+  if (cached !== undefined) return cached;
+  const { data: defaults } = await supabase
+    .from('programa_iluminacao_lote')
+    .select('id, nome, tipo_producao')
+    .eq('integrado_id', integradoId)
+    .eq('is_default', true)
+    .eq('ativo', true);
+  const def = defaults?.find((d) => d.tipo_producao === tipoProducao) ?? defaults?.[0];
+  const value = def ? { id: def.id, nome: def.nome } : null;
+  setCached(defaultProgramCache, key, value);
+  return value;
+}
+
+async function fetchFaixas(programaId: string): Promise<Faixa[]> {
+  const cached = getCached(faixasCache, programaId);
+  if (cached !== undefined) return cached;
+  const { data } = await supabase
+    .from('programa_iluminacao_faixa')
+    .select('*')
+    .eq('programa_id', programaId)
+    .order('dia_inicio', { ascending: true });
+  const value = (data ?? []) as unknown as Faixa[];
+  setCached(faixasCache, programaId, value);
+  return value;
+}
+
+function pickFaixaAtual(faixas: Faixa[], idade: number): Faixa | null {
+  return faixas.find((f) => f.dia_inicio <= idade && f.dia_fim >= idade) ?? null;
+}
+function pickProxFaixa(faixas: Faixa[], idade: number): Faixa | null {
+  return faixas.find((f) => f.dia_inicio > idade) ?? null;
+}
+
 export function PreviewAjusteAlojamento({
   dataAlojamentoAtual,
   novaDataAlojamento,
@@ -42,59 +114,23 @@ export function PreviewAjusteAlojamento({
   const idadeNova = novaDataAlojamento ? differenceInDays(new Date(), novaDataAlojamento) : null;
 
   const programaSelecionado = !novoProgramaId || novoProgramaId === 'default' ? null : novoProgramaId;
-  const mudouData =
-    (dataAlojamentoAtual ?? null) !==
-    (novaDataAlojamento ? format(novaDataAlojamento, 'yyyy-MM-dd') : null);
+  const novaDataKey = novaDataAlojamento ? format(novaDataAlojamento, 'yyyy-MM-dd') : null;
+  const mudouData = (dataAlojamentoAtual ?? null) !== novaDataKey;
   const mudouPrograma = (programaAtualId ?? null) !== (programaSelecionado ?? null);
   const houveMudanca = mudouData || mudouPrograma;
 
-  async function resolverPrograma(programaId: string | null): Promise<{ id: string; nome: string } | null> {
-    if (programaId) {
-      const { data } = await supabase
-        .from('programa_iluminacao_lote')
-        .select('id, nome')
-        .eq('id', programaId)
-        .maybeSingle();
-      return data ? { id: data.id, nome: data.nome } : null;
-    }
+  async function resolverPrograma(programaId: string | null) {
+    if (programaId) return fetchProgramaById(programaId);
     if (!integradoId) return null;
-    const { data: defaults } = await supabase
-      .from('programa_iluminacao_lote')
-      .select('id, nome, tipo_producao')
-      .eq('integrado_id', integradoId)
-      .eq('is_default', true)
-      .eq('ativo', true);
-    const def = defaults?.find((d) => d.tipo_producao === tipoProducao) ?? defaults?.[0];
-    return def ? { id: def.id, nome: def.nome } : null;
-  }
-
-  async function buscarFaixa(programaId: string, idade: number): Promise<Faixa | null> {
-    const { data } = await supabase
-      .from('programa_iluminacao_faixa')
-      .select('*')
-      .eq('programa_id', programaId)
-      .lte('dia_inicio', idade)
-      .gte('dia_fim', idade)
-      .limit(1);
-    return (data?.[0] as any) ?? null;
-  }
-
-  async function buscarProxFaixa(programaId: string, idade: number): Promise<Faixa | null> {
-    const { data } = await supabase
-      .from('programa_iluminacao_faixa')
-      .select('*')
-      .eq('programa_id', programaId)
-      .gt('dia_inicio', idade)
-      .order('dia_inicio', { ascending: true })
-      .limit(1);
-    return (data?.[0] as any) ?? null;
+    return fetchProgramaDefault(integradoId, tipoProducao);
   }
 
   useEffect(() => {
     if (!houveMudanca) return;
     let cancelled = false;
-    (async () => {
-      setLoading(true);
+    setLoading(true);
+
+    const timer = setTimeout(async () => {
       try {
         const [progAtual, progNovo] = await Promise.all([
           resolverPrograma(programaAtualId),
@@ -104,33 +140,29 @@ export function PreviewAjusteAlojamento({
         setNomeAtual(progAtual?.nome ?? null);
         setNomeNovo(progNovo?.nome ?? null);
 
-        const [fa, fn, fnProx] = await Promise.all([
-          progAtual && idadeAtual !== null && idadeAtual >= 0
-            ? buscarFaixa(progAtual.id, idadeAtual)
-            : Promise.resolve(null),
-          progNovo && idadeNova !== null && idadeNova >= 0
-            ? buscarFaixa(progNovo.id, idadeNova)
-            : Promise.resolve(null),
-          progNovo && idadeNova !== null && idadeNova >= 0
-            ? buscarProxFaixa(progNovo.id, idadeNova)
-            : Promise.resolve(null),
+        const [faixasAtuais, faixasNovas] = await Promise.all([
+          progAtual ? fetchFaixas(progAtual.id) : Promise.resolve<Faixa[]>([]),
+          progNovo ? fetchFaixas(progNovo.id) : Promise.resolve<Faixa[]>([]),
         ]);
         if (cancelled) return;
-        setFaixaAtual(fa);
-        setFaixaNova(fn);
-        setProxFaixaNova(fnProx);
+
+        setFaixaAtual(idadeAtual !== null && idadeAtual >= 0 ? pickFaixaAtual(faixasAtuais, idadeAtual) : null);
+        setFaixaNova(idadeNova !== null && idadeNova >= 0 ? pickFaixaAtual(faixasNovas, idadeNova) : null);
+        setProxFaixaNova(idadeNova !== null && idadeNova >= 0 ? pickProxFaixa(faixasNovas, idadeNova) : null);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }, 300);
+
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     houveMudanca,
     dataAlojamentoAtual,
-    novaDataAlojamento ? format(novaDataAlojamento, 'yyyy-MM-dd') : null,
+    novaDataKey,
     programaAtualId,
     programaSelecionado,
     integradoId,
@@ -157,7 +189,6 @@ export function PreviewAjusteAlojamento({
         {loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
       </div>
 
-      {/* Idade */}
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <div className="flex items-center gap-1 text-muted-foreground">
           <CalendarLucide className="h-3.5 w-3.5" /> Idade hoje
@@ -178,7 +209,6 @@ export function PreviewAjusteAlojamento({
           )}
         </div>
 
-        {/* Programa */}
         <div className="flex items-center gap-1 text-muted-foreground">
           <Sun className="h-3.5 w-3.5" /> Programa
         </div>
@@ -188,7 +218,6 @@ export function PreviewAjusteAlojamento({
           <strong className="text-foreground">{nomeNovo ?? 'padrão da org'}</strong>
         </div>
 
-        {/* Faixa de fotoperíodo aplicada hoje */}
         <div className="text-muted-foreground">Faixa hoje</div>
         <div className="flex items-center gap-2 flex-wrap">
           {renderFaixa(faixaAtual)}
@@ -196,7 +225,6 @@ export function PreviewAjusteAlojamento({
           {renderFaixa(faixaNova)}
         </div>
 
-        {/* Próxima troca de faixa */}
         {proxFaixaNova && idadeNova !== null && (
           <>
             <div className="text-muted-foreground">Próxima faixa</div>
