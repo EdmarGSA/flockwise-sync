@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Users, HeartHandshake, Wrench, Bell, Globe2 } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, HeartHandshake, Wrench, Bell, Globe2, ShieldCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -21,6 +21,7 @@ const items = [
   { title: 'Mapbox', url: '/backoffice/mapbox', icon: Globe2 },
   { title: 'Ferramentas', url: '/backoffice/ferramentas', icon: Wrench },
   { title: 'Notificações', url: '/backoffice/notificacoes', icon: Bell },
+  { title: 'Auditoria', url: '/backoffice/auditoria', icon: ShieldCheck },
 ];
 
 export function BackofficeSidebar() {
