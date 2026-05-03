@@ -30,6 +30,7 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
   const [faixaAtual, setFaixaAtual] = useState<Faixa | null>(null);
   const [dispositivoId, setDispositivoId] = useState<string | null>(null);
   const [overridesAtivos, setOverridesAtivos] = useState<number>(0);
+  const [proximoOverrideAte, setProximoOverrideAte] = useState<string | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [estimuloOpen, setEstimuloOpen] = useState(false);
   const isPostura = tipoProducao === 'postura';
@@ -91,14 +92,17 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
             .eq('ativo', true);
           const ids = (canais ?? []).map((c) => c.id);
           if (ids.length) {
-            const { count } = await supabase
+            const { data: ovrs } = await supabase
               .from('override_iluminacao_canal')
-              .select('id', { count: 'exact', head: true })
+              .select('ate_quando')
               .in('canal_id', ids)
-              .gt('ate_quando', new Date().toISOString());
-            setOverridesAtivos(count ?? 0);
+              .gt('ate_quando', new Date().toISOString())
+              .order('ate_quando', { ascending: true });
+            setOverridesAtivos(ovrs?.length ?? 0);
+            setProximoOverrideAte(ovrs?.[0]?.ate_quando ?? null);
           } else {
             setOverridesAtivos(0);
+            setProximoOverrideAte(null);
           }
         }
       }
@@ -120,7 +124,8 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
             <div className="flex items-center gap-2">
               {overridesAtivos > 0 && (
                 <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-                  {overridesAtivos} override{overridesAtivos > 1 ? 's' : ''} ativo{overridesAtivos > 1 ? 's' : ''}
+                  Override ativo{proximoOverrideAte ? ` até ${new Date(proximoOverrideAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                  {overridesAtivos > 1 ? ` (+${overridesAtivos - 1})` : ''}
                 </Badge>
               )}
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
