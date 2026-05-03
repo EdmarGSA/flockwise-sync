@@ -447,6 +447,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                       <FormControl>
                         <Button
                           variant="outline"
+                          disabled={!isEditable && !modoEdicaoAvancada}
                           className={cn(
                             "w-full pl-3 text-left font-normal",
                             !field.value && "text-muted-foreground"
