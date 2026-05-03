@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
 import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
+import { NATRedirectExample } from "@/components/cameras/NATRedirectExample";
 
 type Protocolo = "http" | "https";
 
@@ -358,6 +359,14 @@ const CameraNovoDvr = () => {
                 onChange={(e) => setForm({ ...form, porta_rtsp: +e.target.value })}
               />
             </div>
+
+            <NATRedirectExample
+              protocolo={form.protocolo}
+              portaExternaHttp={form.porta_http}
+              portaExternaHttps={form.porta_https}
+              portaRtsp={form.porta_rtsp}
+            />
+
 
             <div>
               <Label>Usuário *</Label>
