@@ -305,7 +305,6 @@ const CameraNovoDvr = () => {
                       protocolo: protocoloNovo,
                     };
                     setForm(next);
-                    setPortaAutoAjuste(null);
                     validarProtocoloPorta(protocoloNovo, next.porta_http, next.porta_https);
                   }}
                 >
@@ -332,7 +331,6 @@ const CameraNovoDvr = () => {
                         : { porta_https: valor }),
                     };
                     setForm(next);
-                    setPortaAutoAjuste(null);
                     validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
                   }}
                   aria-invalid={!!portaError}
