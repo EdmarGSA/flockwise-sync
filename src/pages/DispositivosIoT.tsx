@@ -760,7 +760,8 @@ export default function DispositivosIoT() {
                   const currentSwitch = switchStates[dev.id];
                   const isOnline = leitura?.online !== false;
 
-                  if (dev.funcao_automacao === 'iluminacao' && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
+                  const isIluminacao = dev.funcao_automacao === 'iluminacao' || iluminacaoDeviceIds.has(dev.id);
+                  if (isIluminacao && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
                     return (
                       <DispositivoIluminacaoCard
                         key={dev.id}
