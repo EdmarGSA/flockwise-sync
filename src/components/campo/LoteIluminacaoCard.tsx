@@ -23,7 +23,7 @@ interface Props {
   tipoProducao?: 'frango_corte' | 'postura' | string | null;
 }
 
-export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoId, tipoProducao }: Props) {
+export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIluminacaoId, tipoProducao }: Props) {
   const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(true);
   const [programaNome, setProgramaNome] = useState<string | null>(null);
