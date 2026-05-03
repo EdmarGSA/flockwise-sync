@@ -7938,6 +7938,11 @@ export type Database = {
     }
     Functions: {
       aplicar_estimulo_postura: { Args: { p_lote_id: string }; Returns: string }
+      aplicar_estimulo_postura_internal: {
+        Args: { p_lote_id: string }
+        Returns: string
+      }
+      auto_aplicar_estimulos_postura: { Args: never; Returns: number }
       calcular_fase_postura: {
         Args: { semanas_vida: number }
         Returns: Database["public"]["Enums"]["fase_postura"]
