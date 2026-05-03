@@ -631,7 +631,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                   type="button"
                   className="flex-1"
                   disabled={loading}
-                  onClick={handleSaveAjustes}
+                  onClick={() => setConfirmAjustesOpen(true)}
                 >
                   {loading ? 'Salvando...' : 'Salvar Ajustes'}
                 </Button>
