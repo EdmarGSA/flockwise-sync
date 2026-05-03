@@ -24,6 +24,7 @@ interface Canal {
   ativo: boolean;
   estado_atual: string | null;
   observacoes: string | null;
+  suporta_dimer?: boolean;
 }
 
 interface Props {
