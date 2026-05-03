@@ -185,6 +185,13 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
           dispositivoId={dispositivoId}
         />
       )}
+      {isPostura && (
+        <EstimuloPosturaDialog
+          open={estimuloOpen}
+          onOpenChange={setEstimuloOpen}
+          loteId={loteId}
+        />
+      )}
     </>
   );
 }
