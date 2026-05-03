@@ -253,14 +253,24 @@ export function DispositivoIluminacaoCard({
           <DialogHeader>
             <DialogTitle>Curva de fotoperíodo · {resumo?.programaNome}</DialogTitle>
           </DialogHeader>
-          {resumo?.programaId && (
-            <CurvaFotoperiodoChart
-              programaId={resumo.programaId}
-              idadeAtual={resumo.idadeDias ?? undefined}
-            />
+          {resumo?.programaId && curvaOpen && (
+            <CurvaProgramaWrapper programaId={resumo.programaId} />
           )}
         </DialogContent>
       </Dialog>
     </Card>
   );
+}
+
+function CurvaProgramaWrapper({ programaId }: { programaId: string }) {
+  const [faixas, setFaixas] = useState<any[]>([]);
+  useEffect(() => {
+    supabase
+      .from('programa_iluminacao_faixa')
+      .select('dia_inicio, dia_fim, horas_luz, blocos, intensidade_pct')
+      .eq('programa_id', programaId)
+      .order('dia_inicio')
+      .then(({ data }) => setFaixas(data ?? []));
+  }, [programaId]);
+  return <CurvaFotoperiodoChart faixas={faixas as any} />;
 }
