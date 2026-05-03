@@ -20,6 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialog';
 import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
 import { SaudeIoTPanel } from '@/components/iot/SaudeIoTPanel';
+import { DispositivoIluminacaoCard } from '@/components/iot/DispositivoIluminacaoCard';
 import { HeartPulse } from 'lucide-react';
 
 interface Dispositivo {
@@ -743,6 +744,21 @@ export default function DispositivosIoT() {
                   const galpao = galpoes.find((g) => g.id === dev.galpao_id);
                   const currentSwitch = switchStates[dev.id];
                   const isOnline = leitura?.online !== false;
+
+                  if (dev.funcao_automacao === 'iluminacao' && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
+                    return (
+                      <DispositivoIluminacaoCard
+                        key={dev.id}
+                        dev={dev as any}
+                        galpao={galpao}
+                        integradoId={integradoId}
+                        isOnline={isOnline}
+                        currentSwitch={currentSwitch as 'on' | 'off' | undefined}
+                        onManageCanais={() => { setSelectedDeviceForCanais(dev); setCanaisDialogOpen(true); }}
+                        onDelete={() => handleDeleteDevice(dev.id)}
+                      />
+                    );
+                  }
 
                   return (
                     <Card key={dev.id} className="relative">
