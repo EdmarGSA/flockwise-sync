@@ -113,6 +113,12 @@ const Configuracoes = () => {
       path: "/configuracoes/dispositivos-iot"
     },
     {
+      title: "Programas de Iluminação",
+      description: "Fotoperíodo por faixa de idade do lote",
+      icon: Lightbulb,
+      path: "/configuracoes/iluminacao"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
