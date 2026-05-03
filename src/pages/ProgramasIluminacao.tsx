@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CurvaFotoperiodoChart } from "@/components/iot/CurvaFotoperiodoChart";
 import { OverridesAtivosLista } from "@/components/iot/OverridesAtivosLista";
+import { TEMPLATES_PROGRAMAS } from "@/lib/templates/programasIluminacao";
 
 interface Programa {
   id: string;
