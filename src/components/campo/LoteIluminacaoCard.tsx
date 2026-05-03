@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, Hand, ExternalLink, Loader2 } from 'lucide-react';
+import { Lightbulb, Hand, ExternalLink, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { OverridesIluminacaoDialog } from '@/components/iot/OverridesIluminacaoDialog';
+import { EstimuloPosturaDialog } from '@/components/iot/EstimuloPosturaDialog';
 
 interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
 interface Faixa {
@@ -22,7 +23,7 @@ interface Props {
   tipoProducao?: 'frango_corte' | 'postura' | string | null;
 }
 
-export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoId, tipoProducao }: Props) {
+export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIluminacaoId, tipoProducao }: Props) {
   const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(true);
   const [programaNome, setProgramaNome] = useState<string | null>(null);
@@ -30,6 +31,8 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
   const [dispositivoId, setDispositivoId] = useState<string | null>(null);
   const [overridesAtivos, setOverridesAtivos] = useState<number>(0);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [estimuloOpen, setEstimuloOpen] = useState(false);
+  const isPostura = tipoProducao === 'postura';
 
   useEffect(() => {
     if (!integradoId) return;
@@ -123,6 +126,12 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
                 <Link to="/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
               </Button>
+              {isPostura && (
+                <Button size="sm" variant="outline" className="h-7 px-2"
+                  onClick={() => setEstimuloOpen(true)}>
+                  <Zap className="w-3.5 h-3.5 mr-1" />Estímulo
+                </Button>
+              )}
               {dispositivoId && (
                 <Button size="sm" variant="outline" className="h-7 px-2"
                   onClick={() => setOverrideOpen(true)}>
@@ -174,6 +183,13 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
           open={overrideOpen}
           onOpenChange={setOverrideOpen}
           dispositivoId={dispositivoId}
+        />
+      )}
+      {isPostura && (
+        <EstimuloPosturaDialog
+          open={estimuloOpen}
+          onOpenChange={setEstimuloOpen}
+          loteId={loteId}
         />
       )}
     </>
