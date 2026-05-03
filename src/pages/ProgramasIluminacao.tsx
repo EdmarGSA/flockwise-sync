@@ -49,6 +49,7 @@ export default function ProgramasIluminacao() {
   const [novoOpen, setNovoOpen] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("frango_corte");
+  const [novoTemplate, setNovoTemplate] = useState<string>("vazio");
 
   const fetchProgramas = async () => {
     if (!integradoId) return;
