@@ -1,7 +1,14 @@
 /**
- * Valida coerência entre protocolo e porta configurada.
- * Regra: HTTP deve usar porta 80 e HTTPS deve usar porta 443 (portas padrão).
- * Retorna { ok, motivo } — motivo só preenchido quando há divergência.
+ * Valida a porta configurada para o protocolo informado.
+ *
+ * Regras:
+ * - A porta deve estar entre 1 e 65535 (caso contrário `ok=false`).
+ * - Portas diferentes da padrão (80 para HTTP, 443 para HTTPS) são PERMITIDAS,
+ *   pois é comum redirecionar portas externas alternativas no roteador
+ *   (ex.: WAN 8080 → DVR 80) quando a porta padrão já está em uso pelo
+ *   próprio painel admin do roteador ou bloqueada pela operadora.
+ * - Quando a porta diverge do padrão retornamos um `aviso` informativo,
+ *   mas `ok` continua `true`.
  */
 export type Protocolo = "http" | "https";
 
@@ -14,6 +21,7 @@ export interface ProtocoloPortaInput {
 export interface ProtocoloPortaResult {
   ok: boolean;
   motivo?: string;
+  aviso?: string;
 }
 
 const PORTAS_PADRAO: Record<Protocolo, number> = {
@@ -37,8 +45,8 @@ export function validateProtocoloPorta(
 
   if (portaAtiva !== padrao) {
     return {
-      ok: false,
-      motivo: `Protocolo ${protocolo.toUpperCase()} deve usar a porta ${padrao}. Porta informada: ${portaAtiva}.`,
+      ok: true,
+      aviso: `Porta ${portaAtiva} não é a padrão de ${protocolo.toUpperCase()} (${padrao}). Confirme que o roteador encaminha esta porta externa para o DVR.`,
     };
   }
 
