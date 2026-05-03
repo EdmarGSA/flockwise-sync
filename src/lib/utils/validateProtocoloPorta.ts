@@ -32,11 +32,27 @@ const PORTAS_PADRAO: Record<Protocolo, number> = {
 export function validateProtocoloPorta(
   input: ProtocoloPortaInput,
 ): ProtocoloPortaResult {
-  const { protocolo } = input;
-  const portaAtiva = protocolo === "http" ? input.porta_http : input.porta_https;
-  const padrao = PORTAS_PADRAO[protocolo];
+  const { protocolo } = input ?? ({} as ProtocoloPortaInput);
+  const padrao = protocolo ? PORTAS_PADRAO[protocolo] : undefined;
 
-  if (!portaAtiva || portaAtiva < 1 || portaAtiva > 65535) {
+  if (!padrao) {
+    return {
+      ok: false,
+      motivo: `Protocolo inválido. Use 'http' ou 'https'.`,
+    };
+  }
+
+  const portaRaw = protocolo === "http" ? input.porta_http : input.porta_https;
+  const portaAtiva = typeof portaRaw === "number" ? portaRaw : Number(portaRaw);
+
+  if (
+    portaRaw === null ||
+    portaRaw === undefined ||
+    portaRaw === "" ||
+    !Number.isFinite(portaAtiva) ||
+    portaAtiva < 1 ||
+    portaAtiva > 65535
+  ) {
     return {
       ok: false,
       motivo: `Porta inválida. Use um valor entre 1 e 65535 (padrão ${padrao} para ${protocolo.toUpperCase()}).`,
