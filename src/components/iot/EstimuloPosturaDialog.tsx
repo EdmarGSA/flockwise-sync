@@ -69,18 +69,42 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
     })();
   }, [open, integradoId, loteId]);
 
-  const salvar = async () => {
-    if (!integradoId) return;
+  const validar = (): boolean => {
+    const r = cfgSchema.safeParse({
+      idade_min_semanas: cfg.idade_min_semanas,
+      peso_min_kg: cfg.peso_min_kg,
+      horas_inicio: cfg.horas_inicio,
+      horas_alvo: cfg.horas_alvo,
+      ganho_semanal_min: cfg.ganho_semanal_min,
+      intensidade_pct: cfg.intensidade_pct,
+    });
+    if (!r.success) {
+      const errs: Record<string, string> = {};
+      r.error.issues.forEach((i) => { errs[i.path[0] as string] = i.message; });
+      setErrors(errs);
+      toast.error(r.error.issues[0].message);
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const salvar = async (): Promise<boolean> => {
+    if (!integradoId) return false;
+    if (!validar()) return false;
     const payload = { ...cfg, lote_id: loteId, integrado_id: integradoId };
     const { error } = await supabase.from('config_estimulo_postura').upsert(payload, { onConflict: 'lote_id' });
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     toast.success('Configuração salva');
+    return true;
   };
 
   const aplicar = async () => {
+    if (!validar()) return;
     setApplying(true);
-    await salvar();
-    const { data, error } = await supabase.rpc('aplicar_estimulo_postura', { p_lote_id: loteId });
+    const ok = await salvar();
+    if (!ok) { setApplying(false); return; }
+    const { error } = await supabase.rpc('aplicar_estimulo_postura', { p_lote_id: loteId });
     setApplying(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Estímulo aplicado e programa vinculado ao lote');
