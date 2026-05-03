@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Power, Loader2, Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle } from 'lucide-react';
+import { Power, Loader2, Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Hand } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useDeviceControl } from '@/hooks/useDeviceControl';
+import { OverridesIluminacaoDialog } from '@/components/iot/OverridesIluminacaoDialog';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
