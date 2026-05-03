@@ -114,8 +114,17 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
 
   const handleSave = async () => {
     if (!dispositivoId || !integradoId) return;
-    setSaving(true);
 
+    // Bloqueia automação de iluminação sem galpão vinculado (auto-iluminacao depende de galpao_id)
+    const luzAutoSemGalpao = canais.some(
+      (c) => c.ativo && c.tipo_equipamento === 'iluminacao' && c.automacao_ativa && !dispositivoGalpaoId,
+    );
+    if (luzAutoSemGalpao) {
+      toast.error('Vincule este dispositivo a um galpão antes de ativar automação de iluminação.');
+      return;
+    }
+
+    setSaving(true);
     try {
       const ativosParaUpsert = canais
         .filter((c) => c.ativo || c.id) // só envia canais ativados ou que já existem
