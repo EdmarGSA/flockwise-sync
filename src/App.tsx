@@ -498,6 +498,7 @@ const AppRoutes = () => (
       <Route path="ferramentas" element={<BackofficeFerramentas />} />
       <Route path="mapbox" element={<BackofficeMapbox />} />
       <Route path="notificacoes" element={<BackofficeNotificacoes />} />
+      <Route path="auditoria" element={<BackofficeAuditoria />} />
     </Route>
 
     {/* Vitrine pública do fornecedor */}
