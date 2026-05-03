@@ -745,7 +745,21 @@ export default function DispositivosIoT() {
                   const currentSwitch = switchStates[dev.id];
                   const isOnline = leitura?.online !== false;
 
-                  return (
+                  if (dev.funcao_automacao === 'iluminacao' && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
+                    return (
+                      <DispositivoIluminacaoCard
+                        key={dev.id}
+                        dev={dev as any}
+                        galpao={galpao}
+                        integradoId={integradoId}
+                        isOnline={isOnline}
+                        currentSwitch={currentSwitch as 'on' | 'off' | undefined}
+                        onManageCanais={() => { setSelectedDeviceForCanais(dev); setCanaisDialogOpen(true); }}
+                        onDelete={() => handleDeleteDevice(dev.id)}
+                      />
+                    );
+                  }
+
                     <Card key={dev.id} className="relative">
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
