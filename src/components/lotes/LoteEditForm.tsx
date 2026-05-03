@@ -673,6 +673,77 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           </Button>
         </div>
       )}
+
+      <AlertDialog open={confirmAjustesOpen} onOpenChange={setConfirmAjustesOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar ajustes do lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Revise as alterações antes de salvar. Mudar a data de alojamento recalcula a idade do lote
+              em todo o sistema (mortalidade, pesagens, fotoperíodo).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border p-3 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground uppercase">Data de Alojamento</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  {lote.data_alojamento
+                    ? format(parseISO(lote.data_alojamento), 'dd/MM/yyyy', { locale: ptBR })
+                    : '—'}
+                </span>
+                <span className="text-foreground font-medium">
+                  →{' '}
+                  {form.watch('data_alojamento')
+                    ? format(form.watch('data_alojamento') as Date, 'dd/MM/yyyy', { locale: ptBR })
+                    : '—'}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground uppercase">Programa de Iluminação</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground truncate">
+                  {programasIluminacao.find((p) => p.id === ((lote as any).programa_iluminacao_id))?.nome ?? 'padrão da org'}
+                </span>
+                <span className="text-foreground font-medium truncate">
+                  →{' '}
+                  {(() => {
+                    const v = form.watch('programa_iluminacao_id');
+                    if (!v || v === 'default') return 'padrão da org';
+                    return programasIluminacao.find((p) => p.id === v)?.nome ?? v;
+                  })()}
+                </span>
+              </div>
+            </div>
+
+            <PreviewAjusteAlojamento
+              dataAlojamentoAtual={lote.data_alojamento}
+              novaDataAlojamento={form.watch('data_alojamento')}
+              programaAtualId={(lote as any).programa_iluminacao_id ?? null}
+              novoProgramaId={form.watch('programa_iluminacao_id')}
+              integradoId={integradoId}
+              tipoProducao={isPostura ? 'postura' : 'frango_corte'}
+            />
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={loading}
+              onClick={async (e) => {
+                e.preventDefault();
+                await handleSaveAjustes();
+                setConfirmAjustesOpen(false);
+              }}
+            >
+              {loading ? 'Salvando...' : 'Confirmar e salvar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
