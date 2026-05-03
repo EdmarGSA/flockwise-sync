@@ -128,33 +128,39 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Idade mínima (semanas)</Label>
-                <Input type="number" value={cfg.idade_min_semanas}
+                <Input type="number" min={10} max={40} value={cfg.idade_min_semanas}
                   onChange={(e) => setCfg({ ...cfg, idade_min_semanas: Number(e.target.value) })} />
+                {errors.idade_min_semanas && <p className="text-xs text-destructive mt-1">{errors.idade_min_semanas}</p>}
               </div>
               <div>
                 <Label>Peso mínimo (kg)</Label>
-                <Input type="number" step="0.01" value={cfg.peso_min_kg}
+                <Input type="number" step="0.01" min={0.5} max={5} value={cfg.peso_min_kg}
                   onChange={(e) => setCfg({ ...cfg, peso_min_kg: Number(e.target.value) })} />
+                {errors.peso_min_kg && <p className="text-xs text-destructive mt-1">{errors.peso_min_kg}</p>}
               </div>
               <div>
                 <Label>Horas início</Label>
-                <Input type="number" step="0.5" value={cfg.horas_inicio}
+                <Input type="number" step="0.5" min={6} max={24} value={cfg.horas_inicio}
                   onChange={(e) => setCfg({ ...cfg, horas_inicio: Number(e.target.value) })} />
+                {errors.horas_inicio && <p className="text-xs text-destructive mt-1">{errors.horas_inicio}</p>}
               </div>
               <div>
                 <Label>Horas alvo</Label>
-                <Input type="number" step="0.5" value={cfg.horas_alvo}
+                <Input type="number" step="0.5" min={6} max={24} value={cfg.horas_alvo}
                   onChange={(e) => setCfg({ ...cfg, horas_alvo: Number(e.target.value) })} />
+                {errors.horas_alvo && <p className="text-xs text-destructive mt-1">{errors.horas_alvo}</p>}
               </div>
               <div>
                 <Label>Ganho semanal (min)</Label>
-                <Input type="number" value={cfg.ganho_semanal_min}
+                <Input type="number" min={5} max={120} value={cfg.ganho_semanal_min}
                   onChange={(e) => setCfg({ ...cfg, ganho_semanal_min: Number(e.target.value) })} />
+                {errors.ganho_semanal_min && <p className="text-xs text-destructive mt-1">{errors.ganho_semanal_min}</p>}
               </div>
               <div>
                 <Label>Intensidade (%)</Label>
-                <Input type="number" value={cfg.intensidade_pct}
+                <Input type="number" min={0} max={100} value={cfg.intensidade_pct}
                   onChange={(e) => setCfg({ ...cfg, intensidade_pct: Number(e.target.value) })} />
+                {errors.intensidade_pct && <p className="text-xs text-destructive mt-1">{errors.intensidade_pct}</p>}
               </div>
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
