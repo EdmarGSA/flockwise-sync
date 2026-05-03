@@ -93,6 +93,7 @@ export default function DispositivosIoT() {
   const navigate = useNavigate();
   const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+  const [iluminacaoDeviceIds, setIluminacaoDeviceIds] = useState<Set<string>>(new Set());
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [leituras, setLeituras] = useState<Record<string, Leitura>>({});
   const [switchStates, setSwitchStates] = useState<Record<string, string | null>>({});
