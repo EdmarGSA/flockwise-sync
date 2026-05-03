@@ -251,6 +251,19 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
                       </div>
                     </div>
 
+                    {canal.tipo_equipamento === 'iluminacao' && (
+                      <div className="md:col-span-2 flex items-center gap-2 rounded-md border border-dashed p-2">
+                        <Switch
+                          checked={!!canal.suporta_dimer}
+                          onCheckedChange={(v) => updateCanal(idx, { suporta_dimer: v })}
+                          disabled={!canal.ativo}
+                        />
+                        <Label className="text-xs text-muted-foreground">
+                          Canal com dimmer/PWM (envia intensidade 0–100% em vez de só on/off)
+                        </Label>
+                      </div>
+                    )}
+
                     <div className="md:col-span-2">
                       <Label className="text-xs">Observações</Label>
                       <Input
