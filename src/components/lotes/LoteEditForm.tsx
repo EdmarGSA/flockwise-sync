@@ -60,6 +60,7 @@ interface LoteEditFormProps {
 export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  const [programasIluminacao, setProgramasIluminacao] = useState<{ id: string; nome: string; is_default: boolean }[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   
