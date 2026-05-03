@@ -31,6 +31,8 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
   const [dispositivoId, setDispositivoId] = useState<string | null>(null);
   const [overridesAtivos, setOverridesAtivos] = useState<number>(0);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [estimuloOpen, setEstimuloOpen] = useState(false);
+  const isPostura = tipoProducao === 'postura';
 
   useEffect(() => {
     if (!integradoId) return;
