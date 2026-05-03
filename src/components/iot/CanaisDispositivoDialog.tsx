@@ -59,7 +59,7 @@ const FUNCOES: { value: FuncaoAutomacao; label: string }[] = [
 
 const tipoIcon = (tipo: TipoEquipamento) => TIPOS.find((t) => t.value === tipo)?.icon || HelpCircle;
 
-export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dispositivoNome, integradoId, numCanais }: Props) {
+export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dispositivoNome, integradoId, numCanais, dispositivoGalpaoId }: Props) {
   const [canais, setCanais] = useState<Canal[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
