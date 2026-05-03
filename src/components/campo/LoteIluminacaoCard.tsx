@@ -92,14 +92,17 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
             .eq('ativo', true);
           const ids = (canais ?? []).map((c) => c.id);
           if (ids.length) {
-            const { count } = await supabase
+            const { data: ovrs } = await supabase
               .from('override_iluminacao_canal')
-              .select('id', { count: 'exact', head: true })
+              .select('ate_quando')
               .in('canal_id', ids)
-              .gt('ate_quando', new Date().toISOString());
-            setOverridesAtivos(count ?? 0);
+              .gt('ate_quando', new Date().toISOString())
+              .order('ate_quando', { ascending: true });
+            setOverridesAtivos(ovrs?.length ?? 0);
+            setProximoOverrideAte(ovrs?.[0]?.ate_quando ?? null);
           } else {
             setOverridesAtivos(0);
+            setProximoOverrideAte(null);
           }
         }
       }
