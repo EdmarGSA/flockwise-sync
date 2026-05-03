@@ -329,11 +329,7 @@ function decideChannelState(
       return { state: "off", reason: `cond. nebulização não atendida (temp ${temp}, umid ${umid})` };
     }
 
-    case "iluminacao":
-      // Iluminação agora é tratada pela edge function dedicada `auto-iluminacao`
-      // (programa de fotoperíodo configurável por lote). Aqui retornamos null
-      // para evitar conflito de comandos entre as duas funções.
-      return null;
+    // case "iluminacao": tratado exclusivamente em `auto-iluminacao` (filtrado na query).
 
     case "cortina": {
       // Curtain: open (off relay = aberta) when hot, close (on = fechada) when cold or at night
