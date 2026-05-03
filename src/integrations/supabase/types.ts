@@ -7947,6 +7947,7 @@ export type Database = {
         Args: { p_extra?: Json; p_function_name: string; p_key_param?: string }
         Returns: undefined
       }
+      redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
       reservar_estoque_ovos_fifo: {
         Args: {
           p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]
