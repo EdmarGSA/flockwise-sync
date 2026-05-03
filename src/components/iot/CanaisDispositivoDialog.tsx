@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Loader2, Save } from 'lucide-react';
+import { Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Loader2, Save, AlertTriangle } from 'lucide-react';
 
 type TipoEquipamento = 'ventilador' | 'nebulizador' | 'iluminacao' | 'aquecimento' | 'cortina' | 'alarme' | 'outro';
 type FuncaoAutomacao = 'nenhuma' | 'aquecimento' | 'ventilacao' | 'nebulizacao' | 'iluminacao' | 'cortina' | 'alarme';
@@ -34,6 +34,7 @@ interface Props {
   dispositivoNome: string;
   integradoId: string | null;
   numCanais: number;
+  dispositivoGalpaoId?: string | null;
 }
 
 const TIPOS: { value: TipoEquipamento; label: string; icon: typeof Fan }[] = [
@@ -58,7 +59,7 @@ const FUNCOES: { value: FuncaoAutomacao; label: string }[] = [
 
 const tipoIcon = (tipo: TipoEquipamento) => TIPOS.find((t) => t.value === tipo)?.icon || HelpCircle;
 
-export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dispositivoNome, integradoId, numCanais }: Props) {
+export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dispositivoNome, integradoId, numCanais, dispositivoGalpaoId }: Props) {
   const [canais, setCanais] = useState<Canal[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -113,8 +114,17 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
 
   const handleSave = async () => {
     if (!dispositivoId || !integradoId) return;
-    setSaving(true);
 
+    // Bloqueia automação de iluminação sem galpão vinculado (auto-iluminacao depende de galpao_id)
+    const luzAutoSemGalpao = canais.some(
+      (c) => c.ativo && c.tipo_equipamento === 'iluminacao' && c.automacao_ativa && !dispositivoGalpaoId,
+    );
+    if (luzAutoSemGalpao) {
+      toast.error('Vincule este dispositivo a um galpão antes de ativar automação de iluminação.');
+      return;
+    }
+
+    setSaving(true);
     try {
       const ativosParaUpsert = canais
         .filter((c) => c.ativo || c.id) // só envia canais ativados ou que já existem
@@ -165,6 +175,17 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           </div>
         ) : (
           <div className="space-y-3 pt-2">
+            {!dispositivoGalpaoId && canais.some((c) => c.ativo && c.tipo_equipamento === 'iluminacao') && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 text-destructive" />
+                <div>
+                  <p className="font-medium text-destructive">Dispositivo sem galpão vinculado</p>
+                  <p className="text-xs text-muted-foreground">
+                    A automação de iluminação só funciona quando o dispositivo está vinculado a um galpão (a função <code>auto-iluminacao</code> usa o lote ativo do galpão para decidir o programa). Edite o dispositivo e selecione um galpão.
+                  </p>
+                </div>
+              </div>
+            )}
             {canais.map((canal, idx) => {
               const Icon = tipoIcon(canal.tipo_equipamento);
               return (
