@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Loader2, Save } from 'lucide-react';
+import { Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Loader2, Save, AlertTriangle } from 'lucide-react';
 
 type TipoEquipamento = 'ventilador' | 'nebulizador' | 'iluminacao' | 'aquecimento' | 'cortina' | 'alarme' | 'outro';
 type FuncaoAutomacao = 'nenhuma' | 'aquecimento' | 'ventilacao' | 'nebulizacao' | 'iluminacao' | 'cortina' | 'alarme';
