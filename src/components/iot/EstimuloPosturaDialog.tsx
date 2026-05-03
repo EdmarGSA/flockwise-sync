@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,21 @@ import { Loader2, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { toast } from 'sonner';
+
+const cfgSchema = z.object({
+  idade_min_semanas: z.number().int('Use valor inteiro').min(10, 'Idade mínima >= 10 semanas').max(40, 'Idade mínima <= 40 semanas'),
+  peso_min_kg: z.number().min(0.5, 'Peso mínimo >= 0,5 kg').max(5, 'Peso mínimo <= 5 kg'),
+  horas_inicio: z.number().min(6, 'Horas início >= 6h').max(24, 'Horas início <= 24h'),
+  horas_alvo: z.number().min(6, 'Horas alvo >= 6h').max(24, 'Horas alvo <= 24h'),
+  ganho_semanal_min: z.number().int('Use minutos inteiros').min(5, 'Ganho semanal >= 5 min').max(120, 'Ganho semanal <= 120 min'),
+  intensidade_pct: z.number().int().min(0, 'Intensidade entre 0 e 100').max(100, 'Intensidade entre 0 e 100'),
+}).refine((d) => d.horas_inicio < d.horas_alvo, {
+  message: 'Horas início deve ser menor que horas alvo',
+  path: ['horas_inicio'],
+}).refine((d) => (d.horas_alvo - d.horas_inicio) * 60 >= d.ganho_semanal_min, {
+  message: 'Ganho semanal maior que a diferença total entre início e alvo',
+  path: ['ganho_semanal_min'],
+});
 
 interface Props {
   open: boolean;
@@ -37,6 +53,7 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
   const [cfg, setCfg] = useState<Cfg>(DEFAULT);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open || !integradoId) return;
@@ -53,18 +70,42 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
     })();
   }, [open, integradoId, loteId]);
 
-  const salvar = async () => {
-    if (!integradoId) return;
+  const validar = (): boolean => {
+    const r = cfgSchema.safeParse({
+      idade_min_semanas: cfg.idade_min_semanas,
+      peso_min_kg: cfg.peso_min_kg,
+      horas_inicio: cfg.horas_inicio,
+      horas_alvo: cfg.horas_alvo,
+      ganho_semanal_min: cfg.ganho_semanal_min,
+      intensidade_pct: cfg.intensidade_pct,
+    });
+    if (!r.success) {
+      const errs: Record<string, string> = {};
+      r.error.issues.forEach((i) => { errs[i.path[0] as string] = i.message; });
+      setErrors(errs);
+      toast.error(r.error.issues[0].message);
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const salvar = async (): Promise<boolean> => {
+    if (!integradoId) return false;
+    if (!validar()) return false;
     const payload = { ...cfg, lote_id: loteId, integrado_id: integradoId };
     const { error } = await supabase.from('config_estimulo_postura').upsert(payload, { onConflict: 'lote_id' });
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     toast.success('Configuração salva');
+    return true;
   };
 
   const aplicar = async () => {
+    if (!validar()) return;
     setApplying(true);
-    await salvar();
-    const { data, error } = await supabase.rpc('aplicar_estimulo_postura', { p_lote_id: loteId });
+    const ok = await salvar();
+    if (!ok) { setApplying(false); return; }
+    const { error } = await supabase.rpc('aplicar_estimulo_postura', { p_lote_id: loteId });
     setApplying(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Estímulo aplicado e programa vinculado ao lote');
@@ -87,33 +128,39 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Idade mínima (semanas)</Label>
-                <Input type="number" value={cfg.idade_min_semanas}
+                <Input type="number" min={10} max={40} value={cfg.idade_min_semanas}
                   onChange={(e) => setCfg({ ...cfg, idade_min_semanas: Number(e.target.value) })} />
+                {errors.idade_min_semanas && <p className="text-xs text-destructive mt-1">{errors.idade_min_semanas}</p>}
               </div>
               <div>
                 <Label>Peso mínimo (kg)</Label>
-                <Input type="number" step="0.01" value={cfg.peso_min_kg}
+                <Input type="number" step="0.01" min={0.5} max={5} value={cfg.peso_min_kg}
                   onChange={(e) => setCfg({ ...cfg, peso_min_kg: Number(e.target.value) })} />
+                {errors.peso_min_kg && <p className="text-xs text-destructive mt-1">{errors.peso_min_kg}</p>}
               </div>
               <div>
                 <Label>Horas início</Label>
-                <Input type="number" step="0.5" value={cfg.horas_inicio}
+                <Input type="number" step="0.5" min={6} max={24} value={cfg.horas_inicio}
                   onChange={(e) => setCfg({ ...cfg, horas_inicio: Number(e.target.value) })} />
+                {errors.horas_inicio && <p className="text-xs text-destructive mt-1">{errors.horas_inicio}</p>}
               </div>
               <div>
                 <Label>Horas alvo</Label>
-                <Input type="number" step="0.5" value={cfg.horas_alvo}
+                <Input type="number" step="0.5" min={6} max={24} value={cfg.horas_alvo}
                   onChange={(e) => setCfg({ ...cfg, horas_alvo: Number(e.target.value) })} />
+                {errors.horas_alvo && <p className="text-xs text-destructive mt-1">{errors.horas_alvo}</p>}
               </div>
               <div>
                 <Label>Ganho semanal (min)</Label>
-                <Input type="number" value={cfg.ganho_semanal_min}
+                <Input type="number" min={5} max={120} value={cfg.ganho_semanal_min}
                   onChange={(e) => setCfg({ ...cfg, ganho_semanal_min: Number(e.target.value) })} />
+                {errors.ganho_semanal_min && <p className="text-xs text-destructive mt-1">{errors.ganho_semanal_min}</p>}
               </div>
               <div>
                 <Label>Intensidade (%)</Label>
-                <Input type="number" value={cfg.intensidade_pct}
+                <Input type="number" min={0} max={100} value={cfg.intensidade_pct}
                   onChange={(e) => setCfg({ ...cfg, intensidade_pct: Number(e.target.value) })} />
+                {errors.intensidade_pct && <p className="text-xs text-destructive mt-1">{errors.intensidade_pct}</p>}
               </div>
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
