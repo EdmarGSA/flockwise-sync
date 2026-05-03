@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,21 @@ import { Loader2, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { toast } from 'sonner';
+
+const cfgSchema = z.object({
+  idade_min_semanas: z.number().int('Use valor inteiro').min(10, 'Idade mínima >= 10 semanas').max(40, 'Idade mínima <= 40 semanas'),
+  peso_min_kg: z.number().min(0.5, 'Peso mínimo >= 0,5 kg').max(5, 'Peso mínimo <= 5 kg'),
+  horas_inicio: z.number().min(6, 'Horas início >= 6h').max(24, 'Horas início <= 24h'),
+  horas_alvo: z.number().min(6, 'Horas alvo >= 6h').max(24, 'Horas alvo <= 24h'),
+  ganho_semanal_min: z.number().int('Use minutos inteiros').min(5, 'Ganho semanal >= 5 min').max(120, 'Ganho semanal <= 120 min'),
+  intensidade_pct: z.number().int().min(0, 'Intensidade entre 0 e 100').max(100, 'Intensidade entre 0 e 100'),
+}).refine((d) => d.horas_inicio < d.horas_alvo, {
+  message: 'Horas início deve ser menor que horas alvo',
+  path: ['horas_inicio'],
+}).refine((d) => (d.horas_alvo - d.horas_inicio) * 60 >= d.ganho_semanal_min, {
+  message: 'Ganho semanal maior que a diferença total entre início e alvo',
+  path: ['ganho_semanal_min'],
+});
 
 interface Props {
   open: boolean;
