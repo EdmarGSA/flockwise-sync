@@ -75,16 +75,16 @@ export function useResumoIluminacaoGalpao(galpaoId: string | null | undefined, i
           .select('*')
           .eq('programa_id', programaId);
 
-        faixaSel = (faixas ?? []).find(
+        faixaSel = ((faixas ?? []).find(
           (f: any) => idade >= f.dia_inicio && idade <= f.dia_fim,
-        ) as FaixaIluminacao | null ?? null;
+        ) as unknown as FaixaIluminacao | undefined) ?? null;
       }
 
       const estado = faixaSel ? calcularEstadoIluminacao(faixaSel) : null;
 
       return {
         loteId: lote.id,
-        loteCodigo: lote.codigo ?? null,
+        loteCodigo: null,
         programaId,
         programaNome,
         fonte: programaId ? fonte : null,
