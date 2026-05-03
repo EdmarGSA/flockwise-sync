@@ -1,37 +1,60 @@
-## Contexto
-
-No diálogo **Gerenciar Lote** (`GestaoCampo` → `LoteDashboardDialog` → aba "Editar Lote" → `LoteEditForm`), todos os campos ficam bloqueados (`disabled={!isEditable}`) quando o lote está em status `alojado`, `saiu_para_entrega` ou `fechado` — só lotes em `previsao` são editáveis. Hoje não há nenhuma forma de corrigir a **Data de Alojamento** (ex.: alojamento registrado no dia errado) nem trocar o **Programa de Iluminação** depois do alojamento, o que é uma necessidade real (ajuste de fotoperíodo durante o ciclo).
-
 ## Objetivo
 
-Permitir editar **somente** dois campos em lotes não-previsão:
-- `data_alojamento`
-- `programa_iluminacao_id`
+Hoje, na aba **Dispositivos** (`/configuracoes/dispositivos-iot`), todo card mostra as mesmas informações: **Temperatura**, **Umidade**, "Última leitura" e um switch genérico Ligado/Desligado. Isso faz sentido para sensores e para dispositivos de **Ventilação/Aquecimento**, mas não para **Iluminação** — onde o que importa é o programa de fotoperíodo, idade do lote, intensidade e próximo evento (acender/apagar).
 
-Sem reabrir a edição completa (quantidade de aves, peso pintinhos, sexo, etc., que afetam histórico e cálculos).
+A meta é renderizar um card especializado quando o dispositivo (ou o canal, no caso de ESP32) tiver função/equipamento **Iluminação**.
 
-## Mudanças
+## Mudanças propostas
 
-### 1. `src/components/lotes/LoteEditForm.tsx`
-- Novo estado local `modoEdicaoAvancada` (boolean).
-- Novo botão **"Editar Lote"** (ícone `Pencil`) exibido no topo do form **apenas quando `!isEditable`** (ou seja, status `alojado`/`saiu_para_entrega`/`fechado`). Ao clicar, ativa `modoEdicaoAvancada`.
-- Os campos `data_alojamento` (linha 405) e `programa_iluminacao_id` (linha 492) passam a usar `disabled={!isEditable && !modoEdicaoAvancada}` em vez de `disabled={!isEditable}`. Os demais campos continuam bloqueados.
-- Quando `modoEdicaoAvancada` está ativo, exibir botões **Cancelar** e **Salvar Ajustes** logo após o campo de programa de iluminação. O Salvar chama um novo handler `handleSaveAjustes` que faz update somente de `data_alojamento` e `programa_iluminacao_id` (preservando os outros campos), com toast de sucesso/erro e `onSuccess()`.
-- Mostrar um pequeno aviso visual (texto pequeno em `text-amber-600`): "Modo edição: alterar a data de alojamento recalcula idade do lote e curvas de fotoperíodo."
+### 1. Card de dispositivo Sonoff de Iluminação (`src/pages/DispositivosIoT.tsx`)
 
-### 2. Comportamento dos botões existentes
-- O bloco final com botões "Cancelar / Saiu p/ Entrega / Salvar" (linhas 533–554) continua só aparecendo quando `isEditable` (status `previsao`). Sem mudança.
-- A seção `SaidaLoteSection` (alojado) também não muda.
+Detectar `dev.funcao_automacao === 'iluminacao'` (e/ou Sonoff cujo único canal seja `tipo_equipamento = 'iluminacao'`) e substituir o bloco de Temperatura/Umidade por um painel próprio:
 
-### 3. Sem mudanças de schema
-Os dois campos já existem na tabela `lotes` e já têm RLS adequada (a página está em rota protegida `/gestao-campo` com `useIntegradoId`). Não há migração.
+- **Cabeçalho**: badge "Iluminação" com ícone `Lightbulb` (substitui badge "Aquecimento/Ventilação").
+- **Bloco principal** (em vez de Temp/Umidade):
+  - Programa vinculado ao lote do galpão (nome do programa + fonte: "Lote" ou "Padrão da Org").
+  - Idade do lote em dias e faixa atual (`dia_inicio–dia_fim`).
+  - Horas de luz programadas para hoje (`horas_luz` da faixa).
+  - Intensidade alvo agora (%) — usa `calcularEstadoIluminacao` (já existe em `src/lib/utils/calcularEstadoIluminacao.ts`).
+  - Próximo evento: "Apaga em 2h13" / "Acende em 45min" (campos `proximo_evento_min/tipo`).
+  - Indicador de override ativo (lê `useOverridesIluminacao` para o canal/dispositivo) com motivo e "até quando".
+- **Rodapé**:
+  - Botão **Forçar iluminação** (abre `OverridesIluminacaoDialog`).
+  - Atalho **Ver curva** (abre dialog com `CurvaFotoperiodoChart` já existente).
+  - Switch Ligado/Desligado mantido, mas com label "Manual" e aviso quando há automação ativa.
+- **Sem leitura de temperatura/umidade**: ocultar o "Última leitura: há 2 minutos" se não houver telemetria ambiental — em vez disso mostrar "Último comando: há X" (já existe em `ultimo_comando_em`).
 
-## Observações
+### 2. Card ESP32 com canais mistos
 
-- O `auto-iluminacao` (edge function que roda a cada 1 min) recalcula o estado a partir de `programa_iluminacao_id` do lote no próximo tick, então a troca tem efeito quase imediato.
-- Idade do lote (`calcularIdadeLote(data_alojamento)`) é derivada — qualquer ajuste retroativo se reflete em todos os lugares que leem essa data.
+Para dispositivos ESP32 (multicanal), manter a lista atual em `CanaisDispositivoList.tsx`, mas, **por canal de iluminação**, enriquecer:
+- Mostrar ícone `Lightbulb` colorido conforme estado.
+- Linha extra (somente para `tipo_equipamento='iluminacao'`): "Programa: {nome} · faixa {a}-{b}d · alvo {%}" e "próx: apaga 18:00".
+- Manter botão "Forçar iluminação" já existente.
 
-## Fora de escopo
+Quando **todos** os canais ativos do ESP32 forem de iluminação, exibir no topo do card o mesmo resumo do programa (idade do lote, horas de luz hoje, próximo evento) — uma única vez, em vez de repetir por canal.
 
-- Auditoria/log de alteração da data (pode ser próximo passo se desejado).
-- Edição de outros campos do lote em status alojado.
+### 3. Helper compartilhado
+
+Criar `src/hooks/useResumoIluminacaoGalpao.ts`:
+- Input: `galpaoId`, `integradoId`.
+- Resolve: lote ativo → programa (lote ou default org) → faixa pela idade → estado calculado via `calcularEstadoIluminacao`.
+- Retorna `{ programaNome, fonte, idadeDias, faixa, estadoCalc, overrideAtivo }`.
+- Cache via React Query (chave `['resumo-iluminacao', galpaoId]`, `staleTime` 60s) para reaproveitar entre vários cards/canais do mesmo galpão.
+
+### 4. Pequenos ajustes visuais
+
+- Cor do ícone de status (Wifi) e do `Power` em verde âmbar quando estiver em rampa de luz (intensidade entre 1 e 99%).
+- Badge "Auto" para iluminação passa a mostrar o programa em tooltip.
+- Remover do card de iluminação a referência a "Temperatura/Umidade" mesmo quando vier `leitura` (Sonoff de luz não tem sensor — evita o "--" confuso visto na imagem enviada).
+
+## Arquivos afetados
+
+- `src/pages/DispositivosIoT.tsx` — render condicional do card por função.
+- `src/components/iot/CanaisDispositivoList.tsx` — enriquecer canais de iluminação + resumo no topo quando aplicável.
+- `src/hooks/useResumoIluminacaoGalpao.ts` — novo.
+- (Opcional) extrair `src/components/iot/DispositivoIluminacaoCard.tsx` para isolar o card especializado e manter `DispositivosIoT.tsx` mais limpo.
+
+## Não muda
+
+- Schema do banco, edge function `auto-iluminacao`, lógica de override e programas — apenas leitura/apresentação.
+- Comportamento dos cards de Ventilação/Aquecimento permanece igual.
