@@ -158,4 +158,67 @@ describe("validateProtocoloPorta", () => {
       expect(r.aviso).toBeDefined();
     });
   });
+
+  describe("case-insensitivity de protocolo", () => {
+    it.each(["HTTP", "Http", "hTTp"])(
+      "aceita variação '%s' como http e usa porta 80",
+      (proto) => {
+        const r = validateProtocoloPorta({
+          protocolo: proto as unknown as "http",
+          porta_http: 80,
+          porta_https: 443,
+        });
+        expect(r.ok).toBe(true);
+        expect(r.aviso).toBeUndefined();
+      },
+    );
+
+    it.each(["HTTPS", "Https", "hTTPs"])(
+      "aceita variação '%s' como https e usa porta 443",
+      (proto) => {
+        const r = validateProtocoloPorta({
+          protocolo: proto as unknown as "https",
+          porta_http: 80,
+          porta_https: 443,
+        });
+        expect(r.ok).toBe(true);
+        expect(r.aviso).toBeUndefined();
+      },
+    );
+
+    it("HTTP em maiúsculas com porta alternativa retorna aviso normalizado", () => {
+      const r = validateProtocoloPorta({
+        protocolo: "HTTP" as unknown as "http",
+        porta_http: 8080,
+        porta_https: 443,
+      });
+      expect(r.ok).toBe(true);
+      expect(r.aviso).toContain("HTTP");
+      expect(r.aviso).toContain("8080");
+    });
+
+    it("rejeita protocolo com espaços ou caracteres extras", () => {
+      const r = validateProtocoloPorta({
+        protocolo: " http " as unknown as "http",
+        porta_http: 80,
+        porta_https: 443,
+      });
+      expect(r.ok).toBe(false);
+      expect(r.motivo).toMatch(/Protocolo inválido/i);
+    });
+
+    it("retorna mensagem consistente para protocolo desconhecido independente do caso", () => {
+      const variantes = ["FTP", "ftp", "Ftp", "ssh"];
+      const motivos = variantes.map(
+        (p) =>
+          validateProtocoloPorta({
+            protocolo: p as unknown as "http",
+            porta_http: 80,
+            porta_https: 443,
+          }).motivo,
+      );
+      expect(new Set(motivos).size).toBe(1);
+      expect(motivos[0]).toMatch(/Protocolo inválido/i);
+    });
+  });
 });
