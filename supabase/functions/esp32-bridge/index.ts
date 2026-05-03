@@ -72,10 +72,41 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .order("canal_numero");
 
+      // Fallback offline: timers de segurança baseados na idade do lote ativo
+      let safety_timers: Array<{
+        canal: number;
+        funcao: string;
+        hora_inicio: string;
+        hora_fim: string;
+        estado: "on" | "off";
+      }> = [];
+
+      if (device.galpao_id) {
+        const { data: lote } = await supabase
+          .from("lotes")
+          .select("data_alojamento")
+          .eq("galpao_id", device.galpao_id)
+          .eq("status", "alojado")
+          .not("data_alojamento", "is", null)
+          .maybeSingle();
+
+        if (lote?.data_alojamento) {
+          const idade = Math.max(
+            1,
+            Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / 86400000) + 1,
+          );
+          for (const c of canais ?? []) {
+            const t = calcularTimerSeguranca(idade, (c as any).funcao_automacao);
+            if (t) safety_timers.push({ canal: (c as any).canal_numero, ...t });
+          }
+        }
+      }
+
       return json({
         device: { id: device.id, nome: device.nome, galpao_id: device.galpao_id },
         canais: canais || [],
         intervalo_telemetria_seg: 60,
+        safety_timers,
       });
     }
 
