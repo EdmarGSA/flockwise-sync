@@ -49,6 +49,7 @@ import CadastroMetasZootecnicas from "./pages/CadastroMetasZootecnicas";
 import OrdensProducao from "./pages/OrdensProducao";
 import DispositivosIoT from "./pages/DispositivosIoT";
 import ProgramasIluminacao from "./pages/ProgramasIluminacao";
+import EstimuloPostura from "./pages/EstimuloPostura";
 import Cameras from "./pages/Cameras";
 import CameraNovoDvr from "./pages/CameraNovoDvr";
 import CameraEditarDvr from "./pages/CameraEditarDvr";
@@ -428,6 +429,15 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ProgramasIluminacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
+    {/* Estímulo de Postura */}
+    <Route path="/configuracoes/estimulo-postura" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <EstimuloPostura />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
