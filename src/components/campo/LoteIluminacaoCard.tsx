@@ -63,7 +63,7 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
           .lte('dia_inicio', diasAlojados)
           .gte('dia_fim', diasAlojados)
           .limit(1);
-        setFaixaAtual((faixas?.[0] as Faixa) ?? null);
+        setFaixaAtual((faixas?.[0] as unknown as Faixa) ?? null);
       } else {
         setFaixaAtual(null);
       }
