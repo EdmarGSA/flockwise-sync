@@ -427,6 +427,14 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Iluminação */}
+      <LoteIluminacaoCard
+        loteId={lote.id}
+        galpaoId={lote.galpao_id}
+        diasAlojados={diasAlojados}
+        programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
+      />
     </div>
   );
 }
