@@ -369,7 +369,6 @@ const CameraEditarDvr = () => {
                         : { porta_https: valor }),
                     };
                     setForm(next);
-                    setPortaAutoAjuste(null);
                     validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
                   }}
                   aria-invalid={!!portaError}
@@ -377,47 +376,17 @@ const CameraEditarDvr = () => {
                 />
               </div>
             </div>
-            {portaAutoAjuste && (
-              <Alert>
-                <AlertDescription className="text-xs flex items-center justify-between gap-3">
-                  <span>
-                    Porta ajustada automaticamente de{" "}
-                    <strong>{portaAutoAjuste.portaAnterior}</strong> para{" "}
-                    <strong>{portaAutoAjuste.portaNova}</strong> (padrão{" "}
-                    {portaAutoAjuste.protocoloNovo.toUpperCase()}).
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 shrink-0"
-                    onClick={() => {
-                      const restore = portaAutoAjuste;
-                      const next = {
-                        ...form,
-                        protocolo: restore.protocoloAnterior,
-                        porta_http:
-                          restore.protocoloAnterior === "http"
-                            ? restore.portaAnterior
-                            : form.porta_http,
-                        porta_https:
-                          restore.protocoloAnterior === "https"
-                            ? restore.portaAnterior
-                            : form.porta_https,
-                      };
-                      setForm(next);
-                      setPortaAutoAjuste(null);
-                      validarProtocoloPorta(next.protocolo, next.porta_http, next.porta_https);
-                    }}
-                  >
-                    Desfazer
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
             {portaError && (
               <p className="text-xs text-destructive -mt-2">{portaError}</p>
             )}
+            {!portaError && portaAviso && (
+              <p className="text-xs text-muted-foreground -mt-2">{portaAviso}</p>
+            )}
+            <p className="text-xs text-muted-foreground -mt-2">
+              Use a porta externa configurada no redirecionamento NAT do roteador — não precisa
+              ser 80/443. Se o painel do roteador já ocupa a porta 80, use uma porta alternativa
+              (ex.: 8080) e redirecione para a porta interna do DVR.
+            </p>
 
             <div>
               <Label>Porta RTSP</Label>
