@@ -42,7 +42,7 @@ export function validateProtocoloPorta(
     };
   }
 
-  const portaRaw = protocolo === "http" ? input.porta_http : input.porta_https;
+  const portaRaw: unknown = protocolo === "http" ? input.porta_http : input.porta_https;
   const portaAtiva = typeof portaRaw === "number" ? portaRaw : Number(portaRaw);
 
   if (
