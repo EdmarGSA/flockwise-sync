@@ -490,12 +490,16 @@ Deno.serve(async (req) => {
       }
 
       // Load all channels for ESP32-S3 / multi-channel devices in this integrado
+      // NOTE: canais com tipo_equipamento='iluminacao' são responsabilidade
+      // exclusiva da edge function `auto-iluminacao` (programa de fotoperíodo).
+      // Filtrados aqui para evitar conflito de comandos.
       const { data: canais } = await supabase
         .from("canais_dispositivo")
         .select("id, dispositivo_id, canal_numero, tipo_equipamento, funcao_automacao, automacao_ativa, ativo, estado_atual")
         .eq("integrado_id", integradoId)
         .eq("ativo", true)
-        .eq("automacao_ativa", true);
+        .eq("automacao_ativa", true)
+        .neq("tipo_equipamento", "iluminacao");
 
       const canaisByDevice = new Map<string, any[]>();
       for (const c of (canais || [])) {
