@@ -66,7 +66,7 @@ export default function ProgramasIluminacao() {
       .select("*")
       .eq("programa_id", programaId)
       .order("dia_inicio");
-    setFaixas((data || []) as Faixa[]);
+    setFaixas((data || []) as unknown as Faixa[]);
   };
 
   useEffect(() => { fetchProgramas(); /* eslint-disable-next-line */ }, [integradoId]);
