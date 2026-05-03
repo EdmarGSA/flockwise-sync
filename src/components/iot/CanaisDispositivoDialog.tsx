@@ -24,6 +24,7 @@ interface Canal {
   ativo: boolean;
   estado_atual: string | null;
   observacoes: string | null;
+  suporta_dimer?: boolean;
 }
 
 interface Props {
@@ -98,6 +99,7 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           ativo: false,
           estado_atual: null,
           observacoes: null,
+          suporta_dimer: false,
         },
       );
     }
@@ -127,6 +129,7 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           automacao_ativa: c.automacao_ativa && c.funcao_automacao !== 'nenhuma',
           ativo: c.ativo,
           observacoes: c.observacoes,
+          suporta_dimer: c.tipo_equipamento === 'iluminacao' ? !!c.suporta_dimer : false,
         }));
 
       if (ativosParaUpsert.length > 0) {
@@ -247,6 +250,19 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
                         </Label>
                       </div>
                     </div>
+
+                    {canal.tipo_equipamento === 'iluminacao' && (
+                      <div className="md:col-span-2 flex items-center gap-2 rounded-md border border-dashed p-2">
+                        <Switch
+                          checked={!!canal.suporta_dimer}
+                          onCheckedChange={(v) => updateCanal(idx, { suporta_dimer: v })}
+                          disabled={!canal.ativo}
+                        />
+                        <Label className="text-xs text-muted-foreground">
+                          Canal com dimmer/PWM (envia intensidade 0–100% em vez de só on/off)
+                        </Label>
+                      </div>
+                    )}
 
                     <div className="md:col-span-2">
                       <Label className="text-xs">Observações</Label>

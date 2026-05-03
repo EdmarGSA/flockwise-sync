@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CurvaFotoperiodoChart } from "@/components/iot/CurvaFotoperiodoChart";
 
 interface Programa {
   id: string;
@@ -243,6 +244,8 @@ export default function ProgramasIluminacao() {
                     )}
                   </CardContent>
                 </Card>
+
+                <CurvaFotoperiodoChart faixas={faixas as any} />
 
                 <Card className="mt-4 bg-muted/30">
                   <CardHeader><CardTitle className="text-sm">Como aplicar</CardTitle></CardHeader>
