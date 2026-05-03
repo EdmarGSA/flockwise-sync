@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, Hand, ExternalLink, Loader2 } from 'lucide-react';
+import { Lightbulb, Hand, ExternalLink, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
 import { OverridesIluminacaoDialog } from '@/components/iot/OverridesIluminacaoDialog';
+import { EstimuloPosturaDialog } from '@/components/iot/EstimuloPosturaDialog';
 
 interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
 interface Faixa {
