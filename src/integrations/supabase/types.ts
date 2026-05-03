@@ -922,6 +922,72 @@ export type Database = {
         }
         Relationships: []
       }
+      config_estimulo_postura: {
+        Row: {
+          aplicado_em: string | null
+          auto_aplicar: boolean
+          created_at: string
+          ganho_semanal_min: number
+          horas_alvo: number
+          horas_inicio: number
+          id: string
+          idade_min_semanas: number
+          integrado_id: string
+          intensidade_pct: number
+          lote_id: string
+          peso_min_kg: number
+          programa_gerado_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          aplicado_em?: string | null
+          auto_aplicar?: boolean
+          created_at?: string
+          ganho_semanal_min?: number
+          horas_alvo?: number
+          horas_inicio?: number
+          id?: string
+          idade_min_semanas?: number
+          integrado_id: string
+          intensidade_pct?: number
+          lote_id: string
+          peso_min_kg?: number
+          programa_gerado_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aplicado_em?: string | null
+          auto_aplicar?: boolean
+          created_at?: string
+          ganho_semanal_min?: number
+          horas_alvo?: number
+          horas_inicio?: number
+          id?: string
+          idade_min_semanas?: number
+          integrado_id?: string
+          intensidade_pct?: number
+          lote_id?: string
+          peso_min_kg?: number
+          programa_gerado_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "config_estimulo_postura_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: true
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "config_estimulo_postura_programa_gerado_id_fkey"
+            columns: ["programa_gerado_id"]
+            isOneToOne: false
+            referencedRelation: "programa_iluminacao_lote"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_fechamento: {
         Row: {
           constante_ajuste_ca: number
@@ -7871,6 +7937,7 @@ export type Database = {
       }
     }
     Functions: {
+      aplicar_estimulo_postura: { Args: { p_lote_id: string }; Returns: string }
       calcular_fase_postura: {
         Args: { semanas_vida: number }
         Returns: Database["public"]["Enums"]["fase_postura"]
