@@ -245,7 +245,7 @@ export default function ProgramasIluminacao() {
                   </CardContent>
                 </Card>
 
-                <Card className="mt-4 bg-muted/30">
+                <CurvaFotoperiodoChart faixas={faixas as any} />
                   <CardHeader><CardTitle className="text-sm">Como aplicar</CardTitle></CardHeader>
                   <CardContent className="text-xs text-muted-foreground space-y-1">
                     <p>1. Cada lote pode ser vinculado a um programa em "Editar lote → Programa de iluminação".</p>
