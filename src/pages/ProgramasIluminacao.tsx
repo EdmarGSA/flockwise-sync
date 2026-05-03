@@ -264,6 +264,8 @@ export default function ProgramasIluminacao() {
 
                 <CurvaFotoperiodoChart faixas={faixas as any} />
 
+                <OverridesAtivosLista />
+
                 <Card className="mt-4 bg-muted/30">
                   <CardHeader><CardTitle className="text-sm">Como aplicar</CardTitle></CardHeader>
                   <CardContent className="text-xs text-muted-foreground space-y-1">
