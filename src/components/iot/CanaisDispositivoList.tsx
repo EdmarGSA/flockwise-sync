@@ -42,6 +42,8 @@ const ICONS: Record<TipoEquipamento, typeof Fan> = {
 export function CanaisDispositivoList({ dispositivoId, integradoId, driver, online }: Props) {
   const [canais, setCanais] = useState<Canal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideCanalId, setOverrideCanalId] = useState<string | undefined>();
 
   const { toggleDevice, isControlling } = useDeviceControl({
     integradoId,
