@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Home } from 'lucide-react';
+import { CalendarIcon, Home, Pencil } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -63,6 +63,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [programasIluminacao, setProgramasIluminacao] = useState<{ id: string; nome: string; is_default: boolean }[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
+  const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
   
   // Saída de Lote fields
   const [dataPrevistaSaida, setDataPrevistaSaida] = useState<string | null>(
@@ -273,8 +274,43 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     }
   };
 
+  const handleSaveAjustes = async () => {
+    setLoading(true);
+    try {
+      const values = form.getValues();
+      const { error } = await supabase
+        .from('lotes')
+        .update({
+          data_alojamento: values.data_alojamento ? format(values.data_alojamento, 'yyyy-MM-dd') : null,
+          programa_iluminacao_id: !values.programa_iluminacao_id || values.programa_iluminacao_id === 'default' ? null : values.programa_iluminacao_id,
+        })
+        .eq('id', lote.id);
+
+      if (error) throw error;
+      toast.success('Ajustes salvos com sucesso!');
+      setModoEdicaoAvancada(false);
+      onSuccess?.();
+    } catch (error) {
+      console.error('Erro ao salvar ajustes:', error);
+      toast.error('Erro ao salvar ajustes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {!isEditable && !modoEdicaoAvancada && (
+        <div className="flex items-center justify-between rounded-md border border-dashed p-3 bg-muted/30">
+          <p className="text-sm text-muted-foreground">
+            Lote em status <strong>{lote.status}</strong>. Você pode ajustar a data de alojamento e o programa de iluminação.
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setModoEdicaoAvancada(true)}>
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar Lote
+          </Button>
+        </div>
+      )}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -411,6 +447,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                       <FormControl>
                         <Button
                           variant="outline"
+                          disabled={!isEditable && !modoEdicaoAvancada}
                           className={cn(
                             "w-full pl-3 text-left font-normal",
                             !field.value && "text-muted-foreground"
@@ -493,7 +530,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Programa de Iluminação</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable && !modoEdicaoAvancada}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um programa" />
@@ -551,7 +588,36 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                 </Button>
               </>
             )}
+            {!isEditable && modoEdicaoAvancada && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  disabled={loading}
+                  onClick={() => {
+                    form.reset();
+                    setModoEdicaoAvancada(false);
+                  }}
+                >
+                  Cancelar Ajustes
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={loading}
+                  onClick={handleSaveAjustes}
+                >
+                  {loading ? 'Salvando...' : 'Salvar Ajustes'}
+                </Button>
+              </>
+            )}
           </div>
+          {!isEditable && modoEdicaoAvancada && (
+            <p className="text-xs text-amber-600">
+              Modo edição: alterar a data de alojamento recalcula idade do lote e curvas de fotoperíodo.
+            </p>
+          )}
         </form>
       </Form>
 
