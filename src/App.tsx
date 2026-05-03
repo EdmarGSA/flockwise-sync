@@ -422,6 +422,16 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
+    {/* Programas de Iluminação */}
+    <Route path="/configuracoes/iluminacao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ProgramasIluminacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
+
     {/* Câmeras Intelbras */}
     <Route path="/cameras" element={
       <ProtectedRoute>
