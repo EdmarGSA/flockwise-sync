@@ -31,15 +31,15 @@ export function useResumoIluminacaoGalpao(galpaoId: string | null | undefined, i
       };
 
       // 1) Lote ativo
-      const { data: lote } = await supabase
+      const { data: lote, error: loteErr } = await supabase
         .from('lotes')
-        .select('id, codigo, data_alojamento, programa_iluminacao_id, integrado_id, tipo_producao')
+        .select('id, data_alojamento, programa_iluminacao_id, integrado_id')
         .eq('galpao_id', galpaoId!)
         .eq('status', 'alojado')
         .not('data_alojamento', 'is', null)
         .maybeSingle();
 
-      if (!lote) return empty;
+      if (loteErr || !lote) return empty;
 
       // 2) Resolver programa: vinculado ao lote OU default da org
       let programaId = lote.programa_iluminacao_id as string | null;
