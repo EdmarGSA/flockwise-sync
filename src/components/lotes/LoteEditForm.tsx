@@ -17,6 +17,8 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
 import { SaidaLoteSection } from './SaidaLoteSection';
+import { PreviewAjusteAlojamento } from './PreviewAjusteAlojamento';
+import { useIntegradoId } from '@/hooks/useIntegradoId';
 
 // Labels for lineages
 const linhagemCorteLabels: Record<string, string> = {
