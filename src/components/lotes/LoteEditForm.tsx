@@ -39,6 +39,7 @@ const loteSchema = z.object({
   sexo: z.enum(['macho', 'femea', 'misto']).optional(),
   status: z.enum(['previsao', 'saiu_para_entrega', 'alojado', 'fechado']),
   veterinario_id: z.string().optional(),
+  programa_iluminacao_id: z.string().optional(),
   observacoes: z.string().optional(),
 });
 
