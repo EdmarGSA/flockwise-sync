@@ -556,6 +556,17 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             )}
           />
 
+          {!isEditable && modoEdicaoAvancada && (
+            <PreviewAjusteAlojamento
+              dataAlojamentoAtual={lote.data_alojamento}
+              novaDataAlojamento={form.watch('data_alojamento')}
+              programaAtualId={(lote as any).programa_iluminacao_id ?? null}
+              novoProgramaId={form.watch('programa_iluminacao_id')}
+              integradoId={integradoId}
+              tipoProducao={isPostura ? 'postura' : 'frango_corte'}
+            />
+          )}
+
           <FormField
             control={form.control}
             name="observacoes"
