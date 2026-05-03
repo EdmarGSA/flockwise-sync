@@ -65,6 +65,7 @@ import BackofficeUsuarios from "./pages/backoffice/BackofficeUsuarios";
 import BackofficeCS from "./pages/backoffice/BackofficeCS";
 import BackofficeFerramentas from "./pages/backoffice/BackofficeFerramentas";
 import BackofficeNotificacoes from "./pages/backoffice/BackofficeNotificacoes";
+import BackofficeAuditoria from "./pages/backoffice/BackofficeAuditoria";
 import BackofficeMapbox from "./pages/backoffice/BackofficeMapbox";
 import NotFound from "./pages/NotFound";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
