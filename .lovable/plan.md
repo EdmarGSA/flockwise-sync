@@ -1,45 +1,77 @@
-## Problema
+## Diagnóstico — o que já existe e o que falta
 
-O roteador já usa a porta 80 da WAN (admin do próprio roteador), então o usuário não consegue redirecionar `80 → DVR` para usar HTTP. O DVR atual responde em HTTPS:443, mas a conexão falha (provavelmente certificado/firewall) e o usuário quer poder testar HTTP em uma porta alternativa (ex.: 8080, 8081).
+### ✅ Já implementado no banco
+- `programa_iluminacao_lote` — cabeçalho do programa (nome, tipo_producao, is_default, ativo) com RLS por `integrado_id`.
+- `programa_iluminacao_faixa` — faixas por idade (dia_inicio/fim, horas_luz, blocos, ramp_up/down, intensidade_pct).
+- `override_iluminacao_canal` — overrides manuais com expiração (`ate_quando`).
+- FK `lotes.programa_iluminacao_id → programa_iluminacao_lote`.
+- `canais_dispositivo` já aceita `tipo_equipamento='iluminacao'`, `funcao_automacao='iluminacao'`, `suporta_dimer`.
+- `config_estimulo_postura` com FK para programa gerado automaticamente.
 
-Hoje isso é bloqueado pelo `validateProtocoloPorta`, que **exige** porta 80 para HTTP e 443 para HTTPS. Qualquer valor diferente é rejeitado no formulário antes mesmo de tentar conectar.
+### ✅ Já implementado em código
+- Página `/configuracoes/iluminacao` (`ProgramasIluminacao.tsx`) — CRUD completo de programas + faixas, gráfico de curva e edição inline.
+- Edge function `auto-iluminacao` (cron 1 min) que executa o programa.
+- Hook `useOverridesIluminacao` + diálogo `OverridesIluminacaoDialog`.
+- `CanaisDispositivoDialog` com tipo "Iluminação" e "Função: Iluminação (programa luz)" + flag dimmer/PWM.
+- `LoteIluminacaoCard` no dashboard do lote (mostra estado atual + link).
+- `EstimuloPosturaDialog` para gerar programa automaticamente.
 
-```
-Protocolo HTTP  → porta_http  DEVE ser 80
-Protocolo HTTPS → porta_https DEVE ser 443
-```
+### ❌ Lacunas (o que falta no plano)
 
-Isso impede o cenário real: porta 80 ocupada pelo roteador, ou provedor bloqueando 443, exigindo redirecionamento tipo `WAN 8080 → LAN 80 do DVR`.
+1. **Menu / descoberta** — A página `/configuracoes/iluminacao` existe mas não tem link visível em `Configurações`. O usuário não consegue chegar nela sem digitar a URL.
+2. **Vínculo lote → programa** — O campo `lotes.programa_iluminacao_id` existe mas o formulário de cadastro/edição de lote **não expõe esse seletor**. Sem isso, nenhum lote roda automação por programa.
+3. **Programa padrão por tipo** — A flag `is_default` existe mas não há UI para marcar/desmarcar (toggle), nem validação de "apenas 1 default por tipo_producao".
+4. **Vínculo programa → canais** — Hoje a edge function `auto-iluminacao` precisa saber **quais canais de iluminação pertencem ao galpão de cada lote**. Verificar se há `nucleo_id`/`galpao_id` em `canais_dispositivo` (ou em `dispositivos_iot`) para essa correlação. Se não houver, falta esse vínculo.
+5. **Visibilidade de overrides** — Os overrides existem no banco/hook, mas não há um indicador no card de iluminação do lote nem listagem central em `/configuracoes/iluminacao`.
+6. **Templates prontos** — Não há programas-modelo (Cobb 500, Ross 308, Lohmann postura) pré-populados via `handle_new_user` ou botão "Importar template".
 
-## Solução
+---
 
-Liberar portas customizadas mantendo validação de range (1-65535) e apenas **avisando** (não bloqueando) quando a porta divergir do padrão.
+## Plano de implementação
 
-### 1. `src/lib/utils/validateProtocoloPorta.ts`
-- Remover a regra de igualdade obrigatória com a porta padrão.
-- Manter validação de range (1-65535).
-- Adicionar campo opcional `aviso?: string` no resultado para sinalizar "porta não padrão" sem invalidar.
-- `ok` continua `true` para portas válidas fora do padrão; `false` apenas para porta inválida (vazia / fora do range).
+### Etapa 1 — Descoberta e navegação
+- Adicionar card "Programas de Iluminação" em `Configuracoes.tsx` (ícone `Lightbulb`) apontando para `/configuracoes/iluminacao`.
+- Adicionar link na sidebar/IoT (`DispositivosIoT.tsx`) na seção de automação.
 
-### 2. `src/pages/CameraNovoDvr.tsx` e `src/pages/CameraEditarDvr.tsx`
-- `validarProtocoloPorta(...)`: passar a tratar `aviso` como mensagem informativa (badge/texto secundário) em vez de erro bloqueante.
-- Ao trocar protocolo, **não** sobrescrever automaticamente para 80/443 se o usuário já tinha digitado uma porta customizada — preencher o padrão apenas quando o campo correspondente ainda estiver no valor default.
-- Habilitar o botão "Testar conexão" e "Salvar" mesmo com porta não padrão.
-- Atualizar texto auxiliar do campo: "Use a porta externa configurada no redirecionamento NAT do roteador (não precisa ser 80/443)."
+### Etapa 2 — Vínculo lote → programa
+- No formulário de cadastro/edição de lote (`src/components/lotes/...`), adicionar `<Select>` "Programa de iluminação" listando programas ativos do mesmo `tipo_producao` do lote (filtra `frango_corte` vs `postura`). Opção "Usar programa padrão" (null).
+- Mostrar resumo da curva selecionada abaixo do select.
 
-### 3. Edge function `supabase/functions/intelbras-bridge/index.ts`
-- Já usa `porta_http`/`porta_https` do registro sem assumir padrão (`resolveDvrConn`). Nenhuma mudança de lógica necessária.
-- Ajustar somente a mensagem de erro de timeout para não sugerir "porta 80/443" fixa — usar a porta efetivamente configurada (já faz isso via `u.port`). Confirmar e manter.
+### Etapa 3 — Programa padrão por tipo
+- Adicionar toggle "Definir como padrão" no header do programa em `ProgramasIluminacao.tsx`.
+- Criar trigger em `programa_iluminacao_lote` que ao marcar `is_default=true` desmarca os demais do mesmo `(integrado_id, tipo_producao)`.
 
-### 4. Mensagens de causa provável (UI de erro do teste de conexão)
-No card vermelho de "Possíveis causas" mostrado quando o teste falha, trocar:
-- "Porta 443 não está redirecionada no roteador" → "A porta externa configurada (`{porta}`) não está redirecionada no roteador para o IP do DVR"
-- Adicionar dica: "Se a porta 80 do roteador já é usada pelo painel admin, escolha outra porta externa (ex.: 8080) e redirecione para a porta 80 ou 443 do DVR."
+### Etapa 4 — Vínculo canal → núcleo/galpão
+- Verificar/garantir colunas `nucleo_id` e `galpao_id` em `canais_dispositivo` (ou herdar de `dispositivos_iot`).
+- No `CanaisDispositivoDialog`, ao marcar tipo=Iluminação, exigir seleção de galpão.
+- Atualizar `auto-iluminacao` para resolver: lote → galpão → canais com `funcao_automacao='iluminacao'`.
 
-## Arquivos afetados
+### Etapa 5 — Visibilidade de overrides
+- Em `LoteIluminacaoCard`: badge "Override ativo até HH:MM" quando houver.
+- Em `ProgramasIluminacao`: aba/secção lateral "Overrides ativos" listando todos os overrides vigentes da organização com botão para encerrar.
 
-- `src/lib/utils/validateProtocoloPorta.ts` (regra)
-- `src/pages/CameraNovoDvr.tsx` (form + mensagens)
-- `src/pages/CameraEditarDvr.tsx` (form + mensagens)
+### Etapa 6 — Templates e seed
+- Botão "Importar template" no diálogo "Novo programa" com presets:
+  - Frango corte Cobb 500 (1-7d 23h, 8-14d 20h, 15-fim 18h)
+  - Postura comercial Lohmann (estímulo gradual 17h)
+  - Matriz pesada
+- Seed via `handle_new_user` para criar 1 programa default por tipo na organização.
 
-Sem migração de banco — colunas `porta_http` / `porta_https` já existem e aceitam inteiros arbitrários.
+### Etapa 7 — QA e documentação
+- Testar ciclo completo: criar programa → vincular ao lote → atribuir canal → verificar log do `auto-iluminacao`.
+- Atualizar memória `iot-lighting-program-system` com fluxo final.
+
+---
+
+## Detalhes técnicos
+
+**Arquivos a alterar:**
+- `src/pages/Configuracoes.tsx` — card de acesso
+- `src/components/lotes/LoteForm*.tsx` — seletor de programa
+- `src/pages/ProgramasIluminacao.tsx` — toggle default + lista de overrides + templates
+- `src/components/iot/CanaisDispositivoDialog.tsx` — exigir galpão para canal de iluminação
+- `src/components/campo/LoteIluminacaoCard.tsx` — badge override
+- `supabase/functions/auto-iluminacao/index.ts` — resolução lote→galpão→canais
+- Nova migration: trigger `is_default` único + (se faltar) coluna `galpao_id` em `canais_dispositivo`
+
+**Sem necessidade de:** novas tabelas — o schema atual já é suficiente.
