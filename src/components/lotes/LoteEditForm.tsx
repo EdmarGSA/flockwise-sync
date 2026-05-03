@@ -39,6 +39,7 @@ const loteSchema = z.object({
   sexo: z.enum(['macho', 'femea', 'misto']).optional(),
   status: z.enum(['previsao', 'saiu_para_entrega', 'alojado', 'fechado']),
   veterinario_id: z.string().optional(),
+  programa_iluminacao_id: z.string().optional(),
   observacoes: z.string().optional(),
 });
 
@@ -59,6 +60,7 @@ interface LoteEditFormProps {
 export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
+  const [programasIluminacao, setProgramasIluminacao] = useState<{ id: string; nome: string; is_default: boolean }[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   
@@ -100,12 +102,14 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       sexo: lote.sexo,
       status: lote.status,
       veterinario_id: lote.veterinario_id || 'none',
+      programa_iluminacao_id: (lote as any).programa_iluminacao_id || 'default',
       observacoes: lote.observacoes || '',
     },
   });
 
   useEffect(() => {
     fetchVeterinarios();
+    fetchProgramasIluminacao();
     if (isAlojado) {
       fetchMortalidade();
       fetchUltimoPeso();
@@ -119,6 +123,18 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       return;
     }
     setVeterinarios(data || []);
+  };
+
+  const fetchProgramasIluminacao = async () => {
+    const tipo = isPostura ? 'postura' : 'frango_corte';
+    const { data } = await supabase
+      .from('programa_iluminacao_lote')
+      .select('id, nome, is_default, tipo_producao')
+      .eq('ativo', true)
+      .eq('tipo_producao', tipo)
+      .order('is_default', { ascending: false })
+      .order('nome');
+    setProgramasIluminacao((data || []) as any);
   };
 
   const fetchMortalidade = async () => {
@@ -240,6 +256,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           sexo: isPostura ? 'femea' : data.sexo,
           status: data.status,
           veterinario_id: data.veterinario_id === 'none' ? null : data.veterinario_id || null,
+          programa_iluminacao_id: !data.programa_iluminacao_id || data.programa_iluminacao_id === 'default' ? null : data.programa_iluminacao_id,
           observacoes: data.observacoes || null,
         })
         .eq('id', lote.id);
@@ -465,6 +482,35 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="programa_iluminacao_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Programa de Iluminação</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um programa" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="default">Usar programa padrão da organização</SelectItem>
+                    {programasIluminacao.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}{p.is_default ? ' (padrão)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define o fotoperíodo automático aplicado por <a href="/configuracoes/iluminacao" className="underline">auto-iluminacao</a>.
+                </p>
                 <FormMessage />
               </FormItem>
             )}

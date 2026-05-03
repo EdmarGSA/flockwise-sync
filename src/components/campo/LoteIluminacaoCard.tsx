@@ -124,7 +124,7 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
                 </Badge>
               )}
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
-                <Link to="/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
+                <Link to="/configuracoes/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
               </Button>
               {isPostura && (
                 <Button size="sm" variant="outline" className="h-7 px-2"

@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { CurvaFotoperiodoChart } from "@/components/iot/CurvaFotoperiodoChart";
+import { OverridesAtivosLista } from "@/components/iot/OverridesAtivosLista";
 
 interface Programa {
   id: string;
@@ -172,7 +174,22 @@ export default function ProgramasIluminacao() {
                       </CardTitle>
                       <CardDescription>{selecionado.descricao || "Sem descrição"}</CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={selecionado.is_default}
+                          onCheckedChange={async (v) => {
+                            const { error } = await supabase
+                              .from("programa_iluminacao_lote")
+                              .update({ is_default: v })
+                              .eq("id", selecionado.id);
+                            if (error) { toast.error(error.message); return; }
+                            toast.success(v ? "Definido como padrão" : "Removido do padrão");
+                            await fetchProgramas();
+                          }}
+                        />
+                        <Label className="text-xs">Padrão p/ {selecionado.tipo_producao}</Label>
+                      </div>
                       <Button variant="outline" size="sm" onClick={adicionarFaixa}>
                         <Plus className="w-4 h-4 mr-2" />Faixa
                       </Button>
@@ -246,6 +263,8 @@ export default function ProgramasIluminacao() {
                 </Card>
 
                 <CurvaFotoperiodoChart faixas={faixas as any} />
+
+                <OverridesAtivosLista />
 
                 <Card className="mt-4 bg-muted/30">
                   <CardHeader><CardTitle className="text-sm">Como aplicar</CardTitle></CardHeader>
