@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CurvaFotoperiodoChart } from "@/components/iot/CurvaFotoperiodoChart";
 import { OverridesAtivosLista } from "@/components/iot/OverridesAtivosLista";
+import { TEMPLATES_PROGRAMAS } from "@/lib/templates/programasIluminacao";
 
 interface Programa {
   id: string;
@@ -48,6 +49,7 @@ export default function ProgramasIluminacao() {
   const [novoOpen, setNovoOpen] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("frango_corte");
+  const [novoTemplate, setNovoTemplate] = useState<string>("vazio");
 
   const fetchProgramas = async () => {
     if (!integradoId) return;
@@ -77,12 +79,25 @@ export default function ProgramasIluminacao() {
 
   const criarPrograma = async () => {
     if (!integradoId || !novoNome.trim()) return;
+    const template = TEMPLATES_PROGRAMAS.find((t) => t.id === novoTemplate);
+    const tipoFinal = template?.tipo_producao ?? novoTipo;
     const { data, error } = await supabase.from("programa_iluminacao_lote").insert({
-      integrado_id: integradoId, nome: novoNome.trim(), tipo_producao: novoTipo, ativo: true,
+      integrado_id: integradoId,
+      nome: novoNome.trim(),
+      tipo_producao: tipoFinal,
+      ativo: true,
+      descricao: template?.descricao ?? null,
     }).select().single();
     if (error) { toast.error(error.message); return; }
-    toast.success("Programa criado");
-    setNovoNome(""); setNovoOpen(false);
+
+    if (template) {
+      const faixasInsert = template.faixas.map((f) => ({ ...f, programa_id: data.id }));
+      const { error: e2 } = await supabase.from("programa_iluminacao_faixa").insert(faixasInsert);
+      if (e2) toast.error(`Programa criado, mas falhou ao inserir faixas: ${e2.message}`);
+    }
+
+    toast.success(template ? `Programa criado a partir do template ${template.label}` : "Programa criado");
+    setNovoNome(""); setNovoTemplate("vazio"); setNovoOpen(false);
     await fetchProgramas();
     setSelecionado(data as Programa);
   };
@@ -286,12 +301,33 @@ export default function ProgramasIluminacao() {
             <DialogHeader><DialogTitle>Novo programa de iluminação</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div>
+                <Label>Template (opcional)</Label>
+                <Select value={novoTemplate} onValueChange={setNovoTemplate}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vazio">Em branco (sem faixas)</SelectItem>
+                    {TEMPLATES_PROGRAMAS.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {novoTemplate !== "vazio" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {TEMPLATES_PROGRAMAS.find((t) => t.id === novoTemplate)?.descricao}
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label>Nome</Label>
                 <Input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Ex: Cobb 500 verão" />
               </div>
               <div>
                 <Label>Tipo de produção</Label>
-                <Select value={novoTipo} onValueChange={setNovoTipo}>
+                <Select
+                  value={novoTemplate !== "vazio" ? (TEMPLATES_PROGRAMAS.find((t) => t.id === novoTemplate)?.tipo_producao ?? novoTipo) : novoTipo}
+                  onValueChange={setNovoTipo}
+                  disabled={novoTemplate !== "vazio"}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="frango_corte">Frango de corte</SelectItem>
