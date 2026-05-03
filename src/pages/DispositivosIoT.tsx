@@ -93,6 +93,7 @@ export default function DispositivosIoT() {
   const navigate = useNavigate();
   const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+  const [iluminacaoDeviceIds, setIluminacaoDeviceIds] = useState<Set<string>>(new Set());
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [leituras, setLeituras] = useState<Record<string, Leitura>>({});
   const [switchStates, setSwitchStates] = useState<Record<string, string | null>>({});
@@ -181,7 +182,21 @@ export default function DispositivosIoT() {
       supabase.from('galpoes').select('id, nome, nucleo_id').eq('ativo', true),
     ]);
 
-    if (devRes.data) setDispositivos(devRes.data as Dispositivo[]);
+    if (devRes.data) {
+      setDispositivos(devRes.data as Dispositivo[]);
+      const devIds = (devRes.data as Dispositivo[]).map((d) => d.id);
+      if (devIds.length) {
+        const { data: canais } = await supabase
+          .from('canais_dispositivo')
+          .select('dispositivo_id')
+          .in('dispositivo_id', devIds)
+          .eq('tipo_equipamento', 'iluminacao')
+          .eq('ativo', true);
+        setIluminacaoDeviceIds(new Set((canais ?? []).map((c: any) => c.dispositivo_id)));
+      } else {
+        setIluminacaoDeviceIds(new Set());
+      }
+    }
     if (galpRes.data) setGalpoes(galpRes.data);
 
     if (devRes.data && devRes.data.length > 0) {
@@ -745,7 +760,8 @@ export default function DispositivosIoT() {
                   const currentSwitch = switchStates[dev.id];
                   const isOnline = leitura?.online !== false;
 
-                  if (dev.funcao_automacao === 'iluminacao' && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
+                  const isIluminacao = dev.funcao_automacao === 'iluminacao' || iluminacaoDeviceIds.has(dev.id);
+                  if (isIluminacao && dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt') {
                     return (
                       <DispositivoIluminacaoCard
                         key={dev.id}
