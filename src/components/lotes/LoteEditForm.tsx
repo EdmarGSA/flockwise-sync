@@ -256,6 +256,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           sexo: isPostura ? 'femea' : data.sexo,
           status: data.status,
           veterinario_id: data.veterinario_id === 'none' ? null : data.veterinario_id || null,
+          programa_iluminacao_id: !data.programa_iluminacao_id || data.programa_iluminacao_id === 'default' ? null : data.programa_iluminacao_id,
           observacoes: data.observacoes || null,
         })
         .eq('id', lote.id);
