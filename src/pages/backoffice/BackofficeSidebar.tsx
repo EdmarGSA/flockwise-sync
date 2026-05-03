@@ -21,6 +21,7 @@ const items = [
   { title: 'Mapbox', url: '/backoffice/mapbox', icon: Globe2 },
   { title: 'Ferramentas', url: '/backoffice/ferramentas', icon: Wrench },
   { title: 'Notificações', url: '/backoffice/notificacoes', icon: Bell },
+  { title: 'Auditoria', url: '/backoffice/auditoria', icon: ShieldCheck },
 ];
 
 export function BackofficeSidebar() {
