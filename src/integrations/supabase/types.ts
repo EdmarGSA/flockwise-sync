@@ -6758,6 +6758,36 @@ export type Database = {
           },
         ]
       }
+      security_definer_audit_log: {
+        Row: {
+          called_at: string
+          extra: Json | null
+          function_name: string
+          id: string
+          integrado_id: string | null
+          key_param: string | null
+          user_id: string | null
+        }
+        Insert: {
+          called_at?: string
+          extra?: Json | null
+          function_name: string
+          id?: string
+          integrado_id?: string | null
+          key_param?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          called_at?: string
+          extra?: Json | null
+          function_name?: string
+          id?: string
+          integrado_id?: string | null
+          key_param?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       separacao_pedidos: {
         Row: {
           created_at: string
@@ -7913,6 +7943,10 @@ export type Database = {
       }
       is_demo_user: { Args: never; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      log_secdef_call: {
+        Args: { p_extra?: Json; p_function_name: string; p_key_param?: string }
+        Returns: undefined
+      }
       reservar_estoque_ovos_fifo: {
         Args: {
           p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]
