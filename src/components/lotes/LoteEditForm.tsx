@@ -530,7 +530,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Programa de Iluminação</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable && !modoEdicaoAvancada}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um programa" />
