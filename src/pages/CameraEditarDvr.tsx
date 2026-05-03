@@ -459,9 +459,19 @@ const CameraEditarDvr = () => {
                       <ul className="list-disc list-inside space-y-0.5">
                         <li>Host informado é IP privado da LAN (use DDNS)</li>
                         <li>DDNS do DVR não está habilitado / está "IP Desatualizado"</li>
-                        <li>Porta {portaAtiva} não está redirecionada no roteador</li>
+                        <li>
+                          A porta externa <strong>{portaAtiva}</strong> não está redirecionada no
+                          roteador para o IP do DVR
+                        </li>
                         <li>Firewall/operadora bloqueia a porta {portaAtiva}</li>
-                        <li>Usando HTTPS com certificado auto-assinado — tente HTTP na porta 80</li>
+                        <li>
+                          Se a porta 80 do roteador já é usada pelo painel admin, escolha outra
+                          porta externa (ex.: 8080) e redirecione para a porta 80 ou 443 do DVR
+                        </li>
+                        <li>
+                          Usando HTTPS com certificado auto-assinado — tente HTTP em uma porta
+                          alternativa
+                        </li>
                       </ul>
                     </div>
                   )}
