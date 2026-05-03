@@ -10,6 +10,7 @@ import { calcularIdadeLote } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Skull, Wheat, TrendingUp, Pill, CalendarCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { LoteIluminacaoCard } from '@/components/campo/LoteIluminacaoCard';
 
 type LoteRow = Database['public']['Tables']['lotes']['Row'];
 
@@ -426,6 +427,14 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Iluminação */}
+      <LoteIluminacaoCard
+        loteId={lote.id}
+        galpaoId={lote.galpao_id}
+        diasAlojados={diasAlojados}
+        programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
+      />
     </div>
   );
 }

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Power, Loader2, Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle } from 'lucide-react';
+import { Power, Loader2, Fan, Droplets, Lightbulb, Flame, Blinds, Bell, HelpCircle, Hand } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useDeviceControl } from '@/hooks/useDeviceControl';
+import { OverridesIluminacaoDialog } from '@/components/iot/OverridesIluminacaoDialog';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -40,6 +42,8 @@ const ICONS: Record<TipoEquipamento, typeof Fan> = {
 export function CanaisDispositivoList({ dispositivoId, integradoId, driver, online }: Props) {
   const [canais, setCanais] = useState<Canal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideCanalId, setOverrideCanalId] = useState<string | undefined>();
 
   const { toggleDevice, isControlling } = useDeviceControl({
     integradoId,
@@ -116,6 +120,17 @@ export function CanaisDispositivoList({ dispositivoId, integradoId, driver, onli
               {c.automacao_ativa && (
                 <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-300 px-1 py-0">Auto</Badge>
               )}
+              {c.tipo_equipamento === 'iluminacao' && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  title="Forçar iluminação"
+                  onClick={() => { setOverrideCanalId(c.id); setOverrideOpen(true); }}
+                >
+                  <Hand className="w-3.5 h-3.5" />
+                </Button>
+              )}
               {busy ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
               ) : (
@@ -132,6 +147,12 @@ export function CanaisDispositivoList({ dispositivoId, integradoId, driver, onli
           </div>
         );
       })}
+      <OverridesIluminacaoDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        dispositivoId={dispositivoId}
+        canalIdInicial={overrideCanalId}
+      />
     </div>
   );
 }

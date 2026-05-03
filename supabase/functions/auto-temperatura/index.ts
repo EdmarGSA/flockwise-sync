@@ -329,11 +329,7 @@ function decideChannelState(
       return { state: "off", reason: `cond. nebulização não atendida (temp ${temp}, umid ${umid})` };
     }
 
-    case "iluminacao":
-      // Iluminação agora é tratada pela edge function dedicada `auto-iluminacao`
-      // (programa de fotoperíodo configurável por lote). Aqui retornamos null
-      // para evitar conflito de comandos entre as duas funções.
-      return null;
+    // case "iluminacao": tratado exclusivamente em `auto-iluminacao` (filtrado na query).
 
     case "cortina": {
       // Curtain: open (off relay = aberta) when hot, close (on = fechada) when cold or at night
@@ -490,12 +486,16 @@ Deno.serve(async (req) => {
       }
 
       // Load all channels for ESP32-S3 / multi-channel devices in this integrado
+      // NOTE: canais com tipo_equipamento='iluminacao' são responsabilidade
+      // exclusiva da edge function `auto-iluminacao` (programa de fotoperíodo).
+      // Filtrados aqui para evitar conflito de comandos.
       const { data: canais } = await supabase
         .from("canais_dispositivo")
         .select("id, dispositivo_id, canal_numero, tipo_equipamento, funcao_automacao, automacao_ativa, ativo, estado_atual")
         .eq("integrado_id", integradoId)
         .eq("ativo", true)
-        .eq("automacao_ativa", true);
+        .eq("automacao_ativa", true)
+        .neq("tipo_equipamento", "iluminacao");
 
       const canaisByDevice = new Map<string, any[]>();
       for (const c of (canais || [])) {
