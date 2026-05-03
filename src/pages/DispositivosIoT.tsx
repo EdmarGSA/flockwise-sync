@@ -760,6 +760,7 @@ export default function DispositivosIoT() {
                     );
                   }
 
+                  return (
                     <Card key={dev.id} className="relative">
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
