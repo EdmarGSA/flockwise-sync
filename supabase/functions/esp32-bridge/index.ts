@@ -36,7 +36,31 @@ interface CommandPayload {
   acao: "ligar" | "desligar";
 }
 
-Deno.serve(async (req) => {
+// Timers de segurança offline calculados pela idade do lote e função do canal.
+// O ESP32 grava esses timers no firmware e executa localmente caso perca conexão.
+function calcularTimerSeguranca(
+  idade: number,
+  funcao: string,
+): { funcao: string; hora_inicio: string; hora_fim: string; estado: "on" | "off" } | null {
+  if (funcao === "aquecimento") {
+    if (idade <= 7) return { funcao, hora_inicio: "18:00", hora_fim: "06:00", estado: "on" };
+    if (idade <= 14) return { funcao, hora_inicio: "20:00", hora_fim: "05:00", estado: "on" };
+    if (idade <= 21) return { funcao, hora_inicio: "22:00", hora_fim: "04:00", estado: "on" };
+    return { funcao, hora_inicio: "00:00", hora_fim: "23:59", estado: "off" };
+  }
+  if (funcao === "ventilacao") {
+    if (idade <= 14) return null;
+    if (idade <= 21) return { funcao, hora_inicio: "11:00", hora_fim: "15:00", estado: "on" };
+    if (idade <= 28) return { funcao, hora_inicio: "10:00", hora_fim: "16:00", estado: "on" };
+    return { funcao, hora_inicio: "09:00", hora_fim: "18:00", estado: "on" };
+  }
+  if (funcao === "iluminacao") {
+    // Programa de luz mínimo: dia inteiro nos primeiros 7 dias, 12h depois
+    if (idade <= 7) return { funcao, hora_inicio: "00:00", hora_fim: "23:00", estado: "on" };
+    return { funcao, hora_inicio: "06:00", hora_fim: "18:00", estado: "on" };
+  }
+  return null;
+}
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
