@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { CurvaFotoperiodoChart } from "@/components/iot/CurvaFotoperiodoChart";
+import { OverridesAtivosLista } from "@/components/iot/OverridesAtivosLista";
 
 interface Programa {
   id: string;
