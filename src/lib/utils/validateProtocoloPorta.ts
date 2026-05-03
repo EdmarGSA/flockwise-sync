@@ -59,14 +59,14 @@ export function validateProtocoloPorta(
   ) {
     return {
       ok: false,
-      motivo: `Porta inválida. Use um valor entre 1 e 65535 (padrão ${padrao} para ${protocolo.toUpperCase()}).`,
+      motivo: `Porta inválida. Use um valor entre 1 e 65535 (padrão ${padrao} para ${protocoloNorm.toUpperCase()}).`,
     };
   }
 
   if (portaAtiva !== padrao) {
     return {
       ok: true,
-      aviso: `Porta ${portaAtiva} não é a padrão de ${protocolo.toUpperCase()} (${padrao}). Confirme que o roteador encaminha esta porta externa para o DVR.`,
+      aviso: `Porta ${portaAtiva} não é a padrão de ${protocoloNorm.toUpperCase()} (${padrao}). Confirme que o roteador encaminha esta porta externa para o DVR.`,
     };
   }
 
