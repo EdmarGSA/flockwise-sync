@@ -126,6 +126,12 @@ export function LoteIluminacaoCard({ galpaoId, diasAlojados, programaIluminacaoI
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
                 <Link to="/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
               </Button>
+              {isPostura && (
+                <Button size="sm" variant="outline" className="h-7 px-2"
+                  onClick={() => setEstimuloOpen(true)}>
+                  <Zap className="w-3.5 h-3.5 mr-1" />Estímulo
+                </Button>
+              )}
               {dispositivoId && (
                 <Button size="sm" variant="outline" className="h-7 px-2"
                   onClick={() => setOverrideOpen(true)}>
