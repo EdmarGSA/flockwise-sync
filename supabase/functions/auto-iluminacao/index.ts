@@ -202,6 +202,19 @@ Deno.serve(async (req) => {
       acoes++;
       log.push({ canal: canal.id, motivo, estado: estadoDesejado, intensidade });
 
+      // Auditoria: registra mudança de estado em historico_estado_canal
+      if (mudouEstado) {
+        await supabase.from("historico_estado_canal").insert({
+          canal_id: canal.id,
+          integrado_id: canal.integrado_id,
+          estado: estadoDesejado,
+          ligado_em: estadoDesejado === "on" ? new Date().toISOString() : null,
+          desligado_em: estadoDesejado === "off" ? new Date().toISOString() : null,
+          motivo: ovr ? "override" : "programa",
+          contexto: { motivo, intensidade, lote_id: lote.id },
+        });
+      }
+
       // Enviar comando conforme driver
       if (dev.driver === "esp32_http") {
         await supabase.functions.invoke("esp32-bridge/command", {
