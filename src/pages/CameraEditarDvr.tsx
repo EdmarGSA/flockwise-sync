@@ -33,18 +33,13 @@ const CameraEditarDvr = () => {
   });
   const [hostError, setHostError] = useState<string | null>(null);
   const [portaError, setPortaError] = useState<string | null>(null);
+  const [portaAviso, setPortaAviso] = useState<string | null>(null);
   const [trocarSenha, setTrocarSenha] = useState(false);
   const [testando, setTestando] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [testedSignature, setTestedSignature] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
-  const [portaAutoAjuste, setPortaAutoAjuste] = useState<{
-    protocoloAnterior: Protocolo;
-    portaAnterior: number;
-    protocoloNovo: Protocolo;
-    portaNova: number;
-  } | null>(null);
 
   const portaAtiva = form.protocolo === "http" ? form.porta_http : form.porta_https;
 
@@ -80,7 +75,8 @@ const CameraEditarDvr = () => {
     porta_https: number = form.porta_https,
   ) => {
     const v = validateProtocoloPorta({ protocolo, porta_http, porta_https });
-    setPortaError(v.ok ? null : v.motivo ?? "Porta incompatível com o protocolo");
+    setPortaError(v.ok ? null : v.motivo ?? "Porta inválida");
+    setPortaAviso(v.ok && v.aviso ? v.aviso : null);
     return v.ok;
   };
 
