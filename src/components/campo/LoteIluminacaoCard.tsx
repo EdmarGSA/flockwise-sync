@@ -124,7 +124,8 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
             <div className="flex items-center gap-2">
               {overridesAtivos > 0 && (
                 <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-                  {overridesAtivos} override{overridesAtivos > 1 ? 's' : ''} ativo{overridesAtivos > 1 ? 's' : ''}
+                  Override ativo{proximoOverrideAte ? ` até ${new Date(proximoOverrideAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                  {overridesAtivos > 1 ? ` (+${overridesAtivos - 1})` : ''}
                 </Badge>
               )}
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
