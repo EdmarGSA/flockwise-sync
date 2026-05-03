@@ -588,7 +588,36 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
                 </Button>
               </>
             )}
+            {!isEditable && modoEdicaoAvancada && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  disabled={loading}
+                  onClick={() => {
+                    form.reset();
+                    setModoEdicaoAvancada(false);
+                  }}
+                >
+                  Cancelar Ajustes
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={loading}
+                  onClick={handleSaveAjustes}
+                >
+                  {loading ? 'Salvando...' : 'Salvar Ajustes'}
+                </Button>
+              </>
+            )}
           </div>
+          {!isEditable && modoEdicaoAvancada && (
+            <p className="text-xs text-amber-600">
+              Modo edição: alterar a data de alojamento recalcula idade do lote e curvas de fotoperíodo.
+            </p>
+          )}
         </form>
       </Form>
 
