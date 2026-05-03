@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { ArrowRight, Network } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Props {
   protocolo: "http" | "https";
@@ -8,10 +11,14 @@ interface Props {
   portaRtsp: number;
 }
 
+const IP_LAN_REGEX =
+  /^(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})$/;
+
+const isValidIpLan = (ip: string) => IP_LAN_REGEX.test(ip.trim());
+
 /**
- * Mostra um exemplo prático de regra de redirecionamento NAT (port forwarding)
- * para o usuário configurar no roteador da granja, com base nas portas
- * que ele já preencheu no formulário do DVR.
+ * Card de exemplo de regra NAT — agora com campo editável para o IP LAN real
+ * do DVR. As linhas de redirecionamento se atualizam automaticamente.
  */
 export const NATRedirectExample = ({
   protocolo,
@@ -19,10 +26,13 @@ export const NATRedirectExample = ({
   portaExternaHttps,
   portaRtsp,
 }: Props) => {
+  const [ipLan, setIpLan] = useState("192.168.1.105");
+  const ipValido = isValidIpLan(ipLan);
+  const ipExibido = ipValido ? ipLan.trim() : "192.168.1.105";
+
   const portaInternaHttp = 80;
   const portaInternaHttps = 443;
   const portaInternaRtsp = 554;
-  const ipLanExemplo = "192.168.1.105";
   const protoAtivoLabel = protocolo.toUpperCase();
   const portaExternaAtiva = protocolo === "http" ? portaExternaHttp : portaExternaHttps;
   const portaInternaAtiva = protocolo === "http" ? portaInternaHttp : portaInternaHttps;
@@ -49,7 +59,7 @@ export const NATRedirectExample = ({
       </span>
       <ArrowRight className="h-3 w-3 text-muted-foreground" />
       <span className="font-mono text-muted-foreground">
-        {ipLanExemplo}:<strong className="text-foreground">{interna}</strong>
+        {ipExibido}:<strong className="text-foreground">{interna}</strong>
       </span>
     </div>
   );
@@ -60,12 +70,31 @@ export const NATRedirectExample = ({
       <AlertTitle className="text-sm">
         Exemplo de regra NAT para o roteador
       </AlertTitle>
-      <AlertDescription className="space-y-2 text-xs">
-        <p className="text-muted-foreground">
-          Substitua <code>{ipLanExemplo}</code> pelo IP local real do seu DVR.
-          A porta externa (WAN) é aberta na internet; a porta interna é a do DVR
-          na rede local.
-        </p>
+      <AlertDescription className="space-y-3 text-xs">
+        <div className="space-y-1">
+          <Label htmlFor="ip-lan-dvr" className="text-xs">
+            IP LAN do DVR (rede local)
+          </Label>
+          <Input
+            id="ip-lan-dvr"
+            value={ipLan}
+            onChange={(e) => setIpLan(e.target.value)}
+            placeholder="192.168.1.105"
+            className={`h-8 font-mono text-xs ${
+              !ipValido && ipLan ? "border-destructive" : ""
+            }`}
+          />
+          {!ipValido && ipLan && (
+            <p className="text-xs text-destructive">
+              Use um IP de rede privada (10.x, 172.16-31.x ou 192.168.x).
+            </p>
+          )}
+          <p className="text-muted-foreground">
+            Esse é o IP do DVR <strong>dentro da granja</strong>. Veja no menu
+            Rede → TCP/IP do DVR.
+          </p>
+        </div>
+
         <div className="space-y-1">
           <Row
             label={protoAtivoLabel}
@@ -75,11 +104,12 @@ export const NATRedirectExample = ({
           />
           <Row label="RTSP" externa={portaRtsp} interna={portaInternaRtsp} />
         </div>
+
         <p className="text-muted-foreground">
           No painel do roteador procure por{" "}
-          <strong>“Port Forwarding”</strong>, <strong>“Virtual Server”</strong>{" "}
-          ou <strong>“Redirecionamento de portas”</strong> e crie as regras
-          acima usando o protocolo <strong>TCP</strong>.
+          <strong>"Port Forwarding"</strong>, <strong>"Virtual Server"</strong>{" "}
+          ou <strong>"Redirecionamento de portas"</strong> e crie as regras
+          acima usando protocolo <strong>TCP</strong>.
         </p>
       </AlertDescription>
     </Alert>
