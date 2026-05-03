@@ -341,22 +341,8 @@ const CameraEditarDvr = () => {
                   onValueChange={(v) => {
                     const protocoloNovo = v as Protocolo;
                     if (protocoloNovo === form.protocolo) return;
-                    const portaAnterior =
-                      form.protocolo === "http" ? form.porta_http : form.porta_https;
-                    const portaPadrao = protocoloNovo === "http" ? 80 : 443;
-                    const next = {
-                      ...form,
-                      protocolo: protocoloNovo,
-                      porta_http: protocoloNovo === "http" ? 80 : form.porta_http,
-                      porta_https: protocoloNovo === "https" ? 443 : form.porta_https,
-                    };
+                    const next = { ...form, protocolo: protocoloNovo };
                     setForm(next);
-                    setPortaAutoAjuste({
-                      protocoloAnterior: form.protocolo,
-                      portaAnterior,
-                      protocoloNovo,
-                      portaNova: portaPadrao,
-                    });
                     validarProtocoloPorta(protocoloNovo, next.porta_http, next.porta_https);
                   }}
                 >
