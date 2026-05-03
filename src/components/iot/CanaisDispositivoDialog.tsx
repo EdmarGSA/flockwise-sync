@@ -99,6 +99,7 @@ export function CanaisDispositivoDialog({ open, onOpenChange, dispositivoId, dis
           ativo: false,
           estado_atual: null,
           observacoes: null,
+          suporta_dimer: false,
         },
       );
     }
