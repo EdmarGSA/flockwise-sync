@@ -53,6 +53,7 @@ export function EstimuloPosturaDialog({ open, onOpenChange, loteId, onApplied }:
   const [cfg, setCfg] = useState<Cfg>(DEFAULT);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open || !integradoId) return;
