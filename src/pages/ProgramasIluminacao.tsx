@@ -301,12 +301,33 @@ export default function ProgramasIluminacao() {
             <DialogHeader><DialogTitle>Novo programa de iluminação</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div>
+                <Label>Template (opcional)</Label>
+                <Select value={novoTemplate} onValueChange={setNovoTemplate}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vazio">Em branco (sem faixas)</SelectItem>
+                    {TEMPLATES_PROGRAMAS.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {novoTemplate !== "vazio" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {TEMPLATES_PROGRAMAS.find((t) => t.id === novoTemplate)?.descricao}
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label>Nome</Label>
                 <Input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Ex: Cobb 500 verão" />
               </div>
               <div>
                 <Label>Tipo de produção</Label>
-                <Select value={novoTipo} onValueChange={setNovoTipo}>
+                <Select
+                  value={novoTemplate !== "vazio" ? (TEMPLATES_PROGRAMAS.find((t) => t.id === novoTemplate)?.tipo_producao ?? novoTipo) : novoTipo}
+                  onValueChange={setNovoTipo}
+                  disabled={novoTemplate !== "vazio"}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="frango_corte">Frango de corte</SelectItem>
