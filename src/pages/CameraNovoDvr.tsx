@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Camera, ChevronDown, Loader2, ShieldAlert, Wifi } from "lucide-react";
 import { validateDvrHost } from "@/lib/utils/validateHost";
 import { validateProtocoloPorta } from "@/lib/utils/validateProtocoloPorta";
+import { NATRedirectExample } from "@/components/cameras/NATRedirectExample";
 
 type Protocolo = "http" | "https";
 
