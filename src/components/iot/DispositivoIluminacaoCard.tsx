@@ -228,6 +228,14 @@ export function DispositivoIluminacaoCard({
           </div>
         )}
 
+        {/* Linha do tempo de eventos */}
+        <EventosTimeline
+          dispositivoId={dev.id}
+          bootCount={dev.boot_count ?? 0}
+          ultimoBootReason={dev.ultimo_boot_reason ?? null}
+        />
+
+
         {/* Switch manual + override */}
         {dev.driver !== 'esp32_http' && dev.driver !== 'esp32_mqtt' && currentSwitch !== undefined && (
           <div className="pt-3 border-t flex items-center justify-between">
