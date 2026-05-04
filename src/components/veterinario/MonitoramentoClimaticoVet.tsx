@@ -84,6 +84,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
   const navigate = useNavigate();
   const { observacao, forecast, alertas, loading, refetch } = useClimaNucleo(nucleo.id);
   const [leituras, setLeituras] = useState<LeituraGalpao[]>([]);
+  const [series, setSeries] = useState<Record<string, SerieSensor[]>>({});
   const [conforto, setConforto] = useState<ContextoConforto | null>(null);
   const [override, setOverride] = useState<any | null>(null);
   const [refreshing, setRefreshing] = useState(false);
