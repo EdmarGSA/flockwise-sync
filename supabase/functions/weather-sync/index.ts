@@ -135,8 +135,25 @@ Deno.serve(async (req) => {
         await supabase.from("solar_diario").upsert(solarRows, { onConflict: "nucleo_id,data" });
 
         log.push({ nucleo: n.id, horas: rows.length });
+        await supabase.from("weather_sync_log").insert({
+          nucleo_id: n.id,
+          integrado_id: n.integrado_id,
+          status: "sucesso",
+          mensagem: `Atualizado: ${rows.length} horas previstas`,
+          duracao_ms: Date.now() - nucleoStart,
+          trigger_tipo: nucleoIdFilter ? "manual" : "cron",
+        });
       } catch (e) {
-        log.push({ nucleo: n.id, erro: (e as Error).message });
+        const msg = (e as Error).message;
+        log.push({ nucleo: n.id, erro: msg });
+        await supabase.from("weather_sync_log").insert({
+          nucleo_id: n.id,
+          integrado_id: n.integrado_id,
+          status: "erro",
+          mensagem: msg,
+          duracao_ms: Date.now() - nucleoStart,
+          trigger_tipo: nucleoIdFilter ? "manual" : "cron",
+        });
       }
     }
 
