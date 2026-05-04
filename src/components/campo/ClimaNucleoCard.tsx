@@ -129,20 +129,25 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex items-center gap-2 text-sm">
+          <cond.Icon className={`h-5 w-5 ${cond.cor}`} />
+          <span className="font-medium text-foreground">{cond.texto}</span>
+        </div>
+
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
             <ThermometerSun className="h-4 w-4 mx-auto text-orange-500" />
-            <p className="text-xl font-bold">{Number(observacao.temp_c).toFixed(0)}°</p>
+            <p className="text-xl font-bold">{observacao.temperatura_c != null ? `${Number(observacao.temperatura_c).toFixed(0)}°` : "—"}</p>
             <p className="text-[10px] text-muted-foreground">Temp</p>
           </div>
           <div>
             <Droplets className="h-4 w-4 mx-auto text-blue-500" />
-            <p className="text-xl font-bold">{Number(observacao.ur_pct).toFixed(0)}%</p>
+            <p className="text-xl font-bold">{observacao.umidade_pct != null ? `${Number(observacao.umidade_pct).toFixed(0)}%` : "—"}</p>
             <p className="text-[10px] text-muted-foreground">UR</p>
           </div>
           <div>
             <Wind className="h-4 w-4 mx-auto text-cyan-500" />
-            <p className="text-xl font-bold">{Number(observacao.vento_kmh).toFixed(0)}</p>
+            <p className="text-xl font-bold">{observacao.vento_kmh != null ? Number(observacao.vento_kmh).toFixed(0) : "—"}</p>
             <p className="text-[10px] text-muted-foreground">km/h</p>
           </div>
           <div>
