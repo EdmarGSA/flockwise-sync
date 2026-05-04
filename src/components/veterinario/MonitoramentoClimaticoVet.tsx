@@ -131,8 +131,34 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
             ith_max_ok: cf.ith_max_ok,
             ith_max_critico: overr?.ith_max_critico ?? cf.ith_max_critico,
             ur_max_ok: cf.ur_max_ok,
-          });
-        }
+        });
+      }
+
+      // Histórico 24h por dispositivo (para sparkline)
+      if (devIds.length) {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: hist } = await supabase
+          .from('leituras_sensores')
+          .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
+          .in('dispositivo_id', devIds)
+          .gte('lido_em', since)
+          .order('lido_em', { ascending: true });
+        const seriesMap: Record<string, SerieSensor[]> = {};
+        (hist ?? []).forEach((h: any) => {
+          if (!seriesMap[h.dispositivo_id]) seriesMap[h.dispositivo_id] = [];
+          seriesMap[h.dispositivo_id].push({ ts: h.lido_em, t: h.temperatura_c, u: h.umidade_pct });
+        });
+        // downsample para no máx ~48 pontos por sensor
+        Object.keys(seriesMap).forEach(k => {
+          const arr = seriesMap[k];
+          const maxPts = 48;
+          if (arr.length > maxPts) {
+            const step = Math.ceil(arr.length / maxPts);
+            seriesMap[k] = arr.filter((_, i) => i % step === 0);
+          }
+        });
+        if (!cancel) setSeries(seriesMap);
+      }
       }
 
       // leituras IoT por galpão
