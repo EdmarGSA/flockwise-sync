@@ -33,6 +33,7 @@ import CadastroDesempenhoAves from "./pages/CadastroDesempenhoAves";
 import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
 import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
+import ConfiguracaoAlertasClima from "./pages/ConfiguracaoAlertasClima";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
@@ -384,6 +385,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ConfiguracaoFechamento />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/alertas-clima" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoAlertasClima />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />

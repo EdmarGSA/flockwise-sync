@@ -45,6 +45,18 @@ Deno.serve(async (req) => {
       return row ?? null;
     };
 
+    // 2b) Configurações de alertas por organização/núcleo (override do conforto)
+    const integradoIds = Array.from(new Set((lotes as any[]).map(l => l.integrado_id)));
+    const { data: alertCfgs } = await supabase
+      .from("nucleo_alertas_config")
+      .select("*")
+      .in("integrado_id", integradoIds);
+    const getAlertCfg = (integrado_id: string, nucleo_id: string) => {
+      const especifico = alertCfgs?.find(c => c.integrado_id === integrado_id && c.nucleo_id === nucleo_id);
+      const padrao = alertCfgs?.find(c => c.integrado_id === integrado_id && c.nucleo_id === null);
+      return especifico ?? padrao ?? null;
+    };
+
     // 3) Para cada lote, busca previsão 24h do núcleo
     const agora = Date.now();
     const limite24h = agora + 24 * 3600 * 1000;
@@ -58,9 +70,24 @@ Deno.serve(async (req) => {
       const conforto = getConforto(nucleo.tipo_producao, idade);
       if (!conforto) continue;
 
+      // Mescla limites: usuário > conforto por idade
+      const usrCfg = getAlertCfg(lote.integrado_id, nucleo.id);
+      const limites = {
+        temp_max: usrCfg?.temp_max_critico ?? conforto.temp_max_critico,
+        temp_min: usrCfg?.temp_min_critico ?? conforto.temp_min_critico,
+        ith_max: usrCfg?.ith_max_critico ?? conforto.ith_max_critico,
+        vento_max: usrCfg?.vento_max_kmh ?? 50,
+        chuva_min: usrCfg?.prob_chuva_min_pct ?? null,
+        ativo_calor: usrCfg?.habilitar_calor ?? true,
+        ativo_frio: usrCfg?.habilitar_frio ?? true,
+        ativo_ith: usrCfg?.habilitar_ith ?? true,
+        ativo_vento: usrCfg?.habilitar_vento ?? true,
+        ativo_chuva: usrCfg?.habilitar_chuva ?? false,
+      };
+
       const { data: forecast } = await supabase
         .from("weather_forecast_horario")
-        .select("hora_prevista, temperatura_c, umidade_pct, vento_kmh, ith")
+        .select("hora_prevista, temperatura_c, umidade_pct, vento_kmh, ith, prob_chuva_pct")
         .eq("nucleo_id", nucleo.id)
         .gte("hora_prevista", new Date(agora).toISOString())
         .lte("hora_prevista", new Date(limite24h).toISOString())
@@ -70,11 +97,12 @@ Deno.serve(async (req) => {
 
       const inercia = (galpao.inercia_termica_min ?? 90) + (idade < 14 ? 30 : 0);
 
-      // Detecta o primeiro pico de cada categoria
-      const picoCalor = forecast.find(f => Number(f.temperatura_c) >= conforto.temp_max_critico);
-      const picoFrio = forecast.find(f => Number(f.temperatura_c) <= conforto.temp_min_critico);
-      const picoITH = forecast.find(f => Number(f.ith ?? 0) >= conforto.ith_max_critico);
-      const picoVento = forecast.find(f => Number(f.vento_kmh ?? 0) >= 50);
+      const picoCalor = limites.ativo_calor ? forecast.find(f => Number(f.temperatura_c) >= limites.temp_max) : null;
+      const picoFrio = limites.ativo_frio ? forecast.find(f => Number(f.temperatura_c) <= limites.temp_min) : null;
+      const picoITH = limites.ativo_ith ? forecast.find(f => Number(f.ith ?? 0) >= limites.ith_max) : null;
+      const picoVento = limites.ativo_vento ? forecast.find(f => Number(f.vento_kmh ?? 0) >= limites.vento_max) : null;
+      const picoChuva = limites.ativo_chuva && limites.chuva_min != null
+        ? forecast.find(f => Number(f.prob_chuva_pct ?? 0) >= limites.chuva_min) : null;
 
       const inserts: any[] = [];
       const acaoStr = (evento: Date) => {
@@ -92,7 +120,7 @@ Deno.serve(async (req) => {
           titulo: `Onda de calor: ${picoCalor.temperatura_c}°C às ${hhEvento}`,
           mensagem: `${galpao.nome}: pico previsto de ${picoCalor.temperatura_c}°C às ${hhEvento}. Inicie resfriamento preventivo às ${hhAcao} (${inercia} min antes).`,
           horario_evento: evt.toISOString(), horario_acao: acao.toISOString(),
-          contexto: { idade_dias: idade, inercia_min: inercia, ur: picoCalor.umidade_pct },
+          contexto: { idade_dias: idade, inercia_min: inercia, ur: picoCalor.umidade_pct, limite: limites.temp_max },
         });
       }
       if (picoFrio) {
@@ -104,7 +132,7 @@ Deno.serve(async (req) => {
           titulo: `Onda de frio: ${picoFrio.temperatura_c}°C às ${hhEvento}`,
           mensagem: `${galpao.nome}: temperatura mínima prevista de ${picoFrio.temperatura_c}°C às ${hhEvento}. Aqueça o galpão a partir de ${hhAcao}.`,
           horario_evento: evt.toISOString(), horario_acao: acao.toISOString(),
-          contexto: { idade_dias: idade, inercia_min: inercia },
+          contexto: { idade_dias: idade, inercia_min: inercia, limite: limites.temp_min },
         });
       }
       if (picoITH && (!picoCalor || picoITH.hora_prevista !== picoCalor.hora_prevista)) {
@@ -116,7 +144,7 @@ Deno.serve(async (req) => {
           titulo: `ITH ${picoITH.ith} previsto às ${hhEvento}`,
           mensagem: `${galpao.nome}: ITH de ${picoITH.ith} (${picoITH.temperatura_c}°C / ${picoITH.umidade_pct}% UR) às ${hhEvento}. Aumente ventilação a partir de ${hhAcao}.`,
           horario_evento: evt.toISOString(), horario_acao: acao.toISOString(),
-          contexto: { idade_dias: idade },
+          contexto: { idade_dias: idade, limite: limites.ith_max },
         });
       }
       if (picoVento) {
@@ -127,7 +155,18 @@ Deno.serve(async (req) => {
           titulo: `Vento forte: ${picoVento.vento_kmh} km/h`,
           mensagem: `${galpao.nome}: rajadas de ${picoVento.vento_kmh} km/h previstas às ${evt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}. Verifique cortinas e estruturas.`,
           horario_evento: evt.toISOString(), horario_acao: evt.toISOString(),
-          contexto: {},
+          contexto: { limite: limites.vento_max },
+        });
+      }
+      if (picoChuva) {
+        const evt = new Date(picoChuva.hora_prevista);
+        inserts.push({
+          integrado_id: lote.integrado_id, nucleo_id: nucleo.id, lote_id: lote.id, galpao_id: galpao.id,
+          tipo: "clima_chuva_intensa", severidade: "warning",
+          titulo: `Chuva prevista: ${picoChuva.prob_chuva_pct}%`,
+          mensagem: `${galpao.nome}: ${picoChuva.prob_chuva_pct}% de chance de chuva às ${evt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}.`,
+          horario_evento: evt.toISOString(), horario_acao: evt.toISOString(),
+          contexto: { limite: limites.chuva_min },
         });
       }
 

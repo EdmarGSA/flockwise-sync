@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine, Activity, MapPin, Lightbulb, ShieldCheck } from "lucide-react";
+import { Building2, Users, Package, ArrowLeft, Settings, Layers, Target, Handshake, Percent, Warehouse, Lock, Bird, Egg, Container, Gauge, Palette, Sun, TreePine, Activity, MapPin, Lightbulb, ShieldCheck, CloudSun } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -123,6 +123,12 @@ const Configuracoes = () => {
       description: "Política após queda de energia/internet por dispositivo ou galpão",
       icon: ShieldCheck,
       path: "/configuracoes/recuperacao-iot"
+    },
+    {
+      title: "Alertas Climáticos",
+      description: "Limites de temperatura, ITH, vento e chuva por núcleo",
+      icon: CloudSun,
+      path: "/configuracoes/alertas-clima"
     },
     {
       title: "Mapeamento (Mapbox)",

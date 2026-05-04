@@ -4104,6 +4104,71 @@ export type Database = {
         }
         Relationships: []
       }
+      nucleo_alertas_config: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          habilitar_calor: boolean
+          habilitar_chuva: boolean
+          habilitar_frio: boolean
+          habilitar_ith: boolean
+          habilitar_vento: boolean
+          id: string
+          integrado_id: string
+          ith_max_critico: number | null
+          nucleo_id: string | null
+          prob_chuva_min_pct: number | null
+          temp_max_critico: number | null
+          temp_min_critico: number | null
+          updated_at: string
+          vento_max_kmh: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          habilitar_calor?: boolean
+          habilitar_chuva?: boolean
+          habilitar_frio?: boolean
+          habilitar_ith?: boolean
+          habilitar_vento?: boolean
+          id?: string
+          integrado_id: string
+          ith_max_critico?: number | null
+          nucleo_id?: string | null
+          prob_chuva_min_pct?: number | null
+          temp_max_critico?: number | null
+          temp_min_critico?: number | null
+          updated_at?: string
+          vento_max_kmh?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          habilitar_calor?: boolean
+          habilitar_chuva?: boolean
+          habilitar_frio?: boolean
+          habilitar_ith?: boolean
+          habilitar_vento?: boolean
+          id?: string
+          integrado_id?: string
+          ith_max_critico?: number | null
+          nucleo_id?: string | null
+          prob_chuva_min_pct?: number | null
+          temp_max_critico?: number | null
+          temp_min_critico?: number | null
+          updated_at?: string
+          vento_max_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nucleo_alertas_config_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nucleos: {
         Row: {
           area_id: string | null
