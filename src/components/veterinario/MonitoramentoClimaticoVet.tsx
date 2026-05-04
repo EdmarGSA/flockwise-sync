@@ -332,7 +332,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
               const st = galpaoStatus(l);
               const sensores = l.sensores ?? [];
               const hasMulti = sensores.length > 1;
-              const divergAlta = (l.divergencia_c ?? 0) >= 3;
+              const divergAlta = (l.divergencia_c ?? 0) >= divergMinCfg;
               const resumo = l.temperatura_min_c != null && l.temperatura_c != null && hasMulti
                 ? `${l.temperatura_min_c.toFixed(1)}–${l.temperatura_c.toFixed(1)}°C`
                 : (l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—');
