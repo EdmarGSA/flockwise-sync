@@ -135,30 +135,6 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         }
       }
 
-      // Histórico 24h por dispositivo (sparkline)
-      if (devIds.length) {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: hist } = await supabase
-          .from('leituras_sensores')
-          .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
-          .in('dispositivo_id', devIds)
-          .gte('lido_em', since)
-          .order('lido_em', { ascending: true });
-        const seriesMap: Record<string, SerieSensor[]> = {};
-        (hist ?? []).forEach((h: any) => {
-          (seriesMap[h.dispositivo_id] ||= []).push({ ts: h.lido_em, t: h.temperatura_c, u: h.umidade_pct });
-        });
-        Object.keys(seriesMap).forEach(k => {
-          const arr = seriesMap[k];
-          const maxPts = 48;
-          if (arr.length > maxPts) {
-            const step = Math.ceil(arr.length / maxPts);
-            seriesMap[k] = arr.filter((_, i) => i % step === 0);
-          }
-        });
-        if (!cancel) setSeries(seriesMap);
-      }
-
 
       // leituras IoT por galpão
       const galpaoIds = nucleo.galpoes.map(g => g.id);
