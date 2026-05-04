@@ -25,6 +25,40 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
+import { LineChart, Line, YAxis, ResponsiveContainer, Tooltip as RcTooltip } from 'recharts';
+
+type SerieSensor = { ts: string; t: number | null; u: number | null };
+
+function SensorSparkline({ data }: { data: SerieSensor[] }) {
+  if (!data || data.length < 2) {
+    return <div className="text-[10px] text-muted-foreground italic">Sem histórico 24h</div>;
+  }
+  const formatted = data.map(d => ({
+    ts: d.ts,
+    label: new Date(d.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    t: d.t,
+    u: d.u,
+  }));
+  return (
+    <div className="h-12 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={formatted} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          <YAxis yAxisId="t" hide domain={['dataMin - 1', 'dataMax + 1']} />
+          <YAxis yAxisId="u" hide domain={[0, 100]} orientation="right" />
+          <RcTooltip
+            contentStyle={{ fontSize: 10, padding: '4px 6px' }}
+            labelFormatter={(_, p) => (p?.[0]?.payload?.label ?? '')}
+            formatter={(v: any, name: string) =>
+              name === 't' ? [`${Number(v).toFixed(1)}°C`, 'Temp'] : [`${Number(v).toFixed(0)}%`, 'UR']
+            }
+          />
+          <Line yAxisId="t" type="monotone" dataKey="t" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls />
+          <Line yAxisId="u" type="monotone" dataKey="u" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 interface NucleoData {
   id: string;
@@ -50,6 +84,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
   const navigate = useNavigate();
   const { observacao, forecast, alertas, loading, refetch } = useClimaNucleo(nucleo.id);
   const [leituras, setLeituras] = useState<LeituraGalpao[]>([]);
+  const [series, setSeries] = useState<Record<string, SerieSensor[]>>({});
   const [conforto, setConforto] = useState<ContextoConforto | null>(null);
   const [override, setOverride] = useState<any | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,6 +135,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         }
       }
 
+
       // leituras IoT por galpão
       const galpaoIds = nucleo.galpoes.map(g => g.id);
       if (galpaoIds.length === 0) return;
@@ -140,6 +176,30 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
           if (!sensoresPorGalpao.has(info.galpao_id)) sensoresPorGalpao.set(info.galpao_id, []);
           sensoresPorGalpao.get(info.galpao_id)!.push(sensor);
         });
+      }
+
+      // Histórico 24h por dispositivo (sparkline)
+      if (devIds.length) {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: hist } = await supabase
+          .from('leituras_sensores')
+          .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
+          .in('dispositivo_id', devIds)
+          .gte('lido_em', since)
+          .order('lido_em', { ascending: true });
+        const seriesMap: Record<string, SerieSensor[]> = {};
+        (hist ?? []).forEach((h: any) => {
+          (seriesMap[h.dispositivo_id] ||= []).push({ ts: h.lido_em, t: h.temperatura_c, u: h.umidade_pct });
+        });
+        Object.keys(seriesMap).forEach(k => {
+          const arr = seriesMap[k];
+          const maxPts = 48;
+          if (arr.length > maxPts) {
+            const step = Math.ceil(arr.length / maxPts);
+            seriesMap[k] = arr.filter((_, i) => i % step === 0);
+          }
+        });
+        if (!cancel) setSeries(seriesMap);
       }
 
       const ls: LeituraGalpao[] = nucleo.galpoes.map(g => {
@@ -374,29 +434,32 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
                           : Infinity;
                         const offline = !isFinite(ageMin) || ageMin > offlineMinCfg;
                         return (
-                          <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {offline ? (
-                                <WifiOff className="w-3 h-3 text-destructive shrink-0" />
-                              ) : (
-                                <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
-                              )}
-                              <span className="truncate">{s.nome}</span>
-                              {s.suspeito && (
-                                <AlertTriangle
-                                  className="w-3 h-3 text-amber-500 shrink-0"
-                                  aria-label={s.motivo_suspeita}
-                                />
-                              )}
+                          <div key={s.dispositivo_id} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[11px] gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {offline ? (
+                                  <WifiOff className="w-3 h-3 text-destructive shrink-0" />
+                                ) : (
+                                  <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="truncate">{s.nome}</span>
+                                {s.suspeito && (
+                                  <AlertTriangle
+                                    className="w-3 h-3 text-amber-500 shrink-0"
+                                    aria-label={s.motivo_suspeita}
+                                  />
+                                )}
+                              </div>
+                              <span className="font-mono text-muted-foreground shrink-0">
+                                {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
+                                {s.umidade_pct != null && (
+                                  <span className={s.suspeito ? 'text-amber-600' : ''}>
+                                    {' / '}{s.umidade_pct.toFixed(0)}%
+                                  </span>
+                                )}
+                              </span>
                             </div>
-                            <span className="font-mono text-muted-foreground shrink-0">
-                              {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
-                              {s.umidade_pct != null && (
-                                <span className={s.suspeito ? 'text-amber-600' : ''}>
-                                  {' / '}{s.umidade_pct.toFixed(0)}%
-                                </span>
-                              )}
-                            </span>
+                            <SensorSparkline data={series[s.dispositivo_id] ?? []} />
                           </div>
                         );
                       })}
