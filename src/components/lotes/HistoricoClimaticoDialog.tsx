@@ -231,6 +231,14 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-end col-span-2">
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch id="comp-prev-dlg" checked={comparar} onCheckedChange={setComparar} />
+                    <Label htmlFor="comp-prev-dlg" className="text-xs cursor-pointer">
+                      Comparar com período anterior (mesma duração)
+                    </Label>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -265,6 +273,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                           <Line type="monotone" dataKey="temp_max" stroke="#f97316" dot={false} name="Máx" />
                           <Line type="monotone" dataKey="temp_med" stroke="#eab308" dot={false} name="Méd" strokeWidth={2} />
                           <Line type="monotone" dataKey="temp_min" stroke="#3b82f6" dot={false} name="Mín" />
+                          {comparar && <Line type="monotone" dataKey="temp_max_prev" stroke="#f97316" dot={false} name="Máx (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line type="monotone" dataKey="temp_med_prev" stroke="#eab308" dot={false} name="Méd (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line type="monotone" dataKey="temp_min_prev" stroke="#3b82f6" dot={false} name="Mín (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
                         </ComposedChart>
                       </ResponsiveContainer>
                     )}
@@ -291,6 +302,8 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                           <Line yAxisId="ur" type="monotone" dataKey="ur_med" stroke="#3b82f6" dot={false} name="UR %" />
                           <Line yAxisId="ith" type="monotone" dataKey="ith_med" stroke="#a855f7" dot={false} name="ITH méd" />
                           <Line yAxisId="ith" type="monotone" dataKey="ith_max" stroke="#dc2626" dot={false} name="ITH máx" strokeDasharray="3 3" />
+                          {comparar && <Line yAxisId="ur" type="monotone" dataKey="ur_med_prev" stroke="#3b82f6" dot={false} name="UR % (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line yAxisId="ith" type="monotone" dataKey="ith_med_prev" stroke="#a855f7" dot={false} name="ITH méd (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
                         </ComposedChart>
                       </ResponsiveContainer>
                     )}
