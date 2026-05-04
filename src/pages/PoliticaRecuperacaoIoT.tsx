@@ -77,17 +77,25 @@ export default function PoliticaRecuperacaoIoT() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/configuracoes')} className="h-9 w-9">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl sm:text-2xl font-bold text-foreground">Política de Recuperação IoT</h1>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Defina como dispositivos devem se comportar após queda de energia ou internet.
               </p>
             </div>
           </div>
+          {!loading && integradoId && (
+            <BulkApplyDialog
+              integradoId={integradoId}
+              galpoes={galpoes}
+              dispositivos={dispositivos}
+              onSaved={fetchAll}
+            />
+          )}
         </div>
 
         {loading ? (
