@@ -13,6 +13,9 @@ interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
 interface Faixa {
   dia_inicio: number; dia_fim: number; horas_luz: number;
   blocos: Bloco[]; ramp_up_min: number; ramp_down_min: number; intensidade_pct: number;
+  modo_horario?: 'fixo' | 'solar';
+  acender_offset_min?: number;
+  apagar_offset_min?: number;
 }
 
 const TZ = "America/Sao_Paulo";
@@ -116,13 +119,32 @@ Deno.serve(async (req) => {
     const galpaoIds = [...new Set(canais.map((c: any) => c.dispositivos_iot?.galpao_id).filter(Boolean))];
     const { data: lotes } = await supabase
       .from("lotes")
-      .select("id, galpao_id, integrado_id, data_alojamento, programa_iluminacao_id")
+      .select("id, galpao_id, integrado_id, data_alojamento, programa_iluminacao_id, galpoes!inner(nucleo_id)")
       .in("galpao_id", galpaoIds)
       .eq("status", "alojado")
       .not("data_alojamento", "is", null);
 
     const loteByGalpao = new Map<string, any>();
-    for (const l of lotes ?? []) loteByGalpao.set(l.galpao_id, l);
+    const nucleoByGalpao = new Map<string, string>();
+    for (const l of (lotes ?? []) as any[]) {
+      loteByGalpao.set(l.galpao_id, l);
+      if (l.galpoes?.nucleo_id) nucleoByGalpao.set(l.galpao_id, l.galpoes.nucleo_id);
+    }
+
+    // Solar de hoje por núcleo
+    const hoje = new Date().toISOString().slice(0, 10);
+    const nucleoIds = [...new Set([...nucleoByGalpao.values()])];
+    const { data: solarHoje } = nucleoIds.length
+      ? await supabase.from("solar_diario").select("nucleo_id, nascer_sol, por_sol").eq("data", hoje).in("nucleo_id", nucleoIds)
+      : { data: [] as any[] };
+    const solarByNucleo = new Map<string, { nascer: Date | null; por: Date | null }>();
+    for (const s of (solarHoje ?? []) as any[]) {
+      solarByNucleo.set(s.nucleo_id, {
+        nascer: s.nascer_sol ? new Date(s.nascer_sol) : null,
+        por: s.por_sol ? new Date(s.por_sol) : null,
+      });
+    }
+
 
     // 3) Programas e faixas (carrega todos de uma vez)
     const integradoIds = [...new Set(canais.map((c: any) => c.integrado_id))];
@@ -187,11 +209,29 @@ Deno.serve(async (req) => {
           const idade = idadeLoteDias(lote.data_alojamento);
           const faixa = programaFaixas.find((f) => idade >= f.dia_inicio && idade <= f.dia_fim);
           if (faixa) {
-            const r = calcular(faixa);
+            // Modo solar: substitui blocos pelos horários ancorados no nascer/pôr do dia
+            let faixaEfetiva = faixa as Faixa;
+            if (faixa.modo_horario === "solar") {
+              const nucleoId = nucleoByGalpao.get(dev.galpao_id);
+              const sol = nucleoId ? solarByNucleo.get(nucleoId) : null;
+              if (sol?.nascer && sol?.por) {
+                const ofA = faixa.acender_offset_min ?? 0;
+                const ofP = faixa.apagar_offset_min ?? 0;
+                const fmt = (d: Date) => {
+                  const dl = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+                  return `${dl.find(p => p.type === "hour")?.value}:${dl.find(p => p.type === "minute")?.value}`;
+                };
+                const nascerOff = new Date(sol.nascer.getTime() + ofA * 60000);
+                const porOff = new Date(sol.por.getTime() + ofP * 60000);
+                faixaEfetiva = { ...faixa, blocos: [{ acender: fmt(nascerOff), apagar: fmt(porOff), intensidade_pct: faixa.intensidade_pct }] };
+              }
+            }
+            const r = calcular(faixaEfetiva);
             estadoDesejado = r.ligado ? "on" : "off";
             intensidade = r.intensidade;
-            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}, ${r.intensidade}%`;
+            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}, ${r.intensidade}%`;
           }
+
         }
       }
 

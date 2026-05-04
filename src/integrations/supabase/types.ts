@@ -114,6 +114,85 @@ export type Database = {
           },
         ]
       }
+      alertas_climaticos: {
+        Row: {
+          contexto: Json | null
+          created_at: string
+          galpao_id: string | null
+          hora_chave: string | null
+          horario_acao: string | null
+          horario_evento: string
+          id: string
+          integrado_id: string
+          lote_id: string | null
+          mensagem: string
+          nucleo_id: string
+          reconhecido_em: string | null
+          reconhecido_por: string | null
+          severidade: string
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          contexto?: Json | null
+          created_at?: string
+          galpao_id?: string | null
+          hora_chave?: string | null
+          horario_acao?: string | null
+          horario_evento: string
+          id?: string
+          integrado_id: string
+          lote_id?: string | null
+          mensagem: string
+          nucleo_id: string
+          reconhecido_em?: string | null
+          reconhecido_por?: string | null
+          severidade?: string
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          contexto?: Json | null
+          created_at?: string
+          galpao_id?: string | null
+          hora_chave?: string | null
+          horario_acao?: string | null
+          horario_evento?: string
+          id?: string
+          integrado_id?: string
+          lote_id?: string | null
+          mensagem?: string
+          nucleo_id?: string
+          reconhecido_em?: string | null
+          reconhecido_por?: string | null
+          severidade?: string
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_climaticos_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_climaticos_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_climaticos_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_temperatura: {
         Row: {
           created_at: string
@@ -1119,6 +1198,57 @@ export type Database = {
           id?: string
           integrado_id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      conforto_termico_ave: {
+        Row: {
+          created_at: string
+          id: string
+          idade_dia_fim: number
+          idade_dia_inicio: number
+          ith_max_critico: number | null
+          ith_max_ok: number | null
+          observacao: string | null
+          temp_max_critico: number
+          temp_max_ok: number
+          temp_min_critico: number
+          temp_min_ok: number
+          tipo_producao: string
+          ur_max_ok: number | null
+          ur_min_ok: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idade_dia_fim: number
+          idade_dia_inicio: number
+          ith_max_critico?: number | null
+          ith_max_ok?: number | null
+          observacao?: string | null
+          temp_max_critico: number
+          temp_max_ok: number
+          temp_min_critico: number
+          temp_min_ok: number
+          tipo_producao: string
+          ur_max_ok?: number | null
+          ur_min_ok?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idade_dia_fim?: number
+          idade_dia_inicio?: number
+          ith_max_critico?: number | null
+          ith_max_ok?: number | null
+          observacao?: string | null
+          temp_max_critico?: number
+          temp_max_ok?: number
+          temp_min_critico?: number
+          temp_min_ok?: number
+          tipo_producao?: string
+          ur_max_ok?: number | null
+          ur_min_ok?: number | null
         }
         Relationships: []
       }
@@ -2298,6 +2428,7 @@ export type Database = {
           comprimento: number
           created_at: string
           id: string
+          inercia_termica_min: number | null
           largura: number
           latitude: number | null
           longitude: number | null
@@ -2324,6 +2455,7 @@ export type Database = {
           comprimento: number
           created_at?: string
           id?: string
+          inercia_termica_min?: number | null
           largura: number
           latitude?: number | null
           longitude?: number | null
@@ -2350,6 +2482,7 @@ export type Database = {
           comprimento?: number
           created_at?: string
           id?: string
+          inercia_termica_min?: number | null
           largura?: number
           latitude?: number | null
           longitude?: number | null
@@ -3933,8 +4066,10 @@ export type Database = {
           longitude: number | null
           nome: string
           numero: string | null
+          timezone: string
           tipo_producao: string
           updated_at: string
+          weather_ativo: boolean
         }
         Insert: {
           area_id?: string | null
@@ -3953,8 +4088,10 @@ export type Database = {
           longitude?: number | null
           nome: string
           numero?: string | null
+          timezone?: string
           tipo_producao: string
           updated_at?: string
+          weather_ativo?: boolean
         }
         Update: {
           area_id?: string | null
@@ -3973,8 +4110,10 @@ export type Database = {
           longitude?: number | null
           nome?: string
           numero?: string | null
+          timezone?: string
           tipo_producao?: string
           updated_at?: string
+          weather_ativo?: boolean
         }
         Relationships: [
           {
@@ -6214,6 +6353,8 @@ export type Database = {
       }
       programa_iluminacao_faixa: {
         Row: {
+          acender_offset_min: number
+          apagar_offset_min: number
           blocos: Json
           created_at: string
           dia_fim: number
@@ -6221,12 +6362,15 @@ export type Database = {
           horas_luz: number
           id: string
           intensidade_pct: number
+          modo_horario: string
           observacoes: string | null
           programa_id: string
           ramp_down_min: number
           ramp_up_min: number
         }
         Insert: {
+          acender_offset_min?: number
+          apagar_offset_min?: number
           blocos?: Json
           created_at?: string
           dia_fim: number
@@ -6234,12 +6378,15 @@ export type Database = {
           horas_luz: number
           id?: string
           intensidade_pct?: number
+          modo_horario?: string
           observacoes?: string | null
           programa_id: string
           ramp_down_min?: number
           ramp_up_min?: number
         }
         Update: {
+          acender_offset_min?: number
+          apagar_offset_min?: number
           blocos?: Json
           created_at?: string
           dia_fim?: number
@@ -6247,6 +6394,7 @@ export type Database = {
           horas_luz?: number
           id?: string
           intensidade_pct?: number
+          modo_horario?: string
           observacoes?: string | null
           programa_id?: string
           ramp_down_min?: number
@@ -6996,6 +7144,53 @@ export type Database = {
           volume_m3?: number
         }
         Relationships: []
+      }
+      solar_diario: {
+        Row: {
+          created_at: string
+          crepusculo_civil_fim: string | null
+          crepusculo_civil_inicio: string | null
+          data: string
+          fotoperiodo_min: number | null
+          id: string
+          integrado_id: string
+          nascer_sol: string | null
+          nucleo_id: string
+          por_sol: string | null
+        }
+        Insert: {
+          created_at?: string
+          crepusculo_civil_fim?: string | null
+          crepusculo_civil_inicio?: string | null
+          data: string
+          fotoperiodo_min?: number | null
+          id?: string
+          integrado_id: string
+          nascer_sol?: string | null
+          nucleo_id: string
+          por_sol?: string | null
+        }
+        Update: {
+          created_at?: string
+          crepusculo_civil_fim?: string | null
+          crepusculo_civil_inicio?: string | null
+          data?: string
+          fotoperiodo_min?: number | null
+          id?: string
+          integrado_id?: string
+          nascer_sol?: string | null
+          nucleo_id?: string
+          por_sol?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solar_diario_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       solicitacoes_racao: {
         Row: {
@@ -7812,6 +8007,239 @@ export type Database = {
             columns: ["fornecedor_global_id"]
             isOneToOne: false
             referencedRelation: "fornecedores_globais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weather_forecast_horario: {
+        Row: {
+          condicao_codigo: number | null
+          created_at: string
+          hora_prevista: string
+          id: string
+          integrado_id: string
+          ith: number | null
+          nucleo_id: string
+          precipitacao_mm: number | null
+          prob_chuva_pct: number | null
+          temperatura_c: number | null
+          umidade_pct: number | null
+          uv_index: number | null
+          vento_kmh: number | null
+        }
+        Insert: {
+          condicao_codigo?: number | null
+          created_at?: string
+          hora_prevista: string
+          id?: string
+          integrado_id: string
+          ith?: number | null
+          nucleo_id: string
+          precipitacao_mm?: number | null
+          prob_chuva_pct?: number | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+          uv_index?: number | null
+          vento_kmh?: number | null
+        }
+        Update: {
+          condicao_codigo?: number | null
+          created_at?: string
+          hora_prevista?: string
+          id?: string
+          integrado_id?: string
+          ith?: number | null
+          nucleo_id?: string
+          precipitacao_mm?: number | null
+          prob_chuva_pct?: number | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+          uv_index?: number | null
+          vento_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_forecast_horario_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weather_historico_3h: {
+        Row: {
+          created_at: string
+          id: string
+          integrado_id: string
+          ith_max: number | null
+          ith_med: number | null
+          nucleo_id: string
+          precipitacao_mm: number | null
+          temp_max: number | null
+          temp_med: number | null
+          temp_min: number | null
+          ts_3h: string
+          ur_med: number | null
+          vento_max: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integrado_id: string
+          ith_max?: number | null
+          ith_med?: number | null
+          nucleo_id: string
+          precipitacao_mm?: number | null
+          temp_max?: number | null
+          temp_med?: number | null
+          temp_min?: number | null
+          ts_3h: string
+          ur_med?: number | null
+          vento_max?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integrado_id?: string
+          ith_max?: number | null
+          ith_med?: number | null
+          nucleo_id?: string
+          precipitacao_mm?: number | null
+          temp_max?: number | null
+          temp_med?: number | null
+          temp_min?: number | null
+          ts_3h?: string
+          ur_med?: number | null
+          vento_max?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_historico_3h_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: false
+            referencedRelation: "nucleos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weather_lote_diario: {
+        Row: {
+          created_at: string
+          data: string
+          dentro_conforto_pct: number | null
+          horas_calor: number | null
+          horas_frio: number | null
+          horas_ith_alto: number | null
+          id: string
+          idade_dias: number | null
+          integrado_id: string
+          ith_max: number | null
+          ith_med: number | null
+          lote_id: string
+          temp_max: number | null
+          temp_med: number | null
+          temp_min: number | null
+          ur_med: number | null
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          dentro_conforto_pct?: number | null
+          horas_calor?: number | null
+          horas_frio?: number | null
+          horas_ith_alto?: number | null
+          id?: string
+          idade_dias?: number | null
+          integrado_id: string
+          ith_max?: number | null
+          ith_med?: number | null
+          lote_id: string
+          temp_max?: number | null
+          temp_med?: number | null
+          temp_min?: number | null
+          ur_med?: number | null
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          dentro_conforto_pct?: number | null
+          horas_calor?: number | null
+          horas_frio?: number | null
+          horas_ith_alto?: number | null
+          id?: string
+          idade_dias?: number | null
+          integrado_id?: string
+          ith_max?: number | null
+          ith_med?: number | null
+          lote_id?: string
+          temp_max?: number | null
+          temp_med?: number | null
+          temp_min?: number | null
+          ur_med?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_lote_diario_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weather_observacoes: {
+        Row: {
+          atualizado_em: string
+          condicao_codigo: number | null
+          condicao_texto: string | null
+          id: string
+          integrado_id: string
+          nucleo_id: string
+          observado_em: string
+          precipitacao_mm: number | null
+          temperatura_c: number | null
+          umidade_pct: number | null
+          uv_index: number | null
+          vento_direcao_deg: number | null
+          vento_kmh: number | null
+        }
+        Insert: {
+          atualizado_em?: string
+          condicao_codigo?: number | null
+          condicao_texto?: string | null
+          id?: string
+          integrado_id: string
+          nucleo_id: string
+          observado_em: string
+          precipitacao_mm?: number | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+          uv_index?: number | null
+          vento_direcao_deg?: number | null
+          vento_kmh?: number | null
+        }
+        Update: {
+          atualizado_em?: string
+          condicao_codigo?: number | null
+          condicao_texto?: string | null
+          id?: string
+          integrado_id?: string
+          nucleo_id?: string
+          observado_em?: string
+          precipitacao_mm?: number | null
+          temperatura_c?: number | null
+          umidade_pct?: number | null
+          uv_index?: number | null
+          vento_direcao_deg?: number | null
+          vento_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_observacoes_nucleo_id_fkey"
+            columns: ["nucleo_id"]
+            isOneToOne: true
+            referencedRelation: "nucleos"
             referencedColumns: ["id"]
           },
         ]
