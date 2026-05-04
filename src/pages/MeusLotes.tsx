@@ -949,6 +949,8 @@ export default function MeusLotes() {
         )}
       </main>
 
+      <HistoricoClimaticoDialog open={historicoClimaOpen} onOpenChange={setHistoricoClimaOpen} />
+
       {/* Dialogs */}
       {selectedLote && (
         <>
