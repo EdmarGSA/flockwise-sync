@@ -436,6 +436,11 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
         diasAlojados={diasAlojados}
         programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
       />
+
+      {/* Clima do Núcleo */}
+      {(lote as any).nucleo_id && (
+        <ClimaNucleoCard nucleoId={(lote as any).nucleo_id} />
+      )}
     </div>
   );
 }
