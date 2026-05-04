@@ -11,14 +11,33 @@ export interface ContextoConforto {
   ur_max_ok?: number | null;
 }
 
+export interface SensorGalpao {
+  dispositivo_id: string;
+  nome: string;
+  temperatura_c: number | null;
+  umidade_pct: number | null;
+  ultima_leitura: string | null;
+  suspeito?: boolean;
+  motivo_suspeita?: string;
+}
+
 export interface LeituraGalpao {
   galpao_id: string;
   galpao_nome: string;
+  /** Pior caso (máxima entre sensores) — usado para alertas de calor */
   temperatura_c: number | null;
+  /** Mínima entre sensores — usado para alertas de frio */
+  temperatura_min_c?: number | null;
+  /** Média das temperaturas válidas */
+  temperatura_media_c?: number | null;
+  /** Diferença entre o sensor mais quente e o mais frio */
+  divergencia_c?: number | null;
   umidade_pct: number | null;
   ultima_leitura: string | null;
   inercia_min: number;
   ventilador_qtd: number;
+  sensores?: SensorGalpao[];
+  sensores_suspeitos?: number;
 }
 
 export interface ForecastPonto {
