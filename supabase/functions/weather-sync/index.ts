@@ -50,13 +50,23 @@ Deno.serve(async (req) => {
   const log: any[] = [];
 
   try {
-    const { data: nucleos } = await supabase
+    let nucleoIdFilter: string | null = null;
+    try {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        if (body && typeof body.nucleo_id === "string") nucleoIdFilter = body.nucleo_id;
+      }
+    } catch (_) { /* ignore */ }
+
+    let q = supabase
       .from("nucleos")
       .select("id, integrado_id, latitude, longitude, weather_ativo, ativo")
       .eq("weather_ativo", true)
       .eq("ativo", true)
       .not("latitude", "is", null)
       .not("longitude", "is", null);
+    if (nucleoIdFilter) q = q.eq("id", nucleoIdFilter);
+    const { data: nucleos } = await q;
 
     if (!nucleos?.length) {
       return new Response(JSON.stringify({ ok: true, processados: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

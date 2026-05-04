@@ -2,9 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useClimaNucleo } from "@/hooks/useClimaNucleo";
-import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun } from "lucide-react";
+import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface Props {
   nucleoId: string;
@@ -20,7 +21,8 @@ const severidadeColor: Record<string, string> = {
 };
 
 export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
-  const { observacao, forecast, alertas, loading } = useClimaNucleo(nucleoId);
+  const { observacao, forecast, alertas, solar, loading, refetch } = useClimaNucleo(nucleoId);
+  const [atualizando, setAtualizando] = useState(false);
 
   const reconhecer = async (id: string) => {
     const { error } = await supabase
@@ -31,10 +33,45 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
     else toast.success("Alerta reconhecido");
   };
 
+  const atualizarClima = async () => {
+    setAtualizando(true);
+    try {
+      const { error } = await supabase.functions.invoke("weather-sync", { body: { nucleo_id: nucleoId } });
+      if (error) throw error;
+      await refetch();
+      toast.success("Clima atualizado");
+    } catch (e: any) {
+      toast.error("Falha ao atualizar clima", { description: e?.message });
+    } finally {
+      setAtualizando(false);
+    }
+  };
+
+  const formatHora = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+
+  const RefreshButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7"
+      onClick={atualizarClima}
+      disabled={atualizando || !nucleoId}
+      title="Atualizar clima e dados solares"
+    >
+      <RefreshCw className={`h-3.5 w-3.5 ${atualizando ? "animate-spin" : ""}`} />
+    </Button>
+  );
+
   if (loading) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-sm">Clima {nucleoNome || ""}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span>Clima {nucleoNome || ""}</span>
+            {RefreshButton}
+          </CardTitle>
+        </CardHeader>
         <CardContent><p className="text-sm text-muted-foreground">Carregando...</p></CardContent>
       </Card>
     );
@@ -43,10 +80,15 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
   if (!observacao) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-sm">Clima {nucleoNome || ""}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span>Clima {nucleoNome || ""}</span>
+            {RefreshButton}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Sem dados climáticos. Verifique se o núcleo possui GPS e está ativo para meteorologia.
+            Sem dados climáticos. Verifique se o núcleo possui GPS e está ativo para meteorologia, ou clique em atualizar.
           </p>
         </CardContent>
       </Card>
@@ -59,10 +101,13 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center justify-between">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
           <span className="flex items-center gap-2"><Cloud className="h-4 w-4" /> Clima {nucleoNome || ""}</span>
-          <span className="text-xs text-muted-foreground">
-            {observacao.atualizado_em ? new Date(observacao.atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}
+          <span className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">
+              {observacao.atualizado_em ? new Date(observacao.atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}
+            </span>
+            {RefreshButton}
           </span>
         </CardTitle>
       </CardHeader>
@@ -89,6 +134,21 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
             <p className="text-[10px] text-muted-foreground">UV</p>
           </div>
         </div>
+
+        {solar && (
+          <div className="grid grid-cols-2 gap-2 text-xs border-t pt-2">
+            <div className="flex items-center gap-1.5">
+              <Sunrise className="h-3.5 w-3.5 text-amber-500" />
+              <span className="text-muted-foreground">Nascer:</span>
+              <span className="font-medium text-foreground">{formatHora(solar.nascer_sol)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 justify-end">
+              <Sunset className="h-3.5 w-3.5 text-orange-600" />
+              <span className="text-muted-foreground">Pôr:</span>
+              <span className="font-medium text-foreground">{formatHora(solar.por_sol)}</span>
+            </div>
+          </div>
+        )}
 
         {forecast.length > 0 && (
           <div className="text-xs text-muted-foreground border-t pt-2">
