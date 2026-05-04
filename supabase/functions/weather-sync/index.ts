@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
     }
 
     for (const n of nucleos) {
+      const nucleoStart = Date.now();
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${n.latitude}&longitude=${n.longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,uv_index,precipitation&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation,uv_index,weather_code&forecast_days=3&timezone=auto&wind_speed_unit=kmh`;
         const r = await fetch(url);
