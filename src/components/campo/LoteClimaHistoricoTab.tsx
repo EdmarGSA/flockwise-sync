@@ -174,14 +174,26 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
           <Cloud className="h-4 w-4 text-primary" />
           Histórico climático do ciclo
         </div>
-        <Tabs value={range} onValueChange={(v) => setRange(v as any)}>
-          <TabsList className="h-8">
-            <TabsTrigger value="7d" className="text-xs h-6">7 dias</TabsTrigger>
-            <TabsTrigger value="30d" className="text-xs h-6">30 dias</TabsTrigger>
-            <TabsTrigger value="ciclo" className="text-xs h-6" disabled={!dataAlojamento}>Ciclo todo</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Switch id="comp-prev" checked={comparar} onCheckedChange={setComparar} />
+            <Label htmlFor="comp-prev" className="text-xs cursor-pointer">Comparar com período anterior</Label>
+          </div>
+          <Tabs value={range} onValueChange={(v) => setRange(v as any)}>
+            <TabsList className="h-8">
+              <TabsTrigger value="7d" className="text-xs h-6">7 dias</TabsTrigger>
+              <TabsTrigger value="30d" className="text-xs h-6">30 dias</TabsTrigger>
+              <TabsTrigger value="ciclo" className="text-xs h-6" disabled={!dataAlojamento}>Ciclo todo</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {comparar && (
+        <p className="text-[11px] text-muted-foreground -mt-2">
+          Linhas tracejadas representam o período imediatamente anterior de mesma duração.
+        </p>
+      )}
 
       {resumo && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -224,6 +236,9 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
                 <Line type="monotone" dataKey="temp_max" stroke="#f97316" dot={false} name="Máx" />
                 <Line type="monotone" dataKey="temp_med" stroke="#eab308" dot={false} name="Média" strokeWidth={2} />
                 <Line type="monotone" dataKey="temp_min" stroke="#3b82f6" dot={false} name="Mín" />
+                {comparar && <Line type="monotone" dataKey="temp_max_prev" stroke="#f97316" dot={false} name="Máx (anterior)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                {comparar && <Line type="monotone" dataKey="temp_med_prev" stroke="#eab308" dot={false} name="Média (anterior)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                {comparar && <Line type="monotone" dataKey="temp_min_prev" stroke="#3b82f6" dot={false} name="Mín (anterior)" strokeDasharray="4 4" strokeOpacity={0.6} />}
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -250,6 +265,8 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
                 <Line yAxisId="ur" type="monotone" dataKey="ur_med" stroke="#3b82f6" dot={false} name="UR %" />
                 <Line yAxisId="ith" type="monotone" dataKey="ith_med" stroke="#a855f7" dot={false} name="ITH méd" />
                 <Line yAxisId="ith" type="monotone" dataKey="ith_max" stroke="#dc2626" dot={false} name="ITH máx" strokeDasharray="3 3" />
+                {comparar && <Line yAxisId="ur" type="monotone" dataKey="ur_med_prev" stroke="#3b82f6" dot={false} name="UR % (anterior)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                {comparar && <Line yAxisId="ith" type="monotone" dataKey="ith_med_prev" stroke="#a855f7" dot={false} name="ITH méd (anterior)" strokeDasharray="4 4" strokeOpacity={0.6} />}
               </ComposedChart>
             </ResponsiveContainer>
           )}
