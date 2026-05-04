@@ -204,8 +204,6 @@ export function gerarPlanoPrevencao(params: {
       }
     });
   }
-    });
-  }
 
   // 3) Picos previstos (próximas 12h)
   const inerciaMaxima = Math.max(60, ...leituras.map(l => l.inercia_min || 60));
