@@ -317,3 +317,156 @@ function PoliticaForm({
     </Card>
   );
 }
+
+interface BulkProps {
+  integradoId: string;
+  galpoes: Galpao[];
+  dispositivos: Dispositivo[];
+  onSaved: () => void;
+}
+
+function BulkApplyDialog({ integradoId, galpoes, dispositivos, onSaved }: BulkProps) {
+  const [open, setOpen] = useState(false);
+  const [tipo, setTipo] = useState<'galpao' | 'dispositivo'>('dispositivo');
+  const [selGalpoes, setSelGalpoes] = useState<string[]>([]);
+  const [selDevs, setSelDevs] = useState<string[]>([]);
+  const [restaurar, setRestaurar] = useState(DEFAULT.restaurar_ultimo_estado);
+  const [schedule, setSchedule] = useState(DEFAULT.aplicar_schedule_offline);
+  const [limite, setLimite] = useState(DEFAULT.limite_horas_offline);
+  const [obs, setObs] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) => {
+    setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+  };
+
+  const selecionarTodos = () => {
+    if (tipo === 'galpao') setSelGalpoes(galpoes.map((g) => g.id));
+    else setSelDevs(dispositivos.map((d) => d.id));
+  };
+
+  const aplicar = async () => {
+    const ids = tipo === 'galpao' ? selGalpoes : selDevs;
+    if (ids.length === 0) {
+      toast.error('Selecione ao menos um item');
+      return;
+    }
+    setSaving(true);
+    const rows = ids.map((id) => ({
+      integrado_id: integradoId,
+      escopo: tipo,
+      galpao_id: tipo === 'galpao' ? id : null,
+      dispositivo_id: tipo === 'dispositivo' ? id : null,
+      restaurar_ultimo_estado: restaurar,
+      aplicar_schedule_offline: schedule,
+      limite_horas_offline: limite,
+      observacoes: obs || null,
+    }));
+    const { error } = await supabase
+      .from('politica_recuperacao_iot')
+      .upsert(rows, { onConflict: tipo === 'galpao' ? 'integrado_id,galpao_id' : 'integrado_id,dispositivo_id' });
+    setSaving(false);
+    if (error) {
+      toast.error('Erro ao aplicar', { description: error.message });
+    } else {
+      toast.success(`Política aplicada a ${ids.length} ${tipo === 'galpao' ? 'galpão(ões)' : 'dispositivo(s)'}`);
+      setOpen(false);
+      setSelGalpoes([]); setSelDevs([]);
+      onSaved();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Copy className="h-3.5 w-3.5" /> Aplicar em massa
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Aplicar política em massa</DialogTitle>
+          <DialogDescription>
+            Defina as configurações e selecione os galpões ou dispositivos que receberão a mesma política.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'galpao' | 'dispositivo')}>
+          <TabsList>
+            <TabsTrigger value="galpao" className="gap-1.5"><Warehouse className="h-3.5 w-3.5" /> Galpões</TabsTrigger>
+            <TabsTrigger value="dispositivo" className="gap-1.5"><Cpu className="h-3.5 w-3.5" /> Dispositivos</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="galpao" className="space-y-2 mt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{selGalpoes.length} de {galpoes.length} selecionados</p>
+              <Button variant="ghost" size="sm" onClick={selecionarTodos}>Selecionar todos</Button>
+            </div>
+            <div className="border rounded max-h-48 overflow-y-auto divide-y">
+              {galpoes.map((g) => (
+                <label key={g.id} className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50">
+                  <Checkbox
+                    checked={selGalpoes.includes(g.id)}
+                    onCheckedChange={() => toggle(selGalpoes, setSelGalpoes, g.id)}
+                  />
+                  <span className="text-sm">{g.nome}</span>
+                </label>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="dispositivo" className="space-y-2 mt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{selDevs.length} de {dispositivos.length} selecionados</p>
+              <Button variant="ghost" size="sm" onClick={selecionarTodos}>Selecionar todos</Button>
+            </div>
+            <div className="border rounded max-h-48 overflow-y-auto divide-y">
+              {dispositivos.map((d) => (
+                <label key={d.id} className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50">
+                  <Checkbox
+                    checked={selDevs.includes(d.id)}
+                    onCheckedChange={() => toggle(selDevs, setSelDevs, d.id)}
+                  />
+                  <span className="text-sm">{d.nome}</span>
+                </label>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Restaurar último estado conhecido</Label>
+            <Switch checked={restaurar} onCheckedChange={setRestaurar} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Aplicar schedule offline (NVS)</Label>
+            <Switch checked={schedule} onCheckedChange={setSchedule} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Limite de horas offline</Label>
+              <Input
+                type="number" min={0} max={720}
+                value={limite}
+                onChange={(e) => setLimite(Math.max(0, Math.min(720, Number(e.target.value) || 0)))}
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Observações</Label>
+              <Textarea rows={1} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Opcional" />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button onClick={aplicar} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Aplicar a {(tipo === 'galpao' ? selGalpoes : selDevs).length} item(ns)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
