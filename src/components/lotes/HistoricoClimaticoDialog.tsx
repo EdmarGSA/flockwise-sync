@@ -19,6 +19,8 @@ import {
 import { format, parseISO, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -41,7 +43,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   const [dataFim, setDataFim] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [hist3h, setHist3h] = useState<any[]>([]);
+  const [hist3hPrev, setHist3hPrev] = useState<any[]>([]);
   const [alertas, setAlertas] = useState<any[]>([]);
+  const [comparar, setComparar] = useState(false);
 
   useEffect(() => {
     if (!open || !integradoId) return;
@@ -58,13 +62,17 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open || !nucleoId) return;
     fetchData();
-  }, [open, nucleoId, dataIni, dataFim]);
+  }, [open, nucleoId, dataIni, dataFim, comparar]);
 
   const fetchData = async () => {
     setLoading(true);
     const ini = dataIni.toISOString();
     const fim = new Date(dataFim.getTime() + 86400000).toISOString();
-    const [h3, al] = await Promise.all([
+    const durMs = new Date(fim).getTime() - new Date(ini).getTime();
+    const prevIni = new Date(new Date(ini).getTime() - durMs).toISOString();
+    const prevFim = ini;
+
+    const calls: any[] = [
       supabase.from('weather_historico_3h').select('*')
         .eq('nucleo_id', nucleoId)
         .gte('ts_3h', ini).lte('ts_3h', fim)
@@ -73,16 +81,26 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
         .eq('nucleo_id', nucleoId)
         .gte('horario_evento', ini).lte('horario_evento', fim)
         .order('horario_evento', { ascending: false }).limit(200),
-    ]);
-    setHist3h(h3.data ?? []);
-    const al2 = al.data ?? [];
+    ];
+    if (comparar) {
+      calls.push(
+        supabase.from('weather_historico_3h').select('*')
+          .eq('nucleo_id', nucleoId)
+          .gte('ts_3h', prevIni).lt('ts_3h', prevFim)
+          .order('ts_3h', { ascending: true }).limit(800),
+      );
+    }
+    const res = await Promise.all(calls);
+    setHist3h(res[0].data ?? []);
+    const al2 = res[1].data ?? [];
     setAlertas(al2);
-    setTipos([...new Set(al2.map((a: any) => a.tipo))]);
+    setTipos(Array.from(new Set(al2.map((a: any) => String(a.tipo)))));
+    setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
 
-  const serie = useMemo(() =>
-    hist3h.map(r => ({
+  const serie = useMemo(() => {
+    const cur = hist3h.map(r => ({
       label: format(parseISO(r.ts_3h), 'dd/MM HH:mm', { locale: ptBR }),
       temp_med: r.temp_med != null ? Number(r.temp_med) : null,
       temp_min: r.temp_min != null ? Number(r.temp_min) : null,
@@ -90,7 +108,30 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
       ur_med: r.ur_med != null ? Number(r.ur_med) : null,
       ith_med: r.ith_med != null ? Number(r.ith_med) : null,
       ith_max: r.ith_max != null ? Number(r.ith_max) : null,
-    })), [hist3h]);
+    }));
+    if (!comparar) return cur;
+    const len = Math.max(cur.length, hist3hPrev.length);
+    const out: any[] = [];
+    for (let i = 0; i < len; i++) {
+      const c = cur[i];
+      const p = hist3hPrev[i];
+      out.push({
+        label: c?.label ?? (p ? format(parseISO(p.ts_3h), 'dd/MM HH:mm', { locale: ptBR }) : `#${i}`),
+        temp_med: c?.temp_med ?? null,
+        temp_min: c?.temp_min ?? null,
+        temp_max: c?.temp_max ?? null,
+        ur_med: c?.ur_med ?? null,
+        ith_med: c?.ith_med ?? null,
+        ith_max: c?.ith_max ?? null,
+        temp_med_prev: p?.temp_med != null ? Number(p.temp_med) : null,
+        temp_max_prev: p?.temp_max != null ? Number(p.temp_max) : null,
+        temp_min_prev: p?.temp_min != null ? Number(p.temp_min) : null,
+        ur_med_prev: p?.ur_med != null ? Number(p.ur_med) : null,
+        ith_med_prev: p?.ith_med != null ? Number(p.ith_med) : null,
+      });
+    }
+    return out;
+  }, [hist3h, hist3hPrev, comparar]);
 
   const alertasFiltrados = useMemo(() =>
     alertas
@@ -190,6 +231,14 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-end col-span-2">
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch id="comp-prev-dlg" checked={comparar} onCheckedChange={setComparar} />
+                    <Label htmlFor="comp-prev-dlg" className="text-xs cursor-pointer">
+                      Comparar com período anterior (mesma duração)
+                    </Label>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -224,6 +273,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                           <Line type="monotone" dataKey="temp_max" stroke="#f97316" dot={false} name="Máx" />
                           <Line type="monotone" dataKey="temp_med" stroke="#eab308" dot={false} name="Méd" strokeWidth={2} />
                           <Line type="monotone" dataKey="temp_min" stroke="#3b82f6" dot={false} name="Mín" />
+                          {comparar && <Line type="monotone" dataKey="temp_max_prev" stroke="#f97316" dot={false} name="Máx (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line type="monotone" dataKey="temp_med_prev" stroke="#eab308" dot={false} name="Méd (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line type="monotone" dataKey="temp_min_prev" stroke="#3b82f6" dot={false} name="Mín (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
                         </ComposedChart>
                       </ResponsiveContainer>
                     )}
@@ -250,6 +302,8 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
                           <Line yAxisId="ur" type="monotone" dataKey="ur_med" stroke="#3b82f6" dot={false} name="UR %" />
                           <Line yAxisId="ith" type="monotone" dataKey="ith_med" stroke="#a855f7" dot={false} name="ITH méd" />
                           <Line yAxisId="ith" type="monotone" dataKey="ith_max" stroke="#dc2626" dot={false} name="ITH máx" strokeDasharray="3 3" />
+                          {comparar && <Line yAxisId="ur" type="monotone" dataKey="ur_med_prev" stroke="#3b82f6" dot={false} name="UR % (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                          {comparar && <Line yAxisId="ith" type="monotone" dataKey="ith_med_prev" stroke="#a855f7" dot={false} name="ITH méd (ant.)" strokeDasharray="4 4" strokeOpacity={0.6} />}
                         </ComposedChart>
                       </ResponsiveContainer>
                     )}
