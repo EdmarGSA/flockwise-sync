@@ -287,6 +287,7 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
                 <Bar dataKey="horas_calor" stackId="s" fill="#f97316" name="Calor" />
                 <Bar dataKey="horas_frio" stackId="s" fill="#3b82f6" name="Frio" />
                 <Bar dataKey="horas_ith_alto" stackId="s" fill="#dc2626" name="ITH alto" />
+                {comparar && <Line type="monotone" dataKey="horas_fora_prev" stroke="hsl(var(--muted-foreground))" dot={false} name="Total fora conforto (anterior)" strokeDasharray="4 4" strokeWidth={2} />}
               </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
