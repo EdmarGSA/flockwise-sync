@@ -298,3 +298,113 @@ function CurvaProgramaWrapper({ programaId }: { programaId: string }) {
   }, [programaId]);
   return <CurvaFotoperiodoChart faixas={faixas as any} />;
 }
+
+interface EventoIoT {
+  id: string;
+  tipo: string;
+  criado_em: string;
+  detalhes: any;
+}
+
+function EventosTimeline({
+  dispositivoId, bootCount, ultimoBootReason,
+}: { dispositivoId: string; bootCount: number; ultimoBootReason: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [eventos, setEventos] = useState<EventoIoT[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    supabase
+      .from('eventos_dispositivo_iot')
+      .select('id, tipo, criado_em, detalhes')
+      .eq('dispositivo_id', dispositivoId)
+      .in('tipo', ['boot', 'reconciliacao', 'recuperacao_local', 'offline', 'online'])
+      .order('criado_em', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        setEventos((data ?? []) as EventoIoT[]);
+        setLoading(false);
+      });
+  }, [open, dispositivoId]);
+
+  const iconFor = (tipo: string) => {
+    switch (tipo) {
+      case 'boot': return <Zap className="h-3 w-3 text-amber-500" />;
+      case 'reconciliacao': return <RotateCcw className="h-3 w-3 text-blue-500" />;
+      case 'recuperacao_local': return <AlertTriangle className="h-3 w-3 text-amber-600" />;
+      case 'offline': return <WifiOff className="h-3 w-3 text-destructive" />;
+      case 'online': return <Wifi className="h-3 w-3 text-primary" />;
+      default: return <Clock className="h-3 w-3 text-muted-foreground" />;
+    }
+  };
+
+  const labelFor = (tipo: string) => ({
+    boot: 'Boot',
+    reconciliacao: 'Reconciliação',
+    recuperacao_local: 'Recuperação local',
+    offline: 'Offline',
+    online: 'Online',
+  } as Record<string, string>)[tipo] ?? tipo;
+
+  return (
+    <div className="border-t pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between text-[11px] text-muted-foreground hover:text-foreground transition"
+      >
+        <span className="flex items-center gap-1.5">
+          <History className="h-3 w-3" />
+          Eventos
+          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+            {bootCount} boot{bootCount === 1 ? '' : 's'}
+          </Badge>
+          {ultimoBootReason && (
+            <span className="opacity-70">· últ.: {ultimoBootReason}</span>
+          )}
+        </span>
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {loading ? (
+            <div className="flex justify-center py-2">
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            </div>
+          ) : eventos.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-1">Nenhum evento registrado.</p>
+          ) : (
+            <ol className="relative border-l border-border/60 ml-1.5 space-y-1.5 pl-3">
+              {eventos.map((e) => {
+                const motivo =
+                  e.detalhes?.boot_reason ??
+                  e.detalhes?.motivo ??
+                  e.detalhes?.reason ??
+                  (e.tipo === 'reconciliacao' && e.detalhes?.estado
+                    ? `estado=${e.detalhes.estado}`
+                    : null);
+                return (
+                  <li key={e.id} className="text-[11px] leading-tight">
+                    <span className="absolute -left-[5px] mt-0.5">{iconFor(e.tipo)}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">{labelFor(e.tipo)}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {formatDistanceToNow(new Date(e.criado_em), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    </div>
+                    {motivo && (
+                      <p className="text-muted-foreground truncate" title={String(motivo)}>{motivo}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
