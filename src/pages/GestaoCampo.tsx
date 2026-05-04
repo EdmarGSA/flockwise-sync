@@ -14,6 +14,7 @@ import { getLinhagemLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { NucleoEditForm } from '@/components/lotes/NucleoEditForm';
+import { ClimaNucleoCard } from '@/components/campo/ClimaNucleoCard';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
 import { GalpaoEditForm } from '@/components/lotes/GalpaoEditForm';
 import { AreaForm } from '@/components/campo/AreaForm';
@@ -513,6 +514,14 @@ export default function GestaoCampo() {
                 </SelectContent>
               </Select>
             </div>
+
+            {filteredNucleos.filter(n => n.latitude && n.longitude).length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredNucleos.filter(n => n.latitude && n.longitude).slice(0, 6).map(n => (
+                  <ClimaNucleoCard key={n.id} nucleoId={n.id} nucleoNome={n.nome} />
+                ))}
+              </div>
+            )}
 
             <div className={`grid grid-cols-1 ${showForm ? 'lg:grid-cols-2' : ''} gap-6`}>
               {showForm && <NucleoForm onSuccess={handleFormSuccess} />}
