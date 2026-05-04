@@ -297,51 +297,179 @@ async function syncTimersForDevice(
   return success;
 }
 
-// ── Channel-level decision engine (Phase 4: cross-rule automation) ──
-// Returns the desired state for a single channel based on its function,
-// bird age, current temp/humidity. Returns null if function is not handled
-// (e.g. 'nenhuma' or 'alarme' which is event-driven).
-function decideChannelState(
+// ── Padrão-ouro: motor multi-variável (ITH + histerese + tempo mín on/off + fail-safe) ──
+
+interface HistereseConfig {
+  deadband_temp_c: number;
+  tempo_min_on_aquecedor_seg: number;
+  tempo_min_off_aquecedor_seg: number;
+  tempo_min_on_ventilador_seg: number;
+  tempo_min_off_ventilador_seg: number;
+  tempo_min_on_nebulizador_seg: number;
+  tempo_min_off_nebulizador_seg: number;
+  ith_amarelo: number;
+  ith_vermelho: number;
+  modo_seguro_vent_min_pct: number;
+  sensor_max_idade_min: number;
+  protege_pintinho_ate_dias: number;
+}
+
+const DEFAULT_HISTERESE: HistereseConfig = {
+  deadband_temp_c: 0.5,
+  tempo_min_on_aquecedor_seg: 60,
+  tempo_min_off_aquecedor_seg: 300,
+  tempo_min_on_ventilador_seg: 120,
+  tempo_min_off_ventilador_seg: 60,
+  tempo_min_on_nebulizador_seg: 180,
+  tempo_min_off_nebulizador_seg: 120,
+  ith_amarelo: 74,
+  ith_vermelho: 78,
+  modo_seguro_vent_min_pct: 30,
+  sensor_max_idade_min: 15,
+  protege_pintinho_ate_dias: 7,
+};
+
+interface PontoCurva {
+  dia_idade: number;
+  temp_alvo_c: number;
+  temp_min_alarme_c: number;
+  temp_max_alarme_c: number;
+  ur_max_pct: number | null;
+  ith_alarme_amarelo: number;
+  ith_alarme_vermelho: number;
+}
+
+interface DecisaoCanal {
+  state: "on" | "off";
+  estagio: "normal" | "noturno" | "heat_stress" | "modo_seguro";
+  reason: string[];
+  bloqueado_por?: "tempo_minimo_on" | "tempo_minimo_off" | "sensor_falho";
+}
+
+function calcularITH(t: number, ur: number | null): number | null {
+  if (ur == null) return null;
+  return +(t - (0.55 - 0.0055 * ur) * (t - 14.5)).toFixed(1);
+}
+
+function tempoDesdeUltimoEstado(canal: any, novoEstado: "on" | "off"): number {
+  // segundos desde o último ON ou OFF (referente ao estado atual)
+  if (novoEstado === "on") {
+    if (!canal.ultimo_off_em) return Number.MAX_SAFE_INTEGER;
+    return Math.floor((Date.now() - new Date(canal.ultimo_off_em).getTime()) / 1000);
+  } else {
+    if (!canal.ultimo_on_em) return Number.MAX_SAFE_INTEGER;
+    return Math.floor((Date.now() - new Date(canal.ultimo_on_em).getTime()) / 1000);
+  }
+}
+
+function checaTempoMinimo(
+  canal: any, desejado: "on" | "off", funcao: string, hist: HistereseConfig
+): "ok" | "tempo_minimo_on" | "tempo_minimo_off" {
+  const atual = canal.estado_atual;
+  if (atual === desejado || !atual) return "ok"; // sem mudança
+  const tempo = tempoDesdeUltimoEstado(canal, atual);
+  let minimo = 0;
+  if (funcao === "aquecimento") {
+    minimo = atual === "on" ? hist.tempo_min_on_aquecedor_seg : hist.tempo_min_off_aquecedor_seg;
+  } else if (funcao === "ventilacao") {
+    minimo = atual === "on" ? hist.tempo_min_on_ventilador_seg : hist.tempo_min_off_ventilador_seg;
+  } else if (funcao === "nebulizacao") {
+    minimo = atual === "on" ? hist.tempo_min_on_nebulizador_seg : hist.tempo_min_off_nebulizador_seg;
+  }
+  if (tempo < minimo) {
+    return atual === "on" ? "tempo_minimo_on" : "tempo_minimo_off";
+  }
+  return "ok";
+}
+
+function decideCanalGoldStandard(
+  canal: any,
   funcao: string,
   ageDays: number,
-  temp: number,
-  tempMin: number,
-  tempMax: number,
+  temp: number | null,
   umid: number | null,
-  umidMax: number,
-): { state: "on" | "off"; reason: string } | null {
-  switch (funcao) {
-    case "aquecimento":
-      return temp < tempMin
-        ? { state: "on", reason: `temp ${temp}°C < min ${tempMin}°C` }
-        : { state: "off", reason: `temp ${temp}°C >= min ${tempMin}°C` };
+  ponto: PontoCurva | null,
+  fallback: { tempMin: number; tempMax: number; umidMax: number },
+  hist: HistereseConfig,
+  sensorIdadeMin: number,
+): DecisaoCanal | null {
+  const sensorOK = temp != null && sensorIdadeMin <= hist.sensor_max_idade_min;
 
-    case "ventilacao":
-      return temp > tempMax
-        ? { state: "on", reason: `temp ${temp}°C > max ${tempMax}°C` }
-        : { state: "off", reason: `temp ${temp}°C <= max ${tempMax}°C` };
-
-    case "nebulizacao": {
-      // Only nebulize when hot AND humidity below ceiling (avoid over-saturating)
-      if (temp > tempMax && umid !== null && umid < umidMax) {
-        return { state: "on", reason: `temp ${temp}°C alta + umid ${umid}% < ${umidMax}%` };
-      }
-      return { state: "off", reason: `cond. nebulização não atendida (temp ${temp}, umid ${umid})` };
+  // ── FAIL-SAFE: sensor offline ou leitura velha ──
+  if (!sensorOK) {
+    if (funcao === "aquecimento" && ageDays <= hist.protege_pintinho_ate_dias) {
+      // Pintinho: NUNCA desliga aquecedor por falha de sensor
+      return { state: "on", estagio: "modo_seguro",
+        reason: [`sensor falho/${sensorIdadeMin}min`, `pintinho dia ${ageDays} ≤ ${hist.protege_pintinho_ate_dias}d → mantém aquecedor`],
+        bloqueado_por: "sensor_falho" };
     }
+    if (funcao === "ventilacao") {
+      // Modo seguro: ventilação mínima por timer (mantém estado atual ou liga curto)
+      return { state: "on", estagio: "modo_seguro",
+        reason: [`sensor falho`, `ventilação mínima de segurança`],
+        bloqueado_por: "sensor_falho" };
+    }
+    return null; // outros canais: não decide
+  }
 
-    // case "iluminacao": tratado exclusivamente em `auto-iluminacao` (filtrado na query).
+  const t = temp as number;
+  const setpoint = ponto?.temp_alvo_c ?? ((fallback.tempMin + fallback.tempMax) / 2);
+  const tMaxAlarme = ponto?.temp_max_alarme_c ?? fallback.tempMax;
+  const tMinAlarme = ponto?.temp_min_alarme_c ?? fallback.tempMin;
+  const ithAmarelo = ponto?.ith_alarme_amarelo ?? hist.ith_amarelo;
+  const ithVermelho = ponto?.ith_alarme_vermelho ?? hist.ith_vermelho;
+  const urMax = ponto?.ur_max_pct ?? fallback.umidMax;
+  const ith = calcularITH(t, umid);
+  const reasons: string[] = [`setpoint ${setpoint}°C`, `temp ${t}°C`];
+  if (ith != null) reasons.push(`ITH ${ith}`);
 
-    case "cortina": {
-      // Curtain: open (off relay = aberta) when hot, close (on = fechada) when cold or at night
-      const hour = new Date().getHours();
-      const isNight = hour >= 19 || hour < 6;
-      if (temp > tempMax) return { state: "off", reason: `temp ${temp}°C alta → abrir cortina` };
-      if (temp < tempMin || isNight) return { state: "on", reason: `temp ${temp}°C baixa ou noite (${hour}h) → fechar` };
+  // ── EMERGÊNCIA CALOR (override): ITH ≥ vermelho OU temp >= alarme alto ──
+  const heatStress = (ith != null && ith >= ithVermelho) || t >= tMaxAlarme + 1;
+  if (heatStress) {
+    reasons.push(`HEAT STRESS (ITH≥${ithVermelho} ou temp≥${tMaxAlarme + 1})`);
+    if (funcao === "ventilacao") return { state: "on", estagio: "heat_stress", reason: reasons };
+    if (funcao === "nebulizacao" && (umid == null || umid < urMax + 5))
+      return { state: "on", estagio: "heat_stress", reason: [...reasons, `nebuliza p/ resfriar (UR ${umid}%)`] };
+    if (funcao === "aquecimento") return { state: "off", estagio: "heat_stress", reason: reasons };
+    if (funcao === "cortina") return { state: "off", estagio: "heat_stress", reason: [...reasons, "abre cortina"] };
+  }
+
+  // ── HISTERESE normal por função ──
+  switch (funcao) {
+    case "aquecimento": {
+      // Liga abaixo de setpoint - deadband; desliga acima de setpoint + deadband
+      if (t < setpoint - hist.deadband_temp_c) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `t<${setpoint - hist.deadband_temp_c} → ligar`] };
+      }
+      if (t > setpoint + hist.deadband_temp_c) {
+        return { state: "off", estagio: "normal", reason: [...reasons, `t>${setpoint + hist.deadband_temp_c} → desligar`] };
+      }
+      return null; // dentro da banda morta → mantém
+    }
+    case "ventilacao": {
+      if (t > setpoint + hist.deadband_temp_c) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `t>${setpoint + hist.deadband_temp_c} → ligar`] };
+      }
+      if (t < setpoint - hist.deadband_temp_c) {
+        return { state: "off", estagio: "normal", reason: [...reasons, `t<${setpoint - hist.deadband_temp_c} → desligar`] };
+      }
       return null;
     }
-
-    case "alarme":
-    case "nenhuma":
+    case "nebulizacao": {
+      if (t > setpoint + hist.deadband_temp_c && umid != null && umid < urMax) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `quente + UR ${umid}<${urMax}`] };
+      }
+      return { state: "off", estagio: "normal", reason: [...reasons, `cond. neb. não atendidas`] };
+    }
+    case "cortina": {
+      const hour = new Date().getHours();
+      const isNight = hour >= 19 || hour < 6;
+      if (t > setpoint + hist.deadband_temp_c)
+        return { state: "off", estagio: "normal", reason: [...reasons, "quente → abrir"] };
+      if (t < setpoint - hist.deadband_temp_c || isNight)
+        return { state: "on", estagio: isNight ? "noturno" : "normal", reason: [...reasons, isNight ? `noite ${hour}h → fechar` : "frio → fechar"] };
+      return null;
+    }
     default:
       return null;
   }
@@ -367,7 +495,7 @@ Deno.serve(async (req) => {
 
     const { data: lotes, error: lotesErr } = await supabase
       .from("lotes")
-      .select("id, integrado_id, galpao_id, data_alojamento")
+      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id")
       .eq("status", "alojado")
       .not("data_alojamento", "is", null)
       .not("galpao_id", "is", null);
@@ -400,7 +528,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      // Get temperature rules (needed for alerts even without token)
+      // Fallback: regras grossas por faixa (usado quando lote não tem curva vinculada)
       const { data: regras } = await supabase
         .from("regras_temperatura_lote")
         .select("*")
@@ -408,8 +536,31 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .order("dia_inicio", { ascending: true });
 
-      if (!regras || regras.length === 0) {
-        console.log(`auto-temperatura: no rules for integrado ${integradoId}, skipping`);
+      // ── Padrão-ouro: histerese da org ──
+      const { data: histRow } = await supabase
+        .from("config_histerese_organizacao")
+        .select("*")
+        .eq("integrado_id", integradoId)
+        .maybeSingle();
+      const hist: HistereseConfig = { ...DEFAULT_HISTERESE, ...(histRow || {}) };
+
+      // ── Carrega pontos das curvas vinculadas aos lotes ──
+      const curvaIds = Array.from(new Set(integradoLotes.map((l: any) => l.curva_climatica_id).filter(Boolean)));
+      const pontosByCurva = new Map<string, Map<number, PontoCurva>>();
+      if (curvaIds.length > 0) {
+        const { data: pts } = await supabase
+          .from("curva_climatica_ponto")
+          .select("curva_id, dia_idade, temp_alvo_c, temp_min_alarme_c, temp_max_alarme_c, ur_max_pct, ith_alarme_amarelo, ith_alarme_vermelho")
+          .in("curva_id", curvaIds);
+        for (const p of (pts || [])) {
+          const m = pontosByCurva.get(p.curva_id) || new Map<number, PontoCurva>();
+          m.set(p.dia_idade, p as PontoCurva);
+          pontosByCurva.set(p.curva_id, m);
+        }
+      }
+
+      if ((!regras || regras.length === 0) && curvaIds.length === 0) {
+        console.log(`auto-temperatura: nenhuma regra nem curva para org ${integradoId}, pulando`);
         continue;
       }
 
@@ -509,10 +660,20 @@ Deno.serve(async (req) => {
           (Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)
         ) + 1;
 
-        const regra = regras.find((r: any) => ageDays >= r.dia_inicio && ageDays <= r.dia_fim);
-        if (!regra) continue;
+        // ── Curva diária (preferida) com fallback para regras grossas ──
+        const pontosLote = lote.curva_climatica_id ? pontosByCurva.get(lote.curva_climatica_id) : null;
+        const pontoHoje: PontoCurva | null = pontosLote?.get(ageDays) || null;
+        const regra = (regras || []).find((r: any) => ageDays >= r.dia_inicio && ageDays <= r.dia_fim);
 
-        // Get all devices in this galpao for reading
+        if (!pontoHoje && !regra) {
+          console.log(`auto-temperatura: lote ${lote.id} dia ${ageDays} sem curva nem regra, pulando`);
+          continue;
+        }
+
+        const tempMin = pontoHoje?.temp_min_alarme_c ?? Number(regra!.temp_min_c);
+        const tempMax = pontoHoje?.temp_max_alarme_c ?? Number(regra!.temp_max_c);
+        const umidMax = pontoHoje?.ur_max_pct ?? (regra?.umidade_max_pct != null ? Number(regra.umidade_max_pct) : 70);
+
         const allGalpaoDeviceIds = (devices || [])
           .filter((d: any) => d.galpao_id === lote.galpao_id)
           .map((d: any) => d.id);
@@ -528,35 +689,61 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        if (!leitura || leitura.temperatura_c === null) continue;
+        const temp = leitura?.temperatura_c != null ? Number(leitura.temperatura_c) : null;
+        const umid = leitura?.umidade_pct != null ? Number(leitura.umidade_pct) : null;
+        const sensorIdadeMin = leitura
+          ? Math.floor((Date.now() - new Date(leitura.created_at).getTime()) / 60000)
+          : Number.MAX_SAFE_INTEGER;
 
-        const readingAge = Date.now() - new Date(leitura.created_at).getTime();
-        if (readingAge > 15 * 60 * 1000) continue;
+        if (temp != null && sensorIdadeMin <= hist.sensor_max_idade_min) {
+          await manageAlerts(supabase, integradoId, lote.id, lote.galpao_id, temp, tempMin, tempMax);
+          totalAlerts++;
+        }
 
-        const temp = Number(leitura.temperatura_c);
-        const umid = leitura.umidade_pct !== null ? Number(leitura.umidade_pct) : null;
-        const tempMin = Number(regra.temp_min_c);
-        const tempMax = Number(regra.temp_max_c);
-        const umidMax = regra.umidade_max_pct !== null && regra.umidade_max_pct !== undefined
-          ? Number(regra.umidade_max_pct) : 70;
-
-        // ── Manage alerts (works even without eWeLink token) ──
-        await manageAlerts(supabase, integradoId, lote.id, lote.galpao_id, temp, tempMin, tempMax);
-        totalAlerts++;
-
-        // ── Multi-channel automation (ESP32-S3 / multi-relay devices) ──
-        // Channels are queued via canais_dispositivo.estado_atual; ESP32 polls the bridge.
+        // ── Multi-channel (ESP32) com motor padrão-ouro ──
         for (const dev of (devices || []).filter((d: any) => d.galpao_id === lote.galpao_id)) {
           const devCanais = canaisByDevice.get(dev.id) || [];
           for (const canal of devCanais) {
-            const desired = decideChannelState(canal.funcao_automacao, ageDays, temp, tempMin, tempMax, umid, umidMax);
-            if (!desired) continue;
-            if (canal.estado_atual === desired.state) continue;
+            const decisao = decideCanalGoldStandard(
+              canal, canal.funcao_automacao, ageDays, temp, umid,
+              pontoHoje, { tempMin, tempMax, umidMax }, hist, sensorIdadeMin
+            );
+            if (!decisao) continue;
 
-            await supabase.from("canais_dispositivo").update({
-              estado_atual: desired.state,
-              ultimo_comando_em: new Date().toISOString(),
-            }).eq("id", canal.id);
+            const guard = checaTempoMinimo(canal, decisao.state, canal.funcao_automacao, hist);
+            if (guard !== "ok") decisao.bloqueado_por = guard;
+
+            await supabase.from("log_decisao_clima").insert({
+              integrado_id: integradoId,
+              galpao_id: lote.galpao_id,
+              lote_id: lote.id,
+              canal_id: canal.id,
+              dispositivo_id: dev.id,
+              funcao_automacao: canal.funcao_automacao,
+              estado_decidido: decisao.bloqueado_por ? "mantido" : decisao.state,
+              estagio: decisao.estagio,
+              temp_lida: temp,
+              ur_lida: umid,
+              ith_calc: temp != null ? calcularITH(temp, umid) : null,
+              setpoint_alvo: pontoHoje?.temp_alvo_c ?? (tempMin + tempMax) / 2,
+              reason_chain: decisao.reason,
+              bloqueado_por: decisao.bloqueado_por ?? null,
+            });
+
+            if (decisao.bloqueado_por) {
+              console.log(`hist-block: canal ${canal.id} ${decisao.state} bloqueado por ${decisao.bloqueado_por}`);
+              continue;
+            }
+            if (canal.estado_atual === decisao.state) continue;
+
+            const nowIso = new Date().toISOString();
+            const updateFields: Record<string, unknown> = {
+              estado_atual: decisao.state,
+              ultimo_comando_em: nowIso,
+            };
+            if (decisao.state === "on") updateFields.ultimo_on_em = nowIso;
+            else updateFields.ultimo_off_em = nowIso;
+            await supabase.from("canais_dispositivo").update(updateFields).eq("id", canal.id);
 
             await supabase.from("log_automacao_temperatura").insert({
               dispositivo_id: dev.id,
@@ -564,54 +751,34 @@ Deno.serve(async (req) => {
               temperatura_lida: temp,
               temp_min_regra: tempMin,
               temp_max_regra: tempMax,
-              acao: `canal_${canal.canal_numero}_${canal.funcao_automacao}_${desired.state}: ${desired.reason}`,
+              acao: `canal_${canal.canal_numero}_${canal.funcao_automacao}_${decisao.state} [${decisao.estagio}]: ${decisao.reason.join(' | ')}`,
               resultado: "enfileirado",
               tempo_resposta_ms: 0,
             });
             totalActions++;
-            console.log(`channel-auto: dev=${dev.device_id_ewelink} canal=${canal.canal_numero} → ${desired.state} (${desired.reason})`);
           }
         }
 
-        // ── Device automation (requires eWeLink token) ──
+        // ── Device-level (eWeLink) com motor padrão-ouro ──
         if (!accessToken) continue;
-
         const galpaoDevices = automationDevices.filter((d: any) => d.galpao_id === lote.galpao_id);
         if (galpaoDevices.length === 0) continue;
 
         for (const device of galpaoDevices) {
-          // ── Sync safety timers (fallback offline) ──
           try {
-            await syncTimersForDevice(
-              supabase, accessToken, appId, region,
-              device, lote.id, integradoId, ageDays
-            );
+            await syncTimersForDevice(supabase, accessToken, appId, region, device, lote.id, integradoId, ageDays);
           } catch (timerErr) {
             console.error(`auto-temperatura: timer sync failed for device ${device.device_id_ewelink}:`, timerErr);
           }
 
-          let desiredState: "on" | "off" | null = null;
-          let acao = "";
-
-          if (device.funcao_automacao === "aquecimento") {
-            if (temp < tempMin) {
-              desiredState = "on";
-              acao = `ligar_aquecimento (temp ${temp}°C < min ${tempMin}°C)`;
-            } else {
-              desiredState = "off";
-              acao = `desligar_aquecimento (temp ${temp}°C >= min ${tempMin}°C)`;
-            }
-          } else if (device.funcao_automacao === "ventilacao") {
-            if (temp > tempMax) {
-              desiredState = "on";
-              acao = `ligar_ventilacao (temp ${temp}°C > max ${tempMax}°C)`;
-            } else {
-              desiredState = "off";
-              acao = `desligar_ventilacao (temp ${temp}°C <= max ${tempMax}°C)`;
-            }
-          }
-
-          if (desiredState === null) continue;
+          const deviceAsCanal = { estado_atual: null, ultimo_on_em: null, ultimo_off_em: null };
+          const decisao = decideCanalGoldStandard(
+            deviceAsCanal, device.funcao_automacao, ageDays, temp, umid,
+            pontoHoje, { tempMin, tempMax, umidMax }, hist, sensorIdadeMin
+          );
+          if (!decisao) continue;
+          const desiredState = decisao.state;
+          const acao = `${decisao.state}_${device.funcao_automacao} [${decisao.estagio}]: ${decisao.reason.join(' | ')}`;
 
           try {
             const statusResult = await getDeviceStatus(accessToken, appId, region, device.device_id_ewelink);
