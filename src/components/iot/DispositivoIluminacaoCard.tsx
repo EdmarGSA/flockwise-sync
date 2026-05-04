@@ -312,22 +312,33 @@ function EventosTimeline({
   const [open, setOpen] = useState(false);
   const [eventos, setEventos] = useState<EventoIoT[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bootSerie, setBootSerie] = useState<{ label: string; valor: number }[]>([]);
+  const [janela, setJanela] = useState<'24h' | '7d'>('7d');
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    supabase
-      .from('eventos_dispositivo_iot')
-      .select('id, tipo, criado_em, detalhes')
-      .eq('dispositivo_id', dispositivoId)
-      .in('tipo', ['boot', 'reconciliacao', 'recuperacao_local', 'offline', 'online'])
-      .order('criado_em', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        setEventos((data ?? []) as EventoIoT[]);
-        setLoading(false);
-      });
-  }, [open, dispositivoId]);
+    const sinceBoots = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
+    Promise.all([
+      supabase
+        .from('eventos_dispositivo_iot')
+        .select('id, tipo, criado_em, detalhes')
+        .eq('dispositivo_id', dispositivoId)
+        .in('tipo', ['boot', 'reconciliacao', 'recuperacao_local', 'offline', 'online'])
+        .order('criado_em', { ascending: false })
+        .limit(10),
+      supabase
+        .from('eventos_dispositivo_iot')
+        .select('criado_em')
+        .eq('dispositivo_id', dispositivoId)
+        .eq('tipo', 'boot')
+        .gte('criado_em', sinceBoots),
+    ]).then(([evRes, bootRes]) => {
+      setEventos((evRes.data ?? []) as EventoIoT[]);
+      setBootSerie(agruparBoots((bootRes.data ?? []).map((r: any) => r.criado_em), janela));
+      setLoading(false);
+    });
+  }, [open, dispositivoId, janela]);
 
   const iconFor = (tipo: string) => {
     switch (tipo) {
