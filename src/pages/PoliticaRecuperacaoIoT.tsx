@@ -39,7 +39,7 @@ const DEFAULT: Omit<Politica, 'id' | 'integrado_id' | 'escopo' | 'galpao_id' | '
 
 export default function PoliticaRecuperacaoIoT() {
   const navigate = useNavigate();
-  const integradoId = useIntegradoId();
+  const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(true);
   const [politicas, setPoliticas] = useState<Politica[]>([]);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
