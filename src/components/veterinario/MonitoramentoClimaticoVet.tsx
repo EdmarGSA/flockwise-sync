@@ -372,7 +372,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
                         const ageMin = s.ultima_leitura
                           ? (Date.now() - new Date(s.ultima_leitura).getTime()) / 60_000
                           : Infinity;
-                        const offline = !isFinite(ageMin) || ageMin > 15;
+                        const offline = !isFinite(ageMin) || ageMin > offlineMinCfg;
                         return (
                           <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
