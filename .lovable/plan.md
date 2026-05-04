@@ -1,65 +1,111 @@
-## Diagnóstico
+# Monitoramento Climático Veterinário
 
-Hoje, na página **Meus Lotes**, temos:
+Adicionar uma nova aba "Clima" no módulo Veterinário (`/veterinario`) com cards por núcleo. Cada card mostra clima externo (observação + previsão + alertas) **e** a temperatura real medida pelos sensores IoT de cada galpão do núcleo, comparada à zona de conforto da idade do lote. Inclui um plano de prevenção automatizado.
 
-1. **`AlertasClimaticosBar`** (já renderizado no topo da lista, linha 579) — mostra alertas climáticos ativos por núcleo, com filtros de severidade e botão de "reconhecer". Atualiza em tempo real via canal Realtime na tabela `alertas_climaticos`. **Os alertas já aparecem aqui automaticamente quando a edge function `weather-alertas` os gera** (a partir do `weather_forecast_horario`). Se você não está vendo alertas, é porque ainda não há previsão ruim no horizonte de 72h dos núcleos OU o `weather-sync` ainda não rodou.
-2. **`HistoricoClimaticoDialog`** (botão "Histórico Climático") — atualmente só mostra **passado** (tabela `weather_historico_3h`) e a lista de alertas históricos. **Não exibe a previsão.**
+## 1. Nova aba "Clima" em `Veterinario.tsx`
 
-O que falta: a **previsão das próximas 24-72h** (chuva, temperatura, UR, ITH, vento) na visão do criador, e mais clareza sobre como os alertas surgem.
+- Adicionar `TabsTrigger value="clima"` (ícone `CloudSun`) ao lado de "Visão Geral" e "Lotes".
+- Conteúdo: novo componente `<MonitoramentoClimaticoVet />`.
 
-## O que vou fazer
+## 2. Componente `MonitoramentoClimaticoVet`
 
-### 1. Adicionar aba "Previsão" no `HistoricoClimaticoDialog`
+Novo arquivo `src/components/veterinario/MonitoramentoClimaticoVet.tsx`. Para o `integradoId` atual:
 
-Renomeio o título do diálogo para **"Clima por Núcleo"** e estruturo em 3 abas:
+1. Carrega núcleos ativos com lotes alojados (`lotes` join `nucleos`/`galpoes`).
+2. Para cada núcleo, em paralelo:
+   - `useClimaNucleo` (já existe): observação atual, previsão 24h, alertas abertos, solar.
+   - `nucleo_alertas_config` (override) + `conforto_termico_ave` por idade do lote.
+   - Para cada galpão do núcleo: última leitura de `leituras_sensores` (temperatura/umidade) batch via `.in('dispositivo_id', ...)`.
+3. Renderiza um grid de **`NucleoClimaCardVet`** (1 col mobile, 2 col desktop).
 
-- **Previsão** (nova) — gráficos das próximas 72h vindo de `weather_forecast_horario`:
-  - Linha de **temperatura** com bandas de conforto da `nucleo_conforto_termico` (zona crítica em vermelho).
-  - **ITH** com referência 78.
-  - Barras de **probabilidade de chuva (%)** + linha de precipitação (mm).
-  - Linha de **vento (km/h)**.
-  - Resumo no topo: temp mín/máx 24h, máx prob. chuva, máx ITH, alertas previstos no horizonte.
-- **Histórico** — o conteúdo atual (séries 3h + comparação com período anterior).
-- **Alertas** — a lista atual de eventos no período.
+## 3. `NucleoClimaCardVet` (card avançado)
 
-### 2. Cartão "Próximas 24h" direto na página `MeusLotes`
+Estrutura visual:
 
-Acima da tabela (logo após o `AlertasClimaticosBar`), um **mini-cartão por núcleo ativo** com:
+```text
++------------------------------------------------------------+
+| Núcleo A1                       [Severidade global: ALTO]  |
+| Externo: 31°C / 68% UR / ITH 79  ☀ Ensolarado              |
+| Próx. 24h: 23–34°C  •  chuva 40%  •  vento 22 km/h         |
+|------------------------------------------------------------|
+| Galpões (real-time IoT):                                   |
+|  • Galpão 1 — 28.4°C / 62% UR ✅ dentro do conforto        |
+|  • Galpão 2 — 33.1°C / 70% UR ⚠ acima da meta (idade 25d)  |
+|  • Galpão 3 — sem leitura há 1h ⛔                          |
+|------------------------------------------------------------|
+| Alertas previstos:                                         |
+|  ▣ Pico calor 35°C às 14h — agir 12h30 (inércia 90 min)    |
+|  ▣ ITH 82 às 15h — aumentar ventilação                     |
+|------------------------------------------------------------|
+| Plano de prevenção (gerado):                               |
+|  1. T-3h: ligar nebulizadores em ciclo 30s on/2min off     |
+|  2. T-2h: 100% ventilação, fechar cortinas a sotavento     |
+|  3. T-1h: reduzir oferta de ração, água gelada disponível  |
+|  4. Pico: monitorar ofegação; se >70% lote, soltar todas   |
+|     cortinas e acionar resgate (vet de plantão)            |
+| [Reconhecer alertas]   [Abrir lote]   [Sincronizar clima]  |
++------------------------------------------------------------+
+```
 
-- Ícone da condição predominante + temp mín/máx das próximas 24h.
-- Pico de chuva (%) e horário esperado.
-- Pico de ITH e horário.
-- Badge "Sem alertas previstos" (verde) ou "N alertas previstos" (laranja) baseado em `alertas_climaticos` com `horario_evento > now()`.
-- Clique abre o diálogo já na aba **Previsão** daquele núcleo.
+### Severidade global do núcleo
+Calculada a partir de:
+- ITH externo previsto vs `ith_max_critico` do conforto/override.
+- Maior `delta = (temp_real_galpão − temp_max_conforto)` entre galpões.
+- Presença de alerta crítico aberto (`alertas_climaticos.severidade='critical'`).
+- Sensores offline (>15 min sem leitura).
 
-Componente novo: `src/components/lotes/PrevisaoNucleosBar.tsx` (colapsável, igual ao `AlertasClimaticosBar`, escondido se não houver lotes ativos).
+Mapeamento: `OK` (verde), `ATENÇÃO` (âmbar) se delta ≥ 1°C ou ITH≥conforto.ith_max_ok, `ALTO` (vermelho) se delta ≥ 3°C, alerta crítico aberto ou >50% galpões fora do conforto.
 
-### 3. Texto explicativo dos alertas
+### Galpões — temperatura real
+- Para cada galpão buscar todos `dispositivos_iot` (sensor temperatura) ativos e usar a **última** leitura (`leituras_sensores`).
+- Comparar com faixa de conforto pela idade do lote ativo do galpão.
+- Mostrar status: ✅ dentro, ⚠ alerta (entre `ok` e `crítico`), 🔴 crítico, ⛔ offline (>15 min).
+- Tooltip: hora da última leitura, idade do lote, faixa esperada.
 
-Na `AlertasClimaticosBar`, quando a lista estiver **vazia**, em vez de não renderizar nada, mostrar um cartão discreto:
+## 4. Plano de prevenção (regras determinísticas)
 
-> "Sem alertas climáticos ativos. Avaliamos a previsão dos próximos 3 dias a cada sincronização e geramos alertas para picos de calor (≥ crítico do núcleo), frio, ITH alto e vento forte (≥ 50 km/h)."
+Função pura `gerarPlanoPrevencao(contexto)` em `src/lib/clima/planoPrevencao.ts`. Entradas: idade do lote, conforto por idade, observação, previsão 24h, leituras IoT, recursos do galpão (já existem em `galpoes`: `ventilador_quantidade`, `bebedouro_tipo`, `tipo_pressao`, `inercia_termica_min`).
 
-Assim o criador entende **de onde** os alertas vêm e por que pode não estar vendo nenhum.
+Regras (ordenadas por gatilho):
 
-### 4. Garantir que a sincronização rodou
+| Gatilho | Janela | Ação sugerida |
+|---|---|---|
+| Pico calor previsto ≥ conforto.temp_max_critico | T - inércia | Pré-resfriar (nebulização + 100% exaustão) |
+| ITH previsto ≥ 78 | T - 2h | Aumentar ventilação progressiva |
+| ITH previsto ≥ 82 | T - 1h | Liberar água gelada, reduzir manejo |
+| UR > 80% e calor | contínuo | Priorizar ventilação sobre nebulização |
+| Vento previsto ≥ 50 km/h | T - 3h | Verificar cortinas, fixar estruturas |
+| Chuva ≥ 70% e idade<14d | T - 2h | Aumentar aquecimento, fechar cortinas |
+| Frio ≤ conforto.temp_min_critico | T - inércia | Aquecedores ON, reduzir ventilação mínima |
+| Sensor offline >15 min | imediato | Inspeção física do galpão X |
+| Galpão atual já fora do conforto | imediato | Ação corretiva por delta (calor/frio) |
+| Lote em última semana + ITH alto | + 6h | Antecipar abate para período frio se possível |
 
-Adicionar um pequeno indicador no cartão da `PrevisaoNucleosBar` mostrando "Atualizado há X min" (lendo `weather_sync_log`). Se nunca sincronizou ou está com erro, botão **"Sincronizar agora"** que dispara `weather-sync` para todos os núcleos do integrado (mesma chamada já usada em Gestão de Campo).
+Plano renderizado como timeline com hora absoluta calculada a partir de `horario_evento - inércia`.
 
-## Detalhes técnicos
+## 5. Reconhecimento e ações
 
-- **Fonte da previsão**: `weather_forecast_horario` (já populada pelo `weather-sync` para 72h, com `temperatura_c, umidade_pct, prob_chuva_pct, precipitacao_mm, vento_kmh, ith, condicao_codigo`).
-- **Alertas previstos**: query em `alertas_climaticos` com `horario_evento > now()` e `reconhecido_em IS NULL`, agrupados por `nucleo_id`.
-- **Conforto térmico**: usar `nucleo_conforto_termico` para as bandas (mesmo padrão do `LoteClimaHistoricoTab`).
-- **Performance**: batch fetch para todos os núcleos de uma vez (`.in('nucleo_id', ids)`) seguindo o padrão do projeto. Estabilizar dependências do `useEffect` com `JSON.stringify` dos arrays de IDs.
-- **Realtime**: o diálogo continua sem realtime (refetch ao abrir/trocar filtro); a barra de previsão na MeusLotes refaz fetch a cada 5 min e quando `alertas_climaticos` muda (canal Realtime já existe).
-- **Sem alterações de schema** — todas as tabelas necessárias já existem.
+- Botão **Reconhecer alertas** chama `update alertas_climaticos set reconhecido_em=now(), reconhecido_por=auth.uid() where nucleo_id=...`.
+- Botão **Sincronizar clima** invoca edge `weather-sync` com `{ nucleo_id }` (já existe).
+- Botão **Abrir lote** navega para `/veterinario/{loteId}` do lote mais crítico.
 
-## Arquivos a alterar
+## 6. Realtime
 
-- `src/components/lotes/HistoricoClimaticoDialog.tsx` — renomear, adicionar aba "Previsão" + queries de forecast e conforto, prop opcional `nucleoIdInicial` e `tabInicial`.
-- `src/components/lotes/PrevisaoNucleosBar.tsx` — **novo** componente (mini-cartões por núcleo + botão sincronizar).
-- `src/components/lotes/AlertasClimaticosBar.tsx` — exibir mensagem explicativa quando vazio.
-- `src/pages/MeusLotes.tsx` — montar `PrevisaoNucleosBar` logo após `AlertasClimaticosBar`; abrir o diálogo na aba certa quando o usuário clicar num cartão.
+Subscrever canal Supabase `postgres_changes` em `leituras_sensores` filtrado por `integrado_id` para refletir temperatura dos galpões em tempo real (debounce 5s para evitar re-renders excessivos). Polling de fallback a cada 60s em `useClimaNucleo`.
 
-Sem mudanças em edge functions ou banco.
+## 7. Detalhes técnicos
+
+- Reutilizar `useClimaNucleo` e helper `condicaoWMO` já existentes.
+- Batch fetch de leituras por `dispositivo_id IN (...)` para evitar N+1.
+- Sem migrações de schema — todas as tabelas necessárias já existem (`weather_observacoes`, `weather_forecast_horario`, `alertas_climaticos`, `nucleo_alertas_config`, `conforto_termico_ave`, `dispositivos_iot`, `leituras_sensores`, `solar_diario`).
+- Arquivos novos:
+  - `src/components/veterinario/MonitoramentoClimaticoVet.tsx`
+  - `src/components/veterinario/NucleoClimaCardVet.tsx`
+  - `src/lib/clima/planoPrevencao.ts`
+- Arquivos editados:
+  - `src/pages/Veterinario.tsx` (nova aba).
+
+## 8. Fora do escopo
+
+- Push notifications adicionais (já são geradas pelo `weather-alertas`).
+- Acionamento automático de equipamentos (apenas sugere ações; controle real fica nos módulos IoT existentes).

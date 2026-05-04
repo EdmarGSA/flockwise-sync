@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, LogOut, Skull, Pill, BarChart3, List } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Search, Bird, AlertTriangle, MessageSquare, ChevronRight, LogOut, Skull, Pill, BarChart3, List, CloudSun } from 'lucide-react';
+import MonitoramentoClimaticoVet from '@/components/veterinario/MonitoramentoClimaticoVet';
 import { calcularIdadeLote } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
@@ -197,12 +198,21 @@ export default function Veterinario() {
               <List className="w-4 h-4" />
               Lotes
             </TabsTrigger>
+            <TabsTrigger value="clima" className="flex-1 gap-1.5">
+              <CloudSun className="w-4 h-4" />
+              Clima
+            </TabsTrigger>
           </TabsList>
         </div>
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="px-4 mt-4">
           <VeterinarioDashboard mortalidadeMap={mortalidadeMap} carenciaMap={carenciaMap} />
+        </TabsContent>
+
+        {/* Clima Tab */}
+        <TabsContent value="clima" className="px-4 mt-4">
+          <MonitoramentoClimaticoVet />
         </TabsContent>
 
         {/* Lotes Tab */}
