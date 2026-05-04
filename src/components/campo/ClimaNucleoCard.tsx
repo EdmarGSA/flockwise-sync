@@ -156,6 +156,30 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
           </div>
         )}
 
+        <div className="border-t pt-2 flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5">
+            {ultimoSync?.status === "sucesso" ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+            ) : ultimoSync?.status === "erro" ? (
+              <XCircle className="h-3.5 w-3.5 text-destructive" />
+            ) : (
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="text-muted-foreground">Sync:</span>
+            <span className={`font-medium ${ultimoSync?.status === "erro" ? "text-destructive" : "text-foreground"}`}>
+              {ultimoSync
+                ? `${new Date(ultimoSync.executado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}${ultimoSync.trigger_tipo === "manual" ? " (manual)" : ""}`
+                : "nunca executado"}
+            </span>
+          </span>
+          {ultimoSync?.duracao_ms != null && (
+            <span className="text-muted-foreground">{ultimoSync.duracao_ms} ms</span>
+          )}
+        </div>
+        {ultimoSync?.status === "erro" && ultimoSync.mensagem && (
+          <p className="text-[11px] text-destructive -mt-1">{ultimoSync.mensagem}</p>
+        )}
+
         {alertas.length > 0 && (
           <div className="border-t pt-2 space-y-2">
             <p className="text-xs font-semibold flex items-center gap-1">
