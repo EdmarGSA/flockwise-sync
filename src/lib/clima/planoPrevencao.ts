@@ -49,6 +49,12 @@ export interface ForecastPonto {
   prob_chuva_pct: number | null;
 }
 
+export interface RegrasSensores {
+  habilitar_sensor_suspeito?: boolean;
+  sensor_offline_min?: number;
+  divergencia_temp_c?: number;
+}
+
 export interface PlanoAcao {
   id: string;
   prioridade: 'critica' | 'alta' | 'media' | 'baixa';
