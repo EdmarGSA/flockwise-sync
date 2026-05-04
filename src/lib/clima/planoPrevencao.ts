@@ -49,6 +49,12 @@ export interface ForecastPonto {
   prob_chuva_pct: number | null;
 }
 
+export interface RegrasSensores {
+  habilitar_sensor_suspeito?: boolean;
+  sensor_offline_min?: number;
+  divergencia_temp_c?: number;
+}
+
 export interface PlanoAcao {
   id: string;
   prioridade: 'critica' | 'alta' | 'media' | 'baixa';
@@ -75,26 +81,32 @@ export function gerarPlanoPrevencao(params: {
   leituras: LeituraGalpao[];
   forecast: ForecastPonto[];
   observacao?: { temperatura_c: number | null; umidade_pct: number | null } | null;
+  regrasSensores?: RegrasSensores;
 }): PlanoAcao[] {
-  const { conforto, leituras, forecast } = params;
+  const { conforto, leituras, forecast, regrasSensores } = params;
+  const habilitarSusp = regrasSensores?.habilitar_sensor_suspeito ?? true;
+  const offlineMin = regrasSensores?.sensor_offline_min ?? 15;
+  const divergMin = regrasSensores?.divergencia_temp_c ?? 5;
   const acoes: PlanoAcao[] = [];
 
-  // 1) Sensores offline (>15 min)
+  // 1) Sensores offline (configurável)
   const agora = Date.now();
-  leituras.forEach((l) => {
-    const ageMin = l.ultima_leitura ? (agora - new Date(l.ultima_leitura).getTime()) / 60_000 : Infinity;
-    if (ageMin > 15) {
-      acoes.push({
-        id: `sensor-${l.galpao_id}`,
-        prioridade: 'alta',
-        quando: 'Imediato',
-        galpao: l.galpao_nome,
-        acao: 'Inspeção física do sensor / verificar energia e rede',
-        motivo: `Sem leitura há ${isFinite(ageMin) ? Math.round(ageMin) + ' min' : 'tempo indeterminado'}`,
-        categoria: 'sensor',
-      });
-    }
-  });
+  if (habilitarSusp) {
+    leituras.forEach((l) => {
+      const ageMin = l.ultima_leitura ? (agora - new Date(l.ultima_leitura).getTime()) / 60_000 : Infinity;
+      if (ageMin > offlineMin) {
+        acoes.push({
+          id: `sensor-${l.galpao_id}`,
+          prioridade: 'alta',
+          quando: 'Imediato',
+          galpao: l.galpao_nome,
+          acao: 'Inspeção física do sensor / verificar energia e rede',
+          motivo: `Sem leitura há ${isFinite(ageMin) ? Math.round(ageMin) + ' min' : 'tempo indeterminado'}`,
+          categoria: 'sensor',
+        });
+      }
+    });
+  }
 
   // 2) Galpão fora do conforto AGORA
   if (conforto) {
@@ -166,26 +178,26 @@ export function gerarPlanoPrevencao(params: {
           categoria: 'frio',
         });
       }
-      // Divergência térmica entre zonas
-      if (l.divergencia_c != null && l.divergencia_c >= 5) {
+      // Divergência térmica entre zonas (limiar configurável)
+      if (l.divergencia_c != null && l.divergencia_c >= divergMin) {
         acoes.push({
           id: `diverg-${l.galpao_id}`,
           prioridade: 'media',
           quando: 'Imediato',
           galpao: l.galpao_nome,
           acao: 'Equalizar ambiente: checar cortinas, exaustão e distribuição de aquecedores na zona divergente',
-          motivo: `Diferença de ${l.divergencia_c.toFixed(1)}°C entre sensores do galpão`,
+          motivo: `Diferença de ${l.divergencia_c.toFixed(1)}°C entre sensores (limite ${divergMin}°C)`,
           categoria: 'manejo',
         });
       }
-      // Sensores suspeitos (UR travada, etc)
-      if (l.sensores_suspeitos && l.sensores_suspeitos > 0) {
+      // Sensores suspeitos (UR travada, estagnados, etc) — só se habilitado
+      if (habilitarSusp && l.sensores_suspeitos && l.sensores_suspeitos > 0) {
         acoes.push({
           id: `sensor-susp-${l.galpao_id}`,
           prioridade: 'media',
           quando: 'Imediato',
           galpao: l.galpao_nome,
-          acao: 'Verificar/calibrar sensor com leitura suspeita (UR travada em 0% ou 100%)',
+          acao: 'Verificar/calibrar sensor com leitura suspeita',
           motivo: `${l.sensores_suspeitos} sensor(es) com leitura inconsistente`,
           categoria: 'sensor',
         });

@@ -71,6 +71,13 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
       const overr = ov?.find(c => c.nucleo_id === nucleo.id) ?? ov?.find(c => c.nucleo_id == null) ?? null;
       if (!cancel) setOverride(overr);
 
+      // Regras configuráveis para sensores suspeitos
+      const habilitarSusp = (overr as any)?.habilitar_sensor_suspeito ?? true;
+      const urBaixa = (overr as any)?.ur_suspeita_baixa_pct ?? 0;
+      const urAlta = (overr as any)?.ur_suspeita_alta_pct ?? 100;
+      const urDivPp = (overr as any)?.ur_divergencia_pp ?? 20;
+      const estagnadoMin = (overr as any)?.sensor_estagnado_min ?? 60;
+
       // conforto por idade
       if (idadeDias != null) {
         const { data: cf } = await supabase
@@ -93,7 +100,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         }
       }
 
-      // leituras IoT por galpão (todos os sensores, não apenas 1 por galpão)
+      // leituras IoT por galpão
       const galpaoIds = nucleo.galpoes.map(g => g.id);
       if (galpaoIds.length === 0) return;
       const { data: devices } = await supabase
@@ -104,7 +111,6 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
       const devIds = (devices ?? []).map(d => d.id);
       const devInfo = new Map((devices ?? []).map(d => [d.id, { galpao_id: d.galpao_id, nome: d.nome }]));
 
-      // última leitura POR DISPOSITIVO
       const sensoresPorGalpao = new Map<string, SensorGalpao[]>();
       if (devIds.length) {
         const { data: leits } = await supabase
@@ -115,7 +121,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
           .limit(devIds.length * 10);
         const ultimoPorDev = new Map<string, { temp: number | null; ur: number | null; ts: string }>();
         (leits ?? []).forEach(l => {
-          if (ultimoPorDev.has(l.dispositivo_id)) return; // já temos a mais recente
+          if (ultimoPorDev.has(l.dispositivo_id)) return;
           ultimoPorDev.set(l.dispositivo_id, {
             temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em,
           });
@@ -148,27 +154,35 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
           : null;
         const divergencia = temp_max != null && temp_min != null ? temp_max - temp_min : null;
 
-        // UR: descartar sensores travados em 0% ou 100% se discordam ≥20pp dos demais
+        // UR: marcar suspeitos por regras configuráveis
         const ursValidas = sensores
           .map(s => s.umidade_pct)
           .filter((v): v is number => v != null);
         let urMedia: number | null = null;
         if (ursValidas.length) {
-          const naoExtremas = ursValidas.filter(v => v > 0 && v < 100);
+          const naoExtremas = ursValidas.filter(v => v > urBaixa && v < urAlta);
           const referencia = naoExtremas.length ? naoExtremas : ursValidas;
           const med = referencia.reduce((a, b) => a + b, 0) / referencia.length;
-          // marcar suspeitos
-          sensores.forEach(s => {
-            if (s.umidade_pct == null) return;
-            if ((s.umidade_pct === 0 || s.umidade_pct === 100) &&
-                Math.abs(s.umidade_pct - med) >= 20 && naoExtremas.length > 0) {
-              s.suspeito = true;
-              s.motivo_suspeita = `UR travada em ${s.umidade_pct}%`;
-            }
-          });
+          if (habilitarSusp) {
+            sensores.forEach(s => {
+              if (s.umidade_pct == null) return;
+              const urTravada = s.umidade_pct <= urBaixa || s.umidade_pct >= urAlta;
+              if (urTravada && Math.abs(s.umidade_pct - med) >= urDivPp && naoExtremas.length > 0) {
+                s.suspeito = true;
+                s.motivo_suspeita = `UR travada em ${s.umidade_pct}%`;
+              }
+              // estagnado
+              if (s.ultima_leitura) {
+                const ageMin = (Date.now() - new Date(s.ultima_leitura).getTime()) / 60_000;
+                if (ageMin > estagnadoMin && !s.suspeito) {
+                  s.suspeito = true;
+                  s.motivo_suspeita = `Sem variação há ${Math.round(ageMin)}min`;
+                }
+              }
+            });
+          }
           urMedia = med;
         }
-        // ultima leitura mais recente
         const ts = sensores
           .map(s => s.ultima_leitura)
           .filter((v): v is string => !!v)
@@ -204,7 +218,12 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
     leituras,
     forecast: forecast as any,
     observacao,
-  }), [idadeDias, conforto, leituras, forecast, observacao]);
+    regrasSensores: {
+      habilitar_sensor_suspeito: (override as any)?.habilitar_sensor_suspeito ?? true,
+      sensor_offline_min: (override as any)?.sensor_offline_min ?? 15,
+      divergencia_temp_c: Number((override as any)?.divergencia_temp_c ?? 5),
+    },
+  }), [idadeDias, conforto, leituras, forecast, observacao, override]);
 
   // severidade global
   const severidade = useMemo<'OK' | 'ATENÇÃO' | 'ALTO'>(() => {
@@ -250,10 +269,13 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
   const probChuvaMax = forecast.length ? Math.max(...forecast.map((f: any) => f.prob_chuva_pct ?? 0)) : 0;
   const ventoMaxFc = forecast.length ? Math.max(...forecast.map((f: any) => f.vento_kmh ?? 0)) : 0;
 
+  const offlineMinCfg = (override as any)?.sensor_offline_min ?? 15;
+  const divergMinCfg = Number((override as any)?.divergencia_temp_c ?? 5);
+
   const galpaoStatus = (l: LeituraGalpao) => {
     if (!l.ultima_leitura) return { icon: <WifiOff className="w-4 h-4 text-muted-foreground" />, txt: 'Sem sensor' };
     const age = (Date.now() - new Date(l.ultima_leitura).getTime()) / 60_000;
-    if (age > 15) return { icon: <WifiOff className="w-4 h-4 text-destructive" />, txt: `Offline ${Math.round(age)}min` };
+    if (age > offlineMinCfg) return { icon: <WifiOff className="w-4 h-4 text-destructive" />, txt: `Offline ${Math.round(age)}min` };
     if (!conforto || l.temperatura_c == null) return { icon: <Activity className="w-4 h-4 text-muted-foreground" />, txt: '—' };
     if (l.temperatura_c >= conforto.temp_max_critico || l.temperatura_c <= conforto.temp_min_critico)
       return { icon: <AlertTriangle className="w-4 h-4 text-destructive" />, txt: 'Crítico' };
@@ -310,7 +332,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
               const st = galpaoStatus(l);
               const sensores = l.sensores ?? [];
               const hasMulti = sensores.length > 1;
-              const divergAlta = (l.divergencia_c ?? 0) >= 3;
+              const divergAlta = (l.divergencia_c ?? 0) >= divergMinCfg;
               const resumo = l.temperatura_min_c != null && l.temperatura_c != null && hasMulti
                 ? `${l.temperatura_min_c.toFixed(1)}–${l.temperatura_c.toFixed(1)}°C`
                 : (l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—');
@@ -350,7 +372,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
                         const ageMin = s.ultima_leitura
                           ? (Date.now() - new Date(s.ultima_leitura).getTime()) / 60_000
                           : Infinity;
-                        const offline = !isFinite(ageMin) || ageMin > 15;
+                        const offline = !isFinite(ageMin) || ageMin > offlineMinCfg;
                         return (
                           <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
