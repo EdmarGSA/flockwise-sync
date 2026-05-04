@@ -119,6 +119,12 @@ const Configuracoes = () => {
       path: "/configuracoes/iluminacao"
     },
     {
+      title: "Recuperação IoT",
+      description: "Política após queda de energia/internet por dispositivo ou galpão",
+      icon: ShieldCheck,
+      path: "/configuracoes/recuperacao-iot"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
