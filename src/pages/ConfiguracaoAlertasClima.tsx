@@ -153,6 +153,8 @@ const ConfiguracaoAlertasClima = () => {
       return;
     }
     setSaving(true);
+    const payload: any = {
+      integrado_id: integradoId,
       nucleo_id: key === "default" ? null : key,
       temp_max_critico: cfg.temp_max_critico,
       temp_min_critico: cfg.temp_min_critico,
