@@ -148,7 +148,6 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           integradoId ? fetchDeviceStatus(device.device_id_ewelink) : Promise.resolve(null),
         ]);
         const reading: any = readingResult?.data;
-        const canal = canaisMap.get(device.id);
 
         return {
           id: device.id,
@@ -161,7 +160,7 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           switchState: statusResult?.switch ?? null,
           autoControlEnabled: statusResult?.autoControlEnabled === 1,
           automacao_ativa: device.automacao_ativa ?? false,
-          funcao_automacao: device.funcao_automacao ?? 'nenhuma',
+          funcao_automacao: isIluminacao ? 'iluminacao' : (device.funcao_automacao ?? 'nenhuma'),
           ultimo_sync: device.ultimo_sync ?? null,
           intensidade_atual: canal?.intensidade ?? null,
           suporta_dimer: canal?.dimer ?? false,
