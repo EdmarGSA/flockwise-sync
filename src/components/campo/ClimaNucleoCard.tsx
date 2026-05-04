@@ -21,7 +21,8 @@ const severidadeColor: Record<string, string> = {
 };
 
 export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
-  const { observacao, forecast, alertas, loading } = useClimaNucleo(nucleoId);
+  const { observacao, forecast, alertas, solar, loading, refetch } = useClimaNucleo(nucleoId);
+  const [atualizando, setAtualizando] = useState(false);
 
   const reconhecer = async (id: string) => {
     const { error } = await supabase
@@ -31,6 +32,23 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
     if (error) toast.error("Erro ao reconhecer alerta");
     else toast.success("Alerta reconhecido");
   };
+
+  const atualizarClima = async () => {
+    setAtualizando(true);
+    try {
+      const { error } = await supabase.functions.invoke("weather-sync", { body: { nucleo_id: nucleoId } });
+      if (error) throw error;
+      await refetch();
+      toast.success("Clima atualizado");
+    } catch (e: any) {
+      toast.error("Falha ao atualizar clima", { description: e?.message });
+    } finally {
+      setAtualizando(false);
+    }
+  };
+
+  const formatHora = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
 
   if (loading) {
     return (
