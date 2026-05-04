@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil, Filter, LayoutDashboard, Map as MapIcon } from 'lucide-react';
+import { Building2, Home, MapPin, ArrowLeft, Plus, Bird, Calendar, BarChart3, Pencil, Filter, LayoutDashboard, Map as MapIcon, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { getLinhagemLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
@@ -108,6 +109,8 @@ export default function GestaoCampo() {
   const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
+  const [atualizandoClimaTodos, setAtualizandoClimaTodos] = useState(false);
+  const [climaRefreshKey, setClimaRefreshKey] = useState(0);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
@@ -516,10 +519,36 @@ export default function GestaoCampo() {
             </div>
 
             {filteredNucleos.filter(n => n.latitude && n.longitude).length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredNucleos.filter(n => n.latitude && n.longitude).slice(0, 6).map(n => (
-                  <ClimaNucleoCard key={n.id} nucleoId={n.id} nucleoNome={n.nome} />
-                ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">Clima dos Núcleos</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setAtualizandoClimaTodos(true);
+                      try {
+                        const { error } = await supabase.functions.invoke('weather-sync', { body: {} });
+                        if (error) throw error;
+                        toast.success('Clima de todos os núcleos atualizado');
+                        setClimaRefreshKey(k => k + 1);
+                      } catch (e: any) {
+                        toast.error('Falha ao atualizar', { description: e?.message });
+                      } finally {
+                        setAtualizandoClimaTodos(false);
+                      }
+                    }}
+                    disabled={atualizandoClimaTodos}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${atualizandoClimaTodos ? 'animate-spin' : ''}`} />
+                    Atualizar todos
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredNucleos.filter(n => n.latitude && n.longitude).slice(0, 6).map(n => (
+                    <ClimaNucleoCard key={`${n.id}-${climaRefreshKey}`} nucleoId={n.id} nucleoNome={n.nome} />
+                  ))}
+                </div>
               </div>
             )}
 
