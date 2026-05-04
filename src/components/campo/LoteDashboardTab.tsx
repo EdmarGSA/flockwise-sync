@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import { Skull, Wheat, TrendingUp, Pill, CalendarCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { LoteIluminacaoCard } from '@/components/campo/LoteIluminacaoCard';
+import { ClimaNucleoCard } from '@/components/campo/ClimaNucleoCard';
 
 type LoteRow = Database['public']['Tables']['lotes']['Row'];
 
