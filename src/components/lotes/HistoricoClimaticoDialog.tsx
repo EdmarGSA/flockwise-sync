@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, parseISO, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle, CloudRain, Wind, CloudSun } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -26,13 +26,15 @@ import { cn } from '@/lib/utils';
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  nucleoIdInicial?: string;
+  tabInicial?: 'previsao' | 'series' | 'alertas';
 }
 
 const SEV_VARIANT: Record<string, 'destructive' | 'default' | 'secondary'> = {
   critico: 'destructive', alto: 'destructive', atencao: 'default', medio: 'default', baixo: 'secondary',
 };
 
-export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
+export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, tabInicial = 'previsao' }: Props) {
   const { integradoId } = useIntegradoId();
   const [nucleos, setNucleos] = useState<{ id: string; nome: string }[]>([]);
   const [nucleoId, setNucleoId] = useState<string>('');
@@ -46,6 +48,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   const [hist3hPrev, setHist3hPrev] = useState<any[]>([]);
   const [alertas, setAlertas] = useState<any[]>([]);
   const [comparar, setComparar] = useState(false);
+  const [forecast, setForecast] = useState<any[]>([]);
+  const [conforto, setConforto] = useState<{ temp_min_critico: number; temp_max_critico: number; ith_max_critico: number } | null>(null);
+  const [tab, setTab] = useState<string>(tabInicial);
 
   useEffect(() => {
     if (!open || !integradoId) return;
@@ -55,14 +60,32 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
         .eq('integrado_id', integradoId).eq('ativo', true).order('nome');
       const list = data ?? [];
       setNucleos(list);
-      if (list.length && !nucleoId) setNucleoId(list[0].id);
+      const candidato = nucleoIdInicial && list.some(n => n.id === nucleoIdInicial) ? nucleoIdInicial : (list[0]?.id || '');
+      if (candidato && candidato !== nucleoId) setNucleoId(candidato);
     })();
-  }, [open, integradoId]);
+  }, [open, integradoId, nucleoIdInicial]);
+
+  useEffect(() => {
+    if (open) setTab(tabInicial);
+  }, [open, tabInicial]);
 
   useEffect(() => {
     if (!open || !nucleoId) return;
     fetchData();
+    fetchForecast();
   }, [open, nucleoId, dataIni, dataFim, comparar]);
+
+  const fetchForecast = async () => {
+    const agora = new Date().toISOString();
+    const ate72h = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    const { data } = await supabase
+      .from('weather_forecast_horario')
+      .select('hora_prevista, temperatura_c, umidade_pct, vento_kmh, prob_chuva_pct, precipitacao_mm, ith, condicao_codigo')
+      .eq('nucleo_id', nucleoId)
+      .gte('hora_prevista', agora).lte('hora_prevista', ate72h)
+      .order('hora_prevista', { ascending: true });
+    setForecast(data ?? []);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -98,6 +121,29 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
     setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
+
+  const seriePrevisao = useMemo(() => forecast.map(f => ({
+    label: format(parseISO(f.hora_prevista), 'dd/MM HH:mm', { locale: ptBR }),
+    temp: f.temperatura_c != null ? Number(f.temperatura_c) : null,
+    ur: f.umidade_pct != null ? Number(f.umidade_pct) : null,
+    chuva_pct: f.prob_chuva_pct != null ? Number(f.prob_chuva_pct) : null,
+    chuva_mm: f.precipitacao_mm != null ? Number(f.precipitacao_mm) : null,
+    ith: f.ith != null ? Number(f.ith) : null,
+    vento: f.vento_kmh != null ? Number(f.vento_kmh) : null,
+  })), [forecast]);
+
+  const resumoPrevisao = useMemo(() => {
+    const f24 = forecast.filter(f => new Date(f.hora_prevista).getTime() <= Date.now() + 24 * 3600 * 1000);
+    const temps = f24.map(f => Number(f.temperatura_c)).filter(v => !isNaN(v));
+    return {
+      tempMin: temps.length ? Math.min(...temps) : null,
+      tempMax: temps.length ? Math.max(...temps) : null,
+      probChuvaMax: f24.reduce((a, f) => Math.max(a, Number(f.prob_chuva_pct) || 0), 0),
+      ithMax: f24.reduce((a, f) => Math.max(a, Number(f.ith) || 0), 0),
+      ventoMax: f24.reduce((a, f) => Math.max(a, Number(f.vento_kmh) || 0), 0),
+      chuvaTotal: f24.reduce((a, f) => a + (Number(f.precipitacao_mm) || 0), 0),
+    };
+  }, [forecast]);
 
   const serie = useMemo(() => {
     const cur = hist3h.map(r => ({
@@ -149,7 +195,7 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5 text-primary" /> Histórico Climático por Núcleo
+            <Cloud className="h-5 w-5 text-primary" /> Clima por Núcleo
           </DialogTitle>
         </DialogHeader>
 
@@ -246,11 +292,104 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <Tabs defaultValue="series">
+            <Tabs value={tab} onValueChange={setTab}>
               <TabsList>
-                <TabsTrigger value="series" className="text-xs">Séries</TabsTrigger>
+                <TabsTrigger value="previsao" className="text-xs">Previsão 72h</TabsTrigger>
+                <TabsTrigger value="series" className="text-xs">Histórico</TabsTrigger>
                 <TabsTrigger value="alertas" className="text-xs">Alertas ({alertasFiltrados.length})</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="previsao" className="space-y-4 mt-3">
+                {seriePrevisao.length === 0 ? (
+                  <Card><CardContent className="py-10 text-center text-xs text-muted-foreground">
+                    Sem previsão disponível. Verifique se o núcleo possui coordenadas e se a sincronização climática rodou.
+                  </CardContent></Card>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Thermometer className="h-3 w-3 text-orange-500" />Temp 24h</div>
+                        <div className="text-sm font-semibold">{resumoPrevisao.tempMin?.toFixed(0)}° / {resumoPrevisao.tempMax?.toFixed(0)}°C</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><CloudRain className="h-3 w-3 text-blue-500" />Chuva 24h</div>
+                        <div className="text-sm font-semibold">{resumoPrevisao.probChuvaMax.toFixed(0)}% · {resumoPrevisao.chuvaTotal.toFixed(1)} mm</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Droplets className="h-3 w-3 text-purple-500" />ITH máx 24h</div>
+                        <div className={cn("text-sm font-semibold", resumoPrevisao.ithMax >= 78 && "text-destructive")}>{resumoPrevisao.ithMax > 0 ? resumoPrevisao.ithMax.toFixed(0) : '—'}</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Wind className="h-3 w-3 text-cyan-500" />Vento máx 24h</div>
+                        <div className={cn("text-sm font-semibold", resumoPrevisao.ventoMax >= 50 && "text-destructive")}>{resumoPrevisao.ventoMax.toFixed(0)} km/h</div>
+                      </CardContent></Card>
+                    </div>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <Thermometer className="h-4 w-4 text-orange-500" /> Temperatura prevista (°C)
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <ReferenceLine y={32} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: '32°', fontSize: 9 }} />
+                            <ReferenceLine y={18} stroke="hsl(var(--primary))" strokeDasharray="3 3" label={{ value: '18°', fontSize: 9 }} />
+                            <Line type="monotone" dataKey="temp" stroke="#f97316" dot={false} name="Temperatura" strokeWidth={2} />
+                            <Line type="monotone" dataKey="ith" stroke="#a855f7" dot={false} name="ITH" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <CloudRain className="h-4 w-4 text-blue-500" /> Chuva prevista
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis yAxisId="pct" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <YAxis yAxisId="mm" orientation="right" tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <Bar yAxisId="pct" dataKey="chuva_pct" fill="#3b82f6" fillOpacity={0.5} name="Prob. chuva (%)" />
+                            <Line yAxisId="mm" type="monotone" dataKey="chuva_mm" stroke="#1d4ed8" dot={false} name="Precipitação (mm)" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <Wind className="h-4 w-4 text-cyan-500" /> Vento e UR previstos
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis yAxisId="ur" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <YAxis yAxisId="vento" orientation="right" tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <ReferenceLine yAxisId="vento" y={50} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
+                            <Line yAxisId="ur" type="monotone" dataKey="ur" stroke="#3b82f6" dot={false} name="UR (%)" />
+                            <Line yAxisId="vento" type="monotone" dataKey="vento" stroke="#06b6d4" dot={false} name="Vento (km/h)" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </TabsContent>
+
 
               <TabsContent value="series" className="space-y-4 mt-3">
                 <Card>

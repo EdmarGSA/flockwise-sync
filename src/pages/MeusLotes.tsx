@@ -31,6 +31,7 @@ import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
 import { AlertasTemperaturaBar } from '@/components/lotes/AlertasTemperaturaBar';
 import { AlertasClimaticosBar } from '@/components/lotes/AlertasClimaticosBar';
 import { HistoricoClimaticoDialog } from '@/components/lotes/HistoricoClimaticoDialog';
+import { PrevisaoNucleosBar } from '@/components/lotes/PrevisaoNucleosBar';
 import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { PosturaIndicators } from '@/components/lotes/postura/PosturaIndicators';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
@@ -109,6 +110,14 @@ export default function MeusLotes() {
   const [metasPosturaOpen, setMetasPosturaOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
   const [historicoClimaOpen, setHistoricoClimaOpen] = useState(false);
+  const [climaTabInicial, setClimaTabInicial] = useState<'previsao' | 'series' | 'alertas'>('previsao');
+  const [climaNucleoInicial, setClimaNucleoInicial] = useState<string | undefined>(undefined);
+
+  const abrirClima = (nucleoId?: string, tab: 'previsao' | 'series' | 'alertas' = 'previsao') => {
+    setClimaNucleoInicial(nucleoId);
+    setClimaTabInicial(tab);
+    setHistoricoClimaOpen(true);
+  };
 
   useEffect(() => {
     if (user) {
@@ -577,8 +586,9 @@ export default function MeusLotes() {
         {/* Temperature Alerts */}
         <AlertasTemperaturaBar />
         <AlertasClimaticosBar />
+        <PrevisaoNucleosBar onAbrirDetalhes={(id) => abrirClima(id, 'previsao')} />
         <div className="flex justify-end mb-4">
-          <Button variant="outline" size="sm" onClick={() => setHistoricoClimaOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => abrirClima(undefined, 'series')}>
             <Thermometer className="w-4 h-4 mr-2" />
             Histórico climático por núcleo
           </Button>
@@ -949,7 +959,12 @@ export default function MeusLotes() {
         )}
       </main>
 
-      <HistoricoClimaticoDialog open={historicoClimaOpen} onOpenChange={setHistoricoClimaOpen} />
+      <HistoricoClimaticoDialog
+        open={historicoClimaOpen}
+        onOpenChange={setHistoricoClimaOpen}
+        nucleoIdInicial={climaNucleoInicial}
+        tabInicial={climaTabInicial}
+      />
 
       {/* Dialogs */}
       {selectedLote && (

@@ -1,40 +1,65 @@
 ## Diagnóstico
 
-O card mostra `NaN°` em Temperatura e `NaN%` em UR porque está lendo campos errados:
+Hoje, na página **Meus Lotes**, temos:
 
-- Código: `observacao.temp_c` e `observacao.ur_pct`
-- Banco (`weather_observacoes`): `temperatura_c` e `umidade_pct`
+1. **`AlertasClimaticosBar`** (já renderizado no topo da lista, linha 579) — mostra alertas climáticos ativos por núcleo, com filtros de severidade e botão de "reconhecer". Atualiza em tempo real via canal Realtime na tabela `alertas_climaticos`. **Os alertas já aparecem aqui automaticamente quando a edge function `weather-alertas` os gera** (a partir do `weather_forecast_horario`). Se você não está vendo alertas, é porque ainda não há previsão ruim no horizonte de 72h dos núcleos OU o `weather-sync` ainda não rodou.
+2. **`HistoricoClimaticoDialog`** (botão "Histórico Climático") — atualmente só mostra **passado** (tabela `weather_historico_3h`) e a lista de alertas históricos. **Não exibe a previsão.**
 
-O mesmo erro está no cálculo de min/max das próximas 12h (`f.temp_c` em vez de `f.temperatura_c`), causando o `99° → -99°` que aparece quando os valores não são lidos.
+O que falta: a **previsão das próximas 24-72h** (chuva, temperatura, UR, ITH, vento) na visão do criador, e mais clareza sobre como os alertas surgem.
 
-A condição do tempo (sol/chuva/nublado) já é gravada em `condicao_codigo` (padrão WMO do Open-Meteo), mas o card nunca exibe essa informação.
+## O que vou fazer
 
-## Correções
+### 1. Adicionar aba "Previsão" no `HistoricoClimaticoDialog`
 
-**`src/components/campo/ClimaNucleoCard.tsx`**
+Renomeio o título do diálogo para **"Clima por Núcleo"** e estruturo em 3 abas:
 
-1. **Renomear leituras dos campos** para os nomes reais do banco:
-   - `observacao.temp_c` → `observacao.temperatura_c`
-   - `observacao.ur_pct` → `observacao.umidade_pct`
-   - `f.temp_c` → `f.temperatura_c` no reduce de min/max
+- **Previsão** (nova) — gráficos das próximas 72h vindo de `weather_forecast_horario`:
+  - Linha de **temperatura** com bandas de conforto da `nucleo_conforto_termico` (zona crítica em vermelho).
+  - **ITH** com referência 78.
+  - Barras de **probabilidade de chuva (%)** + linha de precipitação (mm).
+  - Linha de **vento (km/h)**.
+  - Resumo no topo: temp mín/máx 24h, máx prob. chuva, máx ITH, alertas previstos no horizonte.
+- **Histórico** — o conteúdo atual (séries 3h + comparação com período anterior).
+- **Alertas** — a lista atual de eventos no período.
 
-2. **Adicionar bloco de condição atual** (chuva/sol/nublado) no topo do card, ao lado do nome do núcleo:
-   - Mapear `condicao_codigo` (WMO) para ícone + texto: 0 = Céu limpo, 1-2 = Parcialmente nublado, 3 = Nublado, 45-48 = Neblina, 51-57 = Garoa, 61-67 = Chuva, 71-77 = Neve, 80-82 = Pancadas de chuva, 95+ = Tempestade.
+### 2. Cartão "Próximas 24h" direto na página `MeusLotes`
 
-3. **Adicionar probabilidade de chuva nas próximas horas**: usar `forecast[0..12].prob_chuva_pct` (já existe na tabela `weather_forecast_horario`) — exibir o valor máximo das próximas 12h junto da faixa de temperatura.
+Acima da tabela (logo após o `AlertasClimaticosBar`), um **mini-cartão por núcleo ativo** com:
 
-## Resultado esperado
+- Ícone da condição predominante + temp mín/máx das próximas 24h.
+- Pico de chuva (%) e horário esperado.
+- Pico de ITH e horário.
+- Badge "Sem alertas previstos" (verde) ou "N alertas previstos" (laranja) baseado em `alertas_climaticos` com `horario_evento > now()`.
+- Clique abre o diálogo já na aba **Previsão** daquele núcleo.
 
-```text
-☁ Clima Marcia Fernandes Alvare        22:58 ↻
-   Nublado · 23°C
-   23°  93%   10    0
-   Temp  UR  km/h  UV
-   ─────────────────────
-   Nascer: 05:44   Pôr: 17:22
-   Próximas 12h: 19° → 24° · 30% chuva
-   ─────────────────────
-   ✓ Sync: 03/05, 22:58 (manual)
-```
+Componente novo: `src/components/lotes/PrevisaoNucleosBar.tsx` (colapsável, igual ao `AlertasClimaticosBar`, escondido se não houver lotes ativos).
 
-Sem alteração de schema ou edge function — apenas correção de nomes de campos no componente React.
+### 3. Texto explicativo dos alertas
+
+Na `AlertasClimaticosBar`, quando a lista estiver **vazia**, em vez de não renderizar nada, mostrar um cartão discreto:
+
+> "Sem alertas climáticos ativos. Avaliamos a previsão dos próximos 3 dias a cada sincronização e geramos alertas para picos de calor (≥ crítico do núcleo), frio, ITH alto e vento forte (≥ 50 km/h)."
+
+Assim o criador entende **de onde** os alertas vêm e por que pode não estar vendo nenhum.
+
+### 4. Garantir que a sincronização rodou
+
+Adicionar um pequeno indicador no cartão da `PrevisaoNucleosBar` mostrando "Atualizado há X min" (lendo `weather_sync_log`). Se nunca sincronizou ou está com erro, botão **"Sincronizar agora"** que dispara `weather-sync` para todos os núcleos do integrado (mesma chamada já usada em Gestão de Campo).
+
+## Detalhes técnicos
+
+- **Fonte da previsão**: `weather_forecast_horario` (já populada pelo `weather-sync` para 72h, com `temperatura_c, umidade_pct, prob_chuva_pct, precipitacao_mm, vento_kmh, ith, condicao_codigo`).
+- **Alertas previstos**: query em `alertas_climaticos` com `horario_evento > now()` e `reconhecido_em IS NULL`, agrupados por `nucleo_id`.
+- **Conforto térmico**: usar `nucleo_conforto_termico` para as bandas (mesmo padrão do `LoteClimaHistoricoTab`).
+- **Performance**: batch fetch para todos os núcleos de uma vez (`.in('nucleo_id', ids)`) seguindo o padrão do projeto. Estabilizar dependências do `useEffect` com `JSON.stringify` dos arrays de IDs.
+- **Realtime**: o diálogo continua sem realtime (refetch ao abrir/trocar filtro); a barra de previsão na MeusLotes refaz fetch a cada 5 min e quando `alertas_climaticos` muda (canal Realtime já existe).
+- **Sem alterações de schema** — todas as tabelas necessárias já existem.
+
+## Arquivos a alterar
+
+- `src/components/lotes/HistoricoClimaticoDialog.tsx` — renomear, adicionar aba "Previsão" + queries de forecast e conforto, prop opcional `nucleoIdInicial` e `tabInicial`.
+- `src/components/lotes/PrevisaoNucleosBar.tsx` — **novo** componente (mini-cartões por núcleo + botão sincronizar).
+- `src/components/lotes/AlertasClimaticosBar.tsx` — exibir mensagem explicativa quando vazio.
+- `src/pages/MeusLotes.tsx` — montar `PrevisaoNucleosBar` logo após `AlertasClimaticosBar`; abrir o diálogo na aba certa quando o usuário clicar num cartão.
+
+Sem mudanças em edge functions ou banco.
