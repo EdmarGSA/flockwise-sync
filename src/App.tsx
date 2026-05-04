@@ -443,6 +443,15 @@ const AppRoutes = () => (
       </ProtectedRoute>
     } />
 
+    {/* Política de Recuperação IoT */}
+    <Route path="/configuracoes/recuperacao-iot" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <PoliticaRecuperacaoIoT />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+
 
     {/* Câmeras Intelbras */}
     <Route path="/cameras" element={
