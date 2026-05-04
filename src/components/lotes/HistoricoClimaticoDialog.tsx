@@ -195,7 +195,7 @@ export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, 
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5 text-primary" /> Histórico Climático por Núcleo
+            <Cloud className="h-5 w-5 text-primary" /> Clima por Núcleo
           </DialogTitle>
         </DialogHeader>
 
