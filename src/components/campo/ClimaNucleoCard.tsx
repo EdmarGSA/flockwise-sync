@@ -173,8 +173,13 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
         )}
 
         {forecast.length > 0 && (
-          <div className="text-xs text-muted-foreground border-t pt-2">
-            Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span>
+          <div className="text-xs text-muted-foreground border-t pt-2 flex items-center justify-between gap-2">
+            <span>Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span></span>
+            {probChuvaMax > 0 && (
+              <span className="flex items-center gap-1 text-blue-500">
+                <CloudRain className="h-3 w-3" /> {probChuvaMax}% chuva
+              </span>
+            )}
           </div>
         )}
 
