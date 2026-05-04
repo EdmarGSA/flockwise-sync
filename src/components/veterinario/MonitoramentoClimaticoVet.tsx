@@ -306,34 +306,89 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
             <Activity className="w-3 h-3" /> Temperatura interna (IoT)
           </div>
           <div className="space-y-1.5">
-            <TooltipProvider>
-              {leituras.map(l => {
-                const st = galpaoStatus(l);
-                return (
-                  <Tooltip key={l.galpao_id}>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center justify-between text-sm rounded-md px-2 py-1.5 bg-card border">
-                        <span className="truncate flex-1">{l.galpao_nome}</span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-mono">
-                            {l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—'}
-                            {l.umidade_pct != null && <span className="text-muted-foreground"> / {l.umidade_pct.toFixed(0)}%</span>}
-                          </span>
-                          {st.icon}
+            {leituras.map(l => {
+              const st = galpaoStatus(l);
+              const sensores = l.sensores ?? [];
+              const hasMulti = sensores.length > 1;
+              const divergAlta = (l.divergencia_c ?? 0) >= 3;
+              const resumo = l.temperatura_min_c != null && l.temperatura_c != null && hasMulti
+                ? `${l.temperatura_min_c.toFixed(1)}–${l.temperatura_c.toFixed(1)}°C`
+                : (l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—');
+              return (
+                <Collapsible key={l.galpao_id} className="rounded-md border bg-card">
+                  <CollapsibleTrigger className="w-full flex items-center justify-between text-sm px-2 py-1.5 hover:bg-muted/40">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <ChevronDown className="w-3 h-3 shrink-0 transition-transform data-[state=open]:rotate-0 -rotate-90" />
+                      <span className="truncate">{l.galpao_nome}</span>
+                      {hasMulti && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                          {sensores.length} sensores
+                        </Badge>
+                      )}
+                      {divergAlta && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/40 text-amber-700 bg-amber-500/10">
+                          Δ{l.divergencia_c!.toFixed(1)}°C
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono text-xs">
+                        {resumo}
+                        {l.umidade_pct != null && (
+                          <span className="text-muted-foreground"> / {l.umidade_pct.toFixed(0)}%</span>
+                        )}
+                      </span>
+                      {st.icon}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border-t px-2 py-1.5 space-y-1 bg-muted/20">
+                      {sensores.length === 0 && (
+                        <p className="text-[11px] text-muted-foreground italic">Sem sensor cadastrado.</p>
+                      )}
+                      {sensores.map(s => {
+                        const ageMin = s.ultima_leitura
+                          ? (Date.now() - new Date(s.ultima_leitura).getTime()) / 60_000
+                          : Infinity;
+                        const offline = !isFinite(ageMin) || ageMin > 15;
+                        return (
+                          <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {offline ? (
+                                <WifiOff className="w-3 h-3 text-destructive shrink-0" />
+                              ) : (
+                                <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
+                              )}
+                              <span className="truncate">{s.nome}</span>
+                              {s.suspeito && (
+                                <AlertTriangle
+                                  className="w-3 h-3 text-amber-500 shrink-0"
+                                  aria-label={s.motivo_suspeita}
+                                />
+                              )}
+                            </div>
+                            <span className="font-mono text-muted-foreground shrink-0">
+                              {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
+                              {s.umidade_pct != null && (
+                                <span className={s.suspeito ? 'text-amber-600' : ''}>
+                                  {' / '}{s.umidade_pct.toFixed(0)}%
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {conforto && (
+                        <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+                          Conforto: {conforto.temp_min_ok}–{conforto.temp_max_ok}°C
+                          {l.temperatura_media_c != null && ` • média ${l.temperatura_media_c.toFixed(1)}°C`}
                         </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-xs">
-                        <div>{st.txt}</div>
-                        {conforto && <div>Conforto: {conforto.temp_min_ok}–{conforto.temp_max_ok}°C</div>}
-                        {l.ultima_leitura && <div>Leitura: {new Date(l.ultima_leitura).toLocaleString('pt-BR')}</div>}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TooltipProvider>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
             {leituras.length === 0 && (
               <p className="text-xs text-muted-foreground italic">Sem galpões cadastrados.</p>
             )}
