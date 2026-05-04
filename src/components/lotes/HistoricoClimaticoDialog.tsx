@@ -60,14 +60,32 @@ export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, 
         .eq('integrado_id', integradoId).eq('ativo', true).order('nome');
       const list = data ?? [];
       setNucleos(list);
-      if (list.length && !nucleoId) setNucleoId(list[0].id);
+      const candidato = nucleoIdInicial && list.some(n => n.id === nucleoIdInicial) ? nucleoIdInicial : (list[0]?.id || '');
+      if (candidato && candidato !== nucleoId) setNucleoId(candidato);
     })();
-  }, [open, integradoId]);
+  }, [open, integradoId, nucleoIdInicial]);
+
+  useEffect(() => {
+    if (open) setTab(tabInicial);
+  }, [open, tabInicial]);
 
   useEffect(() => {
     if (!open || !nucleoId) return;
     fetchData();
+    fetchForecast();
   }, [open, nucleoId, dataIni, dataFim, comparar]);
+
+  const fetchForecast = async () => {
+    const agora = new Date().toISOString();
+    const ate72h = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    const { data } = await supabase
+      .from('weather_forecast_horario')
+      .select('hora_prevista, temperatura_c, umidade_pct, vento_kmh, prob_chuva_pct, precipitacao_mm, ith, condicao_codigo')
+      .eq('nucleo_id', nucleoId)
+      .gte('hora_prevista', agora).lte('hora_prevista', ate72h)
+      .order('hora_prevista', { ascending: true });
+    setForecast(data ?? []);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -103,6 +121,29 @@ export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, 
     setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
+
+  const seriePrevisao = useMemo(() => forecast.map(f => ({
+    label: format(parseISO(f.hora_prevista), 'dd/MM HH:mm', { locale: ptBR }),
+    temp: f.temperatura_c != null ? Number(f.temperatura_c) : null,
+    ur: f.umidade_pct != null ? Number(f.umidade_pct) : null,
+    chuva_pct: f.prob_chuva_pct != null ? Number(f.prob_chuva_pct) : null,
+    chuva_mm: f.precipitacao_mm != null ? Number(f.precipitacao_mm) : null,
+    ith: f.ith != null ? Number(f.ith) : null,
+    vento: f.vento_kmh != null ? Number(f.vento_kmh) : null,
+  })), [forecast]);
+
+  const resumoPrevisao = useMemo(() => {
+    const f24 = forecast.filter(f => new Date(f.hora_prevista).getTime() <= Date.now() + 24 * 3600 * 1000);
+    const temps = f24.map(f => Number(f.temperatura_c)).filter(v => !isNaN(v));
+    return {
+      tempMin: temps.length ? Math.min(...temps) : null,
+      tempMax: temps.length ? Math.max(...temps) : null,
+      probChuvaMax: f24.reduce((a, f) => Math.max(a, Number(f.prob_chuva_pct) || 0), 0),
+      ithMax: f24.reduce((a, f) => Math.max(a, Number(f.ith) || 0), 0),
+      ventoMax: f24.reduce((a, f) => Math.max(a, Number(f.vento_kmh) || 0), 0),
+      chuvaTotal: f24.reduce((a, f) => a + (Number(f.precipitacao_mm) || 0), 0),
+    };
+  }, [forecast]);
 
   const serie = useMemo(() => {
     const cur = hist3h.map(r => ({
