@@ -1,0 +1,399 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Cloud, CloudRain, Thermometer, Droplets, Wind, Sun, AlertTriangle,
+  CheckCircle2, WifiOff, RefreshCw, ChevronRight, Activity,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { useClimaNucleo } from '@/hooks/useClimaNucleo';
+import {
+  gerarPlanoPrevencao,
+  type LeituraGalpao,
+  type ContextoConforto,
+  type PlanoAcao,
+} from '@/lib/clima/planoPrevencao';
+import { calcularIdadeLote } from '@/lib/utils';
+
+interface NucleoData {
+  id: string;
+  nome: string;
+  tipo_producao: string;
+  galpoes: Array<{
+    id: string;
+    nome: string;
+    inercia_termica_min: number | null;
+    ventilador_quantidade: number | null;
+    lote: { id: string; data_alojamento: string | null; quantidade_aves: number } | null;
+  }>;
+}
+
+const sevColor: Record<PlanoAcao['prioridade'], string> = {
+  critica: 'bg-destructive text-destructive-foreground',
+  alta: 'bg-orange-500 text-white',
+  media: 'bg-amber-500 text-white',
+  baixa: 'bg-muted text-muted-foreground',
+};
+
+function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integradoId: string }) {
+  const navigate = useNavigate();
+  const { observacao, forecast, alertas, loading, refetch } = useClimaNucleo(nucleo.id);
+  const [leituras, setLeituras] = useState<LeituraGalpao[]>([]);
+  const [conforto, setConforto] = useState<ContextoConforto | null>(null);
+  const [override, setOverride] = useState<any | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // idade média do lote ativo principal (primeiro com data_alojamento)
+  const loteRef = nucleo.galpoes.find(g => g.lote?.data_alojamento)?.lote ?? null;
+  const idadeDias = loteRef?.data_alojamento ? calcularIdadeLote(loteRef.data_alojamento) : null;
+
+  // Buscar conforto + override + leituras
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      // override
+      const { data: ov } = await supabase
+        .from('nucleo_alertas_config')
+        .select('*')
+        .eq('integrado_id', integradoId)
+        .or(`nucleo_id.eq.${nucleo.id},nucleo_id.is.null`);
+      const overr = ov?.find(c => c.nucleo_id === nucleo.id) ?? ov?.find(c => c.nucleo_id == null) ?? null;
+      if (!cancel) setOverride(overr);
+
+      // conforto por idade
+      if (idadeDias != null) {
+        const { data: cf } = await supabase
+          .from('conforto_termico_ave')
+          .select('*')
+          .eq('tipo_producao', nucleo.tipo_producao)
+          .lte('idade_dia_inicio', idadeDias)
+          .gte('idade_dia_fim', idadeDias)
+          .maybeSingle();
+        if (!cancel && cf) {
+          setConforto({
+            temp_min_ok: overr?.temp_min_critico ?? cf.temp_min_ok,
+            temp_max_ok: cf.temp_max_ok,
+            temp_min_critico: overr?.temp_min_critico ?? cf.temp_min_critico,
+            temp_max_critico: overr?.temp_max_critico ?? cf.temp_max_critico,
+            ith_max_ok: cf.ith_max_ok,
+            ith_max_critico: overr?.ith_max_critico ?? cf.ith_max_critico,
+            ur_max_ok: cf.ur_max_ok,
+          });
+        }
+      }
+
+      // leituras IoT por galpão
+      const galpaoIds = nucleo.galpoes.map(g => g.id);
+      if (galpaoIds.length === 0) return;
+      const { data: devices } = await supabase
+        .from('dispositivos_iot')
+        .select('id, galpao_id')
+        .in('galpao_id', galpaoIds)
+        .eq('ativo', true);
+      const devIds = (devices ?? []).map(d => d.id);
+      const devGalpao = new Map((devices ?? []).map(d => [d.id, d.galpao_id]));
+
+      let leiturasMap = new Map<string, { temp: number | null; ur: number | null; ts: string | null }>();
+      if (devIds.length) {
+        const { data: leits } = await supabase
+          .from('leituras_sensores')
+          .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
+          .in('dispositivo_id', devIds)
+          .order('lido_em', { ascending: false })
+          .limit(devIds.length * 5);
+        // pegar a mais recente por galpão (com temp não nula)
+        (leits ?? []).forEach(l => {
+          const galpaoId = devGalpao.get(l.dispositivo_id);
+          if (!galpaoId) return;
+          const cur = leiturasMap.get(galpaoId);
+          if (l.temperatura_c == null) return;
+          if (!cur || (cur.ts && l.lido_em > cur.ts)) {
+            leiturasMap.set(galpaoId, { temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em });
+          }
+        });
+      }
+
+      const ls: LeituraGalpao[] = nucleo.galpoes.map(g => {
+        const r = leiturasMap.get(g.id);
+        return {
+          galpao_id: g.id,
+          galpao_nome: g.nome,
+          temperatura_c: r?.temp ?? null,
+          umidade_pct: r?.ur ?? null,
+          ultima_leitura: r?.ts ?? null,
+          inercia_min: g.inercia_termica_min ?? 60,
+          ventilador_qtd: g.ventilador_quantidade ?? 0,
+        };
+      });
+      if (!cancel) setLeituras(ls);
+    })();
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nucleo.id, integradoId, idadeDias]);
+
+  const plano = useMemo(() => gerarPlanoPrevencao({
+    idadeDias,
+    conforto,
+    leituras,
+    forecast: forecast as any,
+    observacao,
+  }), [idadeDias, conforto, leituras, forecast, observacao]);
+
+  // severidade global
+  const severidade = useMemo<'OK' | 'ATENÇÃO' | 'ALTO'>(() => {
+    if (plano.some(p => p.prioridade === 'critica')) return 'ALTO';
+    if (alertas.some((a: any) => a.severidade === 'critical')) return 'ALTO';
+    if (plano.some(p => p.prioridade === 'alta')) return 'ATENÇÃO';
+    if (plano.length) return 'ATENÇÃO';
+    return 'OK';
+  }, [plano, alertas]);
+
+  const sevBadge = severidade === 'OK'
+    ? 'bg-green-500/10 text-green-700 border-green-500/30'
+    : severidade === 'ATENÇÃO'
+    ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+    : 'bg-destructive/10 text-destructive border-destructive/30';
+
+  const handleSync = async () => {
+    setRefreshing(true);
+    try {
+      const { error } = await supabase.functions.invoke('weather-sync', { body: { nucleo_id: nucleo.id } });
+      if (error) throw error;
+      await refetch();
+      toast.success('Clima sincronizado');
+    } catch (e: any) {
+      toast.error('Falha ao sincronizar', { description: e.message });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleReconhecer = async () => {
+    if (!alertas.length) return;
+    const { error } = await supabase
+      .from('alertas_climaticos')
+      .update({ reconhecido_em: new Date().toISOString() })
+      .eq('nucleo_id', nucleo.id)
+      .is('reconhecido_em', null);
+    if (error) toast.error('Erro ao reconhecer'); else { toast.success('Alertas reconhecidos'); refetch(); }
+  };
+
+  const tempMinFc = forecast.length ? Math.min(...forecast.map((f: any) => f.temperatura_c).filter((v: any) => v != null)) : null;
+  const tempMaxFc = forecast.length ? Math.max(...forecast.map((f: any) => f.temperatura_c).filter((v: any) => v != null)) : null;
+  const probChuvaMax = forecast.length ? Math.max(...forecast.map((f: any) => f.prob_chuva_pct ?? 0)) : 0;
+  const ventoMaxFc = forecast.length ? Math.max(...forecast.map((f: any) => f.vento_kmh ?? 0)) : 0;
+
+  const galpaoStatus = (l: LeituraGalpao) => {
+    if (!l.ultima_leitura) return { icon: <WifiOff className="w-4 h-4 text-muted-foreground" />, txt: 'Sem sensor' };
+    const age = (Date.now() - new Date(l.ultima_leitura).getTime()) / 60_000;
+    if (age > 15) return { icon: <WifiOff className="w-4 h-4 text-destructive" />, txt: `Offline ${Math.round(age)}min` };
+    if (!conforto || l.temperatura_c == null) return { icon: <Activity className="w-4 h-4 text-muted-foreground" />, txt: '—' };
+    if (l.temperatura_c >= conforto.temp_max_critico || l.temperatura_c <= conforto.temp_min_critico)
+      return { icon: <AlertTriangle className="w-4 h-4 text-destructive" />, txt: 'Crítico' };
+    if (l.temperatura_c > conforto.temp_max_ok || l.temperatura_c < conforto.temp_min_ok)
+      return { icon: <AlertTriangle className="w-4 h-4 text-amber-500" />, txt: 'Atenção' };
+    return { icon: <CheckCircle2 className="w-4 h-4 text-green-600" />, txt: 'Conforto' };
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">{nucleo.nome}</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {nucleo.galpoes.length} galpão(ões){idadeDias != null ? ` • lote ${idadeDias}d` : ''}
+            </p>
+          </div>
+          <Badge variant="outline" className={sevBadge}>{severidade}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Externo */}
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Sun className="w-4 h-4 text-amber-500" />
+              <span className="font-medium">{observacao?.condicao_texto || 'Externo'}</span>
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {observacao ? new Date(observacao.observado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-xs">
+            <div className="flex items-center gap-1"><Thermometer className="w-3 h-3" /> {observacao?.temperatura_c?.toFixed(1) ?? '—'}°C</div>
+            <div className="flex items-center gap-1"><Droplets className="w-3 h-3" /> {observacao?.umidade_pct ?? '—'}%</div>
+            <div className="flex items-center gap-1"><Wind className="w-3 h-3" /> {observacao?.vento_kmh ?? '—'} km/h</div>
+            <div className="flex items-center gap-1"><CloudRain className="w-3 h-3" /> {observacao?.precipitacao_mm ?? 0} mm</div>
+          </div>
+          {forecast.length > 0 && (
+            <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
+              24h: {tempMinFc?.toFixed(0)}–{tempMaxFc?.toFixed(0)}°C • chuva {probChuvaMax}% • vento até {ventoMaxFc.toFixed(0)} km/h
+            </div>
+          )}
+        </div>
+
+        {/* Galpões IoT */}
+        <div>
+          <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+            <Activity className="w-3 h-3" /> Temperatura interna (IoT)
+          </div>
+          <div className="space-y-1.5">
+            <TooltipProvider>
+              {leituras.map(l => {
+                const st = galpaoStatus(l);
+                return (
+                  <Tooltip key={l.galpao_id}>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center justify-between text-sm rounded-md px-2 py-1.5 bg-card border">
+                        <span className="truncate flex-1">{l.galpao_nome}</span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-mono">
+                            {l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—'}
+                            {l.umidade_pct != null && <span className="text-muted-foreground"> / {l.umidade_pct.toFixed(0)}%</span>}
+                          </span>
+                          {st.icon}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        <div>{st.txt}</div>
+                        {conforto && <div>Conforto: {conforto.temp_min_ok}–{conforto.temp_max_ok}°C</div>}
+                        {l.ultima_leitura && <div>Leitura: {new Date(l.ultima_leitura).toLocaleString('pt-BR')}</div>}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
+            {leituras.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">Sem galpões cadastrados.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Alertas climáticos abertos */}
+        {alertas.length > 0 && (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> Alertas previstos ({alertas.length})
+            </div>
+            <div className="space-y-1">
+              {alertas.slice(0, 3).map((a: any) => (
+                <div key={a.id} className="text-xs rounded-md border-l-2 border-l-destructive bg-destructive/5 px-2 py-1.5">
+                  <div className="font-medium">{a.titulo}</div>
+                  <div className="text-muted-foreground">{a.mensagem}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Plano de prevenção */}
+        <div>
+          <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Plano de prevenção
+          </div>
+          {plano.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Sem ações recomendadas. Condições dentro do esperado.</p>
+          ) : (
+            <ol className="space-y-1.5">
+              {plano.slice(0, 6).map(p => (
+                <li key={p.id} className="text-xs rounded-md border bg-card p-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className={`${sevColor[p.prioridade]} text-[10px] px-1.5 py-0`}>{p.prioridade.toUpperCase()}</Badge>
+                    <span className="font-medium">{p.quando}</span>
+                    {p.galpao && <span className="text-muted-foreground">• {p.galpao}</span>}
+                  </div>
+                  <div className="font-medium">{p.acao}</div>
+                  <div className="text-muted-foreground">{p.motivo}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-wrap gap-2 pt-2 border-t">
+          <Button size="sm" variant="outline" onClick={handleSync} disabled={refreshing}>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Sincronizar
+          </Button>
+          {alertas.length > 0 && (
+            <Button size="sm" variant="outline" onClick={handleReconhecer}>
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Reconhecer
+            </Button>
+          )}
+          {loteRef && (
+            <Button size="sm" variant="default" className="ml-auto" onClick={() => navigate(`/veterinario/${loteRef.id}`)}>
+              Abrir lote <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function MonitoramentoClimaticoVet() {
+  const [nucleos, setNucleos] = useState<NucleoData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [integradoId, setIntegradoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: lotes } = await supabase
+        .from('lotes')
+        .select(`
+          id, data_alojamento, quantidade_aves, integrado_id,
+          galpao:galpoes!inner(
+            id, nome, inercia_termica_min, ventilador_quantidade,
+            nucleo:nucleos!inner(id, nome, tipo_producao)
+          )
+        `)
+        .in('status', ['alojado', 'previsao']);
+
+      if (!lotes || lotes.length === 0) { setLoading(false); return; }
+      setIntegradoId(lotes[0].integrado_id);
+
+      const map = new Map<string, NucleoData>();
+      lotes.forEach((l: any) => {
+        const g = l.galpao;
+        const n = g.nucleo;
+        if (!map.has(n.id)) map.set(n.id, { id: n.id, nome: n.nome, tipo_producao: n.tipo_producao, galpoes: [] });
+        const nuc = map.get(n.id)!;
+        if (!nuc.galpoes.find(x => x.id === g.id)) {
+          nuc.galpoes.push({
+            id: g.id, nome: g.nome,
+            inercia_termica_min: g.inercia_termica_min,
+            ventilador_quantidade: g.ventilador_quantidade,
+            lote: { id: l.id, data_alojamento: l.data_alojamento, quantidade_aves: l.quantidade_aves },
+          });
+        }
+      });
+      setNucleos(Array.from(map.values()));
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return <div className="text-center py-12 text-muted-foreground">Carregando monitoramento...</div>;
+  if (!nucleos.length) return (
+    <div className="text-center py-12 text-muted-foreground">
+      <Cloud className="w-12 h-12 mx-auto mb-3 opacity-30" />
+      <p>Nenhum núcleo com lote ativo.</p>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {nucleos.map(n => integradoId && (
+        <NucleoClimaCardVet key={n.id} nucleo={n} integradoId={integradoId} />
+      ))}
+    </div>
+  );
+}
