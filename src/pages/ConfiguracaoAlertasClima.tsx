@@ -15,37 +15,37 @@ import { z } from "zod";
 import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin, Activity } from "lucide-react";
 
 const alertaSchema = z.object({
-  temp_max_critico: z.number().min(-10, "Temp. máx. fora da faixa (-10 a 50°C)").max(50, "Temp. máx. fora da faixa (-10 a 50°C)").nullable(),
-  temp_min_critico: z.number().min(-20, "Temp. mín. fora da faixa (-20 a 40°C)").max(40, "Temp. mín. fora da faixa (-20 a 40°C)").nullable(),
-  ith_max_critico: z.number().min(50, "ITH deve estar entre 50 e 100").max(100, "ITH deve estar entre 50 e 100").nullable(),
-  vento_max_kmh: z.number().min(10, "Vento entre 10 e 200 km/h").max(200, "Vento entre 10 e 200 km/h").nullable(),
-  prob_chuva_min_pct: z.number().min(0, "Probabilidade entre 0 e 100%").max(100, "Probabilidade entre 0 e 100%").nullable(),
+  temp_max_critico: z.number().min(-10).max(50).nullable(),
+  temp_min_critico: z.number().min(-20).max(40).nullable(),
+  ith_max_critico: z.number().min(50).max(100).nullable(),
+  vento_max_kmh: z.number().min(10).max(200).nullable(),
+  prob_chuva_min_pct: z.number().min(0).max(100).nullable(),
   habilitar_calor: z.boolean(),
   habilitar_frio: z.boolean(),
   habilitar_ith: z.boolean(),
   habilitar_vento: z.boolean(),
   habilitar_chuva: z.boolean(),
+  habilitar_sensor_suspeito: z.boolean(),
+  sensor_offline_min: z.number().int().min(2, "Mínimo 2 min").max(120, "Máximo 120 min"),
+  sensor_estagnado_min: z.number().int().min(10, "Mínimo 10 min").max(720, "Máximo 720 min"),
+  ur_suspeita_baixa_pct: z.number().int().min(0).max(50, "Limite inferior até 50%"),
+  ur_suspeita_alta_pct: z.number().int().min(50, "Limite superior a partir de 50%").max(100),
+  ur_divergencia_pp: z.number().int().min(5, "Mínimo 5 pp").max(80, "Máximo 80 pp"),
+  divergencia_temp_c: z.number().min(1, "Mínimo 1°C").max(15, "Máximo 15°C"),
 }).superRefine((d, ctx) => {
-  if (d.habilitar_calor && d.temp_max_critico == null) {
-    ctx.addIssue({ code: "custom", message: "Informe a temperatura máxima crítica" });
-  }
-  if (d.habilitar_frio && d.temp_min_critico == null) {
-    ctx.addIssue({ code: "custom", message: "Informe a temperatura mínima crítica" });
-  }
-  if (d.habilitar_ith && d.ith_max_critico == null) {
-    ctx.addIssue({ code: "custom", message: "Informe o ITH máximo" });
-  }
-  if (d.habilitar_vento && d.vento_max_kmh == null) {
-    ctx.addIssue({ code: "custom", message: "Informe o vento máximo" });
-  }
-  if (d.habilitar_chuva && d.prob_chuva_min_pct == null) {
-    ctx.addIssue({ code: "custom", message: "Informe a probabilidade mínima de chuva" });
-  }
+  if (d.habilitar_calor && d.temp_max_critico == null) ctx.addIssue({ code: "custom", message: "Informe a temperatura máxima crítica" });
+  if (d.habilitar_frio && d.temp_min_critico == null) ctx.addIssue({ code: "custom", message: "Informe a temperatura mínima crítica" });
+  if (d.habilitar_ith && d.ith_max_critico == null) ctx.addIssue({ code: "custom", message: "Informe o ITH máximo" });
+  if (d.habilitar_vento && d.vento_max_kmh == null) ctx.addIssue({ code: "custom", message: "Informe o vento máximo" });
+  if (d.habilitar_chuva && d.prob_chuva_min_pct == null) ctx.addIssue({ code: "custom", message: "Informe a probabilidade mínima de chuva" });
   if (d.temp_min_critico != null && d.temp_max_critico != null && d.temp_min_critico >= d.temp_max_critico) {
     ctx.addIssue({ code: "custom", message: "Temperatura mínima deve ser menor que a máxima" });
   }
   if (d.temp_max_critico != null && d.temp_min_critico != null && (d.temp_max_critico - d.temp_min_critico) < 3) {
     ctx.addIssue({ code: "custom", message: "Diferença entre temp. mín. e máx. deve ser de pelo menos 3°C" });
+  }
+  if (d.ur_suspeita_baixa_pct >= d.ur_suspeita_alta_pct) {
+    ctx.addIssue({ code: "custom", message: "UR suspeita baixa deve ser menor que a alta" });
   }
 });
 
@@ -62,6 +62,13 @@ interface AlertaConfig {
   habilitar_ith: boolean;
   habilitar_vento: boolean;
   habilitar_chuva: boolean;
+  habilitar_sensor_suspeito: boolean;
+  sensor_offline_min: number;
+  sensor_estagnado_min: number;
+  ur_suspeita_baixa_pct: number;
+  ur_suspeita_alta_pct: number;
+  ur_divergencia_pp: number;
+  divergencia_temp_c: number;
 }
 
 const DEFAULTS: AlertaConfig = {
@@ -76,6 +83,13 @@ const DEFAULTS: AlertaConfig = {
   habilitar_ith: true,
   habilitar_vento: true,
   habilitar_chuva: false,
+  habilitar_sensor_suspeito: true,
+  sensor_offline_min: 15,
+  sensor_estagnado_min: 60,
+  ur_suspeita_baixa_pct: 0,
+  ur_suspeita_alta_pct: 100,
+  ur_divergencia_pp: 20,
+  divergencia_temp_c: 5,
 };
 
 const ConfiguracaoAlertasClima = () => {
