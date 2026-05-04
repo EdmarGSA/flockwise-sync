@@ -237,21 +237,22 @@ Deno.serve(async (req) => {
 
       const mudouEstado = canal.estado_atual !== estadoDesejado;
       const mudouIntensidade = canal.suporta_dimer && (canal.intensidade_atual ?? 0) !== intensidade;
-      if (!mudouEstado && !mudouIntensidade) continue;
+      const precisaReconciliar = canal.recuperacao_apos_falha === true;
+      if (!mudouEstado && !mudouIntensidade && !precisaReconciliar) continue;
 
       acoes++;
-      log.push({ canal: canal.id, motivo, estado: estadoDesejado, intensidade });
+      log.push({ canal: canal.id, motivo, estado: estadoDesejado, intensidade, reconciliacao: precisaReconciliar });
 
       // Auditoria: registra mudança de estado em historico_estado_canal
-      if (mudouEstado) {
+      if (mudouEstado || precisaReconciliar) {
         await supabase.from("historico_estado_canal").insert({
           canal_id: canal.id,
           integrado_id: canal.integrado_id,
           estado: estadoDesejado,
           ligado_em: estadoDesejado === "on" ? new Date().toISOString() : null,
           desligado_em: estadoDesejado === "off" ? new Date().toISOString() : null,
-          motivo: ovr ? "override" : "programa",
-          contexto: { motivo, intensidade, lote_id: lote.id },
+          motivo: precisaReconciliar ? "reconciliacao_pos_falha" : (ovr ? "override" : "programa"),
+          contexto: { motivo, intensidade, lote_id: lote.id, reconciliacao: precisaReconciliar },
         });
       }
 
@@ -265,7 +266,6 @@ Deno.serve(async (req) => {
           },
         });
       } else {
-        // eWeLink: on/off apenas (sem dimer)
         await supabase.functions.invoke("sync-sensors", {
           body: {
             action: "control-device",
@@ -277,6 +277,19 @@ Deno.serve(async (req) => {
         await supabase.from("canais_dispositivo")
           .update({ estado_atual: estadoDesejado, ultimo_comando_em: new Date().toISOString() })
           .eq("id", canal.id);
+      }
+
+      // Limpa flag e registra evento de reconciliação
+      if (precisaReconciliar) {
+        await supabase.from("canais_dispositivo")
+          .update({ recuperacao_apos_falha: false })
+          .eq("id", canal.id);
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: dev.id,
+          integrado_id: canal.integrado_id,
+          tipo: "reconciliacao",
+          detalhes: { canal_id: canal.id, estado: estadoDesejado, intensidade, motivo },
+        });
       }
     }
 
