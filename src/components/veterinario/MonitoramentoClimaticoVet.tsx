@@ -202,6 +202,7 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         if (!cancel) setSeries(seriesMap);
       }
 
+      const ls: LeituraGalpao[] = nucleo.galpoes.map(g => {
         const sensores = sensoresPorGalpao.get(g.id) ?? [];
         const tempsValidas = sensores
           .map(s => s.temperatura_c)
