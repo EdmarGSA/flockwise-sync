@@ -495,7 +495,7 @@ Deno.serve(async (req) => {
 
     const { data: lotes, error: lotesErr } = await supabase
       .from("lotes")
-      .select("id, integrado_id, galpao_id, data_alojamento")
+      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id")
       .eq("status", "alojado")
       .not("data_alojamento", "is", null)
       .not("galpao_id", "is", null);
@@ -528,7 +528,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      // Get temperature rules (needed for alerts even without token)
+      // Fallback: regras grossas por faixa (usado quando lote não tem curva vinculada)
       const { data: regras } = await supabase
         .from("regras_temperatura_lote")
         .select("*")
@@ -536,8 +536,31 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .order("dia_inicio", { ascending: true });
 
-      if (!regras || regras.length === 0) {
-        console.log(`auto-temperatura: no rules for integrado ${integradoId}, skipping`);
+      // ── Padrão-ouro: histerese da org ──
+      const { data: histRow } = await supabase
+        .from("config_histerese_organizacao")
+        .select("*")
+        .eq("integrado_id", integradoId)
+        .maybeSingle();
+      const hist: HistereseConfig = { ...DEFAULT_HISTERESE, ...(histRow || {}) };
+
+      // ── Carrega pontos das curvas vinculadas aos lotes ──
+      const curvaIds = Array.from(new Set(integradoLotes.map((l: any) => l.curva_climatica_id).filter(Boolean)));
+      const pontosByCurva = new Map<string, Map<number, PontoCurva>>();
+      if (curvaIds.length > 0) {
+        const { data: pts } = await supabase
+          .from("curva_climatica_ponto")
+          .select("curva_id, dia_idade, temp_alvo_c, temp_min_alarme_c, temp_max_alarme_c, ur_max_pct, ith_alarme_amarelo, ith_alarme_vermelho")
+          .in("curva_id", curvaIds);
+        for (const p of (pts || [])) {
+          const m = pontosByCurva.get(p.curva_id) || new Map<number, PontoCurva>();
+          m.set(p.dia_idade, p as PontoCurva);
+          pontosByCurva.set(p.curva_id, m);
+        }
+      }
+
+      if ((!regras || regras.length === 0) && curvaIds.length === 0) {
+        console.log(`auto-temperatura: nenhuma regra nem curva para org ${integradoId}, pulando`);
         continue;
       }
 
