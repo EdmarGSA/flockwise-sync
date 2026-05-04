@@ -1,23 +1,40 @@
-## Problema
+## Diagnóstico
 
-Em `/meus-lotes/:id`, o card "Iluminação Granja" mostra **Desligado** mesmo com o dispositivo realmente ligado (e a página `/dispositivos-iot` mostra **Ligado** corretamente).
+O card mostra `NaN°` em Temperatura e `NaN%` em UR porque está lendo campos errados:
 
-**Causa raiz:** em `TemperaturaUmidadeCard.tsx`, o estado on/off vem de `fetchDeviceStatus()` (poll eWeLink → campo `switch`). Para o dispositivo `Iluminação Granja` (Sonoff multi-canal, driver `ewelink`), esse polling não retorna um campo `switch` único — o estado real fica em `switches[]` por canal. Resultado: `switchState = null` ou `'off'`, exibindo "Desligado".
+- Código: `observacao.temp_c` e `observacao.ur_pct`
+- Banco (`weather_observacoes`): `temperatura_c` e `umidade_pct`
 
-Já a tela de IoT lê o estado correto de `canais_dispositivo.estado_atual` (atualizado por telemetria/comando), por isso aparece "Ligado".
+O mesmo erro está no cálculo de min/max das próximas 12h (`f.temp_c` em vez de `f.temperatura_c`), causando o `99° → -99°` que aparece quando os valores não são lidos.
 
-## Solução
+A condição do tempo (sol/chuva/nublado) já é gravada em `condicao_codigo` (padrão WMO do Open-Meteo), mas o card nunca exibe essa informação.
 
-Em `src/components/lotes/TemperaturaUmidadeCard.tsx`, para dispositivos de iluminação, **priorizar `canais_dispositivo.estado_atual`** sobre o `switch` retornado pelo poll eWeLink:
+## Correções
 
-1. Incluir `estado_atual` no `select` do batch de `canais_dispositivo`.
-2. Guardar `estadoAtual` no `canaisMap`.
-3. Ao montar o objeto do dispositivo:
-   - Se `isIluminacao`: `switchState = canal.estadoAtual ?? statusResult.switch`.
-   - Caso contrário: comportamento atual (do polling).
+**`src/components/campo/ClimaNucleoCard.tsx`**
 
-Sem mudanças em banco, hooks ou em outros componentes. Apenas ajuste de fonte de verdade do estado para iluminação.
+1. **Renomear leituras dos campos** para os nomes reais do banco:
+   - `observacao.temp_c` → `observacao.temperatura_c`
+   - `observacao.ur_pct` → `observacao.umidade_pct`
+   - `f.temp_c` → `f.temperatura_c` no reduce de min/max
 
-## Arquivos afetados
+2. **Adicionar bloco de condição atual** (chuva/sol/nublado) no topo do card, ao lado do nome do núcleo:
+   - Mapear `condicao_codigo` (WMO) para ícone + texto: 0 = Céu limpo, 1-2 = Parcialmente nublado, 3 = Nublado, 45-48 = Neblina, 51-57 = Garoa, 61-67 = Chuva, 71-77 = Neve, 80-82 = Pancadas de chuva, 95+ = Tempestade.
 
-- `src/components/lotes/TemperaturaUmidadeCard.tsx`
+3. **Adicionar probabilidade de chuva nas próximas horas**: usar `forecast[0..12].prob_chuva_pct` (já existe na tabela `weather_forecast_horario`) — exibir o valor máximo das próximas 12h junto da faixa de temperatura.
+
+## Resultado esperado
+
+```text
+☁ Clima Marcia Fernandes Alvare        22:58 ↻
+   Nublado · 23°C
+   23°  93%   10    0
+   Temp  UR  km/h  UV
+   ─────────────────────
+   Nascer: 05:44   Pôr: 17:22
+   Próximas 12h: 19° → 24° · 30% chuva
+   ─────────────────────
+   ✓ Sync: 03/05, 22:58 (manual)
+```
+
+Sem alteração de schema ou edge function — apenas correção de nomes de campos no componente React.

@@ -2,7 +2,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useClimaNucleo } from "@/hooks/useClimaNucleo";
-import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset, CheckCircle2, XCircle, Clock, CloudRain, CloudSnow, CloudFog, CloudLightning, CloudSun } from "lucide-react";
+
+const condicaoWMO = (code?: number | null): { texto: string; Icon: any; cor: string } => {
+  if (code == null) return { texto: "—", Icon: Cloud, cor: "text-muted-foreground" };
+  if (code === 0) return { texto: "Céu limpo", Icon: Sun, cor: "text-yellow-500" };
+  if (code <= 2) return { texto: "Parcialmente nublado", Icon: CloudSun, cor: "text-yellow-400" };
+  if (code === 3) return { texto: "Nublado", Icon: Cloud, cor: "text-slate-400" };
+  if (code >= 45 && code <= 48) return { texto: "Neblina", Icon: CloudFog, cor: "text-slate-400" };
+  if (code >= 51 && code <= 57) return { texto: "Garoa", Icon: CloudRain, cor: "text-blue-400" };
+  if (code >= 61 && code <= 67) return { texto: "Chuva", Icon: CloudRain, cor: "text-blue-500" };
+  if (code >= 71 && code <= 77) return { texto: "Neve", Icon: CloudSnow, cor: "text-cyan-300" };
+  if (code >= 80 && code <= 82) return { texto: "Pancadas de chuva", Icon: CloudRain, cor: "text-blue-600" };
+  if (code >= 85 && code <= 86) return { texto: "Pancadas de neve", Icon: CloudSnow, cor: "text-cyan-300" };
+  if (code >= 95) return { texto: "Tempestade", Icon: CloudLightning, cor: "text-purple-500" };
+  return { texto: "—", Icon: Cloud, cor: "text-muted-foreground" };
+};
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -95,8 +110,10 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
     );
   }
 
-  const proxMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.temp_c) || -99), -99);
-  const proxMin = forecast.slice(0, 12).reduce((a, f) => Math.min(a, Number(f.temp_c) || 99), 99);
+  const proxMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.temperatura_c) || -99), -99);
+  const proxMin = forecast.slice(0, 12).reduce((a, f) => Math.min(a, Number(f.temperatura_c) || 99), 99);
+  const probChuvaMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.prob_chuva_pct) || 0), 0);
+  const cond = condicaoWMO(observacao.condicao_codigo);
 
   return (
     <Card>
@@ -112,20 +129,25 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex items-center gap-2 text-sm">
+          <cond.Icon className={`h-5 w-5 ${cond.cor}`} />
+          <span className="font-medium text-foreground">{cond.texto}</span>
+        </div>
+
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
             <ThermometerSun className="h-4 w-4 mx-auto text-orange-500" />
-            <p className="text-xl font-bold">{Number(observacao.temp_c).toFixed(0)}°</p>
+            <p className="text-xl font-bold">{observacao.temperatura_c != null ? `${Number(observacao.temperatura_c).toFixed(0)}°` : "—"}</p>
             <p className="text-[10px] text-muted-foreground">Temp</p>
           </div>
           <div>
             <Droplets className="h-4 w-4 mx-auto text-blue-500" />
-            <p className="text-xl font-bold">{Number(observacao.ur_pct).toFixed(0)}%</p>
+            <p className="text-xl font-bold">{observacao.umidade_pct != null ? `${Number(observacao.umidade_pct).toFixed(0)}%` : "—"}</p>
             <p className="text-[10px] text-muted-foreground">UR</p>
           </div>
           <div>
             <Wind className="h-4 w-4 mx-auto text-cyan-500" />
-            <p className="text-xl font-bold">{Number(observacao.vento_kmh).toFixed(0)}</p>
+            <p className="text-xl font-bold">{observacao.vento_kmh != null ? Number(observacao.vento_kmh).toFixed(0) : "—"}</p>
             <p className="text-[10px] text-muted-foreground">km/h</p>
           </div>
           <div>
@@ -151,8 +173,13 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
         )}
 
         {forecast.length > 0 && (
-          <div className="text-xs text-muted-foreground border-t pt-2">
-            Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span>
+          <div className="text-xs text-muted-foreground border-t pt-2 flex items-center justify-between gap-2">
+            <span>Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span></span>
+            {probChuvaMax > 0 && (
+              <span className="flex items-center gap-1 text-blue-500">
+                <CloudRain className="h-3 w-3" /> {probChuvaMax}% chuva
+              </span>
+            )}
           </div>
         )}
 
