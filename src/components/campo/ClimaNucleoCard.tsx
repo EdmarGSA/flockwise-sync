@@ -110,8 +110,10 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
     );
   }
 
-  const proxMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.temp_c) || -99), -99);
-  const proxMin = forecast.slice(0, 12).reduce((a, f) => Math.min(a, Number(f.temp_c) || 99), 99);
+  const proxMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.temperatura_c) || -99), -99);
+  const proxMin = forecast.slice(0, 12).reduce((a, f) => Math.min(a, Number(f.temperatura_c) || 99), 99);
+  const probChuvaMax = forecast.slice(0, 12).reduce((a, f) => Math.max(a, Number(f.prob_chuva_pct) || 0), 0);
+  const cond = condicaoWMO(observacao.condicao_codigo);
 
   return (
     <Card>
