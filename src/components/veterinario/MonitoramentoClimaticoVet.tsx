@@ -269,10 +269,13 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
   const probChuvaMax = forecast.length ? Math.max(...forecast.map((f: any) => f.prob_chuva_pct ?? 0)) : 0;
   const ventoMaxFc = forecast.length ? Math.max(...forecast.map((f: any) => f.vento_kmh ?? 0)) : 0;
 
+  const offlineMinCfg = (override as any)?.sensor_offline_min ?? 15;
+  const divergMinCfg = Number((override as any)?.divergencia_temp_c ?? 5);
+
   const galpaoStatus = (l: LeituraGalpao) => {
     if (!l.ultima_leitura) return { icon: <WifiOff className="w-4 h-4 text-muted-foreground" />, txt: 'Sem sensor' };
     const age = (Date.now() - new Date(l.ultima_leitura).getTime()) / 60_000;
-    if (age > 15) return { icon: <WifiOff className="w-4 h-4 text-destructive" />, txt: `Offline ${Math.round(age)}min` };
+    if (age > offlineMinCfg) return { icon: <WifiOff className="w-4 h-4 text-destructive" />, txt: `Offline ${Math.round(age)}min` };
     if (!conforto || l.temperatura_c == null) return { icon: <Activity className="w-4 h-4 text-muted-foreground" />, txt: '—' };
     if (l.temperatura_c >= conforto.temp_max_critico || l.temperatura_c <= conforto.temp_min_critico)
       return { icon: <AlertTriangle className="w-4 h-4 text-destructive" />, txt: 'Crítico' };
