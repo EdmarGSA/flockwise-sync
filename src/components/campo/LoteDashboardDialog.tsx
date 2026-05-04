@@ -19,11 +19,11 @@ export function LoteDashboardDialog({ lote, onSuccess, onCancel }: LoteDashboard
 
   const showDashboard = lote.status !== 'previsao';
   const showClima = showDashboard && !!(lote as any).nucleo_id;
-  const cols = 1 + (showDashboard ? 1 : 0) + (showClima ? 1 : 0);
+  const colsClass = showClima ? 'grid-cols-3' : showDashboard ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className={`grid w-full grid-cols-${cols}`}>
+      <TabsList className={`grid w-full ${colsClass}`}>
         <TabsTrigger value="editar" className="flex items-center gap-2">
           <Pencil className="w-4 h-4" /> Editar Lote
         </TabsTrigger>
