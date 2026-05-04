@@ -135,10 +135,24 @@ const ConfiguracaoAlertasClima = () => {
 
   const handleSave = async (key: string) => {
     if (!integradoId) return;
-    setSaving(true);
     const cfg = getCfg(key);
-    const payload: any = {
-      integrado_id: integradoId,
+    const parsed = alertaSchema.safeParse({
+      temp_max_critico: cfg.temp_max_critico,
+      temp_min_critico: cfg.temp_min_critico,
+      ith_max_critico: cfg.ith_max_critico,
+      vento_max_kmh: cfg.vento_max_kmh,
+      prob_chuva_min_pct: cfg.prob_chuva_min_pct,
+      habilitar_calor: cfg.habilitar_calor,
+      habilitar_frio: cfg.habilitar_frio,
+      habilitar_ith: cfg.habilitar_ith,
+      habilitar_vento: cfg.habilitar_vento,
+      habilitar_chuva: cfg.habilitar_chuva,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Valores inválidos");
+      return;
+    }
+    setSaving(true);
       nucleo_id: key === "default" ? null : key,
       temp_max_critico: cfg.temp_max_critico,
       temp_min_critico: cfg.temp_min_critico,
