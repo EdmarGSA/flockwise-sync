@@ -169,6 +169,13 @@ const ConfiguracaoAlertasClima = () => {
       habilitar_ith: cfg.habilitar_ith,
       habilitar_vento: cfg.habilitar_vento,
       habilitar_chuva: cfg.habilitar_chuva,
+      habilitar_sensor_suspeito: cfg.habilitar_sensor_suspeito,
+      sensor_offline_min: cfg.sensor_offline_min,
+      sensor_estagnado_min: cfg.sensor_estagnado_min,
+      ur_suspeita_baixa_pct: cfg.ur_suspeita_baixa_pct,
+      ur_suspeita_alta_pct: cfg.ur_suspeita_alta_pct,
+      ur_divergencia_pp: cfg.ur_divergencia_pp,
+      divergencia_temp_c: cfg.divergencia_temp_c,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Valores inválidos");
@@ -188,6 +195,13 @@ const ConfiguracaoAlertasClima = () => {
       habilitar_ith: cfg.habilitar_ith,
       habilitar_vento: cfg.habilitar_vento,
       habilitar_chuva: cfg.habilitar_chuva,
+      habilitar_sensor_suspeito: cfg.habilitar_sensor_suspeito,
+      sensor_offline_min: cfg.sensor_offline_min,
+      sensor_estagnado_min: cfg.sensor_estagnado_min,
+      ur_suspeita_baixa_pct: cfg.ur_suspeita_baixa_pct,
+      ur_suspeita_alta_pct: cfg.ur_suspeita_alta_pct,
+      ur_divergencia_pp: cfg.ur_divergencia_pp,
+      divergencia_temp_c: cfg.divergencia_temp_c,
     };
     const { data, error } = await supabase
       .from("nucleo_alertas_config")
