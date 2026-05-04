@@ -19,20 +19,24 @@ const json = (body: unknown, status = 200) =>
   });
 
 interface TelemetryPayload {
-  deviceId: string;            // device_id_ewelink (reaproveitando o campo)
+  deviceId: string;
   temperature?: number | null;
   humidity?: number | null;
   online?: boolean;
   channels?: Array<{
     canal: number;
     estado: "on" | "off";
+    intensidade_pct?: number;
   }>;
+  boot_reason?: "power_on" | "watchdog" | "manual" | "software" | "brownout" | "unknown";
+  uptime_s?: number;
+  programa_versao_aplicada?: string;
   raw?: Record<string, unknown>;
 }
 
 interface CommandPayload {
-  dispositivoId?: string;      // public.dispositivos_iot.id
-  canalId?: string;            // public.canais_dispositivo.id
+  dispositivoId?: string;
+  canalId?: string;
   acao: "ligar" | "desligar";
 }
 
