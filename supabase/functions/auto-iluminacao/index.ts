@@ -119,13 +119,32 @@ Deno.serve(async (req) => {
     const galpaoIds = [...new Set(canais.map((c: any) => c.dispositivos_iot?.galpao_id).filter(Boolean))];
     const { data: lotes } = await supabase
       .from("lotes")
-      .select("id, galpao_id, integrado_id, data_alojamento, programa_iluminacao_id")
+      .select("id, galpao_id, integrado_id, data_alojamento, programa_iluminacao_id, galpoes!inner(nucleo_id)")
       .in("galpao_id", galpaoIds)
       .eq("status", "alojado")
       .not("data_alojamento", "is", null);
 
     const loteByGalpao = new Map<string, any>();
-    for (const l of lotes ?? []) loteByGalpao.set(l.galpao_id, l);
+    const nucleoByGalpao = new Map<string, string>();
+    for (const l of (lotes ?? []) as any[]) {
+      loteByGalpao.set(l.galpao_id, l);
+      if (l.galpoes?.nucleo_id) nucleoByGalpao.set(l.galpao_id, l.galpoes.nucleo_id);
+    }
+
+    // Solar de hoje por núcleo
+    const hoje = new Date().toISOString().slice(0, 10);
+    const nucleoIds = [...new Set([...nucleoByGalpao.values()])];
+    const { data: solarHoje } = nucleoIds.length
+      ? await supabase.from("solar_diario").select("nucleo_id, nascer_sol, por_sol").eq("data", hoje).in("nucleo_id", nucleoIds)
+      : { data: [] as any[] };
+    const solarByNucleo = new Map<string, { nascer: Date | null; por: Date | null }>();
+    for (const s of (solarHoje ?? []) as any[]) {
+      solarByNucleo.set(s.nucleo_id, {
+        nascer: s.nascer_sol ? new Date(s.nascer_sol) : null,
+        por: s.por_sol ? new Date(s.por_sol) : null,
+      });
+    }
+
 
     // 3) Programas e faixas (carrega todos de uma vez)
     const integradoIds = [...new Set(canais.map((c: any) => c.integrado_id))];
