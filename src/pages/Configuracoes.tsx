@@ -125,6 +125,12 @@ const Configuracoes = () => {
       path: "/configuracoes/recuperacao-iot"
     },
     {
+      title: "Alertas Climáticos",
+      description: "Limites de temperatura, ITH, vento e chuva por núcleo",
+      icon: CloudSun,
+      path: "/configuracoes/alertas-clima"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
