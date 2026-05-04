@@ -86,7 +86,21 @@ export function AlertasClimaticosBar() {
       .sort((a, b) => (SEV_ORDER[a.severidade] ?? 9) - (SEV_ORDER[b.severidade] ?? 9));
   }, [alertas, nucleoFiltro, sevFiltro]);
 
-  if (alertas.length === 0) return null;
+  if (alertas.length === 0) {
+    return (
+      <Card className="mb-4 border-muted bg-muted/30">
+        <CardContent className="py-2.5 px-4">
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <CloudAlert className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+            <span>
+              <span className="font-medium text-foreground">Sem alertas climáticos ativos.</span>{' '}
+              Avaliamos a previsão dos próximos 3 dias a cada sincronização e geramos alertas para picos de calor (acima do crítico do núcleo), frio extremo, ITH alto e vento forte (≥ 50 km/h).
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const visiveis = expandido ? filtrados : filtrados.slice(0, 3);
   const criticos = filtrados.filter(a => a.severidade === 'critico' || a.severidade === 'alto').length;
