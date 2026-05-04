@@ -27,6 +27,9 @@ interface Dispositivo {
   automacao_ativa: boolean;
   funcao_automacao: string;
   ultimo_sync: string | null;
+  ultima_inicializacao?: string | null;
+  boot_count?: number | null;
+  ultimo_boot_reason?: string | null;
 }
 
 interface Galpao { id: string; nome: string }
@@ -210,6 +213,18 @@ export function DispositivoIluminacaoCard({
             <Clock className="h-3 w-3" />
             Última sinc: {formatDistanceToNow(new Date(dev.ultimo_sync), { addSuffix: true, locale: ptBR })}
           </p>
+        )}
+
+        {/* Recuperação após queda de energia/internet */}
+        {dev.ultima_inicializacao && (Date.now() - new Date(dev.ultima_inicializacao).getTime()) < 6 * 3600_000 && (
+          <div className="text-[11px] text-amber-700 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1 flex items-center gap-1.5">
+            <AlertTriangle className="h-3 w-3" />
+            Recuperação após reinício {formatDistanceToNow(new Date(dev.ultima_inicializacao), { addSuffix: true, locale: ptBR })}
+            {dev.ultimo_boot_reason && <span className="opacity-75">· {dev.ultimo_boot_reason}</span>}
+            {typeof dev.boot_count === 'number' && dev.boot_count > 0 && (
+              <span className="opacity-75">· total {dev.boot_count}</span>
+            )}
+          </div>
         )}
 
         {/* Switch manual + override */}

@@ -19,20 +19,24 @@ const json = (body: unknown, status = 200) =>
   });
 
 interface TelemetryPayload {
-  deviceId: string;            // device_id_ewelink (reaproveitando o campo)
+  deviceId: string;
   temperature?: number | null;
   humidity?: number | null;
   online?: boolean;
   channels?: Array<{
     canal: number;
     estado: "on" | "off";
+    intensidade_pct?: number;
   }>;
+  boot_reason?: "power_on" | "watchdog" | "manual" | "software" | "brownout" | "unknown";
+  uptime_s?: number;
+  programa_versao_aplicada?: string;
   raw?: Record<string, unknown>;
 }
 
 interface CommandPayload {
-  dispositivoId?: string;      // public.dispositivos_iot.id
-  canalId?: string;            // public.canais_dispositivo.id
+  dispositivoId?: string;
+  canalId?: string;
   acao: "ligar" | "desligar";
 }
 
@@ -62,6 +66,68 @@ function calcularTimerSeguranca(
   return null;
 }
 
+// ────────────────────────────────────────────────────────────
+// Schedule 24h por canal — fonte da verdade offline para o ESP32
+// ────────────────────────────────────────────────────────────
+interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
+interface Faixa {
+  dia_inicio: number; dia_fim: number; horas_luz: number;
+  blocos: Bloco[]; ramp_up_min: number; ramp_down_min: number; intensidade_pct: number;
+}
+interface ScheduleSlot { hora_inicio: string; hora_fim: string; intensidade_pct: number }
+
+function montarSchedule24h(faixa: Faixa | null): ScheduleSlot[] {
+  if (!faixa || !faixa.blocos?.length) return [];
+  const out: ScheduleSlot[] = [];
+  for (const b of faixa.blocos) {
+    out.push({
+      hora_inicio: b.acender,
+      hora_fim: b.apagar,
+      intensidade_pct: Math.min(b.intensidade_pct ?? faixa.intensidade_pct, faixa.intensidade_pct),
+    });
+  }
+  return out;
+}
+
+async function carregarFaixaAtiva(
+  supabase: any,
+  loteId: string,
+  integradoId: string,
+  programaIdLote: string | null,
+  idadeDias: number,
+): Promise<Faixa | null> {
+  let programaId = programaIdLote;
+  if (!programaId) {
+    const { data: defp } = await supabase
+      .from("programa_iluminacao_lote")
+      .select("id")
+      .eq("integrado_id", integradoId)
+      .eq("tipo_producao", "frango_corte")
+      .eq("is_default", true)
+      .eq("ativo", true)
+      .maybeSingle();
+    programaId = defp?.id ?? null;
+  }
+  if (!programaId) return null;
+  const { data: faixa } = await supabase
+    .from("programa_iluminacao_faixa")
+    .select("*")
+    .eq("programa_id", programaId)
+    .lte("dia_inicio", idadeDias)
+    .gte("dia_fim", idadeDias)
+    .maybeSingle();
+  return (faixa as Faixa) ?? null;
+}
+
+function gerarVersaoSchedule(slots: Record<string, ScheduleSlot[]>): string {
+  const json = JSON.stringify(slots);
+  let hash = 0;
+  for (let i = 0; i < json.length; i++) {
+    hash = ((hash << 5) - hash + json.charCodeAt(i)) | 0;
+  }
+  return `v${Math.abs(hash).toString(36)}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -84,21 +150,36 @@ Deno.serve(async (req) => {
 
       const { data: device } = await supabase
         .from("dispositivos_iot")
-        .select("id, nome, num_canais, auth_token, galpao_id")
+        .select("id, nome, num_canais, auth_token, galpao_id, integrado_id, online")
         .eq("device_id_ewelink", deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
       if (!device) return json({ error: "Dispositivo não registrado" }, 404);
 
+      // Marca online + atualiza ultimo_sync
+      const wasOffline = device.online === false;
+      await supabase
+        .from("dispositivos_iot")
+        .update({ ultimo_sync: new Date().toISOString(), online: true })
+        .eq("id", device.id);
+
+      if (wasOffline) {
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "online",
+          detalhes: { fonte: "config_poll" },
+        });
+      }
+
       const { data: canais } = await supabase
         .from("canais_dispositivo")
-        .select("canal_numero, nome, tipo_equipamento, funcao_automacao, automacao_ativa, estado_atual")
+        .select("id, canal_numero, nome, tipo_equipamento, funcao_automacao, automacao_ativa, estado_atual, suporta_dimer, intensidade_atual, integrado_id")
         .eq("dispositivo_id", device.id)
         .eq("ativo", true)
         .order("canal_numero");
 
-      // Fallback offline: timers de segurança baseados na idade do lote ativo
       let safety_timers: Array<{
         canal: number;
         funcao: string;
@@ -106,15 +187,18 @@ Deno.serve(async (req) => {
         hora_fim: string;
         estado: "on" | "off";
       }> = [];
+      const schedule_24h: Record<string, ScheduleSlot[]> = {};
+      let lote: any = null;
 
       if (device.galpao_id) {
-        const { data: lote } = await supabase
+        const { data: l } = await supabase
           .from("lotes")
-          .select("data_alojamento")
+          .select("id, integrado_id, data_alojamento, programa_iluminacao_id")
           .eq("galpao_id", device.galpao_id)
           .eq("status", "alojado")
           .not("data_alojamento", "is", null)
           .maybeSingle();
+        lote = l;
 
         if (lote?.data_alojamento) {
           const idade = Math.max(
@@ -124,15 +208,48 @@ Deno.serve(async (req) => {
           for (const c of canais ?? []) {
             const t = calcularTimerSeguranca(idade, (c as any).funcao_automacao);
             if (t) safety_timers.push({ canal: (c as any).canal_numero, ...t });
+
+            // Schedule 24h apenas para canais de iluminação com automação ativa
+            if ((c as any).tipo_equipamento === "iluminacao" && (c as any).automacao_ativa) {
+              const faixa = await carregarFaixaAtiva(
+                supabase, lote.id, lote.integrado_id,
+                lote.programa_iluminacao_id, idade,
+              );
+              schedule_24h[String((c as any).canal_numero)] = montarSchedule24h(faixa);
+            }
           }
         }
       }
 
+      const programa_versao = gerarVersaoSchedule(schedule_24h);
+
+      // Persiste versão (se mudou) para que o ESP32 saiba quando regravar a NVS
+      if (programa_versao && (device as any).programa_versao !== programa_versao) {
+        await supabase
+          .from("dispositivos_iot")
+          .update({ programa_versao })
+          .eq("id", device.id);
+      }
+
+      const now = new Date();
       return json({
         device: { id: device.id, nome: device.nome, galpao_id: device.galpao_id },
         canais: canais || [],
         intervalo_telemetria_seg: 60,
         safety_timers,
+        schedule_24h,
+        programa_versao,
+        rtc: {
+          utc_iso: now.toISOString(),
+          utc_epoch_s: Math.floor(now.getTime() / 1000),
+          tz: "America/Sao_Paulo",
+          tz_offset_min: -180,
+        },
+        politica_recuperacao: {
+          restaurar_ultimo_estado: true,
+          aplicar_schedule_offline: true,
+          max_horas_sem_sync_para_safety: 24,
+        },
       });
     }
 
@@ -145,7 +262,7 @@ Deno.serve(async (req) => {
 
       const { data: device } = await supabase
         .from("dispositivos_iot")
-        .select("id, nome, auth_token")
+        .select("id, nome, auth_token, integrado_id, online, boot_count, ultima_inicializacao")
         .eq("device_id_ewelink", body.deviceId)
         .eq("ativo", true)
         .maybeSingle();
@@ -154,7 +271,6 @@ Deno.serve(async (req) => {
         return json({ message: "Dispositivo não registrado, ignorando" }, 200);
       }
 
-      // Validação simples de token (opcional, recomendado em produção)
       if (device.auth_token) {
         const provided = req.headers.get("x-device-token");
         if (provided !== device.auth_token) {
@@ -162,7 +278,49 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 1. Persistir leitura ambiental (compartilha tabela com Sonoff)
+      // 0. Detecta boot/recuperação após queda
+      const isBoot = body.boot_reason && body.boot_reason !== "unknown" && (body.uptime_s ?? 9999) < 120;
+      if (isBoot) {
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "boot",
+          detalhes: {
+            boot_reason: body.boot_reason,
+            uptime_s: body.uptime_s,
+            programa_versao_aplicada: body.programa_versao_aplicada,
+          },
+        });
+        await supabase
+          .from("dispositivos_iot")
+          .update({
+            ultima_inicializacao: new Date().toISOString(),
+            boot_count: (device.boot_count ?? 0) + 1,
+            ultimo_boot_reason: body.boot_reason,
+          })
+          .eq("id", device.id);
+        // marca todos os canais para reconciliação no próximo cron
+        await supabase
+          .from("canais_dispositivo")
+          .update({ recuperacao_apos_falha: true })
+          .eq("dispositivo_id", device.id)
+          .eq("ativo", true);
+      } else if (device.online === false) {
+        // voltou online sem boot (perdeu apenas internet)
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "online",
+          detalhes: { fonte: "telemetry" },
+        });
+        await supabase
+          .from("canais_dispositivo")
+          .update({ recuperacao_apos_falha: true })
+          .eq("dispositivo_id", device.id)
+          .eq("ativo", true);
+      }
+
+      // 1. Persistir leitura ambiental
       if (body.temperature !== undefined || body.humidity !== undefined) {
         await supabase.from("leituras_sensores").insert({
           dispositivo_id: device.id,
@@ -173,7 +331,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 2. Atualizar estado de cada canal
+      // 2. Atualizar estado de cada canal (firmware confirma o que aplicou)
       if (body.channels && body.channels.length > 0) {
         await Promise.all(
           body.channels.map((ch) =>
@@ -181,6 +339,9 @@ Deno.serve(async (req) => {
               .from("canais_dispositivo")
               .update({
                 estado_atual: ch.estado,
+                intensidade_atual: ch.intensidade_pct ?? undefined,
+                ultimo_estado_persistido: ch.estado,
+                ultimo_estado_persistido_em: new Date().toISOString(),
                 ultimo_comando_em: new Date().toISOString(),
               })
               .eq("dispositivo_id", device.id)
@@ -189,13 +350,13 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 3. Marcar último sync no dispositivo
+      // 3. Marcar último sync + online
       await supabase
         .from("dispositivos_iot")
-        .update({ ultimo_sync: new Date().toISOString() })
+        .update({ ultimo_sync: new Date().toISOString(), online: true })
         .eq("id", device.id);
 
-      return json({ ok: true, device: device.nome });
+      return json({ ok: true, device: device.nome, boot_detectado: !!isBoot });
     }
 
     // ──────────────────────────────────────────────
