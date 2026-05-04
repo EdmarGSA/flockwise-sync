@@ -5570,6 +5570,63 @@ export type Database = {
           },
         ]
       }
+      politica_recuperacao_iot: {
+        Row: {
+          aplicar_schedule_offline: boolean
+          created_at: string
+          dispositivo_id: string | null
+          escopo: string
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          limite_horas_offline: number
+          observacoes: string | null
+          restaurar_ultimo_estado: boolean
+          updated_at: string
+        }
+        Insert: {
+          aplicar_schedule_offline?: boolean
+          created_at?: string
+          dispositivo_id?: string | null
+          escopo: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          limite_horas_offline?: number
+          observacoes?: string | null
+          restaurar_ultimo_estado?: boolean
+          updated_at?: string
+        }
+        Update: {
+          aplicar_schedule_offline?: boolean
+          created_at?: string
+          dispositivo_id?: string | null
+          escopo?: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          limite_horas_offline?: number
+          observacoes?: string | null
+          restaurar_ultimo_estado?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "politica_recuperacao_iot_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "politica_recuperacao_iot_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prazos_pagamento: {
         Row: {
           ativo: boolean | null
