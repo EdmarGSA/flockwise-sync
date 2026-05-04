@@ -9,6 +9,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Cloud, Thermometer, Droplets, AlertTriangle, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface Props {
   loteId: string;
@@ -23,41 +25,61 @@ const SEV_VARIANT: Record<string, 'destructive' | 'default' | 'secondary'> = {
 export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Props) {
   const [loading, setLoading] = useState(true);
   const [hist3h, setHist3h] = useState<any[]>([]);
+  const [hist3hPrev, setHist3hPrev] = useState<any[]>([]);
   const [diario, setDiario] = useState<any[]>([]);
+  const [diarioPrev, setDiarioPrev] = useState<any[]>([]);
   const [alertas, setAlertas] = useState<any[]>([]);
   const [range, setRange] = useState<'7d' | '30d' | 'ciclo'>('7d');
+  const [comparar, setComparar] = useState(false);
 
   useEffect(() => {
     if (!nucleoId) return;
     fetchData();
-  }, [nucleoId, loteId, range]);
+  }, [nucleoId, loteId, range, comparar]);
 
   const fetchData = async () => {
     setLoading(true);
-    const inicio = (() => {
-      if (range === 'ciclo' && dataAlojamento) return new Date(dataAlojamento).toISOString();
+    const agora = new Date();
+    const inicioDate = (() => {
+      if (range === 'ciclo' && dataAlojamento) return new Date(dataAlojamento);
       const d = new Date();
       d.setDate(d.getDate() - (range === '7d' ? 7 : 30));
-      return d.toISOString();
+      return d;
     })();
+    const inicio = inicioDate.toISOString();
+    const durMs = agora.getTime() - inicioDate.getTime();
+    const prevFimDate = new Date(inicioDate.getTime());
+    const prevIniDate = new Date(inicioDate.getTime() - durMs);
+    const prevIni = prevIniDate.toISOString();
+    const prevFim = prevFimDate.toISOString();
 
-    const [h3, dia, al] = await Promise.all([
+    const calls: any[] = [
       supabase.from('weather_historico_3h').select('*').eq('nucleo_id', nucleoId)
         .gte('ts_3h', inicio).order('ts_3h', { ascending: true }).limit(500),
       supabase.from('weather_lote_diario').select('*').eq('lote_id', loteId)
         .gte('data', inicio.slice(0, 10)).order('data', { ascending: true }).limit(120),
       supabase.from('alertas_climaticos').select('*').eq('nucleo_id', nucleoId)
         .gte('horario_evento', inicio).order('horario_evento', { ascending: false }).limit(100),
-    ]);
-    setHist3h(h3.data ?? []);
-    setDiario(dia.data ?? []);
-    setAlertas(al.data ?? []);
+    ];
+    if (comparar) {
+      calls.push(
+        supabase.from('weather_historico_3h').select('*').eq('nucleo_id', nucleoId)
+          .gte('ts_3h', prevIni).lt('ts_3h', prevFim).order('ts_3h', { ascending: true }).limit(500),
+        supabase.from('weather_lote_diario').select('*').eq('lote_id', loteId)
+          .gte('data', prevIni.slice(0, 10)).lt('data', prevFim.slice(0, 10)).order('data', { ascending: true }).limit(120),
+      );
+    }
+    const res = await Promise.all(calls);
+    setHist3h(res[0].data ?? []);
+    setDiario(res[1].data ?? []);
+    setAlertas(res[2].data ?? []);
+    setHist3hPrev(comparar ? (res[3]?.data ?? []) : []);
+    setDiarioPrev(comparar ? (res[4]?.data ?? []) : []);
     setLoading(false);
   };
 
-  const serie3h = useMemo(() =>
-    hist3h.map(r => ({
-      ts: r.ts_3h,
+  const serie3h = useMemo(() => {
+    const cur = hist3h.map(r => ({
       label: format(parseISO(r.ts_3h), 'dd/MM HH:mm', { locale: ptBR }),
       temp_med: r.temp_med != null ? Number(r.temp_med) : null,
       temp_min: r.temp_min != null ? Number(r.temp_min) : null,
@@ -65,10 +87,34 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
       ur_med: r.ur_med != null ? Number(r.ur_med) : null,
       ith_med: r.ith_med != null ? Number(r.ith_med) : null,
       ith_max: r.ith_max != null ? Number(r.ith_max) : null,
-    })), [hist3h]);
+    }));
+    if (!comparar) return cur;
+    // alinha por índice (posição relativa no período)
+    const len = Math.max(cur.length, hist3hPrev.length);
+    const out: any[] = [];
+    for (let i = 0; i < len; i++) {
+      const c = cur[i];
+      const p = hist3hPrev[i];
+      out.push({
+        label: c?.label ?? (p ? format(parseISO(p.ts_3h), 'dd/MM HH:mm', { locale: ptBR }) : `#${i}`),
+        temp_med: c?.temp_med ?? null,
+        temp_min: c?.temp_min ?? null,
+        temp_max: c?.temp_max ?? null,
+        ur_med: c?.ur_med ?? null,
+        ith_med: c?.ith_med ?? null,
+        ith_max: c?.ith_max ?? null,
+        temp_med_prev: p?.temp_med != null ? Number(p.temp_med) : null,
+        temp_max_prev: p?.temp_max != null ? Number(p.temp_max) : null,
+        temp_min_prev: p?.temp_min != null ? Number(p.temp_min) : null,
+        ur_med_prev: p?.ur_med != null ? Number(p.ur_med) : null,
+        ith_med_prev: p?.ith_med != null ? Number(p.ith_med) : null,
+      });
+    }
+    return out;
+  }, [hist3h, hist3hPrev, comparar]);
 
-  const serieDiario = useMemo(() =>
-    diario.map(r => ({
+  const serieDiario = useMemo(() => {
+    const cur = diario.map(r => ({
       data: format(parseISO(r.data), 'dd/MM', { locale: ptBR }),
       idade: r.idade_dias,
       temp_min: r.temp_min != null ? Number(r.temp_min) : null,
@@ -78,8 +124,27 @@ export function LoteClimaHistoricoTab({ loteId, nucleoId, dataAlojamento }: Prop
       horas_calor: r.horas_calor || 0,
       horas_frio: r.horas_frio || 0,
       horas_ith_alto: r.horas_ith_alto || 0,
+      horas_fora_conforto: (r.horas_calor || 0) + (r.horas_frio || 0) + (r.horas_ith_alto || 0),
       conforto_pct: r.dentro_conforto_pct != null ? Number(r.dentro_conforto_pct) : null,
-    })), [diario]);
+    }));
+    if (!comparar) return cur;
+    const len = Math.max(cur.length, diarioPrev.length);
+    const out: any[] = [];
+    for (let i = 0; i < len; i++) {
+      const c = cur[i];
+      const p = diarioPrev[i];
+      const prevHoras = p ? (p.horas_calor || 0) + (p.horas_frio || 0) + (p.horas_ith_alto || 0) : null;
+      out.push({
+        data: c?.data ?? (p ? format(parseISO(p.data), 'dd/MM', { locale: ptBR }) : `#${i}`),
+        horas_calor: c?.horas_calor ?? 0,
+        horas_frio: c?.horas_frio ?? 0,
+        horas_ith_alto: c?.horas_ith_alto ?? 0,
+        horas_fora_conforto: c?.horas_fora_conforto ?? 0,
+        horas_fora_prev: prevHoras,
+      });
+    }
+    return out;
+  }, [diario, diarioPrev, comparar]);
 
   const resumo = useMemo(() => {
     if (diario.length === 0) return null;
