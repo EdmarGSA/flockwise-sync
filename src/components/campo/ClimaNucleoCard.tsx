@@ -21,7 +21,7 @@ const severidadeColor: Record<string, string> = {
 };
 
 export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
-  const { observacao, forecast, alertas, solar, loading, refetch } = useClimaNucleo(nucleoId);
+  const { observacao, forecast, alertas, solar, ultimoSync, loading, refetch } = useClimaNucleo(nucleoId);
   const [atualizando, setAtualizando] = useState(false);
 
   const reconhecer = async (id: string) => {
