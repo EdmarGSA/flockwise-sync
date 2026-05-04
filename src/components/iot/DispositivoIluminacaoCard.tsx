@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Lightbulb, Wifi, WifiOff, Hand, Sun, Sunset, Sunrise, Loader2, Power,
   Trash2, SlidersHorizontal, Clock, LineChart, AlertTriangle,
+  History, RotateCcw, Zap, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDistanceToNow } from 'date-fns';
