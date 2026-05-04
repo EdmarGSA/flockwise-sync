@@ -25,6 +25,40 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
+import { LineChart, Line, YAxis, ResponsiveContainer, Tooltip as RcTooltip } from 'recharts';
+
+type SerieSensor = { ts: string; t: number | null; u: number | null };
+
+function SensorSparkline({ data }: { data: SerieSensor[] }) {
+  if (!data || data.length < 2) {
+    return <div className="text-[10px] text-muted-foreground italic">Sem histórico 24h</div>;
+  }
+  const formatted = data.map(d => ({
+    ts: d.ts,
+    label: new Date(d.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    t: d.t,
+    u: d.u,
+  }));
+  return (
+    <div className="h-12 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={formatted} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          <YAxis yAxisId="t" hide domain={['dataMin - 1', 'dataMax + 1']} />
+          <YAxis yAxisId="u" hide domain={[0, 100]} orientation="right" />
+          <RcTooltip
+            contentStyle={{ fontSize: 10, padding: '4px 6px' }}
+            labelFormatter={(_, p) => (p?.[0]?.payload?.label ?? '')}
+            formatter={(v: any, name: string) =>
+              name === 't' ? [`${Number(v).toFixed(1)}°C`, 'Temp'] : [`${Number(v).toFixed(0)}%`, 'UR']
+            }
+          />
+          <Line yAxisId="t" type="monotone" dataKey="t" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls />
+          <Line yAxisId="u" type="monotone" dataKey="u" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 interface NucleoData {
   id: string;
