@@ -150,21 +150,36 @@ Deno.serve(async (req) => {
 
       const { data: device } = await supabase
         .from("dispositivos_iot")
-        .select("id, nome, num_canais, auth_token, galpao_id")
+        .select("id, nome, num_canais, auth_token, galpao_id, integrado_id, online")
         .eq("device_id_ewelink", deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
       if (!device) return json({ error: "Dispositivo não registrado" }, 404);
 
+      // Marca online + atualiza ultimo_sync
+      const wasOffline = device.online === false;
+      await supabase
+        .from("dispositivos_iot")
+        .update({ ultimo_sync: new Date().toISOString(), online: true })
+        .eq("id", device.id);
+
+      if (wasOffline) {
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "online",
+          detalhes: { fonte: "config_poll" },
+        });
+      }
+
       const { data: canais } = await supabase
         .from("canais_dispositivo")
-        .select("canal_numero, nome, tipo_equipamento, funcao_automacao, automacao_ativa, estado_atual")
+        .select("id, canal_numero, nome, tipo_equipamento, funcao_automacao, automacao_ativa, estado_atual, suporta_dimer, intensidade_atual, integrado_id")
         .eq("dispositivo_id", device.id)
         .eq("ativo", true)
         .order("canal_numero");
 
-      // Fallback offline: timers de segurança baseados na idade do lote ativo
       let safety_timers: Array<{
         canal: number;
         funcao: string;
@@ -172,15 +187,18 @@ Deno.serve(async (req) => {
         hora_fim: string;
         estado: "on" | "off";
       }> = [];
+      const schedule_24h: Record<string, ScheduleSlot[]> = {};
+      let lote: any = null;
 
       if (device.galpao_id) {
-        const { data: lote } = await supabase
+        const { data: l } = await supabase
           .from("lotes")
-          .select("data_alojamento")
+          .select("id, integrado_id, data_alojamento, programa_iluminacao_id")
           .eq("galpao_id", device.galpao_id)
           .eq("status", "alojado")
           .not("data_alojamento", "is", null)
           .maybeSingle();
+        lote = l;
 
         if (lote?.data_alojamento) {
           const idade = Math.max(
@@ -190,15 +208,48 @@ Deno.serve(async (req) => {
           for (const c of canais ?? []) {
             const t = calcularTimerSeguranca(idade, (c as any).funcao_automacao);
             if (t) safety_timers.push({ canal: (c as any).canal_numero, ...t });
+
+            // Schedule 24h apenas para canais de iluminação com automação ativa
+            if ((c as any).tipo_equipamento === "iluminacao" && (c as any).automacao_ativa) {
+              const faixa = await carregarFaixaAtiva(
+                supabase, lote.id, lote.integrado_id,
+                lote.programa_iluminacao_id, idade,
+              );
+              schedule_24h[String((c as any).canal_numero)] = montarSchedule24h(faixa);
+            }
           }
         }
       }
 
+      const programa_versao = gerarVersaoSchedule(schedule_24h);
+
+      // Persiste versão (se mudou) para que o ESP32 saiba quando regravar a NVS
+      if (programa_versao && (device as any).programa_versao !== programa_versao) {
+        await supabase
+          .from("dispositivos_iot")
+          .update({ programa_versao })
+          .eq("id", device.id);
+      }
+
+      const now = new Date();
       return json({
         device: { id: device.id, nome: device.nome, galpao_id: device.galpao_id },
         canais: canais || [],
         intervalo_telemetria_seg: 60,
         safety_timers,
+        schedule_24h,
+        programa_versao,
+        rtc: {
+          utc_iso: now.toISOString(),
+          utc_epoch_s: Math.floor(now.getTime() / 1000),
+          tz: "America/Sao_Paulo",
+          tz_offset_min: -180,
+        },
+        politica_recuperacao: {
+          restaurar_ultimo_estado: true,
+          aplicar_schedule_offline: true,
+          max_horas_sem_sync_para_safety: 24,
+        },
       });
     }
 
