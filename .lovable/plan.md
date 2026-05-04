@@ -1,23 +1,22 @@
 ## Problema
 
-O card "Iluminação Granja" continua mostrando Temperatura/Umidade vazios. A causa: o componente `TemperaturaUmidadeCard` só classifica um dispositivo como iluminação quando `dispositivos_iot.funcao_automacao === 'iluminacao'`. Para esse dispositivo, o campo no banco está como `'nenhuma'`, mas o canal correspondente em `canais_dispositivo` tem `funcao_automacao = 'iluminacao'` e `tipo_equipamento = 'iluminacao'`.
+Em `/meus-lotes/:id`, o card "Iluminação Granja" mostra **Desligado** mesmo com o dispositivo realmente ligado (e a página `/dispositivos-iot` mostra **Ligado** corretamente).
 
-Resultado: o componente o trata como dispositivo climático e renderiza o card padrão com `--`.
+**Causa raiz:** em `TemperaturaUmidadeCard.tsx`, o estado on/off vem de `fetchDeviceStatus()` (poll eWeLink → campo `switch`). Para o dispositivo `Iluminação Granja` (Sonoff multi-canal, driver `ewelink`), esse polling não retorna um campo `switch` único — o estado real fica em `switches[]` por canal. Resultado: `switchState = null` ou `'off'`, exibindo "Desligado".
+
+Já a tela de IoT lê o estado correto de `canais_dispositivo.estado_atual` (atualizado por telemetria/comando), por isso aparece "Ligado".
 
 ## Solução
 
-Em `src/components/lotes/TemperaturaUmidadeCard.tsx`:
+Em `src/components/lotes/TemperaturaUmidadeCard.tsx`, para dispositivos de iluminação, **priorizar `canais_dispositivo.estado_atual`** sobre o `switch` retornado pelo poll eWeLink:
 
-1. No batch `canais_dispositivo`, também selecionar `funcao_automacao` e `tipo_equipamento`.
-2. Calcular um flag derivado `isIluminacao` por dispositivo:
-   - `device.funcao_automacao === 'iluminacao'` **OU**
-   - qualquer canal do dispositivo com `funcao_automacao === 'iluminacao'` ou `tipo_equipamento === 'iluminacao'`.
-3. Usar esse flag para:
-   - pular o fetch de `leituras_sensores`,
-   - definir `funcao_automacao` efetivo no objeto resultante como `'iluminacao'` (para que o split `climaticos` vs `iluminacao` funcione),
-   - propagar `intensidade_atual` / `suporta_dimer` do canal de iluminação.
+1. Incluir `estado_atual` no `select` do batch de `canais_dispositivo`.
+2. Guardar `estadoAtual` no `canaisMap`.
+3. Ao montar o objeto do dispositivo:
+   - Se `isIluminacao`: `switchState = canal.estadoAtual ?? statusResult.switch`.
+   - Caso contrário: comportamento atual (do polling).
 
-Sem mudanças de banco. Apenas ajuste de classificação no componente.
+Sem mudanças em banco, hooks ou em outros componentes. Apenas ajuste de fonte de verdade do estado para iluminação.
 
 ## Arquivos afetados
 

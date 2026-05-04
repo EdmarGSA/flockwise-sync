@@ -114,9 +114,9 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
     const devIds = devices.map((d: any) => d.id);
     const { data: canais } = await supabase
       .from('canais_dispositivo')
-      .select('dispositivo_id, intensidade_atual, suporta_dimer, funcao_automacao, tipo_equipamento')
+      .select('dispositivo_id, intensidade_atual, suporta_dimer, funcao_automacao, tipo_equipamento, estado_atual')
       .in('dispositivo_id', devIds);
-    const canaisMap = new Map<string, { intensidade: number | null; dimer: boolean; isIluminacao: boolean }>();
+    const canaisMap = new Map<string, { intensidade: number | null; dimer: boolean; isIluminacao: boolean; estadoAtual: string | null }>();
     (canais ?? []).forEach((c: any) => {
       const canalIlum = c.funcao_automacao === 'iluminacao' || c.tipo_equipamento === 'iluminacao';
       const cur = canaisMap.get(c.dispositivo_id);
@@ -125,9 +125,14 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           intensidade: c.intensidade_atual,
           dimer: !!c.suporta_dimer,
           isIluminacao: canalIlum,
+          estadoAtual: c.estado_atual ?? null,
         });
-      } else if (canalIlum && !cur.isIluminacao) {
-        canaisMap.set(c.dispositivo_id, { ...cur, isIluminacao: true });
+      } else {
+        canaisMap.set(c.dispositivo_id, {
+          ...cur,
+          isIluminacao: cur.isIluminacao || canalIlum,
+          estadoAtual: cur.estadoAtual ?? c.estado_atual ?? null,
+        });
       }
     });
 
@@ -149,6 +154,12 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
         ]);
         const reading: any = readingResult?.data;
 
+        // Para iluminação multi-canal o poll eWeLink não traz `switch` único; usa estado_atual do canal.
+        const switchFromStatus = statusResult?.switch ?? null;
+        const switchState = isIluminacao
+          ? (canal?.estadoAtual ?? switchFromStatus)
+          : switchFromStatus;
+
         return {
           id: device.id,
           nome: device.nome,
@@ -157,7 +168,7 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           umidade_pct: reading?.umidade_pct ?? null,
           online: reading?.online ?? !!device.ultimo_sync,
           created_at: reading?.created_at ?? null,
-          switchState: statusResult?.switch ?? null,
+          switchState,
           autoControlEnabled: statusResult?.autoControlEnabled === 1,
           automacao_ativa: device.automacao_ativa ?? false,
           funcao_automacao: isIluminacao ? 'iluminacao' : (device.funcao_automacao ?? 'nenhuma'),
