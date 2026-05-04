@@ -108,6 +108,7 @@ export default function MeusLotes() {
   const [producaoOvosOpen, setProducaoOvosOpen] = useState(false);
   const [metasPosturaOpen, setMetasPosturaOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
+  const [historicoClimaOpen, setHistoricoClimaOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -576,7 +577,12 @@ export default function MeusLotes() {
         {/* Temperature Alerts */}
         <AlertasTemperaturaBar />
         <AlertasClimaticosBar />
-        {/* Stats */}
+        <div className="flex justify-end mb-4">
+          <Button variant="outline" size="sm" onClick={() => setHistoricoClimaOpen(true)}>
+            <Thermometer className="w-4 h-4 mr-2" />
+            Histórico climático por núcleo
+          </Button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card className="bg-card border-border">
             <CardContent className="pt-6">
