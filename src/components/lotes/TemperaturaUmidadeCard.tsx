@@ -114,19 +114,27 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
     const devIds = devices.map((d: any) => d.id);
     const { data: canais } = await supabase
       .from('canais_dispositivo')
-      .select('dispositivo_id, intensidade_atual, suporta_dimer')
+      .select('dispositivo_id, intensidade_atual, suporta_dimer, funcao_automacao, tipo_equipamento')
       .in('dispositivo_id', devIds);
-    const canaisMap = new Map<string, { intensidade: number | null; dimer: boolean }>();
+    const canaisMap = new Map<string, { intensidade: number | null; dimer: boolean; isIluminacao: boolean }>();
     (canais ?? []).forEach((c: any) => {
+      const canalIlum = c.funcao_automacao === 'iluminacao' || c.tipo_equipamento === 'iluminacao';
       const cur = canaisMap.get(c.dispositivo_id);
       if (!cur) {
-        canaisMap.set(c.dispositivo_id, { intensidade: c.intensidade_atual, dimer: !!c.suporta_dimer });
+        canaisMap.set(c.dispositivo_id, {
+          intensidade: c.intensidade_atual,
+          dimer: !!c.suporta_dimer,
+          isIluminacao: canalIlum,
+        });
+      } else if (canalIlum && !cur.isIluminacao) {
+        canaisMap.set(c.dispositivo_id, { ...cur, isIluminacao: true });
       }
     });
 
     const results = await Promise.all(
       devices.map(async (device: any) => {
-        const isIluminacao = device.funcao_automacao === 'iluminacao';
+        const canal = canaisMap.get(device.id);
+        const isIluminacao = device.funcao_automacao === 'iluminacao' || !!canal?.isIluminacao;
         const [readingResult, statusResult] = await Promise.all([
           isIluminacao
             ? Promise.resolve({ data: null })
@@ -140,7 +148,6 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           integradoId ? fetchDeviceStatus(device.device_id_ewelink) : Promise.resolve(null),
         ]);
         const reading: any = readingResult?.data;
-        const canal = canaisMap.get(device.id);
 
         return {
           id: device.id,
@@ -153,7 +160,7 @@ export function TemperaturaUmidadeCard({ galpaoId, idadeDias, programaIluminacao
           switchState: statusResult?.switch ?? null,
           autoControlEnabled: statusResult?.autoControlEnabled === 1,
           automacao_ativa: device.automacao_ativa ?? false,
-          funcao_automacao: device.funcao_automacao ?? 'nenhuma',
+          funcao_automacao: isIluminacao ? 'iluminacao' : (device.funcao_automacao ?? 'nenhuma'),
           ultimo_sync: device.ultimo_sync ?? null,
           intensidade_atual: canal?.intensidade ?? null,
           suporta_dimer: canal?.dimer ?? false,
