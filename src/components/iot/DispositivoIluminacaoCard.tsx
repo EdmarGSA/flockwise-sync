@@ -312,22 +312,33 @@ function EventosTimeline({
   const [open, setOpen] = useState(false);
   const [eventos, setEventos] = useState<EventoIoT[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bootSerie, setBootSerie] = useState<{ label: string; valor: number }[]>([]);
+  const [janela, setJanela] = useState<'24h' | '7d'>('7d');
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    supabase
-      .from('eventos_dispositivo_iot')
-      .select('id, tipo, criado_em, detalhes')
-      .eq('dispositivo_id', dispositivoId)
-      .in('tipo', ['boot', 'reconciliacao', 'recuperacao_local', 'offline', 'online'])
-      .order('criado_em', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        setEventos((data ?? []) as EventoIoT[]);
-        setLoading(false);
-      });
-  }, [open, dispositivoId]);
+    const sinceBoots = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
+    Promise.all([
+      supabase
+        .from('eventos_dispositivo_iot')
+        .select('id, tipo, criado_em, detalhes')
+        .eq('dispositivo_id', dispositivoId)
+        .in('tipo', ['boot', 'reconciliacao', 'recuperacao_local', 'offline', 'online'])
+        .order('criado_em', { ascending: false })
+        .limit(10),
+      supabase
+        .from('eventos_dispositivo_iot')
+        .select('criado_em')
+        .eq('dispositivo_id', dispositivoId)
+        .eq('tipo', 'boot')
+        .gte('criado_em', sinceBoots),
+    ]).then(([evRes, bootRes]) => {
+      setEventos((evRes.data ?? []) as EventoIoT[]);
+      setBootSerie(agruparBoots((bootRes.data ?? []).map((r: any) => r.criado_em), janela));
+      setLoading(false);
+    });
+  }, [open, dispositivoId, janela]);
 
   const iconFor = (tipo: string) => {
     switch (tipo) {
@@ -369,7 +380,32 @@ function EventosTimeline({
       </button>
 
       {open && (
-        <div className="mt-2 space-y-1.5">
+        <div className="mt-2 space-y-2">
+          {/* Mini-chart de boots */}
+          <div className="rounded-md border bg-muted/20 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                Reinícios por {janela === '24h' ? 'hora (24h)' : 'dia (7d)'}
+              </span>
+              <div className="flex gap-0.5">
+                {(['24h', '7d'] as const).map((j) => (
+                  <button
+                    key={j}
+                    onClick={(e) => { e.stopPropagation(); setJanela(j); }}
+                    className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      janela === j
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {j}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <BootsBarChart data={bootSerie} />
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-2">
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
@@ -405,6 +441,74 @@ function EventosTimeline({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function agruparBoots(timestamps: string[], janela: '24h' | '7d') {
+  const agora = new Date();
+  if (janela === '24h') {
+    const buckets: { label: string; valor: number }[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(agora.getTime() - i * 3600_000);
+      const horaIni = new Date(d);
+      horaIni.setMinutes(0, 0, 0);
+      const horaFim = new Date(horaIni.getTime() + 3600_000);
+      const valor = timestamps.filter((t) => {
+        const ts = new Date(t).getTime();
+        return ts >= horaIni.getTime() && ts < horaFim.getTime();
+      }).length;
+      buckets.push({ label: `${horaIni.getHours().toString().padStart(2, '0')}h`, valor });
+    }
+    return buckets;
+  }
+  const buckets: { label: string; valor: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(agora);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    const fim = new Date(d.getTime() + 24 * 3600_000);
+    const valor = timestamps.filter((t) => {
+      const ts = new Date(t).getTime();
+      return ts >= d.getTime() && ts < fim.getTime();
+    }).length;
+    buckets.push({
+      label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').slice(0, 3),
+      valor,
+    });
+  }
+  return buckets;
+}
+
+function BootsBarChart({ data }: { data: { label: string; valor: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.valor));
+  const total = data.reduce((s, d) => s + d.valor, 0);
+  return (
+    <div>
+      <div className="flex items-end gap-0.5 h-10">
+        {data.map((d, i) => {
+          const altura = d.valor === 0 ? 2 : Math.max(3, (d.valor / max) * 100);
+          return (
+            <div
+              key={i}
+              className="flex-1 group relative flex items-end"
+              title={`${d.label}: ${d.valor} reinício${d.valor === 1 ? '' : 's'}`}
+            >
+              <div
+                className={`w-full rounded-sm transition-all ${
+                  d.valor === 0 ? 'bg-muted' : 'bg-amber-500/70 hover:bg-amber-500'
+                }`}
+                style={{ height: `${altura}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+        <span>{data[0]?.label}</span>
+        <span className="font-medium">Total: {total}</span>
+        <span>{data[data.length - 1]?.label}</span>
+      </div>
     </div>
   );
 }
