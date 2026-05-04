@@ -176,8 +176,22 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
             <span className="text-muted-foreground">{ultimoSync.duracao_ms} ms</span>
           )}
         </div>
-        {ultimoSync?.status === "erro" && ultimoSync.mensagem && (
-          <p className="text-[11px] text-destructive -mt-1">{ultimoSync.mensagem}</p>
+        {ultimoSync?.status === "erro" && (
+          <div className="-mt-1 space-y-1.5">
+            {ultimoSync.mensagem && (
+              <p className="text-[11px] text-destructive">{ultimoSync.mensagem}</p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px] w-full"
+              onClick={atualizarClima}
+              disabled={atualizando}
+            >
+              <RefreshCw className={`h-3 w-3 mr-1.5 ${atualizando ? "animate-spin" : ""}`} />
+              Tentar novamente
+            </Button>
+          </div>
         )}
 
         {alertas.length > 0 && (
