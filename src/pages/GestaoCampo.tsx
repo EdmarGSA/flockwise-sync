@@ -76,6 +76,7 @@ interface Galpao {
   caixa_agua_volume_total: number | null;
   latitude: number | null;
   longitude: number | null;
+  inercia_termica_min: number | null;
   created_at: string;
   updated_at: string;
 }
