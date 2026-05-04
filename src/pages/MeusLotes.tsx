@@ -959,7 +959,12 @@ export default function MeusLotes() {
         )}
       </main>
 
-      <HistoricoClimaticoDialog open={historicoClimaOpen} onOpenChange={setHistoricoClimaOpen} />
+      <HistoricoClimaticoDialog
+        open={historicoClimaOpen}
+        onOpenChange={setHistoricoClimaOpen}
+        nucleoIdInicial={climaNucleoInicial}
+        tabInicial={climaTabInicial}
+      />
 
       {/* Dialogs */}
       {selectedLote && (
