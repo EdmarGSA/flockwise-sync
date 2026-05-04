@@ -131,8 +131,10 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
             ith_max_ok: cf.ith_max_ok,
             ith_max_critico: overr?.ith_max_critico ?? cf.ith_max_critico,
             ur_max_ok: cf.ur_max_ok,
-        });
+          });
+        }
       }
+
 
 
       // leituras IoT por galpão
