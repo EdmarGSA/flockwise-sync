@@ -11,7 +11,43 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { z } from "zod";
 import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin } from "lucide-react";
+
+const alertaSchema = z.object({
+  temp_max_critico: z.number().min(-10, "Temp. máx. fora da faixa (-10 a 50°C)").max(50, "Temp. máx. fora da faixa (-10 a 50°C)").nullable(),
+  temp_min_critico: z.number().min(-20, "Temp. mín. fora da faixa (-20 a 40°C)").max(40, "Temp. mín. fora da faixa (-20 a 40°C)").nullable(),
+  ith_max_critico: z.number().min(50, "ITH deve estar entre 50 e 100").max(100, "ITH deve estar entre 50 e 100").nullable(),
+  vento_max_kmh: z.number().min(10, "Vento entre 10 e 200 km/h").max(200, "Vento entre 10 e 200 km/h").nullable(),
+  prob_chuva_min_pct: z.number().min(0, "Probabilidade entre 0 e 100%").max(100, "Probabilidade entre 0 e 100%").nullable(),
+  habilitar_calor: z.boolean(),
+  habilitar_frio: z.boolean(),
+  habilitar_ith: z.boolean(),
+  habilitar_vento: z.boolean(),
+  habilitar_chuva: z.boolean(),
+}).superRefine((d, ctx) => {
+  if (d.habilitar_calor && d.temp_max_critico == null) {
+    ctx.addIssue({ code: "custom", message: "Informe a temperatura máxima crítica" });
+  }
+  if (d.habilitar_frio && d.temp_min_critico == null) {
+    ctx.addIssue({ code: "custom", message: "Informe a temperatura mínima crítica" });
+  }
+  if (d.habilitar_ith && d.ith_max_critico == null) {
+    ctx.addIssue({ code: "custom", message: "Informe o ITH máximo" });
+  }
+  if (d.habilitar_vento && d.vento_max_kmh == null) {
+    ctx.addIssue({ code: "custom", message: "Informe o vento máximo" });
+  }
+  if (d.habilitar_chuva && d.prob_chuva_min_pct == null) {
+    ctx.addIssue({ code: "custom", message: "Informe a probabilidade mínima de chuva" });
+  }
+  if (d.temp_min_critico != null && d.temp_max_critico != null && d.temp_min_critico >= d.temp_max_critico) {
+    ctx.addIssue({ code: "custom", message: "Temperatura mínima deve ser menor que a máxima" });
+  }
+  if (d.temp_max_critico != null && d.temp_min_critico != null && (d.temp_max_critico - d.temp_min_critico) < 3) {
+    ctx.addIssue({ code: "custom", message: "Diferença entre temp. mín. e máx. deve ser de pelo menos 3°C" });
+  }
+});
 
 interface AlertaConfig {
   id?: string;
@@ -99,8 +135,24 @@ const ConfiguracaoAlertasClima = () => {
 
   const handleSave = async (key: string) => {
     if (!integradoId) return;
-    setSaving(true);
     const cfg = getCfg(key);
+    const parsed = alertaSchema.safeParse({
+      temp_max_critico: cfg.temp_max_critico,
+      temp_min_critico: cfg.temp_min_critico,
+      ith_max_critico: cfg.ith_max_critico,
+      vento_max_kmh: cfg.vento_max_kmh,
+      prob_chuva_min_pct: cfg.prob_chuva_min_pct,
+      habilitar_calor: cfg.habilitar_calor,
+      habilitar_frio: cfg.habilitar_frio,
+      habilitar_ith: cfg.habilitar_ith,
+      habilitar_vento: cfg.habilitar_vento,
+      habilitar_chuva: cfg.habilitar_chuva,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Valores inválidos");
+      return;
+    }
+    setSaving(true);
     const payload: any = {
       integrado_id: integradoId,
       nucleo_id: key === "default" ? null : key,
