@@ -55,3 +55,13 @@ verify_jwt = false
 verify_jwt = false
 [functions.auto-iluminacao]
 verify_jwt = false
+
+[functions.weather-sync]
+verify_jwt = false
+
+[functions.weather-alertas]
+verify_jwt = false
+
+[functions.weather-aggregator]
+verify_jwt = false
+
