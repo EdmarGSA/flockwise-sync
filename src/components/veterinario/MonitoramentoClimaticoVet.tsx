@@ -16,8 +16,15 @@ import {
   type LeituraGalpao,
   type ContextoConforto,
   type PlanoAcao,
+  type SensorGalpao,
 } from '@/lib/clima/planoPrevencao';
 import { calcularIdadeLote } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 interface NucleoData {
   id: string;
