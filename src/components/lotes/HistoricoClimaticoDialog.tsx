@@ -94,7 +94,7 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
     setHist3h(res[0].data ?? []);
     const al2 = res[1].data ?? [];
     setAlertas(al2);
-    setTipos([...new Set(al2.map((a: any) => a.tipo))]);
+    setTipos([...new Set(al2.map((a: any) => a.tipo as string))]);
     setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
