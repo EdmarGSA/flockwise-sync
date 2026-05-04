@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+// (Tooltip removido — substituído por Collapsible com detalhamento por sensor)
 import { supabase } from '@/integrations/supabase/client';
 import {
   Cloud, CloudRain, Thermometer, Droplets, Wind, Sun, AlertTriangle,
