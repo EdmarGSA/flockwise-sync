@@ -218,7 +218,12 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
     leituras,
     forecast: forecast as any,
     observacao,
-  }), [idadeDias, conforto, leituras, forecast, observacao]);
+    regrasSensores: {
+      habilitar_sensor_suspeito: (override as any)?.habilitar_sensor_suspeito ?? true,
+      sensor_offline_min: (override as any)?.sensor_offline_min ?? 15,
+      divergencia_temp_c: Number((override as any)?.divergencia_temp_c ?? 5),
+    },
+  }), [idadeDias, conforto, leituras, forecast, observacao, override]);
 
   // severidade global
   const severidade = useMemo<'OK' | 'ATENÇÃO' | 'ALTO'>(() => {
