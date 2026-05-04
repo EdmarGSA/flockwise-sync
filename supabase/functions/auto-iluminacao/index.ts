@@ -13,6 +13,9 @@ interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
 interface Faixa {
   dia_inicio: number; dia_fim: number; horas_luz: number;
   blocos: Bloco[]; ramp_up_min: number; ramp_down_min: number; intensidade_pct: number;
+  modo_horario?: 'fixo' | 'solar';
+  acender_offset_min?: number;
+  apagar_offset_min?: number;
 }
 
 const TZ = "America/Sao_Paulo";
