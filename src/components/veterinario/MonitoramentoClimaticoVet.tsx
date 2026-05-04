@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+// (Tooltip removido — substituído por Collapsible com detalhamento por sensor)
 import { supabase } from '@/integrations/supabase/client';
 import {
   Cloud, CloudRain, Thermometer, Droplets, Wind, Sun, AlertTriangle,
@@ -16,8 +16,15 @@ import {
   type LeituraGalpao,
   type ContextoConforto,
   type PlanoAcao,
+  type SensorGalpao,
 } from '@/lib/clima/planoPrevencao';
 import { calcularIdadeLote } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 interface NucleoData {
   id: string;
@@ -86,47 +93,103 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         }
       }
 
-      // leituras IoT por galpão
+      // leituras IoT por galpão (todos os sensores, não apenas 1 por galpão)
       const galpaoIds = nucleo.galpoes.map(g => g.id);
       if (galpaoIds.length === 0) return;
       const { data: devices } = await supabase
         .from('dispositivos_iot')
-        .select('id, galpao_id')
+        .select('id, nome, galpao_id')
         .in('galpao_id', galpaoIds)
         .eq('ativo', true);
       const devIds = (devices ?? []).map(d => d.id);
-      const devGalpao = new Map((devices ?? []).map(d => [d.id, d.galpao_id]));
+      const devInfo = new Map((devices ?? []).map(d => [d.id, { galpao_id: d.galpao_id, nome: d.nome }]));
 
-      let leiturasMap = new Map<string, { temp: number | null; ur: number | null; ts: string | null }>();
+      // última leitura POR DISPOSITIVO
+      const sensoresPorGalpao = new Map<string, SensorGalpao[]>();
       if (devIds.length) {
         const { data: leits } = await supabase
           .from('leituras_sensores')
           .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
           .in('dispositivo_id', devIds)
           .order('lido_em', { ascending: false })
-          .limit(devIds.length * 5);
-        // pegar a mais recente por galpão (com temp não nula)
+          .limit(devIds.length * 10);
+        const ultimoPorDev = new Map<string, { temp: number | null; ur: number | null; ts: string }>();
         (leits ?? []).forEach(l => {
-          const galpaoId = devGalpao.get(l.dispositivo_id);
-          if (!galpaoId) return;
-          const cur = leiturasMap.get(galpaoId);
-          if (l.temperatura_c == null) return;
-          if (!cur || (cur.ts && l.lido_em > cur.ts)) {
-            leiturasMap.set(galpaoId, { temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em });
-          }
+          if (ultimoPorDev.has(l.dispositivo_id)) return; // já temos a mais recente
+          ultimoPorDev.set(l.dispositivo_id, {
+            temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em,
+          });
+        });
+        devIds.forEach(devId => {
+          const info = devInfo.get(devId);
+          if (!info?.galpao_id) return;
+          const r = ultimoPorDev.get(devId);
+          const sensor: SensorGalpao = {
+            dispositivo_id: devId,
+            nome: info.nome,
+            temperatura_c: r?.temp ?? null,
+            umidade_pct: r?.ur ?? null,
+            ultima_leitura: r?.ts ?? null,
+          };
+          if (!sensoresPorGalpao.has(info.galpao_id)) sensoresPorGalpao.set(info.galpao_id, []);
+          sensoresPorGalpao.get(info.galpao_id)!.push(sensor);
         });
       }
 
       const ls: LeituraGalpao[] = nucleo.galpoes.map(g => {
-        const r = leiturasMap.get(g.id);
+        const sensores = sensoresPorGalpao.get(g.id) ?? [];
+        const tempsValidas = sensores
+          .map(s => s.temperatura_c)
+          .filter((v): v is number => v != null);
+        const temp_max = tempsValidas.length ? Math.max(...tempsValidas) : null;
+        const temp_min = tempsValidas.length ? Math.min(...tempsValidas) : null;
+        const temp_media = tempsValidas.length
+          ? tempsValidas.reduce((a, b) => a + b, 0) / tempsValidas.length
+          : null;
+        const divergencia = temp_max != null && temp_min != null ? temp_max - temp_min : null;
+
+        // UR: descartar sensores travados em 0% ou 100% se discordam ≥20pp dos demais
+        const ursValidas = sensores
+          .map(s => s.umidade_pct)
+          .filter((v): v is number => v != null);
+        let urMedia: number | null = null;
+        if (ursValidas.length) {
+          const naoExtremas = ursValidas.filter(v => v > 0 && v < 100);
+          const referencia = naoExtremas.length ? naoExtremas : ursValidas;
+          const med = referencia.reduce((a, b) => a + b, 0) / referencia.length;
+          // marcar suspeitos
+          sensores.forEach(s => {
+            if (s.umidade_pct == null) return;
+            if ((s.umidade_pct === 0 || s.umidade_pct === 100) &&
+                Math.abs(s.umidade_pct - med) >= 20 && naoExtremas.length > 0) {
+              s.suspeito = true;
+              s.motivo_suspeita = `UR travada em ${s.umidade_pct}%`;
+            }
+          });
+          urMedia = med;
+        }
+        // ultima leitura mais recente
+        const ts = sensores
+          .map(s => s.ultima_leitura)
+          .filter((v): v is string => !!v)
+          .sort()
+          .reverse()[0] ?? null;
+
+        const sensores_suspeitos = sensores.filter(s => s.suspeito).length;
+
         return {
           galpao_id: g.id,
           galpao_nome: g.nome,
-          temperatura_c: r?.temp ?? null,
-          umidade_pct: r?.ur ?? null,
-          ultima_leitura: r?.ts ?? null,
+          temperatura_c: temp_max,
+          temperatura_min_c: temp_min,
+          temperatura_media_c: temp_media,
+          divergencia_c: divergencia,
+          umidade_pct: urMedia,
+          ultima_leitura: ts,
           inercia_min: g.inercia_termica_min ?? 60,
           ventilador_qtd: g.ventilador_quantidade ?? 0,
+          sensores,
+          sensores_suspeitos,
         };
       });
       if (!cancel) setLeituras(ls);
@@ -243,34 +306,89 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
             <Activity className="w-3 h-3" /> Temperatura interna (IoT)
           </div>
           <div className="space-y-1.5">
-            <TooltipProvider>
-              {leituras.map(l => {
-                const st = galpaoStatus(l);
-                return (
-                  <Tooltip key={l.galpao_id}>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center justify-between text-sm rounded-md px-2 py-1.5 bg-card border">
-                        <span className="truncate flex-1">{l.galpao_nome}</span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-mono">
-                            {l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—'}
-                            {l.umidade_pct != null && <span className="text-muted-foreground"> / {l.umidade_pct.toFixed(0)}%</span>}
-                          </span>
-                          {st.icon}
+            {leituras.map(l => {
+              const st = galpaoStatus(l);
+              const sensores = l.sensores ?? [];
+              const hasMulti = sensores.length > 1;
+              const divergAlta = (l.divergencia_c ?? 0) >= 3;
+              const resumo = l.temperatura_min_c != null && l.temperatura_c != null && hasMulti
+                ? `${l.temperatura_min_c.toFixed(1)}–${l.temperatura_c.toFixed(1)}°C`
+                : (l.temperatura_c != null ? `${l.temperatura_c.toFixed(1)}°C` : '—');
+              return (
+                <Collapsible key={l.galpao_id} className="rounded-md border bg-card">
+                  <CollapsibleTrigger className="w-full flex items-center justify-between text-sm px-2 py-1.5 hover:bg-muted/40">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <ChevronDown className="w-3 h-3 shrink-0 transition-transform data-[state=open]:rotate-0 -rotate-90" />
+                      <span className="truncate">{l.galpao_nome}</span>
+                      {hasMulti && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                          {sensores.length} sensores
+                        </Badge>
+                      )}
+                      {divergAlta && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/40 text-amber-700 bg-amber-500/10">
+                          Δ{l.divergencia_c!.toFixed(1)}°C
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono text-xs">
+                        {resumo}
+                        {l.umidade_pct != null && (
+                          <span className="text-muted-foreground"> / {l.umidade_pct.toFixed(0)}%</span>
+                        )}
+                      </span>
+                      {st.icon}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border-t px-2 py-1.5 space-y-1 bg-muted/20">
+                      {sensores.length === 0 && (
+                        <p className="text-[11px] text-muted-foreground italic">Sem sensor cadastrado.</p>
+                      )}
+                      {sensores.map(s => {
+                        const ageMin = s.ultima_leitura
+                          ? (Date.now() - new Date(s.ultima_leitura).getTime()) / 60_000
+                          : Infinity;
+                        const offline = !isFinite(ageMin) || ageMin > 15;
+                        return (
+                          <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {offline ? (
+                                <WifiOff className="w-3 h-3 text-destructive shrink-0" />
+                              ) : (
+                                <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
+                              )}
+                              <span className="truncate">{s.nome}</span>
+                              {s.suspeito && (
+                                <AlertTriangle
+                                  className="w-3 h-3 text-amber-500 shrink-0"
+                                  aria-label={s.motivo_suspeita}
+                                />
+                              )}
+                            </div>
+                            <span className="font-mono text-muted-foreground shrink-0">
+                              {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
+                              {s.umidade_pct != null && (
+                                <span className={s.suspeito ? 'text-amber-600' : ''}>
+                                  {' / '}{s.umidade_pct.toFixed(0)}%
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {conforto && (
+                        <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+                          Conforto: {conforto.temp_min_ok}–{conforto.temp_max_ok}°C
+                          {l.temperatura_media_c != null && ` • média ${l.temperatura_media_c.toFixed(1)}°C`}
                         </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-xs">
-                        <div>{st.txt}</div>
-                        {conforto && <div>Conforto: {conforto.temp_min_ok}–{conforto.temp_max_ok}°C</div>}
-                        {l.ultima_leitura && <div>Leitura: {new Date(l.ultima_leitura).toLocaleString('pt-BR')}</div>}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TooltipProvider>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
             {leituras.length === 0 && (
               <p className="text-xs text-muted-foreground italic">Sem galpões cadastrados.</p>
             )}

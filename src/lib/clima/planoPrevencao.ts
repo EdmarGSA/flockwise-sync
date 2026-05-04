@@ -11,14 +11,33 @@ export interface ContextoConforto {
   ur_max_ok?: number | null;
 }
 
+export interface SensorGalpao {
+  dispositivo_id: string;
+  nome: string;
+  temperatura_c: number | null;
+  umidade_pct: number | null;
+  ultima_leitura: string | null;
+  suspeito?: boolean;
+  motivo_suspeita?: string;
+}
+
 export interface LeituraGalpao {
   galpao_id: string;
   galpao_nome: string;
+  /** Pior caso (máxima entre sensores) — usado para alertas de calor */
   temperatura_c: number | null;
+  /** Mínima entre sensores — usado para alertas de frio */
+  temperatura_min_c?: number | null;
+  /** Média das temperaturas válidas */
+  temperatura_media_c?: number | null;
+  /** Diferença entre o sensor mais quente e o mais frio */
+  divergencia_c?: number | null;
   umidade_pct: number | null;
   ultima_leitura: string | null;
   inercia_min: number;
   ventilador_qtd: number;
+  sensores?: SensorGalpao[];
+  sensores_suspeitos?: number;
 }
 
 export interface ForecastPonto {
@@ -132,6 +151,43 @@ export function gerarPlanoPrevencao(params: {
           acao: 'Priorizar ventilação sobre nebulização (UR alta inibe evaporação)',
           motivo: `UR ${l.umidade_pct.toFixed(0)}% > ${conforto.ur_max_ok}% com calor`,
           categoria: 'umidade',
+        });
+      }
+      // Frio localizado em pinteiro (lote ≤14d) — mesmo com média OK
+      if (params.idadeDias != null && params.idadeDias <= 14 &&
+          l.temperatura_min_c != null && l.temperatura_min_c < conforto.temp_min_ok) {
+        acoes.push({
+          id: `frio-loc-${l.galpao_id}`,
+          prioridade: 'alta',
+          quando: 'Imediato',
+          galpao: l.galpao_nome,
+          acao: 'Reforçar aquecimento na zona fria do pinteiro e vedar correntes de ar',
+          motivo: `Sensor mais frio em ${l.temperatura_min_c.toFixed(1)}°C (lote ${params.idadeDias}d)`,
+          categoria: 'frio',
+        });
+      }
+      // Divergência térmica entre zonas
+      if (l.divergencia_c != null && l.divergencia_c >= 5) {
+        acoes.push({
+          id: `diverg-${l.galpao_id}`,
+          prioridade: 'media',
+          quando: 'Imediato',
+          galpao: l.galpao_nome,
+          acao: 'Equalizar ambiente: checar cortinas, exaustão e distribuição de aquecedores na zona divergente',
+          motivo: `Diferença de ${l.divergencia_c.toFixed(1)}°C entre sensores do galpão`,
+          categoria: 'manejo',
+        });
+      }
+      // Sensores suspeitos (UR travada, etc)
+      if (l.sensores_suspeitos && l.sensores_suspeitos > 0) {
+        acoes.push({
+          id: `sensor-susp-${l.galpao_id}`,
+          prioridade: 'media',
+          quando: 'Imediato',
+          galpao: l.galpao_nome,
+          acao: 'Verificar/calibrar sensor com leitura suspeita (UR travada em 0% ou 100%)',
+          motivo: `${l.sensores_suspeitos} sensor(es) com leitura inconsistente`,
+          categoria: 'sensor',
         });
       }
     });
