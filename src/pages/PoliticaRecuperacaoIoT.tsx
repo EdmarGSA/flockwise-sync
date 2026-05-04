@@ -362,9 +362,17 @@ function BulkApplyDialog({ integradoId, galpoes, dispositivos, onSaved }: BulkPr
       limite_horas_offline: limite,
       observacoes: obs || null,
     }));
-    const { error } = await supabase
-      .from('politica_recuperacao_iot')
-      .upsert(rows, { onConflict: tipo === 'galpao' ? 'integrado_id,galpao_id' : 'integrado_id,dispositivo_id' });
+    // Remove existentes para evitar conflito com índices únicos parciais
+    const delQuery = supabase.from('politica_recuperacao_iot').delete().eq('integrado_id', integradoId).eq('escopo', tipo);
+    const { error: delErr } = tipo === 'galpao'
+      ? await delQuery.in('galpao_id', ids)
+      : await delQuery.in('dispositivo_id', ids);
+    if (delErr) {
+      setSaving(false);
+      toast.error('Erro ao limpar políticas anteriores', { description: delErr.message });
+      return;
+    }
+    const { error } = await supabase.from('politica_recuperacao_iot').insert(rows);
     setSaving(false);
     if (error) {
       toast.error('Erro ao aplicar', { description: error.message });
