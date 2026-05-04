@@ -297,51 +297,179 @@ async function syncTimersForDevice(
   return success;
 }
 
-// ── Channel-level decision engine (Phase 4: cross-rule automation) ──
-// Returns the desired state for a single channel based on its function,
-// bird age, current temp/humidity. Returns null if function is not handled
-// (e.g. 'nenhuma' or 'alarme' which is event-driven).
-function decideChannelState(
+// ── Padrão-ouro: motor multi-variável (ITH + histerese + tempo mín on/off + fail-safe) ──
+
+interface HistereseConfig {
+  deadband_temp_c: number;
+  tempo_min_on_aquecedor_seg: number;
+  tempo_min_off_aquecedor_seg: number;
+  tempo_min_on_ventilador_seg: number;
+  tempo_min_off_ventilador_seg: number;
+  tempo_min_on_nebulizador_seg: number;
+  tempo_min_off_nebulizador_seg: number;
+  ith_amarelo: number;
+  ith_vermelho: number;
+  modo_seguro_vent_min_pct: number;
+  sensor_max_idade_min: number;
+  protege_pintinho_ate_dias: number;
+}
+
+const DEFAULT_HISTERESE: HistereseConfig = {
+  deadband_temp_c: 0.5,
+  tempo_min_on_aquecedor_seg: 60,
+  tempo_min_off_aquecedor_seg: 300,
+  tempo_min_on_ventilador_seg: 120,
+  tempo_min_off_ventilador_seg: 60,
+  tempo_min_on_nebulizador_seg: 180,
+  tempo_min_off_nebulizador_seg: 120,
+  ith_amarelo: 74,
+  ith_vermelho: 78,
+  modo_seguro_vent_min_pct: 30,
+  sensor_max_idade_min: 15,
+  protege_pintinho_ate_dias: 7,
+};
+
+interface PontoCurva {
+  dia_idade: number;
+  temp_alvo_c: number;
+  temp_min_alarme_c: number;
+  temp_max_alarme_c: number;
+  ur_max_pct: number | null;
+  ith_alarme_amarelo: number;
+  ith_alarme_vermelho: number;
+}
+
+interface DecisaoCanal {
+  state: "on" | "off";
+  estagio: "normal" | "noturno" | "heat_stress" | "modo_seguro";
+  reason: string[];
+  bloqueado_por?: "tempo_minimo_on" | "tempo_minimo_off" | "sensor_falho";
+}
+
+function calcularITH(t: number, ur: number | null): number | null {
+  if (ur == null) return null;
+  return +(t - (0.55 - 0.0055 * ur) * (t - 14.5)).toFixed(1);
+}
+
+function tempoDesdeUltimoEstado(canal: any, novoEstado: "on" | "off"): number {
+  // segundos desde o último ON ou OFF (referente ao estado atual)
+  if (novoEstado === "on") {
+    if (!canal.ultimo_off_em) return Number.MAX_SAFE_INTEGER;
+    return Math.floor((Date.now() - new Date(canal.ultimo_off_em).getTime()) / 1000);
+  } else {
+    if (!canal.ultimo_on_em) return Number.MAX_SAFE_INTEGER;
+    return Math.floor((Date.now() - new Date(canal.ultimo_on_em).getTime()) / 1000);
+  }
+}
+
+function checaTempoMinimo(
+  canal: any, desejado: "on" | "off", funcao: string, hist: HistereseConfig
+): "ok" | "tempo_minimo_on" | "tempo_minimo_off" {
+  const atual = canal.estado_atual;
+  if (atual === desejado || !atual) return "ok"; // sem mudança
+  const tempo = tempoDesdeUltimoEstado(canal, atual);
+  let minimo = 0;
+  if (funcao === "aquecimento") {
+    minimo = atual === "on" ? hist.tempo_min_on_aquecedor_seg : hist.tempo_min_off_aquecedor_seg;
+  } else if (funcao === "ventilacao") {
+    minimo = atual === "on" ? hist.tempo_min_on_ventilador_seg : hist.tempo_min_off_ventilador_seg;
+  } else if (funcao === "nebulizacao") {
+    minimo = atual === "on" ? hist.tempo_min_on_nebulizador_seg : hist.tempo_min_off_nebulizador_seg;
+  }
+  if (tempo < minimo) {
+    return atual === "on" ? "tempo_minimo_on" : "tempo_minimo_off";
+  }
+  return "ok";
+}
+
+function decideCanalGoldStandard(
+  canal: any,
   funcao: string,
   ageDays: number,
-  temp: number,
-  tempMin: number,
-  tempMax: number,
+  temp: number | null,
   umid: number | null,
-  umidMax: number,
-): { state: "on" | "off"; reason: string } | null {
-  switch (funcao) {
-    case "aquecimento":
-      return temp < tempMin
-        ? { state: "on", reason: `temp ${temp}°C < min ${tempMin}°C` }
-        : { state: "off", reason: `temp ${temp}°C >= min ${tempMin}°C` };
+  ponto: PontoCurva | null,
+  fallback: { tempMin: number; tempMax: number; umidMax: number },
+  hist: HistereseConfig,
+  sensorIdadeMin: number,
+): DecisaoCanal | null {
+  const sensorOK = temp != null && sensorIdadeMin <= hist.sensor_max_idade_min;
 
-    case "ventilacao":
-      return temp > tempMax
-        ? { state: "on", reason: `temp ${temp}°C > max ${tempMax}°C` }
-        : { state: "off", reason: `temp ${temp}°C <= max ${tempMax}°C` };
-
-    case "nebulizacao": {
-      // Only nebulize when hot AND humidity below ceiling (avoid over-saturating)
-      if (temp > tempMax && umid !== null && umid < umidMax) {
-        return { state: "on", reason: `temp ${temp}°C alta + umid ${umid}% < ${umidMax}%` };
-      }
-      return { state: "off", reason: `cond. nebulização não atendida (temp ${temp}, umid ${umid})` };
+  // ── FAIL-SAFE: sensor offline ou leitura velha ──
+  if (!sensorOK) {
+    if (funcao === "aquecimento" && ageDays <= hist.protege_pintinho_ate_dias) {
+      // Pintinho: NUNCA desliga aquecedor por falha de sensor
+      return { state: "on", estagio: "modo_seguro",
+        reason: [`sensor falho/${sensorIdadeMin}min`, `pintinho dia ${ageDays} ≤ ${hist.protege_pintinho_ate_dias}d → mantém aquecedor`],
+        bloqueado_por: "sensor_falho" };
     }
+    if (funcao === "ventilacao") {
+      // Modo seguro: ventilação mínima por timer (mantém estado atual ou liga curto)
+      return { state: "on", estagio: "modo_seguro",
+        reason: [`sensor falho`, `ventilação mínima de segurança`],
+        bloqueado_por: "sensor_falho" };
+    }
+    return null; // outros canais: não decide
+  }
 
-    // case "iluminacao": tratado exclusivamente em `auto-iluminacao` (filtrado na query).
+  const t = temp as number;
+  const setpoint = ponto?.temp_alvo_c ?? ((fallback.tempMin + fallback.tempMax) / 2);
+  const tMaxAlarme = ponto?.temp_max_alarme_c ?? fallback.tempMax;
+  const tMinAlarme = ponto?.temp_min_alarme_c ?? fallback.tempMin;
+  const ithAmarelo = ponto?.ith_alarme_amarelo ?? hist.ith_amarelo;
+  const ithVermelho = ponto?.ith_alarme_vermelho ?? hist.ith_vermelho;
+  const urMax = ponto?.ur_max_pct ?? fallback.umidMax;
+  const ith = calcularITH(t, umid);
+  const reasons: string[] = [`setpoint ${setpoint}°C`, `temp ${t}°C`];
+  if (ith != null) reasons.push(`ITH ${ith}`);
 
-    case "cortina": {
-      // Curtain: open (off relay = aberta) when hot, close (on = fechada) when cold or at night
-      const hour = new Date().getHours();
-      const isNight = hour >= 19 || hour < 6;
-      if (temp > tempMax) return { state: "off", reason: `temp ${temp}°C alta → abrir cortina` };
-      if (temp < tempMin || isNight) return { state: "on", reason: `temp ${temp}°C baixa ou noite (${hour}h) → fechar` };
+  // ── EMERGÊNCIA CALOR (override): ITH ≥ vermelho OU temp >= alarme alto ──
+  const heatStress = (ith != null && ith >= ithVermelho) || t >= tMaxAlarme + 1;
+  if (heatStress) {
+    reasons.push(`HEAT STRESS (ITH≥${ithVermelho} ou temp≥${tMaxAlarme + 1})`);
+    if (funcao === "ventilacao") return { state: "on", estagio: "heat_stress", reason: reasons };
+    if (funcao === "nebulizacao" && (umid == null || umid < urMax + 5))
+      return { state: "on", estagio: "heat_stress", reason: [...reasons, `nebuliza p/ resfriar (UR ${umid}%)`] };
+    if (funcao === "aquecimento") return { state: "off", estagio: "heat_stress", reason: reasons };
+    if (funcao === "cortina") return { state: "off", estagio: "heat_stress", reason: [...reasons, "abre cortina"] };
+  }
+
+  // ── HISTERESE normal por função ──
+  switch (funcao) {
+    case "aquecimento": {
+      // Liga abaixo de setpoint - deadband; desliga acima de setpoint + deadband
+      if (t < setpoint - hist.deadband_temp_c) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `t<${setpoint - hist.deadband_temp_c} → ligar`] };
+      }
+      if (t > setpoint + hist.deadband_temp_c) {
+        return { state: "off", estagio: "normal", reason: [...reasons, `t>${setpoint + hist.deadband_temp_c} → desligar`] };
+      }
+      return null; // dentro da banda morta → mantém
+    }
+    case "ventilacao": {
+      if (t > setpoint + hist.deadband_temp_c) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `t>${setpoint + hist.deadband_temp_c} → ligar`] };
+      }
+      if (t < setpoint - hist.deadband_temp_c) {
+        return { state: "off", estagio: "normal", reason: [...reasons, `t<${setpoint - hist.deadband_temp_c} → desligar`] };
+      }
       return null;
     }
-
-    case "alarme":
-    case "nenhuma":
+    case "nebulizacao": {
+      if (t > setpoint + hist.deadband_temp_c && umid != null && umid < urMax) {
+        return { state: "on", estagio: "normal", reason: [...reasons, `quente + UR ${umid}<${urMax}`] };
+      }
+      return { state: "off", estagio: "normal", reason: [...reasons, `cond. neb. não atendidas`] };
+    }
+    case "cortina": {
+      const hour = new Date().getHours();
+      const isNight = hour >= 19 || hour < 6;
+      if (t > setpoint + hist.deadband_temp_c)
+        return { state: "off", estagio: "normal", reason: [...reasons, "quente → abrir"] };
+      if (t < setpoint - hist.deadband_temp_c || isNight)
+        return { state: "on", estagio: isNight ? "noturno" : "normal", reason: [...reasons, isNight ? `noite ${hour}h → fechar` : "frio → fechar"] };
+      return null;
+    }
     default:
       return null;
   }
