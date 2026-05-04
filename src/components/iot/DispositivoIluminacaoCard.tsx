@@ -444,3 +444,71 @@ function EventosTimeline({
     </div>
   );
 }
+
+function agruparBoots(timestamps: string[], janela: '24h' | '7d') {
+  const agora = new Date();
+  if (janela === '24h') {
+    const buckets: { label: string; valor: number }[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(agora.getTime() - i * 3600_000);
+      const horaIni = new Date(d);
+      horaIni.setMinutes(0, 0, 0);
+      const horaFim = new Date(horaIni.getTime() + 3600_000);
+      const valor = timestamps.filter((t) => {
+        const ts = new Date(t).getTime();
+        return ts >= horaIni.getTime() && ts < horaFim.getTime();
+      }).length;
+      buckets.push({ label: `${horaIni.getHours().toString().padStart(2, '0')}h`, valor });
+    }
+    return buckets;
+  }
+  const buckets: { label: string; valor: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(agora);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    const fim = new Date(d.getTime() + 24 * 3600_000);
+    const valor = timestamps.filter((t) => {
+      const ts = new Date(t).getTime();
+      return ts >= d.getTime() && ts < fim.getTime();
+    }).length;
+    buckets.push({
+      label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').slice(0, 3),
+      valor,
+    });
+  }
+  return buckets;
+}
+
+function BootsBarChart({ data }: { data: { label: string; valor: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.valor));
+  const total = data.reduce((s, d) => s + d.valor, 0);
+  return (
+    <div>
+      <div className="flex items-end gap-0.5 h-10">
+        {data.map((d, i) => {
+          const altura = d.valor === 0 ? 2 : Math.max(3, (d.valor / max) * 100);
+          return (
+            <div
+              key={i}
+              className="flex-1 group relative flex items-end"
+              title={`${d.label}: ${d.valor} reinício${d.valor === 1 ? '' : 's'}`}
+            >
+              <div
+                className={`w-full rounded-sm transition-all ${
+                  d.valor === 0 ? 'bg-muted' : 'bg-amber-500/70 hover:bg-amber-500'
+                }`}
+                style={{ height: `${altura}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+        <span>{data[0]?.label}</span>
+        <span className="font-medium">Total: {total}</span>
+        <span>{data[data.length - 1]?.label}</span>
+      </div>
+    </div>
+  );
+}
