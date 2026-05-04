@@ -292,11 +292,104 @@ export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, 
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <Tabs defaultValue="series">
+            <Tabs value={tab} onValueChange={setTab}>
               <TabsList>
-                <TabsTrigger value="series" className="text-xs">Séries</TabsTrigger>
+                <TabsTrigger value="previsao" className="text-xs">Previsão 72h</TabsTrigger>
+                <TabsTrigger value="series" className="text-xs">Histórico</TabsTrigger>
                 <TabsTrigger value="alertas" className="text-xs">Alertas ({alertasFiltrados.length})</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="previsao" className="space-y-4 mt-3">
+                {seriePrevisao.length === 0 ? (
+                  <Card><CardContent className="py-10 text-center text-xs text-muted-foreground">
+                    Sem previsão disponível. Verifique se o núcleo possui coordenadas e se a sincronização climática rodou.
+                  </CardContent></Card>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Thermometer className="h-3 w-3 text-orange-500" />Temp 24h</div>
+                        <div className="text-sm font-semibold">{resumoPrevisao.tempMin?.toFixed(0)}° / {resumoPrevisao.tempMax?.toFixed(0)}°C</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><CloudRain className="h-3 w-3 text-blue-500" />Chuva 24h</div>
+                        <div className="text-sm font-semibold">{resumoPrevisao.probChuvaMax.toFixed(0)}% · {resumoPrevisao.chuvaTotal.toFixed(1)} mm</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Droplets className="h-3 w-3 text-purple-500" />ITH máx 24h</div>
+                        <div className={cn("text-sm font-semibold", resumoPrevisao.ithMax >= 78 && "text-destructive")}>{resumoPrevisao.ithMax > 0 ? resumoPrevisao.ithMax.toFixed(0) : '—'}</div>
+                      </CardContent></Card>
+                      <Card><CardContent className="py-2.5 px-3">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Wind className="h-3 w-3 text-cyan-500" />Vento máx 24h</div>
+                        <div className={cn("text-sm font-semibold", resumoPrevisao.ventoMax >= 50 && "text-destructive")}>{resumoPrevisao.ventoMax.toFixed(0)} km/h</div>
+                      </CardContent></Card>
+                    </div>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <Thermometer className="h-4 w-4 text-orange-500" /> Temperatura prevista (°C)
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <ReferenceLine y={32} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: '32°', fontSize: 9 }} />
+                            <ReferenceLine y={18} stroke="hsl(var(--primary))" strokeDasharray="3 3" label={{ value: '18°', fontSize: 9 }} />
+                            <Line type="monotone" dataKey="temp" stroke="#f97316" dot={false} name="Temperatura" strokeWidth={2} />
+                            <Line type="monotone" dataKey="ith" stroke="#a855f7" dot={false} name="ITH" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <CloudRain className="h-4 w-4 text-blue-500" /> Chuva prevista
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis yAxisId="pct" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <YAxis yAxisId="mm" orientation="right" tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <Bar yAxisId="pct" dataKey="chuva_pct" fill="#3b82f6" fillOpacity={0.5} name="Prob. chuva (%)" />
+                            <Line yAxisId="mm" type="monotone" dataKey="chuva_mm" stroke="#1d4ed8" dot={false} name="Precipitação (mm)" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">
+                        <Wind className="h-4 w-4 text-cyan-500" /> Vento e UR previstos
+                      </CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <ComposedChart data={seriePrevisao}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                            <YAxis yAxisId="ur" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                            <YAxis yAxisId="vento" orientation="right" tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <ReferenceLine yAxisId="vento" y={50} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
+                            <Line yAxisId="ur" type="monotone" dataKey="ur" stroke="#3b82f6" dot={false} name="UR (%)" />
+                            <Line yAxisId="vento" type="monotone" dataKey="vento" stroke="#06b6d4" dot={false} name="Vento (km/h)" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </TabsContent>
+
 
               <TabsContent value="series" className="space-y-4 mt-3">
                 <Card>
