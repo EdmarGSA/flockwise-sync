@@ -34,7 +34,7 @@ const SEV_VARIANT: Record<string, 'destructive' | 'default' | 'secondary'> = {
   critico: 'destructive', alto: 'destructive', atencao: 'default', medio: 'default', baixo: 'secondary',
 };
 
-export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
+export function HistoricoClimaticoDialog({ open, onOpenChange, nucleoIdInicial, tabInicial = 'previsao' }: Props) {
   const { integradoId } = useIntegradoId();
   const [nucleos, setNucleos] = useState<{ id: string; nome: string }[]>([]);
   const [nucleoId, setNucleoId] = useState<string>('');
@@ -48,6 +48,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   const [hist3hPrev, setHist3hPrev] = useState<any[]>([]);
   const [alertas, setAlertas] = useState<any[]>([]);
   const [comparar, setComparar] = useState(false);
+  const [forecast, setForecast] = useState<any[]>([]);
+  const [conforto, setConforto] = useState<{ temp_min_critico: number; temp_max_critico: number; ith_max_critico: number } | null>(null);
+  const [tab, setTab] = useState<string>(tabInicial);
 
   useEffect(() => {
     if (!open || !integradoId) return;
