@@ -2,9 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useClimaNucleo } from "@/hooks/useClimaNucleo";
-import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun } from "lucide-react";
+import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface Props {
   nucleoId: string;
