@@ -2,7 +2,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useClimaNucleo } from "@/hooks/useClimaNucleo";
-import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset, CheckCircle2, XCircle, Clock, CloudRain, CloudSnow, CloudFog, CloudLightning, CloudSun } from "lucide-react";
+
+const condicaoWMO = (code?: number | null): { texto: string; Icon: any; cor: string } => {
+  if (code == null) return { texto: "—", Icon: Cloud, cor: "text-muted-foreground" };
+  if (code === 0) return { texto: "Céu limpo", Icon: Sun, cor: "text-yellow-500" };
+  if (code <= 2) return { texto: "Parcialmente nublado", Icon: CloudSun, cor: "text-yellow-400" };
+  if (code === 3) return { texto: "Nublado", Icon: Cloud, cor: "text-slate-400" };
+  if (code >= 45 && code <= 48) return { texto: "Neblina", Icon: CloudFog, cor: "text-slate-400" };
+  if (code >= 51 && code <= 57) return { texto: "Garoa", Icon: CloudRain, cor: "text-blue-400" };
+  if (code >= 61 && code <= 67) return { texto: "Chuva", Icon: CloudRain, cor: "text-blue-500" };
+  if (code >= 71 && code <= 77) return { texto: "Neve", Icon: CloudSnow, cor: "text-cyan-300" };
+  if (code >= 80 && code <= 82) return { texto: "Pancadas de chuva", Icon: CloudRain, cor: "text-blue-600" };
+  if (code >= 85 && code <= 86) return { texto: "Pancadas de neve", Icon: CloudSnow, cor: "text-cyan-300" };
+  if (code >= 95) return { texto: "Tempestade", Icon: CloudLightning, cor: "text-purple-500" };
+  return { texto: "—", Icon: Cloud, cor: "text-muted-foreground" };
+};
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
