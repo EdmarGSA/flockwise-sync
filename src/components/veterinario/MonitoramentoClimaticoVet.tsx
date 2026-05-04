@@ -434,29 +434,32 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
                           : Infinity;
                         const offline = !isFinite(ageMin) || ageMin > offlineMinCfg;
                         return (
-                          <div key={s.dispositivo_id} className="flex items-center justify-between text-[11px] gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {offline ? (
-                                <WifiOff className="w-3 h-3 text-destructive shrink-0" />
-                              ) : (
-                                <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
-                              )}
-                              <span className="truncate">{s.nome}</span>
-                              {s.suspeito && (
-                                <AlertTriangle
-                                  className="w-3 h-3 text-amber-500 shrink-0"
-                                  aria-label={s.motivo_suspeita}
-                                />
-                              )}
+                          <div key={s.dispositivo_id} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[11px] gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {offline ? (
+                                  <WifiOff className="w-3 h-3 text-destructive shrink-0" />
+                                ) : (
+                                  <Activity className="w-3 h-3 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="truncate">{s.nome}</span>
+                                {s.suspeito && (
+                                  <AlertTriangle
+                                    className="w-3 h-3 text-amber-500 shrink-0"
+                                    aria-label={s.motivo_suspeita}
+                                  />
+                                )}
+                              </div>
+                              <span className="font-mono text-muted-foreground shrink-0">
+                                {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
+                                {s.umidade_pct != null && (
+                                  <span className={s.suspeito ? 'text-amber-600' : ''}>
+                                    {' / '}{s.umidade_pct.toFixed(0)}%
+                                  </span>
+                                )}
+                              </span>
                             </div>
-                            <span className="font-mono text-muted-foreground shrink-0">
-                              {s.temperatura_c != null ? `${s.temperatura_c.toFixed(1)}°C` : '—'}
-                              {s.umidade_pct != null && (
-                                <span className={s.suspeito ? 'text-amber-600' : ''}>
-                                  {' / '}{s.umidade_pct.toFixed(0)}%
-                                </span>
-                              )}
-                            </span>
+                            <SensorSparkline data={series[s.dispositivo_id] ?? []} />
                           </div>
                         );
                       })}
