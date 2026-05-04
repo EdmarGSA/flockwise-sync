@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
     }
 
     for (const n of nucleos) {
+      const nucleoStart = Date.now();
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${n.latitude}&longitude=${n.longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,uv_index,precipitation&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation,uv_index,weather_code&forecast_days=3&timezone=auto&wind_speed_unit=kmh`;
         const r = await fetch(url);
@@ -134,8 +135,25 @@ Deno.serve(async (req) => {
         await supabase.from("solar_diario").upsert(solarRows, { onConflict: "nucleo_id,data" });
 
         log.push({ nucleo: n.id, horas: rows.length });
+        await supabase.from("weather_sync_log").insert({
+          nucleo_id: n.id,
+          integrado_id: n.integrado_id,
+          status: "sucesso",
+          mensagem: `Atualizado: ${rows.length} horas previstas`,
+          duracao_ms: Date.now() - nucleoStart,
+          trigger_tipo: nucleoIdFilter ? "manual" : "cron",
+        });
       } catch (e) {
-        log.push({ nucleo: n.id, erro: (e as Error).message });
+        const msg = (e as Error).message;
+        log.push({ nucleo: n.id, erro: msg });
+        await supabase.from("weather_sync_log").insert({
+          nucleo_id: n.id,
+          integrado_id: n.integrado_id,
+          status: "erro",
+          mensagem: msg,
+          duracao_ms: Date.now() - nucleoStart,
+          trigger_tipo: nucleoIdFilter ? "manual" : "cron",
+        });
       }
     }
 

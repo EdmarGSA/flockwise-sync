@@ -8357,6 +8357,39 @@ export type Database = {
           },
         ]
       }
+      weather_sync_log: {
+        Row: {
+          duracao_ms: number | null
+          executado_em: string
+          id: string
+          integrado_id: string | null
+          mensagem: string | null
+          nucleo_id: string | null
+          status: string
+          trigger_tipo: string | null
+        }
+        Insert: {
+          duracao_ms?: number | null
+          executado_em?: string
+          id?: string
+          integrado_id?: string | null
+          mensagem?: string | null
+          nucleo_id?: string | null
+          status: string
+          trigger_tipo?: string | null
+        }
+        Update: {
+          duracao_ms?: number | null
+          executado_em?: string
+          id?: string
+          integrado_id?: string | null
+          mensagem?: string | null
+          nucleo_id?: string | null
+          status?: string
+          trigger_tipo?: string | null
+        }
+        Relationships: []
+      }
       webhooks_fornecedor: {
         Row: {
           ativo: boolean

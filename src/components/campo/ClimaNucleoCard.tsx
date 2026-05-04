@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useClimaNucleo } from "@/hooks/useClimaNucleo";
-import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset } from "lucide-react";
+import { Cloud, Droplets, Wind, Sun, AlertTriangle, ThermometerSun, RefreshCw, Sunrise, Sunset, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -21,7 +21,7 @@ const severidadeColor: Record<string, string> = {
 };
 
 export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
-  const { observacao, forecast, alertas, solar, loading, refetch } = useClimaNucleo(nucleoId);
+  const { observacao, forecast, alertas, solar, ultimoSync, loading, refetch } = useClimaNucleo(nucleoId);
   const [atualizando, setAtualizando] = useState(false);
 
   const reconhecer = async (id: string) => {
@@ -154,6 +154,30 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
           <div className="text-xs text-muted-foreground border-t pt-2">
             Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span>
           </div>
+        )}
+
+        <div className="border-t pt-2 flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5">
+            {ultimoSync?.status === "sucesso" ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+            ) : ultimoSync?.status === "erro" ? (
+              <XCircle className="h-3.5 w-3.5 text-destructive" />
+            ) : (
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="text-muted-foreground">Sync:</span>
+            <span className={`font-medium ${ultimoSync?.status === "erro" ? "text-destructive" : "text-foreground"}`}>
+              {ultimoSync
+                ? `${new Date(ultimoSync.executado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}${ultimoSync.trigger_tipo === "manual" ? " (manual)" : ""}`
+                : "nunca executado"}
+            </span>
+          </span>
+          {ultimoSync?.duracao_ms != null && (
+            <span className="text-muted-foreground">{ultimoSync.duracao_ms} ms</span>
+          )}
+        </div>
+        {ultimoSync?.status === "erro" && ultimoSync.mensagem && (
+          <p className="text-[11px] text-destructive -mt-1">{ultimoSync.mensagem}</p>
         )}
 
         {alertas.length > 0 && (
