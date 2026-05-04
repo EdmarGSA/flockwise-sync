@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     const { data: canais, error: e1 } = await supabase
       .from("canais_dispositivo")
       .select(`
-        id, dispositivo_id, integrado_id, estado_atual, intensidade_atual, suporta_dimer,
+        id, dispositivo_id, integrado_id, estado_atual, intensidade_atual, suporta_dimer, recuperacao_apos_falha,
         dispositivos_iot!inner(id, device_id_ewelink, driver, galpao_id, ativo)
       `)
       .eq("tipo_equipamento", "iluminacao")
