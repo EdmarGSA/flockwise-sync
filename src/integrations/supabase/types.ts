@@ -677,9 +677,12 @@ export type Database = {
           intensidade_atual: number | null
           nome: string
           observacoes: string | null
+          recuperacao_apos_falha: boolean
           suporta_dimer: boolean
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em: string | null
+          ultimo_estado_persistido: string | null
+          ultimo_estado_persistido_em: string | null
           updated_at: string
         }
         Insert: {
@@ -695,9 +698,12 @@ export type Database = {
           intensidade_atual?: number | null
           nome: string
           observacoes?: string | null
+          recuperacao_apos_falha?: boolean
           suporta_dimer?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
+          ultimo_estado_persistido?: string | null
+          ultimo_estado_persistido_em?: string | null
           updated_at?: string
         }
         Update: {
@@ -713,9 +719,12 @@ export type Database = {
           intensidade_atual?: number | null
           nome?: string
           observacoes?: string | null
+          recuperacao_apos_falha?: boolean
           suporta_dimer?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
+          ultimo_estado_persistido?: string | null
+          ultimo_estado_persistido_em?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1828,6 +1837,7 @@ export type Database = {
           ativo: boolean
           auth_token: string | null
           automacao_ativa: boolean
+          boot_count: number
           created_at: string
           device_id_ewelink: string
           driver: Database["public"]["Enums"]["driver_iot"]
@@ -1840,8 +1850,11 @@ export type Database = {
           modelo: string | null
           nome: string
           num_canais: number
+          programa_versao: string | null
           regra_grupo: string | null
           tipo: string
+          ultima_inicializacao: string | null
+          ultimo_boot_reason: string | null
           ultimo_sync: string | null
           updated_at: string
         }
@@ -1849,6 +1862,7 @@ export type Database = {
           ativo?: boolean
           auth_token?: string | null
           automacao_ativa?: boolean
+          boot_count?: number
           created_at?: string
           device_id_ewelink: string
           driver?: Database["public"]["Enums"]["driver_iot"]
@@ -1861,8 +1875,11 @@ export type Database = {
           modelo?: string | null
           nome: string
           num_canais?: number
+          programa_versao?: string | null
           regra_grupo?: string | null
           tipo?: string
+          ultima_inicializacao?: string | null
+          ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
           updated_at?: string
         }
@@ -1870,6 +1887,7 @@ export type Database = {
           ativo?: boolean
           auth_token?: string | null
           automacao_ativa?: boolean
+          boot_count?: number
           created_at?: string
           device_id_ewelink?: string
           driver?: Database["public"]["Enums"]["driver_iot"]
@@ -1882,8 +1900,11 @@ export type Database = {
           modelo?: string | null
           nome?: string
           num_canais?: number
+          programa_versao?: string | null
           regra_grupo?: string | null
           tipo?: string
+          ultima_inicializacao?: string | null
+          ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
           updated_at?: string
         }
@@ -2088,6 +2109,41 @@ export type Database = {
             columns: ["tratamento_lote_id"]
             isOneToOne: false
             referencedRelation: "tratamentos_lote"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eventos_dispositivo_iot: {
+        Row: {
+          criado_em: string
+          detalhes: Json | null
+          dispositivo_id: string
+          id: string
+          integrado_id: string
+          tipo: string
+        }
+        Insert: {
+          criado_em?: string
+          detalhes?: Json | null
+          dispositivo_id: string
+          id?: string
+          integrado_id: string
+          tipo: string
+        }
+        Update: {
+          criado_em?: string
+          detalhes?: Json | null
+          dispositivo_id?: string
+          id?: string
+          integrado_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eventos_dispositivo_iot_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos_iot"
             referencedColumns: ["id"]
           },
         ]
@@ -8447,6 +8503,7 @@ export type Database = {
         Args: { p_extra?: Json; p_function_name: string; p_key_param?: string }
         Returns: undefined
       }
+      marcar_dispositivos_offline_iot: { Args: never; Returns: number }
       redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
       reservar_estoque_ovos_fifo: {
         Args: {
