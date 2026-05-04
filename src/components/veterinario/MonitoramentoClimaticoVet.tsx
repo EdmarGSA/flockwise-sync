@@ -93,47 +93,103 @@ function NucleoClimaCardVet({ nucleo, integradoId }: { nucleo: NucleoData; integ
         }
       }
 
-      // leituras IoT por galpão
+      // leituras IoT por galpão (todos os sensores, não apenas 1 por galpão)
       const galpaoIds = nucleo.galpoes.map(g => g.id);
       if (galpaoIds.length === 0) return;
       const { data: devices } = await supabase
         .from('dispositivos_iot')
-        .select('id, galpao_id')
+        .select('id, nome, galpao_id')
         .in('galpao_id', galpaoIds)
         .eq('ativo', true);
       const devIds = (devices ?? []).map(d => d.id);
-      const devGalpao = new Map((devices ?? []).map(d => [d.id, d.galpao_id]));
+      const devInfo = new Map((devices ?? []).map(d => [d.id, { galpao_id: d.galpao_id, nome: d.nome }]));
 
-      let leiturasMap = new Map<string, { temp: number | null; ur: number | null; ts: string | null }>();
+      // última leitura POR DISPOSITIVO
+      const sensoresPorGalpao = new Map<string, SensorGalpao[]>();
       if (devIds.length) {
         const { data: leits } = await supabase
           .from('leituras_sensores')
           .select('dispositivo_id, temperatura_c, umidade_pct, lido_em')
           .in('dispositivo_id', devIds)
           .order('lido_em', { ascending: false })
-          .limit(devIds.length * 5);
-        // pegar a mais recente por galpão (com temp não nula)
+          .limit(devIds.length * 10);
+        const ultimoPorDev = new Map<string, { temp: number | null; ur: number | null; ts: string }>();
         (leits ?? []).forEach(l => {
-          const galpaoId = devGalpao.get(l.dispositivo_id);
-          if (!galpaoId) return;
-          const cur = leiturasMap.get(galpaoId);
-          if (l.temperatura_c == null) return;
-          if (!cur || (cur.ts && l.lido_em > cur.ts)) {
-            leiturasMap.set(galpaoId, { temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em });
-          }
+          if (ultimoPorDev.has(l.dispositivo_id)) return; // já temos a mais recente
+          ultimoPorDev.set(l.dispositivo_id, {
+            temp: l.temperatura_c, ur: l.umidade_pct, ts: l.lido_em,
+          });
+        });
+        devIds.forEach(devId => {
+          const info = devInfo.get(devId);
+          if (!info?.galpao_id) return;
+          const r = ultimoPorDev.get(devId);
+          const sensor: SensorGalpao = {
+            dispositivo_id: devId,
+            nome: info.nome,
+            temperatura_c: r?.temp ?? null,
+            umidade_pct: r?.ur ?? null,
+            ultima_leitura: r?.ts ?? null,
+          };
+          if (!sensoresPorGalpao.has(info.galpao_id)) sensoresPorGalpao.set(info.galpao_id, []);
+          sensoresPorGalpao.get(info.galpao_id)!.push(sensor);
         });
       }
 
       const ls: LeituraGalpao[] = nucleo.galpoes.map(g => {
-        const r = leiturasMap.get(g.id);
+        const sensores = sensoresPorGalpao.get(g.id) ?? [];
+        const tempsValidas = sensores
+          .map(s => s.temperatura_c)
+          .filter((v): v is number => v != null);
+        const temp_max = tempsValidas.length ? Math.max(...tempsValidas) : null;
+        const temp_min = tempsValidas.length ? Math.min(...tempsValidas) : null;
+        const temp_media = tempsValidas.length
+          ? tempsValidas.reduce((a, b) => a + b, 0) / tempsValidas.length
+          : null;
+        const divergencia = temp_max != null && temp_min != null ? temp_max - temp_min : null;
+
+        // UR: descartar sensores travados em 0% ou 100% se discordam ≥20pp dos demais
+        const ursValidas = sensores
+          .map(s => s.umidade_pct)
+          .filter((v): v is number => v != null);
+        let urMedia: number | null = null;
+        if (ursValidas.length) {
+          const naoExtremas = ursValidas.filter(v => v > 0 && v < 100);
+          const referencia = naoExtremas.length ? naoExtremas : ursValidas;
+          const med = referencia.reduce((a, b) => a + b, 0) / referencia.length;
+          // marcar suspeitos
+          sensores.forEach(s => {
+            if (s.umidade_pct == null) return;
+            if ((s.umidade_pct === 0 || s.umidade_pct === 100) &&
+                Math.abs(s.umidade_pct - med) >= 20 && naoExtremas.length > 0) {
+              s.suspeito = true;
+              s.motivo_suspeita = `UR travada em ${s.umidade_pct}%`;
+            }
+          });
+          urMedia = med;
+        }
+        // ultima leitura mais recente
+        const ts = sensores
+          .map(s => s.ultima_leitura)
+          .filter((v): v is string => !!v)
+          .sort()
+          .reverse()[0] ?? null;
+
+        const sensores_suspeitos = sensores.filter(s => s.suspeito).length;
+
         return {
           galpao_id: g.id,
           galpao_nome: g.nome,
-          temperatura_c: r?.temp ?? null,
-          umidade_pct: r?.ur ?? null,
-          ultima_leitura: r?.ts ?? null,
+          temperatura_c: temp_max,
+          temperatura_min_c: temp_min,
+          temperatura_media_c: temp_media,
+          divergencia_c: divergencia,
+          umidade_pct: urMedia,
+          ultima_leitura: ts,
           inercia_min: g.inercia_termica_min ?? 60,
           ventilador_qtd: g.ventilador_quantidade ?? 0,
+          sensores,
+          sensores_suspeitos,
         };
       });
       if (!cancel) setLeituras(ls);
