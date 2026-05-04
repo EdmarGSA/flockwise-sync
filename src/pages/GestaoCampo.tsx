@@ -14,6 +14,7 @@ import { getLinhagemLabel, getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NucleoForm } from '@/components/lotes/NucleoForm';
 import { NucleoEditForm } from '@/components/lotes/NucleoEditForm';
+import { ClimaNucleoCard } from '@/components/campo/ClimaNucleoCard';
 import { GalpaoForm } from '@/components/lotes/GalpaoForm';
 import { GalpaoEditForm } from '@/components/lotes/GalpaoEditForm';
 import { AreaForm } from '@/components/campo/AreaForm';
