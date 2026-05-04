@@ -178,30 +178,32 @@ export function gerarPlanoPrevencao(params: {
           categoria: 'frio',
         });
       }
-      // Divergência térmica entre zonas
-      if (l.divergencia_c != null && l.divergencia_c >= 5) {
+      // Divergência térmica entre zonas (limiar configurável)
+      if (l.divergencia_c != null && l.divergencia_c >= divergMin) {
         acoes.push({
           id: `diverg-${l.galpao_id}`,
           prioridade: 'media',
           quando: 'Imediato',
           galpao: l.galpao_nome,
           acao: 'Equalizar ambiente: checar cortinas, exaustão e distribuição de aquecedores na zona divergente',
-          motivo: `Diferença de ${l.divergencia_c.toFixed(1)}°C entre sensores do galpão`,
+          motivo: `Diferença de ${l.divergencia_c.toFixed(1)}°C entre sensores (limite ${divergMin}°C)`,
           categoria: 'manejo',
         });
       }
-      // Sensores suspeitos (UR travada, etc)
-      if (l.sensores_suspeitos && l.sensores_suspeitos > 0) {
+      // Sensores suspeitos (UR travada, estagnados, etc) — só se habilitado
+      if (habilitarSusp && l.sensores_suspeitos && l.sensores_suspeitos > 0) {
         acoes.push({
           id: `sensor-susp-${l.galpao_id}`,
           prioridade: 'media',
           quando: 'Imediato',
           galpao: l.galpao_nome,
-          acao: 'Verificar/calibrar sensor com leitura suspeita (UR travada em 0% ou 100%)',
+          acao: 'Verificar/calibrar sensor com leitura suspeita',
           motivo: `${l.sensores_suspeitos} sensor(es) com leitura inconsistente`,
           categoria: 'sensor',
         });
       }
+    });
+  }
     });
   }
 
