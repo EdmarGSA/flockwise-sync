@@ -668,6 +668,7 @@ export type Database = {
           ativo: boolean
           automacao_ativa: boolean
           canal_numero: number
+          cfm_nominal: number | null
           created_at: string
           dispositivo_id: string
           estado_atual: string | null
@@ -683,12 +684,16 @@ export type Database = {
           ultimo_comando_em: string | null
           ultimo_estado_persistido: string | null
           ultimo_estado_persistido_em: string | null
+          ultimo_off_em: string | null
+          ultimo_on_em: string | null
           updated_at: string
+          watts_nominal: number | null
         }
         Insert: {
           ativo?: boolean
           automacao_ativa?: boolean
           canal_numero: number
+          cfm_nominal?: number | null
           created_at?: string
           dispositivo_id: string
           estado_atual?: string | null
@@ -704,12 +709,16 @@ export type Database = {
           ultimo_comando_em?: string | null
           ultimo_estado_persistido?: string | null
           ultimo_estado_persistido_em?: string | null
+          ultimo_off_em?: string | null
+          ultimo_on_em?: string | null
           updated_at?: string
+          watts_nominal?: number | null
         }
         Update: {
           ativo?: boolean
           automacao_ativa?: boolean
           canal_numero?: number
+          cfm_nominal?: number | null
           created_at?: string
           dispositivo_id?: string
           estado_atual?: string | null
@@ -725,7 +734,10 @@ export type Database = {
           ultimo_comando_em?: string | null
           ultimo_estado_persistido?: string | null
           ultimo_estado_persistido_em?: string | null
+          ultimo_off_em?: string | null
+          ultimo_on_em?: string | null
           updated_at?: string
+          watts_nominal?: number | null
         }
         Relationships: [
           {
@@ -1096,6 +1108,60 @@ export type Database = {
           created_at?: string
           id?: string
           integrado_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      config_histerese_organizacao: {
+        Row: {
+          created_at: string
+          deadband_temp_c: number
+          integrado_id: string
+          ith_amarelo: number
+          ith_vermelho: number
+          modo_seguro_vent_min_pct: number
+          protege_pintinho_ate_dias: number
+          sensor_max_idade_min: number
+          tempo_min_off_aquecedor_seg: number
+          tempo_min_off_nebulizador_seg: number
+          tempo_min_off_ventilador_seg: number
+          tempo_min_on_aquecedor_seg: number
+          tempo_min_on_nebulizador_seg: number
+          tempo_min_on_ventilador_seg: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deadband_temp_c?: number
+          integrado_id: string
+          ith_amarelo?: number
+          ith_vermelho?: number
+          modo_seguro_vent_min_pct?: number
+          protege_pintinho_ate_dias?: number
+          sensor_max_idade_min?: number
+          tempo_min_off_aquecedor_seg?: number
+          tempo_min_off_nebulizador_seg?: number
+          tempo_min_off_ventilador_seg?: number
+          tempo_min_on_aquecedor_seg?: number
+          tempo_min_on_nebulizador_seg?: number
+          tempo_min_on_ventilador_seg?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deadband_temp_c?: number
+          integrado_id?: string
+          ith_amarelo?: number
+          ith_vermelho?: number
+          modo_seguro_vent_min_pct?: number
+          protege_pintinho_ate_dias?: number
+          sensor_max_idade_min?: number
+          tempo_min_off_aquecedor_seg?: number
+          tempo_min_off_nebulizador_seg?: number
+          tempo_min_off_ventilador_seg?: number
+          tempo_min_on_aquecedor_seg?: number
+          tempo_min_on_nebulizador_seg?: number
+          tempo_min_on_ventilador_seg?: number
           updated_at?: string
         }
         Relationships: []
@@ -1679,6 +1745,107 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      curva_climatica_ponto: {
+        Row: {
+          co2_max_ppm: number | null
+          curva_id: string
+          dia_idade: number
+          id: string
+          ith_alarme_amarelo: number | null
+          ith_alarme_vermelho: number | null
+          nh3_max_ppm: number | null
+          temp_alvo_c: number
+          temp_max_alarme_c: number
+          temp_min_alarme_c: number
+          ur_max_pct: number | null
+          ur_min_pct: number | null
+          vazao_min_m3h_por_kg: number | null
+          velocidade_ar_max_ms: number | null
+          velocidade_ar_min_ms: number | null
+        }
+        Insert: {
+          co2_max_ppm?: number | null
+          curva_id: string
+          dia_idade: number
+          id?: string
+          ith_alarme_amarelo?: number | null
+          ith_alarme_vermelho?: number | null
+          nh3_max_ppm?: number | null
+          temp_alvo_c: number
+          temp_max_alarme_c: number
+          temp_min_alarme_c: number
+          ur_max_pct?: number | null
+          ur_min_pct?: number | null
+          vazao_min_m3h_por_kg?: number | null
+          velocidade_ar_max_ms?: number | null
+          velocidade_ar_min_ms?: number | null
+        }
+        Update: {
+          co2_max_ppm?: number | null
+          curva_id?: string
+          dia_idade?: number
+          id?: string
+          ith_alarme_amarelo?: number | null
+          ith_alarme_vermelho?: number | null
+          nh3_max_ppm?: number | null
+          temp_alvo_c?: number
+          temp_max_alarme_c?: number
+          temp_min_alarme_c?: number
+          ur_max_pct?: number | null
+          ur_min_pct?: number | null
+          vazao_min_m3h_por_kg?: number | null
+          velocidade_ar_max_ms?: number | null
+          velocidade_ar_min_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curva_climatica_ponto_curva_id_fkey"
+            columns: ["curva_id"]
+            isOneToOne: false
+            referencedRelation: "curva_climatica_referencia"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      curva_climatica_referencia: {
+        Row: {
+          created_at: string
+          fonte: string | null
+          id: string
+          integrado_id: string | null
+          linhagem: string
+          nome: string
+          publica: boolean
+          sexo: string
+          tipo_producao: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          integrado_id?: string | null
+          linhagem: string
+          nome: string
+          publica?: boolean
+          sexo?: string
+          tipo_producao?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          integrado_id?: string | null
+          linhagem?: string
+          nome?: string
+          publica?: boolean
+          sexo?: string
+          tipo_producao?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       demo_data_templates: {
         Row: {
@@ -3071,10 +3238,68 @@ export type Database = {
           },
         ]
       }
+      log_decisao_clima: {
+        Row: {
+          bloqueado_por: string | null
+          canal_id: string | null
+          created_at: string
+          dispositivo_id: string | null
+          estado_decidido: string | null
+          estagio: string | null
+          funcao_automacao: string | null
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          ith_calc: number | null
+          lote_id: string | null
+          reason_chain: Json
+          setpoint_alvo: number | null
+          temp_lida: number | null
+          ur_lida: number | null
+        }
+        Insert: {
+          bloqueado_por?: string | null
+          canal_id?: string | null
+          created_at?: string
+          dispositivo_id?: string | null
+          estado_decidido?: string | null
+          estagio?: string | null
+          funcao_automacao?: string | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          ith_calc?: number | null
+          lote_id?: string | null
+          reason_chain: Json
+          setpoint_alvo?: number | null
+          temp_lida?: number | null
+          ur_lida?: number | null
+        }
+        Update: {
+          bloqueado_por?: string | null
+          canal_id?: string | null
+          created_at?: string
+          dispositivo_id?: string | null
+          estado_decidido?: string | null
+          estagio?: string | null
+          funcao_automacao?: string | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          ith_calc?: number | null
+          lote_id?: string | null
+          reason_chain?: Json
+          setpoint_alvo?: number | null
+          temp_lida?: number | null
+          ur_lida?: number | null
+        }
+        Relationships: []
+      }
       lotes: {
         Row: {
           created_at: string
           criador_id: string | null
+          curva_climatica_id: string | null
           custo_aves: number | null
           data_alojamento: string | null
           data_fechamento: string | null
@@ -3108,6 +3333,7 @@ export type Database = {
         Insert: {
           created_at?: string
           criador_id?: string | null
+          curva_climatica_id?: string | null
           custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
@@ -3143,6 +3369,7 @@ export type Database = {
         Update: {
           created_at?: string
           criador_id?: string | null
+          curva_climatica_id?: string | null
           custo_aves?: number | null
           data_alojamento?: string | null
           data_fechamento?: string | null
@@ -3176,6 +3403,13 @@ export type Database = {
           veterinario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lotes_curva_climatica_id_fkey"
+            columns: ["curva_climatica_id"]
+            isOneToOne: false
+            referencedRelation: "curva_climatica_referencia"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lotes_galpao_id_fkey"
             columns: ["galpao_id"]
