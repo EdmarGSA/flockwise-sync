@@ -209,11 +209,29 @@ Deno.serve(async (req) => {
           const idade = idadeLoteDias(lote.data_alojamento);
           const faixa = programaFaixas.find((f) => idade >= f.dia_inicio && idade <= f.dia_fim);
           if (faixa) {
-            const r = calcular(faixa);
+            // Modo solar: substitui blocos pelos horários ancorados no nascer/pôr do dia
+            let faixaEfetiva = faixa as Faixa;
+            if (faixa.modo_horario === "solar") {
+              const nucleoId = nucleoByGalpao.get(dev.galpao_id);
+              const sol = nucleoId ? solarByNucleo.get(nucleoId) : null;
+              if (sol?.nascer && sol?.por) {
+                const ofA = faixa.acender_offset_min ?? 0;
+                const ofP = faixa.apagar_offset_min ?? 0;
+                const fmt = (d: Date) => {
+                  const dl = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+                  return `${dl.find(p => p.type === "hour")?.value}:${dl.find(p => p.type === "minute")?.value}`;
+                };
+                const nascerOff = new Date(sol.nascer.getTime() + ofA * 60000);
+                const porOff = new Date(sol.por.getTime() + ofP * 60000);
+                faixaEfetiva = { ...faixa, blocos: [{ acender: fmt(nascerOff), apagar: fmt(porOff), intensidade_pct: faixa.intensidade_pct }] };
+              }
+            }
+            const r = calcular(faixaEfetiva);
             estadoDesejado = r.ligado ? "on" : "off";
             intensidade = r.intensidade;
-            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}, ${r.intensidade}%`;
+            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}, ${r.intensidade}%`;
           }
+
         }
       }
 
