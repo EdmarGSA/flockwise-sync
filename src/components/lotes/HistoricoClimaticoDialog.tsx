@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, parseISO, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle, CloudRain, Wind, CloudSun } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,8 @@ import { cn } from '@/lib/utils';
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  nucleoIdInicial?: string;
+  tabInicial?: 'previsao' | 'series' | 'alertas';
 }
 
 const SEV_VARIANT: Record<string, 'destructive' | 'default' | 'secondary'> = {
