@@ -117,6 +117,7 @@ const ConfiguracaoAlertasClima = () => {
       (cfgs || []).forEach((c: any) => {
         const key = c.nucleo_id || "default";
         map[key] = {
+          ...DEFAULTS,
           id: c.id, nucleo_id: c.nucleo_id,
           temp_max_critico: c.temp_max_critico, temp_min_critico: c.temp_min_critico,
           ith_max_critico: c.ith_max_critico, vento_max_kmh: c.vento_max_kmh,
@@ -124,6 +125,13 @@ const ConfiguracaoAlertasClima = () => {
           habilitar_calor: c.habilitar_calor, habilitar_frio: c.habilitar_frio,
           habilitar_ith: c.habilitar_ith, habilitar_vento: c.habilitar_vento,
           habilitar_chuva: c.habilitar_chuva,
+          habilitar_sensor_suspeito: c.habilitar_sensor_suspeito ?? DEFAULTS.habilitar_sensor_suspeito,
+          sensor_offline_min: c.sensor_offline_min ?? DEFAULTS.sensor_offline_min,
+          sensor_estagnado_min: c.sensor_estagnado_min ?? DEFAULTS.sensor_estagnado_min,
+          ur_suspeita_baixa_pct: c.ur_suspeita_baixa_pct ?? DEFAULTS.ur_suspeita_baixa_pct,
+          ur_suspeita_alta_pct: c.ur_suspeita_alta_pct ?? DEFAULTS.ur_suspeita_alta_pct,
+          ur_divergencia_pp: c.ur_divergencia_pp ?? DEFAULTS.ur_divergencia_pp,
+          divergencia_temp_c: Number(c.divergencia_temp_c ?? DEFAULTS.divergencia_temp_c),
         };
       });
       setConfigs(map);
