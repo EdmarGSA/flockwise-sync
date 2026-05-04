@@ -66,6 +66,68 @@ function calcularTimerSeguranca(
   return null;
 }
 
+// ────────────────────────────────────────────────────────────
+// Schedule 24h por canal — fonte da verdade offline para o ESP32
+// ────────────────────────────────────────────────────────────
+interface Bloco { acender: string; apagar: string; intensidade_pct?: number }
+interface Faixa {
+  dia_inicio: number; dia_fim: number; horas_luz: number;
+  blocos: Bloco[]; ramp_up_min: number; ramp_down_min: number; intensidade_pct: number;
+}
+interface ScheduleSlot { hora_inicio: string; hora_fim: string; intensidade_pct: number }
+
+function montarSchedule24h(faixa: Faixa | null): ScheduleSlot[] {
+  if (!faixa || !faixa.blocos?.length) return [];
+  const out: ScheduleSlot[] = [];
+  for (const b of faixa.blocos) {
+    out.push({
+      hora_inicio: b.acender,
+      hora_fim: b.apagar,
+      intensidade_pct: Math.min(b.intensidade_pct ?? faixa.intensidade_pct, faixa.intensidade_pct),
+    });
+  }
+  return out;
+}
+
+async function carregarFaixaAtiva(
+  supabase: any,
+  loteId: string,
+  integradoId: string,
+  programaIdLote: string | null,
+  idadeDias: number,
+): Promise<Faixa | null> {
+  let programaId = programaIdLote;
+  if (!programaId) {
+    const { data: defp } = await supabase
+      .from("programa_iluminacao_lote")
+      .select("id")
+      .eq("integrado_id", integradoId)
+      .eq("tipo_producao", "frango_corte")
+      .eq("is_default", true)
+      .eq("ativo", true)
+      .maybeSingle();
+    programaId = defp?.id ?? null;
+  }
+  if (!programaId) return null;
+  const { data: faixa } = await supabase
+    .from("programa_iluminacao_faixa")
+    .select("*")
+    .eq("programa_id", programaId)
+    .lte("dia_inicio", idadeDias)
+    .gte("dia_fim", idadeDias)
+    .maybeSingle();
+  return (faixa as Faixa) ?? null;
+}
+
+function gerarVersaoSchedule(slots: Record<string, ScheduleSlot[]>): string {
+  const json = JSON.stringify(slots);
+  let hash = 0;
+  for (let i = 0; i < json.length; i++) {
+    hash = ((hash << 5) - hash + json.charCodeAt(i)) | 0;
+  }
+  return `v${Math.abs(hash).toString(36)}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
