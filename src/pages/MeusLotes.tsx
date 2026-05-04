@@ -110,6 +110,14 @@ export default function MeusLotes() {
   const [metasPosturaOpen, setMetasPosturaOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<LoteComPesagem | null>(null);
   const [historicoClimaOpen, setHistoricoClimaOpen] = useState(false);
+  const [climaTabInicial, setClimaTabInicial] = useState<'previsao' | 'series' | 'alertas'>('previsao');
+  const [climaNucleoInicial, setClimaNucleoInicial] = useState<string | undefined>(undefined);
+
+  const abrirClima = (nucleoId?: string, tab: 'previsao' | 'series' | 'alertas' = 'previsao') => {
+    setClimaNucleoInicial(nucleoId);
+    setClimaTabInicial(tab);
+    setHistoricoClimaOpen(true);
+  };
 
   useEffect(() => {
     if (user) {
