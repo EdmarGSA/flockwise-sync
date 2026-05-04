@@ -586,8 +586,9 @@ export default function MeusLotes() {
         {/* Temperature Alerts */}
         <AlertasTemperaturaBar />
         <AlertasClimaticosBar />
+        <PrevisaoNucleosBar onAbrirDetalhes={(id) => abrirClima(id, 'previsao')} />
         <div className="flex justify-end mb-4">
-          <Button variant="outline" size="sm" onClick={() => setHistoricoClimaOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => abrirClima(undefined, 'series')}>
             <Thermometer className="w-4 h-4 mr-2" />
             Histórico climático por núcleo
           </Button>
