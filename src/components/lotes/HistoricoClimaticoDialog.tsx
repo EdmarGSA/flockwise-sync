@@ -94,13 +94,13 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
     setHist3h(res[0].data ?? []);
     const al2 = res[1].data ?? [];
     setAlertas(al2);
-    setTipos([...new Set(al2.map((a: any) => a.tipo as string))]);
+    setTipos(Array.from(new Set(al2.map((a: any) => String(a.tipo)))));
     setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
 
-  const serie = useMemo(() =>
-    hist3h.map(r => ({
+  const serie = useMemo(() => {
+    const cur = hist3h.map(r => ({
       label: format(parseISO(r.ts_3h), 'dd/MM HH:mm', { locale: ptBR }),
       temp_med: r.temp_med != null ? Number(r.temp_med) : null,
       temp_min: r.temp_min != null ? Number(r.temp_min) : null,
@@ -108,7 +108,30 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
       ur_med: r.ur_med != null ? Number(r.ur_med) : null,
       ith_med: r.ith_med != null ? Number(r.ith_med) : null,
       ith_max: r.ith_max != null ? Number(r.ith_max) : null,
-    })), [hist3h]);
+    }));
+    if (!comparar) return cur;
+    const len = Math.max(cur.length, hist3hPrev.length);
+    const out: any[] = [];
+    for (let i = 0; i < len; i++) {
+      const c = cur[i];
+      const p = hist3hPrev[i];
+      out.push({
+        label: c?.label ?? (p ? format(parseISO(p.ts_3h), 'dd/MM HH:mm', { locale: ptBR }) : `#${i}`),
+        temp_med: c?.temp_med ?? null,
+        temp_min: c?.temp_min ?? null,
+        temp_max: c?.temp_max ?? null,
+        ur_med: c?.ur_med ?? null,
+        ith_med: c?.ith_med ?? null,
+        ith_max: c?.ith_max ?? null,
+        temp_med_prev: p?.temp_med != null ? Number(p.temp_med) : null,
+        temp_max_prev: p?.temp_max != null ? Number(p.temp_max) : null,
+        temp_min_prev: p?.temp_min != null ? Number(p.temp_min) : null,
+        ur_med_prev: p?.ur_med != null ? Number(p.ur_med) : null,
+        ith_med_prev: p?.ith_med != null ? Number(p.ith_med) : null,
+      });
+    }
+    return out;
+  }, [hist3h, hist3hPrev, comparar]);
 
   const alertasFiltrados = useMemo(() =>
     alertas
