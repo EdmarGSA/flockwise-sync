@@ -109,6 +109,8 @@ export default function GestaoCampo() {
   const { integradoId, loading: loadingIntegrado } = useIntegradoId();
   const navigate = useNavigate();
   const [nucleos, setNucleos] = useState<Nucleo[]>([]);
+  const [atualizandoClimaTodos, setAtualizandoClimaTodos] = useState(false);
+  const [climaRefreshKey, setClimaRefreshKey] = useState(0);
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
