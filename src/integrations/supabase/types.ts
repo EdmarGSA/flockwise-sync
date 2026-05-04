@@ -4108,55 +4108,76 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          divergencia_temp_c: number
           habilitar_calor: boolean
           habilitar_chuva: boolean
           habilitar_frio: boolean
           habilitar_ith: boolean
+          habilitar_sensor_suspeito: boolean
           habilitar_vento: boolean
           id: string
           integrado_id: string
           ith_max_critico: number | null
           nucleo_id: string | null
           prob_chuva_min_pct: number | null
+          sensor_estagnado_min: number
+          sensor_offline_min: number
           temp_max_critico: number | null
           temp_min_critico: number | null
           updated_at: string
+          ur_divergencia_pp: number
+          ur_suspeita_alta_pct: number
+          ur_suspeita_baixa_pct: number
           vento_max_kmh: number | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          divergencia_temp_c?: number
           habilitar_calor?: boolean
           habilitar_chuva?: boolean
           habilitar_frio?: boolean
           habilitar_ith?: boolean
+          habilitar_sensor_suspeito?: boolean
           habilitar_vento?: boolean
           id?: string
           integrado_id: string
           ith_max_critico?: number | null
           nucleo_id?: string | null
           prob_chuva_min_pct?: number | null
+          sensor_estagnado_min?: number
+          sensor_offline_min?: number
           temp_max_critico?: number | null
           temp_min_critico?: number | null
           updated_at?: string
+          ur_divergencia_pp?: number
+          ur_suspeita_alta_pct?: number
+          ur_suspeita_baixa_pct?: number
           vento_max_kmh?: number | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          divergencia_temp_c?: number
           habilitar_calor?: boolean
           habilitar_chuva?: boolean
           habilitar_frio?: boolean
           habilitar_ith?: boolean
+          habilitar_sensor_suspeito?: boolean
           habilitar_vento?: boolean
           id?: string
           integrado_id?: string
           ith_max_critico?: number | null
           nucleo_id?: string | null
           prob_chuva_min_pct?: number | null
+          sensor_estagnado_min?: number
+          sensor_offline_min?: number
           temp_max_critico?: number | null
           temp_min_critico?: number | null
           updated_at?: string
+          ur_divergencia_pp?: number
+          ur_suspeita_alta_pct?: number
+          ur_suspeita_baixa_pct?: number
           vento_max_kmh?: number | null
         }
         Relationships: [

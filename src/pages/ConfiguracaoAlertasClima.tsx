@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin } from "lucide-react";
+import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin, Activity } from "lucide-react";
 
 const alertaSchema = z.object({
   temp_max_critico: z.number().min(-10, "Temp. máx. fora da faixa (-10 a 50°C)").max(50, "Temp. máx. fora da faixa (-10 a 50°C)").nullable(),
