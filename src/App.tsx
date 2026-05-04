@@ -50,6 +50,7 @@ import OrdensProducao from "./pages/OrdensProducao";
 import DispositivosIoT from "./pages/DispositivosIoT";
 import ProgramasIluminacao from "./pages/ProgramasIluminacao";
 import EstimuloPostura from "./pages/EstimuloPostura";
+import PoliticaRecuperacaoIoT from "./pages/PoliticaRecuperacaoIoT";
 import Cameras from "./pages/Cameras";
 import CameraNovoDvr from "./pages/CameraNovoDvr";
 import CameraEditarDvr from "./pages/CameraEditarDvr";
