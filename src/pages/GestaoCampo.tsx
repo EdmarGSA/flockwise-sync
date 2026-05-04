@@ -517,10 +517,36 @@ export default function GestaoCampo() {
             </div>
 
             {filteredNucleos.filter(n => n.latitude && n.longitude).length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredNucleos.filter(n => n.latitude && n.longitude).slice(0, 6).map(n => (
-                  <ClimaNucleoCard key={n.id} nucleoId={n.id} nucleoNome={n.nome} />
-                ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">Clima dos Núcleos</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setAtualizandoClimaTodos(true);
+                      try {
+                        const { error } = await supabase.functions.invoke('weather-sync', { body: {} });
+                        if (error) throw error;
+                        toast.success('Clima de todos os núcleos atualizado');
+                        setClimaRefreshKey(k => k + 1);
+                      } catch (e: any) {
+                        toast.error('Falha ao atualizar', { description: e?.message });
+                      } finally {
+                        setAtualizandoClimaTodos(false);
+                      }
+                    }}
+                    disabled={atualizandoClimaTodos}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${atualizandoClimaTodos ? 'animate-spin' : ''}`} />
+                    Atualizar todos
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredNucleos.filter(n => n.latitude && n.longitude).slice(0, 6).map(n => (
+                    <ClimaNucleoCard key={`${n.id}-${climaRefreshKey}`} nucleoId={n.id} nucleoNome={n.nome} />
+                  ))}
+                </div>
               </div>
             )}
 
