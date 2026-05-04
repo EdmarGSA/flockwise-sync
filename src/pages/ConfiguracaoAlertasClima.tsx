@@ -341,6 +341,59 @@ const ConfiguracaoAlertasClima = () => {
             </div>
           </div>
 
+          {/* Sensores suspeitos */}
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2 text-base">
+                <Activity className="h-4 w-4 text-purple-500" /> Sensores suspeitos / divergência
+              </Label>
+              <Switch checked={cfg.habilitar_sensor_suspeito} onCheckedChange={(v) => updateField(key, { habilitar_sensor_suspeito: v })} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Detecta sensores com leitura travada, offline ou divergente entre si dentro do mesmo galpão.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Offline após (min)</Label>
+                <Input type="number" min={2} max={120} step={1} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.sensor_offline_min}
+                  onChange={(e) => updateField(key, { sensor_offline_min: Number(e.target.value || 0) })} />
+              </div>
+              <div>
+                <Label className="text-xs">Estagnado após (min)</Label>
+                <Input type="number" min={10} max={720} step={5} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.sensor_estagnado_min}
+                  onChange={(e) => updateField(key, { sensor_estagnado_min: Number(e.target.value || 0) })} />
+              </div>
+              <div>
+                <Label className="text-xs">UR suspeita ≤ (%)</Label>
+                <Input type="number" min={0} max={50} step={1} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.ur_suspeita_baixa_pct}
+                  onChange={(e) => updateField(key, { ur_suspeita_baixa_pct: Number(e.target.value || 0) })} />
+              </div>
+              <div>
+                <Label className="text-xs">UR suspeita ≥ (%)</Label>
+                <Input type="number" min={50} max={100} step={1} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.ur_suspeita_alta_pct}
+                  onChange={(e) => updateField(key, { ur_suspeita_alta_pct: Number(e.target.value || 0) })} />
+              </div>
+              <div>
+                <Label className="text-xs">Divergência mín. UR (pp)</Label>
+                <Input type="number" min={5} max={80} step={1} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.ur_divergencia_pp}
+                  onChange={(e) => updateField(key, { ur_divergencia_pp: Number(e.target.value || 0) })} />
+              </div>
+              <div>
+                <Label className="text-xs">Divergência mín. temp. (°C)</Label>
+                <Input type="number" min={1} max={15} step={0.5} disabled={!cfg.habilitar_sensor_suspeito}
+                  value={cfg.divergencia_temp_c}
+                  onChange={(e) => updateField(key, { divergencia_temp_c: Number(e.target.value || 0) })} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Marca a UR como travada se ficar ≤ {cfg.ur_suspeita_baixa_pct}% ou ≥ {cfg.ur_suspeita_alta_pct}% e divergir dos demais em ≥ {cfg.ur_divergencia_pp} pp. Aciona alerta de equalização quando dois sensores no mesmo galpão divergem ≥ {cfg.divergencia_temp_c}°C.
+            </p>
+          </div>
           <div className="flex gap-2 justify-end pt-2">
             {!isDefault && cfg.id && (
               <Button variant="outline" onClick={() => handleReset(key)} disabled={saving}>
