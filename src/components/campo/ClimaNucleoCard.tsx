@@ -154,11 +154,6 @@ export function ClimaNucleoCard({ nucleoId, nucleoNome }: Props) {
           <div className="text-xs text-muted-foreground border-t pt-2">
             Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span>
           </div>
-
-        {forecast.length > 0 && (
-          <div className="text-xs text-muted-foreground border-t pt-2">
-            Próximas 12h: <span className="font-medium text-foreground">{proxMin.toFixed(0)}° → {proxMax.toFixed(0)}°</span>
-          </div>
         )}
 
         {alertas.length > 0 && (
