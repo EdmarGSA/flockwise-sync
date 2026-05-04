@@ -19,6 +19,8 @@ import {
 import { format, parseISO, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Cloud, Loader2, Thermometer, Droplets, AlertTriangle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -41,7 +43,9 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   const [dataFim, setDataFim] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [hist3h, setHist3h] = useState<any[]>([]);
+  const [hist3hPrev, setHist3hPrev] = useState<any[]>([]);
   const [alertas, setAlertas] = useState<any[]>([]);
+  const [comparar, setComparar] = useState(false);
 
   useEffect(() => {
     if (!open || !integradoId) return;
@@ -58,13 +62,17 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open || !nucleoId) return;
     fetchData();
-  }, [open, nucleoId, dataIni, dataFim]);
+  }, [open, nucleoId, dataIni, dataFim, comparar]);
 
   const fetchData = async () => {
     setLoading(true);
     const ini = dataIni.toISOString();
     const fim = new Date(dataFim.getTime() + 86400000).toISOString();
-    const [h3, al] = await Promise.all([
+    const durMs = new Date(fim).getTime() - new Date(ini).getTime();
+    const prevIni = new Date(new Date(ini).getTime() - durMs).toISOString();
+    const prevFim = ini;
+
+    const calls: any[] = [
       supabase.from('weather_historico_3h').select('*')
         .eq('nucleo_id', nucleoId)
         .gte('ts_3h', ini).lte('ts_3h', fim)
@@ -73,11 +81,21 @@ export function HistoricoClimaticoDialog({ open, onOpenChange }: Props) {
         .eq('nucleo_id', nucleoId)
         .gte('horario_evento', ini).lte('horario_evento', fim)
         .order('horario_evento', { ascending: false }).limit(200),
-    ]);
-    setHist3h(h3.data ?? []);
-    const al2 = al.data ?? [];
+    ];
+    if (comparar) {
+      calls.push(
+        supabase.from('weather_historico_3h').select('*')
+          .eq('nucleo_id', nucleoId)
+          .gte('ts_3h', prevIni).lt('ts_3h', prevFim)
+          .order('ts_3h', { ascending: true }).limit(800),
+      );
+    }
+    const res = await Promise.all(calls);
+    setHist3h(res[0].data ?? []);
+    const al2 = res[1].data ?? [];
     setAlertas(al2);
     setTipos([...new Set(al2.map((a: any) => a.tipo))]);
+    setHist3hPrev(comparar ? (res[2]?.data ?? []) : []);
     setLoading(false);
   };
 
