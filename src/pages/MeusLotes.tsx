@@ -29,6 +29,7 @@ import { ConfirmarJejumDialog } from '@/components/lotes/ConfirmarJejumDialog';
 import { SaidaLoteInfoDialog } from '@/components/lotes/SaidaLoteInfoDialog';
 import { FechamentoLoteDialog } from '@/components/lotes/FechamentoLoteDialog';
 import { AlertasTemperaturaBar } from '@/components/lotes/AlertasTemperaturaBar';
+import { AlertasClimaticosBar } from '@/components/lotes/AlertasClimaticosBar';
 import { FasePosturaBadge } from '@/components/lotes/postura/FasePosturaBadge';
 import { PosturaIndicators } from '@/components/lotes/postura/PosturaIndicators';
 import { ProducaoOvosDialog } from '@/components/lotes/postura/ProducaoOvosDialog';
@@ -573,6 +574,7 @@ export default function MeusLotes() {
       <main className="container mx-auto px-4 py-8 pt-24">
         {/* Temperature Alerts */}
         <AlertasTemperaturaBar />
+        <AlertasClimaticosBar />
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card className="bg-card border-border">
