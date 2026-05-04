@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
 
       const { data: device } = await supabase
         .from("dispositivos_iot")
-        .select("id, nome, auth_token")
+        .select("id, nome, auth_token, integrado_id, online, boot_count, ultima_inicializacao")
         .eq("device_id_ewelink", body.deviceId)
         .eq("ativo", true)
         .maybeSingle();
@@ -271,7 +271,6 @@ Deno.serve(async (req) => {
         return json({ message: "Dispositivo não registrado, ignorando" }, 200);
       }
 
-      // Validação simples de token (opcional, recomendado em produção)
       if (device.auth_token) {
         const provided = req.headers.get("x-device-token");
         if (provided !== device.auth_token) {
@@ -279,7 +278,49 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 1. Persistir leitura ambiental (compartilha tabela com Sonoff)
+      // 0. Detecta boot/recuperação após queda
+      const isBoot = body.boot_reason && body.boot_reason !== "unknown" && (body.uptime_s ?? 9999) < 120;
+      if (isBoot) {
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "boot",
+          detalhes: {
+            boot_reason: body.boot_reason,
+            uptime_s: body.uptime_s,
+            programa_versao_aplicada: body.programa_versao_aplicada,
+          },
+        });
+        await supabase
+          .from("dispositivos_iot")
+          .update({
+            ultima_inicializacao: new Date().toISOString(),
+            boot_count: (device.boot_count ?? 0) + 1,
+            ultimo_boot_reason: body.boot_reason,
+          })
+          .eq("id", device.id);
+        // marca todos os canais para reconciliação no próximo cron
+        await supabase
+          .from("canais_dispositivo")
+          .update({ recuperacao_apos_falha: true })
+          .eq("dispositivo_id", device.id)
+          .eq("ativo", true);
+      } else if (device.online === false) {
+        // voltou online sem boot (perdeu apenas internet)
+        await supabase.from("eventos_dispositivo_iot").insert({
+          dispositivo_id: device.id,
+          integrado_id: device.integrado_id,
+          tipo: "online",
+          detalhes: { fonte: "telemetry" },
+        });
+        await supabase
+          .from("canais_dispositivo")
+          .update({ recuperacao_apos_falha: true })
+          .eq("dispositivo_id", device.id)
+          .eq("ativo", true);
+      }
+
+      // 1. Persistir leitura ambiental
       if (body.temperature !== undefined || body.humidity !== undefined) {
         await supabase.from("leituras_sensores").insert({
           dispositivo_id: device.id,
@@ -290,7 +331,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 2. Atualizar estado de cada canal
+      // 2. Atualizar estado de cada canal (firmware confirma o que aplicou)
       if (body.channels && body.channels.length > 0) {
         await Promise.all(
           body.channels.map((ch) =>
@@ -298,6 +339,9 @@ Deno.serve(async (req) => {
               .from("canais_dispositivo")
               .update({
                 estado_atual: ch.estado,
+                intensidade_atual: ch.intensidade_pct ?? undefined,
+                ultimo_estado_persistido: ch.estado,
+                ultimo_estado_persistido_em: new Date().toISOString(),
                 ultimo_comando_em: new Date().toISOString(),
               })
               .eq("dispositivo_id", device.id)
@@ -306,13 +350,13 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 3. Marcar último sync no dispositivo
+      // 3. Marcar último sync + online
       await supabase
         .from("dispositivos_iot")
-        .update({ ultimo_sync: new Date().toISOString() })
+        .update({ ultimo_sync: new Date().toISOString(), online: true })
         .eq("id", device.id);
 
-      return json({ ok: true, device: device.nome });
+      return json({ ok: true, device: device.nome, boot_detectado: !!isBoot });
     }
 
     // ──────────────────────────────────────────────
