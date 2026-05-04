@@ -380,7 +380,32 @@ function EventosTimeline({
       </button>
 
       {open && (
-        <div className="mt-2 space-y-1.5">
+        <div className="mt-2 space-y-2">
+          {/* Mini-chart de boots */}
+          <div className="rounded-md border bg-muted/20 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                Reinícios por {janela === '24h' ? 'hora (24h)' : 'dia (7d)'}
+              </span>
+              <div className="flex gap-0.5">
+                {(['24h', '7d'] as const).map((j) => (
+                  <button
+                    key={j}
+                    onClick={(e) => { e.stopPropagation(); setJanela(j); }}
+                    className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      janela === j
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {j}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <BootsBarChart data={bootSerie} />
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-2">
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
