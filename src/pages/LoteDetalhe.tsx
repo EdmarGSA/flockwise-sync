@@ -322,10 +322,12 @@ export default function LoteDetalhe() {
           </CardContent>
         </Card>
 
-        {/* Monitoramento IoT - Temperatura e Umidade */}
+        {/* Monitoramento IoT - Temperatura/Umidade e Iluminação */}
         {lote.status === 'alojado' && (
           <TemperaturaUmidadeCard
             galpaoId={lote.galpao_id}
+            loteId={lote.id}
+            programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
             idadeDias={lote.data_alojamento ? Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)) + 1 : undefined}
           />
         )}
