@@ -585,6 +585,36 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
             )}
           />
 
+          <FormField
+            control={form.control}
+            name="curva_climatica_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Curva Climática (Linhagem)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!isEditable && !modoEdicaoAvancada}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma curva" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="auto">Automática (faixas tradicionais)</SelectItem>
+                    {curvasClimaticas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}{c.publica ? ' · template' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define os setpoints diários de temperatura, umidade e velocidade de ar usados pela{' '}
+                  <a href="/configuracoes/curva-climatica" className="underline">automação climática</a>.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           {!isEditable && modoEdicaoAvancada && (
             <PreviewAjusteAlojamento
               dataAlojamentoAtual={lote.data_alojamento}
