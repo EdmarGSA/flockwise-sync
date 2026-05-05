@@ -168,6 +168,8 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       .order('nome');
     setCurvasClimaticas((data || []) as any);
   };
+
+  const fetchMortalidade = async () => {
     // Buscar total de mortalidade (mortes + eliminados)
     const { data, error } = await supabase
       .from('mortalidade')
