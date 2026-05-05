@@ -34,6 +34,8 @@ import CadastroParceiros from "./pages/CadastroParceiros";
 import CadastroMortalidadeMedia from "./pages/CadastroMortalidadeMedia";
 import ConfiguracaoSilo from "./pages/ConfiguracaoSilo";
 import ConfiguracaoAlertasClima from "./pages/ConfiguracaoAlertasClima";
+import ConfiguracaoCurvaClimatica from "./pages/ConfiguracaoCurvaClimatica";
+import ConfiguracaoHistereseClima from "./pages/ConfiguracaoHistereseClima";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
@@ -392,6 +394,20 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ConfiguracaoAlertasClima />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/curva-climatica" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoCurvaClimatica />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/histerese-clima" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoHistereseClima />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />

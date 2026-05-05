@@ -131,6 +131,18 @@ const Configuracoes = () => {
       path: "/configuracoes/alertas-clima"
     },
     {
+      title: "Curva Climática (Linhagem)",
+      description: "Curvas diárias de temp, UR e velocidade de ar (Cobb, Ross, Lohmann...)",
+      icon: CloudSun,
+      path: "/configuracoes/curva-climatica"
+    },
+    {
+      title: "Histerese e Segurança Climática",
+      description: "Deadband, tempos mínimos, ITH e modo seguro do motor de automação",
+      icon: ShieldCheck,
+      path: "/configuracoes/histerese-clima"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
