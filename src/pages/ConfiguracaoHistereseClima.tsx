@@ -48,7 +48,7 @@ const DEFAULT: Omit<Config, "integrado_id"> = {
 const ConfiguracaoHistereseClima = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const integradoId = useIntegradoId();
+  const { integradoId } = useIntegradoId();
   const [cfg, setCfg] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

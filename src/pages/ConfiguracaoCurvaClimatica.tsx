@@ -48,7 +48,7 @@ interface Ponto {
 const ConfiguracaoCurvaClimatica = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const integradoId = useIntegradoId();
+  const { integradoId } = useIntegradoId();
 
   const [curvas, setCurvas] = useState<CurvaRef[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -107,7 +107,7 @@ const ConfiguracaoCurvaClimatica = () => {
     };
     const { data, error } = await supabase
       .from("curva_climatica_referencia")
-      .insert(novo)
+      .insert([novo])
       .select()
       .single();
     if (error || !data) {
