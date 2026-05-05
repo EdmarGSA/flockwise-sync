@@ -52,6 +52,7 @@ const loteSchema = z.object({
   status: z.enum(['previsao', 'saiu_para_entrega', 'alojado', 'fechado']),
   veterinario_id: z.string().optional(),
   programa_iluminacao_id: z.string().optional(),
+  curva_climatica_id: z.string().optional(),
   observacoes: z.string().optional(),
 });
 
@@ -73,6 +74,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [veterinarios, setVeterinarios] = useState<Veterinario[]>([]);
   const [programasIluminacao, setProgramasIluminacao] = useState<{ id: string; nome: string; is_default: boolean }[]>([]);
+  const [curvasClimaticas, setCurvasClimaticas] = useState<{ id: string; nome: string; publica: boolean }[]>([]);
   const [totalMortalidade, setTotalMortalidade] = useState<number>(0);
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
@@ -118,6 +120,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       status: lote.status,
       veterinario_id: lote.veterinario_id || 'none',
       programa_iluminacao_id: (lote as any).programa_iluminacao_id || 'default',
+      curva_climatica_id: (lote as any).curva_climatica_id || 'auto',
       observacoes: lote.observacoes || '',
     },
   });
@@ -125,6 +128,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   useEffect(() => {
     fetchVeterinarios();
     fetchProgramasIluminacao();
+    fetchCurvasClimaticas();
     if (isAlojado) {
       fetchMortalidade();
       fetchUltimoPeso();
@@ -152,7 +156,18 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     setProgramasIluminacao((data || []) as any);
   };
 
-  const fetchMortalidade = async () => {
+  const fetchCurvasClimaticas = async () => {
+    if (!integradoId) return;
+    const tipo = isPostura ? 'postura' : 'frango_corte';
+    const { data } = await supabase
+      .from('curva_climatica_referencia')
+      .select('id, nome, publica')
+      .eq('tipo_producao', tipo)
+      .or(`publica.eq.true,integrado_id.eq.${integradoId}`)
+      .order('publica', { ascending: false })
+      .order('nome');
+    setCurvasClimaticas((data || []) as any);
+  };
     // Buscar total de mortalidade (mortes + eliminados)
     const { data, error } = await supabase
       .from('mortalidade')
