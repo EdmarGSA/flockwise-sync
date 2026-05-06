@@ -678,8 +678,10 @@ export type Database = {
           intensidade_atual: number | null
           nome: string
           observacoes: string | null
+          posicao_atual_pct: number | null
           recuperacao_apos_falha: boolean
           suporta_dimer: boolean
+          suporta_posicionamento: boolean
           tipo_equipamento: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em: string | null
           ultimo_estado_persistido: string | null
@@ -703,8 +705,10 @@ export type Database = {
           intensidade_atual?: number | null
           nome: string
           observacoes?: string | null
+          posicao_atual_pct?: number | null
           recuperacao_apos_falha?: boolean
           suporta_dimer?: boolean
+          suporta_posicionamento?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
           ultimo_estado_persistido?: string | null
@@ -728,8 +732,10 @@ export type Database = {
           intensidade_atual?: number | null
           nome?: string
           observacoes?: string | null
+          posicao_atual_pct?: number | null
           recuperacao_apos_falha?: boolean
           suporta_dimer?: boolean
+          suporta_posicionamento?: boolean
           tipo_equipamento?: Database["public"]["Enums"]["tipo_equipamento_canal"]
           ultimo_comando_em?: string | null
           ultimo_estado_persistido?: string | null
@@ -2196,6 +2202,45 @@ export type Database = {
           protocolo?: string | null
           tipo?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      estagio_ventilacao_estado: {
+        Row: {
+          cfm_total_ativo: number | null
+          estagio_atual: string
+          galpao_id: string
+          integrado_id: string
+          permanencia_minima_seg: number
+          pressao_estatica_pa: number | null
+          reason: Json | null
+          ultima_transicao_em: string
+          updated_at: string
+          velocidade_estimada_ms: number | null
+        }
+        Insert: {
+          cfm_total_ativo?: number | null
+          estagio_atual?: string
+          galpao_id: string
+          integrado_id: string
+          permanencia_minima_seg?: number
+          pressao_estatica_pa?: number | null
+          reason?: Json | null
+          ultima_transicao_em?: string
+          updated_at?: string
+          velocidade_estimada_ms?: number | null
+        }
+        Update: {
+          cfm_total_ativo?: number | null
+          estagio_atual?: string
+          galpao_id?: string
+          integrado_id?: string
+          permanencia_minima_seg?: number
+          pressao_estatica_pa?: number | null
+          reason?: Json | null
+          ultima_transicao_em?: string
+          updated_at?: string
+          velocidade_estimada_ms?: number | null
         }
         Relationships: []
       }
@@ -6876,6 +6921,51 @@ export type Database = {
           nome?: string
           tipo_producao?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      programa_ventilacao_galpao: {
+        Row: {
+          area_transversal_m2: number | null
+          ativo: boolean
+          created_at: string
+          estagios: Json
+          galpao_id: string
+          id: string
+          integrado_id: string
+          modo: string
+          pressao_estatica_alvo_pa: number | null
+          updated_at: string
+          velocidade_alvo_ms_max: number | null
+          velocidade_alvo_ms_min: number | null
+        }
+        Insert: {
+          area_transversal_m2?: number | null
+          ativo?: boolean
+          created_at?: string
+          estagios?: Json
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          modo?: string
+          pressao_estatica_alvo_pa?: number | null
+          updated_at?: string
+          velocidade_alvo_ms_max?: number | null
+          velocidade_alvo_ms_min?: number | null
+        }
+        Update: {
+          area_transversal_m2?: number | null
+          ativo?: boolean
+          created_at?: string
+          estagios?: Json
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          modo?: string
+          pressao_estatica_alvo_pa?: number | null
+          updated_at?: string
+          velocidade_alvo_ms_max?: number | null
+          velocidade_alvo_ms_min?: number | null
         }
         Relationships: []
       }
