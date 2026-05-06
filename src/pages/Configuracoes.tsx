@@ -143,6 +143,12 @@ const Configuracoes = () => {
       path: "/configuracoes/histerese-clima"
     },
     {
+      title: "Programa de Ventilação por Galpão",
+      description: "Pressão positiva/negativa, estágios mín→túnel e simulador de velocidade",
+      icon: Gauge,
+      path: "/configuracoes/ventilacao"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
