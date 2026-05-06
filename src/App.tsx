@@ -412,6 +412,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/configuracoes/ventilacao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoVentilacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/configuracoes/financeiro" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
