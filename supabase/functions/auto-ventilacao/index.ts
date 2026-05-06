@@ -237,20 +237,14 @@ Deno.serve(async (req) => {
       integrado_id: prog.integrado_id,
       galpao_id: prog.galpao_id,
       lote_id: lote.id,
-      origem: "auto-ventilacao",
+      funcao_automacao: "ventilacao",
       estado_decidido: novoEstagio,
+      estagio: novoEstagio,
+      temp_lida: tempC,
+      ur_lida: urPct,
+      ith_calc: ith(tempC, urPct),
       reason_chain: reason,
       bloqueado_por: bloqueado,
-      contexto: {
-        modo: prog.modo,
-        estagio_alvo: alvo.estagio,
-        ventiladores_alvo: alvo.ventiladores_n,
-        ventiladores_ativos: ativos.size,
-        cfm_total_ativo: cfmTotalAtivo,
-        velocidade_estimada_ms: velEstimada,
-        temp_c: tempC,
-        ur_pct: urPct,
-      },
     });
 
     resultados.push({
