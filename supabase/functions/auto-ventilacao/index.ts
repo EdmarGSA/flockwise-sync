@@ -12,7 +12,6 @@
 // comandos pelo edge `sync-sensors` (driver eWeLink) ou `esp32-bridge` (esp32_http).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { calcularITH } from "../auto-temperatura/index.ts" assert { type: "macro" }; // not used; placeholder
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
