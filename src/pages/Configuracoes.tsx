@@ -149,6 +149,12 @@ const Configuracoes = () => {
       path: "/configuracoes/ventilacao"
     },
     {
+      title: "Cortinas Inteligentes",
+      description: "Posição (%) por estágio de ventilação, idade e vento externo",
+      icon: Layers,
+      path: "/configuracoes/cortinas"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
