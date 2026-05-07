@@ -1614,6 +1614,47 @@ export type Database = {
           },
         ]
       }
+      cortina_estado_atual: {
+        Row: {
+          galpao_id: string
+          integrado_id: string
+          posicao_alvo_pct: number | null
+          posicao_atual_pct: number | null
+          reason_chain: Json | null
+          ultima_movimentacao_em: string | null
+          ultimo_motivo: string | null
+          updated_at: string
+        }
+        Insert: {
+          galpao_id: string
+          integrado_id: string
+          posicao_alvo_pct?: number | null
+          posicao_atual_pct?: number | null
+          reason_chain?: Json | null
+          ultima_movimentacao_em?: string | null
+          ultimo_motivo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          galpao_id?: string
+          integrado_id?: string
+          posicao_alvo_pct?: number | null
+          posicao_atual_pct?: number | null
+          reason_chain?: Json | null
+          ultima_movimentacao_em?: string | null
+          ultimo_motivo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cortina_estado_atual_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: true
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       create_user_audit_log: {
         Row: {
           attempt: number
@@ -6790,6 +6831,84 @@ export type Database = {
           },
         ]
       }
+      programa_cortina_inteligente: {
+        Row: {
+          ativo: boolean
+          considerar_vento_externo: boolean
+          created_at: string
+          galpao_id: string
+          id: string
+          integrado_id: string
+          modo: string
+          offset_estagio_heat_stress_pct: number
+          offset_estagio_min_pct: number
+          offset_estagio_transicao_pct: number
+          offset_estagio_tunel_pct: number
+          posicao_max_pct: number
+          posicao_min_pct: number
+          programa_ventilacao_id: string | null
+          updated_at: string
+          velocidade_abertura_pct_min: number
+          velocidade_fechamento_pct_min: number
+          vento_externo_max_ms: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          considerar_vento_externo?: boolean
+          created_at?: string
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          modo?: string
+          offset_estagio_heat_stress_pct?: number
+          offset_estagio_min_pct?: number
+          offset_estagio_transicao_pct?: number
+          offset_estagio_tunel_pct?: number
+          posicao_max_pct?: number
+          posicao_min_pct?: number
+          programa_ventilacao_id?: string | null
+          updated_at?: string
+          velocidade_abertura_pct_min?: number
+          velocidade_fechamento_pct_min?: number
+          vento_externo_max_ms?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          considerar_vento_externo?: boolean
+          created_at?: string
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          modo?: string
+          offset_estagio_heat_stress_pct?: number
+          offset_estagio_min_pct?: number
+          offset_estagio_transicao_pct?: number
+          offset_estagio_tunel_pct?: number
+          posicao_max_pct?: number
+          posicao_min_pct?: number
+          programa_ventilacao_id?: string | null
+          updated_at?: string
+          velocidade_abertura_pct_min?: number
+          velocidade_fechamento_pct_min?: number
+          vento_externo_max_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programa_cortina_inteligente_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: true
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programa_cortina_inteligente_programa_ventilacao_id_fkey"
+            columns: ["programa_ventilacao_id"]
+            isOneToOne: false
+            referencedRelation: "programa_ventilacao_galpao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programa_cortina_lote: {
         Row: {
           ativo: boolean
@@ -7355,6 +7474,8 @@ export type Database = {
       regras_temperatura_lote: {
         Row: {
           ativo: boolean
+          cortina_pos_max_pct: number | null
+          cortina_pos_min_pct: number | null
           created_at: string
           dia_fim: number
           dia_inicio: number
@@ -7373,6 +7494,8 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cortina_pos_max_pct?: number | null
+          cortina_pos_min_pct?: number | null
           created_at?: string
           dia_fim: number
           dia_inicio: number
@@ -7391,6 +7514,8 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cortina_pos_max_pct?: number | null
+          cortina_pos_min_pct?: number | null
           created_at?: string
           dia_fim?: number
           dia_inicio?: number
