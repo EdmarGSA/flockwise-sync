@@ -37,6 +37,7 @@ import ConfiguracaoAlertasClima from "./pages/ConfiguracaoAlertasClima";
 import ConfiguracaoCurvaClimatica from "./pages/ConfiguracaoCurvaClimatica";
 import ConfiguracaoHistereseClima from "./pages/ConfiguracaoHistereseClima";
 import ConfiguracaoVentilacao from "./pages/ConfiguracaoVentilacao";
+import ConfiguracaoCortinas from "./pages/ConfiguracaoCortinas";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
