@@ -155,6 +155,12 @@ const Configuracoes = () => {
       path: "/configuracoes/cortinas"
     },
     {
+      title: "Qualidade do Ar e Pressão",
+      description: "Limites de NH₃, CO₂ e pressão estática para alertas automáticos",
+      icon: Activity,
+      path: "/configuracoes/qualidade-ar"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,

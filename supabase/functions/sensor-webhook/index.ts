@@ -43,8 +43,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const temp = params.currentTemperature ? parseFloat(params.currentTemperature) : null;
-    const hum = params.currentHumidity ? parseFloat(params.currentHumidity) : null;
+    const num = (v: unknown) => (v == null || v === "" ? null : parseFloat(String(v)));
+    const temp = num(params.currentTemperature ?? params.temperature);
+    const hum = num(params.currentHumidity ?? params.humidity);
+    const nh3 = num(params.nh3 ?? params.nh3_ppm ?? params.ammonia);
+    const co2 = num(params.co2 ?? params.co2_ppm);
+    const velAr = num(params.wind ?? params.velocidade_ar_ms ?? params.air_speed);
+    const pressao = num(params.pressao ?? params.pressao_estatica_pa ?? params.static_pressure);
+    const lux = num(params.lux ?? params.brightness);
     const online = params.online ?? true;
 
     // Insert reading
@@ -52,6 +58,11 @@ Deno.serve(async (req) => {
       dispositivo_id: device.id,
       temperatura_c: temp,
       umidade_pct: hum,
+      nh3_ppm: nh3,
+      co2_ppm: co2,
+      velocidade_ar_ms: velAr,
+      pressao_estatica_pa: pressao,
+      lux,
       online,
       raw_data: params,
     });
