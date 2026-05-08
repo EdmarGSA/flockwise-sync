@@ -38,6 +38,7 @@ import ConfiguracaoCurvaClimatica from "./pages/ConfiguracaoCurvaClimatica";
 import ConfiguracaoHistereseClima from "./pages/ConfiguracaoHistereseClima";
 import ConfiguracaoVentilacao from "./pages/ConfiguracaoVentilacao";
 import ConfiguracaoCortinas from "./pages/ConfiguracaoCortinas";
+import ConfiguracaoQualidadeAr from "./pages/ConfiguracaoQualidadeAr";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
@@ -424,6 +425,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ConfiguracaoCortinas />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/qualidade-ar" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ConfiguracaoQualidadeAr />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
