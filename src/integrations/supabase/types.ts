@@ -193,6 +193,48 @@ export type Database = {
           },
         ]
       }
+      alertas_qualidade_ar: {
+        Row: {
+          created_at: string
+          dispositivo_id: string | null
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          limite_configurado: number
+          lote_id: string | null
+          resolvido_em: string | null
+          severidade: string
+          tipo: string
+          valor_lido: number
+        }
+        Insert: {
+          created_at?: string
+          dispositivo_id?: string | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          limite_configurado: number
+          lote_id?: string | null
+          resolvido_em?: string | null
+          severidade: string
+          tipo: string
+          valor_lido: number
+        }
+        Update: {
+          created_at?: string
+          dispositivo_id?: string | null
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          limite_configurado?: number
+          lote_id?: string | null
+          resolvido_em?: string | null
+          severidade?: string
+          tipo?: string
+          valor_lido?: number
+        }
+        Relationships: []
+      }
       alertas_temperatura: {
         Row: {
           created_at: string
@@ -994,6 +1036,48 @@ export type Database = {
           temp_fora_faixa_min?: number
           umid_critica_max_pct?: number
           umid_critica_min_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      config_alertas_qualidade_ar: {
+        Row: {
+          ativo: boolean
+          co2_amarelo_ppm: number
+          co2_vermelho_ppm: number
+          cooldown_minutos: number
+          created_at: string
+          integrado_id: string
+          nh3_amarelo_ppm: number
+          nh3_vermelho_ppm: number
+          pressao_max_pa: number
+          pressao_min_pa: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          co2_amarelo_ppm?: number
+          co2_vermelho_ppm?: number
+          cooldown_minutos?: number
+          created_at?: string
+          integrado_id: string
+          nh3_amarelo_ppm?: number
+          nh3_vermelho_ppm?: number
+          pressao_max_pa?: number
+          pressao_min_pa?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          co2_amarelo_ppm?: number
+          co2_vermelho_ppm?: number
+          cooldown_minutos?: number
+          created_at?: string
+          integrado_id?: string
+          nh3_amarelo_ppm?: number
+          nh3_vermelho_ppm?: number
+          pressao_max_pa?: number
+          pressao_min_pa?: number
           updated_at?: string
         }
         Relationships: []
@@ -2066,6 +2150,11 @@ export type Database = {
           num_canais: number
           programa_versao: string | null
           regra_grupo: string | null
+          suporta_anemometro: boolean | null
+          suporta_co2: boolean | null
+          suporta_lux: boolean | null
+          suporta_manometro: boolean | null
+          suporta_nh3: boolean | null
           tipo: string
           ultima_inicializacao: string | null
           ultimo_boot_reason: string | null
@@ -2091,6 +2180,11 @@ export type Database = {
           num_canais?: number
           programa_versao?: string | null
           regra_grupo?: string | null
+          suporta_anemometro?: boolean | null
+          suporta_co2?: boolean | null
+          suporta_lux?: boolean | null
+          suporta_manometro?: boolean | null
+          suporta_nh3?: boolean | null
           tipo?: string
           ultima_inicializacao?: string | null
           ultimo_boot_reason?: string | null
@@ -2116,6 +2210,11 @@ export type Database = {
           num_canais?: number
           programa_versao?: string | null
           regra_grupo?: string | null
+          suporta_anemometro?: boolean | null
+          suporta_co2?: boolean | null
+          suporta_lux?: boolean | null
+          suporta_manometro?: boolean | null
+          suporta_nh3?: boolean | null
           tipo?: string
           ultima_inicializacao?: string | null
           ultimo_boot_reason?: string | null
@@ -3231,34 +3330,49 @@ export type Database = {
       }
       leituras_sensores: {
         Row: {
+          co2_ppm: number | null
           created_at: string
           dispositivo_id: string
           id: string
           lido_em: string
+          lux: number | null
+          nh3_ppm: number | null
           online: boolean | null
+          pressao_estatica_pa: number | null
           raw_data: Json | null
           temperatura_c: number | null
           umidade_pct: number | null
+          velocidade_ar_ms: number | null
         }
         Insert: {
+          co2_ppm?: number | null
           created_at?: string
           dispositivo_id: string
           id?: string
           lido_em?: string
+          lux?: number | null
+          nh3_ppm?: number | null
           online?: boolean | null
+          pressao_estatica_pa?: number | null
           raw_data?: Json | null
           temperatura_c?: number | null
           umidade_pct?: number | null
+          velocidade_ar_ms?: number | null
         }
         Update: {
+          co2_ppm?: number | null
           created_at?: string
           dispositivo_id?: string
           id?: string
           lido_em?: string
+          lux?: number | null
+          nh3_ppm?: number | null
           online?: boolean | null
+          pressao_estatica_pa?: number | null
           raw_data?: Json | null
           temperatura_c?: number | null
           umidade_pct?: number | null
+          velocidade_ar_ms?: number | null
         }
         Relationships: [
           {
