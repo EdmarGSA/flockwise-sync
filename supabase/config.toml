@@ -65,3 +65,12 @@ verify_jwt = false
 [functions.weather-aggregator]
 verify_jwt = false
 
+
+[functions.climate-brain]
+verify_jwt = false
+
+[functions.climate-learn]
+verify_jwt = false
+
+[functions.auto-nebulizacao]
+verify_jwt = false
