@@ -161,6 +161,12 @@ const Configuracoes = () => {
       path: "/configuracoes/qualidade-ar"
     },
     {
+      title: "Climate Brain (IA)",
+      description: "Cérebro climático integrado com perfil aprendido por galpão",
+      icon: Brain,
+      path: "/configuracoes/climate-brain"
+    },
+    {
       title: "Mapeamento (Mapbox)",
       description: "Token do mapa para localizar núcleos e galpões",
       icon: MapPin,
