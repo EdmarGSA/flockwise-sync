@@ -436,6 +436,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/configuracoes/climate-brain" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <ClimateBrain />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/configuracoes/financeiro" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
