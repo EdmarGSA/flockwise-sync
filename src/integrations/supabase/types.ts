@@ -304,6 +304,68 @@ export type Database = {
           },
         ]
       }
+      aprendizado_galpao: {
+        Row: {
+          amostras_treinadas: number
+          created_at: string
+          fator_isolamento: number
+          fator_perda_calor_noturna: number
+          galpao_id: string
+          inercia_estimada_min: number
+          integrado_id: string
+          metricas: Json | null
+          modelo_versao: number
+          narrativa_atualizada_em: string | null
+          narrativa_ia: string | null
+          offset_temp_aprendido_c: number
+          offset_ur_aprendido_pct: number
+          ultimo_treino_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          amostras_treinadas?: number
+          created_at?: string
+          fator_isolamento?: number
+          fator_perda_calor_noturna?: number
+          galpao_id: string
+          inercia_estimada_min?: number
+          integrado_id: string
+          metricas?: Json | null
+          modelo_versao?: number
+          narrativa_atualizada_em?: string | null
+          narrativa_ia?: string | null
+          offset_temp_aprendido_c?: number
+          offset_ur_aprendido_pct?: number
+          ultimo_treino_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amostras_treinadas?: number
+          created_at?: string
+          fator_isolamento?: number
+          fator_perda_calor_noturna?: number
+          galpao_id?: string
+          inercia_estimada_min?: number
+          integrado_id?: string
+          metricas?: Json | null
+          modelo_versao?: number
+          narrativa_atualizada_em?: string | null
+          narrativa_ia?: string | null
+          offset_temp_aprendido_c?: number
+          offset_ur_aprendido_pct?: number
+          ultimo_treino_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprendizado_galpao_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: true
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           ativo: boolean
@@ -3452,6 +3514,8 @@ export type Database = {
           integrado_id: string
           ith_calc: number | null
           lote_id: string | null
+          modo_dominante: string | null
+          offset_aprendido_aplicado_c: number | null
           reason_chain: Json
           setpoint_alvo: number | null
           temp_lida: number | null
@@ -3470,6 +3534,8 @@ export type Database = {
           integrado_id: string
           ith_calc?: number | null
           lote_id?: string | null
+          modo_dominante?: string | null
+          offset_aprendido_aplicado_c?: number | null
           reason_chain: Json
           setpoint_alvo?: number | null
           temp_lida?: number | null
@@ -3488,6 +3554,8 @@ export type Database = {
           integrado_id?: string
           ith_calc?: number | null
           lote_id?: string | null
+          modo_dominante?: string | null
+          offset_aprendido_aplicado_c?: number | null
           reason_chain?: Json
           setpoint_alvo?: number | null
           temp_lida?: number | null
@@ -7157,6 +7225,65 @@ export type Database = {
         }
         Relationships: []
       }
+      programa_nebulizacao_galpao: {
+        Row: {
+          ativo: boolean
+          ciclo_off_seg: number
+          ciclo_on_seg: number
+          cooldown_seg: number
+          created_at: string
+          delta_temp_acionar_c: number
+          galpao_id: string
+          idade_minima_dias: number
+          integrado_id: string
+          ultimo_acionamento_em: string | null
+          ultimo_estado: string | null
+          updated_at: string
+          ur_max_pct: number
+          ventilacao_min_pct: number
+        }
+        Insert: {
+          ativo?: boolean
+          ciclo_off_seg?: number
+          ciclo_on_seg?: number
+          cooldown_seg?: number
+          created_at?: string
+          delta_temp_acionar_c?: number
+          galpao_id: string
+          idade_minima_dias?: number
+          integrado_id: string
+          ultimo_acionamento_em?: string | null
+          ultimo_estado?: string | null
+          updated_at?: string
+          ur_max_pct?: number
+          ventilacao_min_pct?: number
+        }
+        Update: {
+          ativo?: boolean
+          ciclo_off_seg?: number
+          ciclo_on_seg?: number
+          cooldown_seg?: number
+          created_at?: string
+          delta_temp_acionar_c?: number
+          galpao_id?: string
+          idade_minima_dias?: number
+          integrado_id?: string
+          ultimo_acionamento_em?: string | null
+          ultimo_estado?: string | null
+          updated_at?: string
+          ur_max_pct?: number
+          ventilacao_min_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programa_nebulizacao_galpao_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: true
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programa_ventilacao_galpao: {
         Row: {
           area_transversal_m2: number | null
@@ -7168,6 +7295,8 @@ export type Database = {
           integrado_id: string
           modo: string
           pressao_estatica_alvo_pa: number | null
+          troca_ar_brooding_ativa: boolean
+          troca_ar_brooding_max_pct: number
           updated_at: string
           velocidade_alvo_ms_max: number | null
           velocidade_alvo_ms_min: number | null
@@ -7182,6 +7311,8 @@ export type Database = {
           integrado_id: string
           modo?: string
           pressao_estatica_alvo_pa?: number | null
+          troca_ar_brooding_ativa?: boolean
+          troca_ar_brooding_max_pct?: number
           updated_at?: string
           velocidade_alvo_ms_max?: number | null
           velocidade_alvo_ms_min?: number | null
@@ -7196,6 +7327,8 @@ export type Database = {
           integrado_id?: string
           modo?: string
           pressao_estatica_alvo_pa?: number | null
+          troca_ar_brooding_ativa?: boolean
+          troca_ar_brooding_max_pct?: number
           updated_at?: string
           velocidade_alvo_ms_max?: number | null
           velocidade_alvo_ms_min?: number | null
