@@ -742,18 +742,43 @@ export function MortalidadeDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Quantidade *</Label>
-                  <Input type="number" placeholder="Ex: 5" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} min={1} />
+                  <Label>Quantidade * <span className="text-xs text-muted-foreground font-normal">(restam {Math.max(0, quantidadeAves - totalQtdItems)})</span></Label>
+                  <Input
+                    ref={quantidadeRef}
+                    type="number"
+                    placeholder="Ex: 5"
+                    value={quantidade}
+                    onChange={(e) => setQuantidade(e.target.value)}
+                    onKeyDown={handleQtdPesoKeyDown}
+                    min={1}
+                    className={cn(tentouAdicionar && (!quantidade || parseInt(quantidade) <= 0) && 'border-destructive')}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Peso (kg) *</Label>
-                  <Input type="number" placeholder="Ex: 1.5" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} step="0.01" min={0.01} />
+                  <Input
+                    ref={pesoRef}
+                    type="number"
+                    placeholder="Ex: 1.5"
+                    value={pesoKg}
+                    onChange={(e) => setPesoKg(e.target.value)}
+                    onKeyDown={handleQtdPesoKeyDown}
+                    step="0.01"
+                    min={0.01}
+                    className={cn(tentouAdicionar && (!pesoKg || parseFloat(pesoKg) <= 0) && 'border-destructive')}
+                  />
                 </div>
               </div>
 
-              <Button onClick={handleAddItem} className="w-full gap-2">
+              {limiteAtingido && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Limite de aves vivas atingido ({totalQtdItems}/{quantidadeAves}).
+                </p>
+              )}
+
+              <Button onClick={handleAddItem} disabled={limiteAtingido} className="w-full gap-2">
                 <Plus className="w-4 h-4" />
-                Adicionar Item
+                Adicionar Item <span className="text-xs opacity-70">(Enter)</span>
               </Button>
             </CardContent>
           </Card>
