@@ -340,17 +340,25 @@ export function MortalidadeDialog({
   };
 
   const handleAddItem = () => {
+    setTentouAdicionar(true);
     const qtd = parseInt(quantidade);
     if (isNaN(qtd) || qtd <= 0) {
       toast.error('Informe uma quantidade válida');
+      quantidadeRef.current?.focus();
       return;
     }
     if (!pesoKg || parseFloat(pesoKg) <= 0) {
       toast.error('Informe o peso das aves (obrigatório)');
+      pesoRef.current?.focus();
       return;
     }
     if (motivo === 'eliminado' && submotivos.length === 0) {
       toast.error('Selecione pelo menos um submotivo');
+      return;
+    }
+    if (totalQtdItems + qtd > quantidadeAves) {
+      const restantes = Math.max(0, quantidadeAves - totalQtdItems);
+      toast.error(`Restam apenas ${restantes} aves vivas disponíveis para registro`);
       return;
     }
 
@@ -366,6 +374,16 @@ export function MortalidadeDialog({
     setQuantidade('');
     setPesoKg('');
     setSubmotivos([]);
+    setTentouAdicionar(false);
+    // Foco de volta para registros em série
+    setTimeout(() => quantidadeRef.current?.focus(), 50);
+  };
+
+  const handleQtdPesoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddItem();
+    }
   };
 
   const handleRemoveItem = (id: string) => {
