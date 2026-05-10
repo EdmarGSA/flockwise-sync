@@ -94,6 +94,14 @@ export function MortalidadeDialog({
     diaFim: number;
   } | null>(null);
   const [savedMortalidadeId, setSavedMortalidadeId] = useState<string | null>(null);
+  const [climaDia, setClimaDia] = useState<MinMaxDia | null>(null);
+  const [galpaoIdLote, setGalpaoIdLote] = useState<string | null>(null);
+  const [draftRecuperado, setDraftRecuperado] = useState<{ savedAt: string } | null>(null);
+  const [draftCheckedKey, setDraftCheckedKey] = useState<string | null>(null);
+  const [metaPesoIdade, setMetaPesoIdade] = useState<number | null>(null);
+  const [tentouAdicionar, setTentouAdicionar] = useState(false);
+  const quantidadeRef = useRef<HTMLInputElement>(null);
+  const pesoRef = useRef<HTMLInputElement>(null);
 
   const getSemanaRange = (semana: number): { diaInicio: number; diaFim: number } => {
     switch (semana) {
