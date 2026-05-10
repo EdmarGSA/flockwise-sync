@@ -845,6 +845,38 @@ export function MortalidadeDialog({
                   </span>
                   <span className="text-xl font-bold text-destructive">{getTotalGeral()} aves</span>
                 </div>
+
+                {pesoMedioMortas != null && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-2 text-sm">
+                        <Scale className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium">Peso médio das mortas:</span>
+                      </span>
+                      <span className="text-base font-bold">
+                        {pesoMedioMortas.toFixed(3)} kg
+                        <span className="text-xs text-muted-foreground ml-1">({Math.round(pesoMedioMortas * 1000)} g)</span>
+                      </span>
+                    </div>
+                    {pesoComparacao && metaPesoIdade != null && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">
+                          Meta da idade ({diasDesdeAlojamento}d): {metaPesoIdade.toFixed(3)} kg
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            pesoComparacao.color === 'amber' && 'text-amber-600 border-amber-500/40 bg-amber-500/10',
+                            pesoComparacao.color === 'orange' && 'text-orange-600 border-orange-500/40 bg-orange-500/10',
+                            pesoComparacao.color === 'green' && 'text-green-600 border-green-500/40 bg-green-500/10',
+                          )}
+                        >
+                          {pesoComparacao.label} · {(pesoComparacao.ratio * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
