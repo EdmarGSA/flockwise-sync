@@ -135,6 +135,8 @@ const ConfiguracaoVentilacao = () => {
           velocidade_alvo_ms_min: data.velocidade_alvo_ms_min,
           velocidade_alvo_ms_max: data.velocidade_alvo_ms_max,
           area_transversal_m2: data.area_transversal_m2 ?? area,
+          troca_ar_brooding_ativa: (data as any).troca_ar_brooding_ativa ?? true,
+          troca_ar_brooding_max_pct: (data as any).troca_ar_brooding_max_pct ?? 25,
           ativo: data.ativo,
         });
       } else {
