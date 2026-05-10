@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 import { useIntegradoId } from "@/hooks/useIntegradoId";
 import { supabase } from "@/integrations/supabase/client";
