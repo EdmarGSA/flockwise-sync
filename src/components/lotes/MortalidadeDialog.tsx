@@ -117,54 +117,62 @@ export function MortalidadeDialog({
 
   const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
 
-  // Auto-fill temperature/humidity from IoT sensors
+  // Auto-fill temperature/humidity from IoT sensors — fetches all readings of the day
   useEffect(() => {
     if (open && loteId && integradoId) {
       fetchSensorData();
     }
-  }, [open, loteId, integradoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loteId, integradoId, dataRegistro]);
 
   const fetchSensorData = async () => {
     try {
-      // Get galpao_id from lote
-      const { data: lote } = await supabase
-        .from('lotes')
-        .select('galpao_id')
-        .eq('id', loteId)
-        .single();
+      // Get galpao_id from lote (cached)
+      let galpaoId = galpaoIdLote;
+      if (!galpaoId) {
+        const { data: lote } = await supabase
+          .from('lotes')
+          .select('galpao_id')
+          .eq('id', loteId)
+          .single();
+        if (!lote?.galpao_id) {
+          setClimaDia(null);
+          return;
+        }
+        galpaoId = lote.galpao_id;
+        setGalpaoIdLote(galpaoId);
+      }
 
-      if (!lote?.galpao_id) return;
-
-      // Get device linked to this galpao
-      const { data: device } = await supabase
+      // Get devices linked to this galpao
+      const { data: devices } = await supabase
         .from('dispositivos_iot')
         .select('id')
-        .eq('galpao_id', lote.galpao_id)
-        .eq('ativo', true)
-        .limit(1)
-        .maybeSingle();
+        .eq('galpao_id', galpaoId)
+        .eq('ativo', true);
 
-      if (!device) return;
+      if (!devices || devices.length === 0) {
+        setClimaDia(null);
+        return;
+      }
 
-      // Get latest reading
-      const { data: leitura } = await supabase
+      const deviceIds = devices.map((d) => d.id);
+      const dataStr = format(dataRegistro, 'yyyy-MM-dd');
+      const inicioDia = `${dataStr}T00:00:00`;
+      const fimDia = `${dataStr}T23:59:59`;
+
+      const { data: leituras } = await supabase
         .from('leituras_sensores')
         .select('temperatura_c, umidade_pct, lido_em')
-        .eq('dispositivo_id', device.id)
-        .order('lido_em', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .in('dispositivo_id', deviceIds)
+        .gte('lido_em', inicioDia)
+        .lte('lido_em', fimDia)
+        .order('lido_em', { ascending: true });
 
-      if (leitura) {
-        // Only auto-fill if reading is recent (< 2 hours)
-        const readingAge = Date.now() - new Date(leitura.lido_em).getTime();
-        if (readingAge < 2 * 60 * 60 * 1000) {
-          if (leitura.temperatura_c && !temperaturaC) setTemperaturaC(String(leitura.temperatura_c));
-          if (leitura.umidade_pct && !umidadePct) setUmidadePct(String(leitura.umidade_pct));
-        }
-      }
+      const resumo = calcularMinMaxDia(leituras || []);
+      setClimaDia(resumo.totalLeituras > 0 ? resumo : null);
     } catch (err) {
       console.error('Erro ao buscar dados do sensor:', err);
+      setClimaDia(null);
     }
   };
 
