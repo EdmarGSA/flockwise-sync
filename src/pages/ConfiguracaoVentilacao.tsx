@@ -44,6 +44,8 @@ interface Programa {
   velocidade_alvo_ms_min: number | null;
   velocidade_alvo_ms_max: number | null;
   area_transversal_m2: number | null;
+  troca_ar_brooding_ativa: boolean;
+  troca_ar_brooding_max_pct: number;
   ativo: boolean;
 }
 
