@@ -445,6 +445,9 @@ export function MortalidadeDialog({
 
       toast.success('Mortalidade registrada com sucesso!');
       setSavedMortalidadeId(mortalidadeData.id);
+      // Limpa o rascunho — registro persistido com sucesso
+      clearDraft(loteId);
+      setDraftRecuperado(null);
       onSuccess();
     } catch (error) {
       console.error('Erro ao salvar mortalidade:', error);
@@ -454,7 +457,7 @@ export function MortalidadeDialog({
     }
   };
 
-  const handleClose = () => {
+  const resetForm = () => {
     setItems([]);
     setDataRegistro(new Date());
     setHoraRegistro('08:00');
@@ -465,7 +468,24 @@ export function MortalidadeDialog({
     setTemperaturaC('');
     setUmidadePct('');
     setSavedMortalidadeId(null);
+    setDraftRecuperado(null);
+    setTentouAdicionar(false);
+  };
+
+  // Fecha o dialog. Se já salvou, limpa o form. Caso contrário mantém os dados (rascunho persistido).
+  const handleClose = () => {
+    if (savedMortalidadeId) {
+      resetForm();
+    } else if (items.length > 0 || quantidade || pesoKg) {
+      toast.info('Rascunho salvo — seus dados estarão aqui ao reabrir', { duration: 2500 });
+    }
     onOpenChange(false);
+  };
+
+  const handleDescartarRascunho = () => {
+    clearDraft(loteId);
+    resetForm();
+    toast.success('Rascunho descartado');
   };
 
   return (
