@@ -293,6 +293,8 @@ const CockpitThoth = () => {
           <WarningLights lights={warningLights} />
         )}
 
+        <ClimateBrainAlertCard integradoId={integradoId} />
+
         {/* Main Panels Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Production & Stock Panel */}
