@@ -9,6 +9,7 @@ import { ArrowLeft, Plane, RefreshCw } from 'lucide-react';
 import { WarningLights, createWarningLights } from '@/components/cockpit/WarningLights';
 import { ScoreOperacionalCard, calculateOperationalScore } from '@/components/cockpit/ScoreOperacionalCard';
 import { ProducaoEstoquePanel } from '@/components/cockpit/ProducaoEstoquePanel';
+import ClimateBrainAlertCard from '@/components/cockpit/ClimateBrainAlertCard';
 import { FinanceiroPanel } from '@/components/cockpit/FinanceiroPanel';
 import { ZootecnicoPanel } from '@/components/cockpit/ZootecnicoPanel';
 import { Loader2 } from 'lucide-react';
