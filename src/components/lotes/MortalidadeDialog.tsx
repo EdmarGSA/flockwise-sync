@@ -225,6 +225,114 @@ export function MortalidadeDialog({
     setTotalMortalidade(total);
   };
 
+  // ---- Meta de peso para idade do lote (interpolação linear entre marcos) ----
+  useEffect(() => {
+    if (!open || !loteId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('metas_peso')
+        .select('peso_inicial_kg, meta_7_dias_kg, meta_14_dias_kg, meta_21_dias_kg, meta_28_dias_kg, meta_35_dias_kg, meta_42_dias_kg')
+        .eq('lote_id', loteId)
+        .maybeSingle();
+      if (!data) { setMetaPesoIdade(null); return; }
+      const idade = Math.max(0, diasDesdeAlojamento);
+      const marcos: { dia: number; peso: number }[] = [
+        { dia: 0, peso: data.peso_inicial_kg },
+        { dia: 7, peso: data.meta_7_dias_kg },
+        { dia: 14, peso: data.meta_14_dias_kg },
+        { dia: 21, peso: data.meta_21_dias_kg },
+        { dia: 28, peso: data.meta_28_dias_kg },
+        { dia: 35, peso: data.meta_35_dias_kg },
+        { dia: 42, peso: data.meta_42_dias_kg },
+      ];
+      if (idade >= 42) { setMetaPesoIdade(data.meta_42_dias_kg); return; }
+      for (let i = 0; i < marcos.length - 1; i++) {
+        const a = marcos[i]; const b = marcos[i + 1];
+        if (idade >= a.dia && idade <= b.dia) {
+          const t = b.dia === a.dia ? 0 : (idade - a.dia) / (b.dia - a.dia);
+          setMetaPesoIdade(a.peso + (b.peso - a.peso) * t);
+          return;
+        }
+      }
+      setMetaPesoIdade(data.peso_inicial_kg);
+    })();
+  }, [open, loteId, diasDesdeAlojamento]);
+
+  // ---- Draft: carregar ao abrir ----
+  useEffect(() => {
+    if (!open || !loteId) return;
+    if (draftCheckedKey === loteId) return;
+    setDraftCheckedKey(loteId);
+    const draft = loadDraft(loteId);
+    if (isDraftMeaningful(draft) && draft) {
+      try {
+        setItems(draft.items || []);
+        if (draft.dataRegistroISO) {
+          const d = new Date(draft.dataRegistroISO);
+          if (!isNaN(d.getTime())) setDataRegistro(d);
+        }
+        setHoraRegistro(draft.horaRegistro || '08:00');
+        setMotivo((draft.motivo as MotivoMortalidade) || 'natural');
+        setSubmotivos((draft.submotivos as SubmotivoEliminacao[]) || []);
+        setQuantidade(draft.quantidade || '');
+        setPesoKg(draft.pesoKg || '');
+        setTemperaturaC(draft.temperaturaC || '');
+        setUmidadePct(draft.umidadePct || '');
+        setDraftRecuperado({ savedAt: draft.savedAt });
+      } catch (e) {
+        console.error('Erro ao restaurar rascunho', e);
+      }
+    }
+  }, [open, loteId, draftCheckedKey]);
+
+  // Reset draft check when dialog fully closes
+  useEffect(() => {
+    if (!open) setDraftCheckedKey(null);
+  }, [open]);
+
+  // ---- Draft: salvar (debounced) enquanto aberto e não salvo ----
+  const { savingDraft } = useDraftSaver({
+    loteId,
+    enabled: open && !savedMortalidadeId,
+    build: () => ({
+      items,
+      dataRegistroISO: dataRegistro.toISOString(),
+      horaRegistro,
+      motivo,
+      submotivos,
+      quantidade,
+      pesoKg,
+      temperaturaC,
+      umidadePct,
+    }),
+    deps: [items, dataRegistro, horaRegistro, motivo, submotivos, quantidade, pesoKg, temperaturaC, umidadePct],
+  });
+
+  // ---- Peso médio das mortas (ponderado) ----
+  const pesoMedioMortas = useMemo(() => {
+    if (items.length === 0) return null;
+    let somaPeso = 0;
+    let somaQtd = 0;
+    for (const it of items) {
+      const p = parseFloat(it.pesoKg);
+      if (isNaN(p) || p <= 0) continue;
+      somaPeso += p * it.quantidade;
+      somaQtd += it.quantidade;
+    }
+    return somaQtd > 0 ? somaPeso / somaQtd : null;
+  }, [items]);
+
+  const pesoComparacao = useMemo(() => {
+    if (pesoMedioMortas == null || metaPesoIdade == null || metaPesoIdade <= 0) return null;
+    const ratio = pesoMedioMortas / metaPesoIdade;
+    if (ratio < 0.7) return { label: 'Refugo provável', color: 'amber', ratio } as const;
+    if (ratio < 0.95) return { label: 'Abaixo da meta', color: 'orange', ratio } as const;
+    return { label: 'Compatível com meta', color: 'green', ratio } as const;
+  }, [pesoMedioMortas, metaPesoIdade]);
+
+  const totalQtdItems = useMemo(() => items.reduce((a, i) => a + i.quantidade, 0), [items]);
+  const limiteAtingido = totalQtdItems >= quantidadeAves;
+
   const toggleSubmotivo = (sub: SubmotivoEliminacao) => {
     setSubmotivos(prev =>
       prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
