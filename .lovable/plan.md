@@ -1,134 +1,86 @@
-# Onda 7 — Climate Brain Padrão Ouro 🏆
+## Análise da Tela Atual de Registro de Mortalidade
 
-## O que já temos hoje (análise)
+`MortalidadeDialog.tsx` (619 linhas) hoje:
+- Usa apenas a **última leitura** do sensor IoT (se < 2h) para preencher temperatura/umidade — um único ponto, fácil de subestimar estresse térmico real do dia.
+- **Perde tudo** ao fechar o dialog: `handleClose()` reseta items, peso, quantidade, submotivos, temperatura, umidade, hora. Se o usuário fecha sem querer ou troca de tela, refaz do zero.
+- Pede `pesoKg` por item, mas **nunca mostra a média** — o usuário não tem feedback do peso médio acumulado das aves mortas no registro.
+- Não exibe histórico do peso médio das mortas vs meta de peso da idade.
 
+## Plano de Melhorias
 
-| Camada                                                   | Estado     | Tabela / Função                                                                                                                     |
-| -------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Curva alvo por idade (T, UR, vel.ar, NH₃, CO₂, ITH)      | ✅          | `curva_climatica_ponto`                                                                                                             |
-| Histerese global (deadband, tempos min ON/OFF)           | ✅          | `config_histerese_organizacao`                                                                                                      |
-| Estágios de ventilação (min/transição/túnel/heat-stress) | ✅          | `programa_ventilacao_galpao` + `auto-ventilacao` (cron 2 min)                                                                       |
-| Cortinas inteligentes por estágio + vento externo        | ✅          | `programa_cortina_inteligente` + `auto-cortina`                                                                                     |
-| Aquecimento / liga-desliga térmico                       | ⚠️ Parcial | `auto-temperatura` (controle direto eWeLink, sem coordenação)                                                                       |
-| Nebulização                                              | ❌ Falta    | parâmetros existem em `regras_temperatura_lote.nebulizador_*` mas **sem edge function dedicada**, sem coordenação com UR/ventilação |
-| Troca de ar mínima durante aquecimento (pinteiro)        | ❌ Falta    | aquecimento e ventilação rodam isolados; não há ciclo coordenado                                                                    |
-| Aprendizado por galpão (peculiaridades térmicas)         | ❌ Falta    | log existe (`log_decisao_clima`), mas nada consome para ajustar setpoints                                                           |
+### 1. Temperatura e Umidade Mín/Máx do Dia (sensor IoT)
 
+Trocar o "snapshot" por uma faixa real do dia.
 
-### Problemas concretos identificados
-
-1. **Aquecimento sufoca**: durante brooding (≤14d), aquecedores ligam mas ventilação fica em "minima_apenas" — risco de CO₂/NH₃/UR alto sem renovação cíclica.
-2. **Nebulização cega**: campos no banco, mas nenhum loop que respeite UR off, cooldown e estágio túnel.
-3. **Setpoints rígidos**: a curva é a mesma para todo galpão. Galpão antigo, voltado ao sol, com isolamento ruim, recebe o mesmo alvo de um galpão novo.
-4. **Sem feedback loop**: divergência sustentada entre alvo e leitura nunca alimenta correção automática.
-
----
-
-## Plano Padrão Ouro
-
-### 1. Coordenador único `climate-brain` (substitui chamadas isoladas)
-
-Edge function chamada pelo cron a cada **1 min**. Para cada galpão com lote ativo:
+- Em `fetchSensorData()`, ao invés de pegar 1 leitura, buscar todas as leituras do galpão para a data selecionada (`dataRegistro`) e calcular:
+  - `tempMinDia / tempMaxDia / tempAtual`
+  - `umidMinDia / umidMaxDia / umidAtual`
+  - horários do mín e do máx
+- Reexecutar quando `dataRegistro` mudar (registros retroativos mostram mín/máx daquele dia).
+- Manter inputs `temperaturaC` / `umidadePct` editáveis (registro pontual no momento da mortalidade) e adicionar um **card de contexto climático do dia** abaixo:
 
 ```text
-┌─────────────────────────────────────────────────┐
-│   1. Coleta: leituras 5min + outdoor + idade    │
-│   2. Calcula alvos (curva ± offset_aprendido)   │
-│   3. Resolve modo dominante:                    │
-│        AQUECIMENTO  → ventilação cíclica mín    │
-│        CONFORTO     → ventilação por estágio    │
-│        ALERTA_CALOR → nebulização + túnel       │
-│        EMERGÊNCIA   → 100% + alarme             │
-│   4. Aplica ações (chama drivers existentes)    │
-│   5. Registra em log_decisao_clima              │
-│   6. Atualiza modelo de aprendizado (passo 3)   │
-└─────────────────────────────────────────────────┘
+┌─ Clima do dia (sensor galpão) ──────────────────┐
+│ Temp: 21.4° (06:12) ↔ 32.7° (14:48) | Atual 28.1│
+│ Umid: 58% ↔ 81%                     | Atual 67% │
+│ [Usar mín] [Usar máx] [Usar atual]              │
+└──────────────────────────────────────────────────┘
 ```
 
-Reaproveita: `auto-ventilacao`, `auto-cortina`, `auto-temperatura` viraram **executores** (continuam existindo). O `climate-brain` decide *qual* aciona e com que parâmetro derivado.
+Botões aplicam o valor no input correspondente (UX rápida).
 
-### 2. Nebulização inteligente (nova função `auto-nebulizacao`)
+Se não houver sensor, esconder o card e manter inputs manuais como hoje.
 
-- Liga apenas se: `T > T_alvo + deadband` **E** `UR < neb_umid_off_pct` **E** estágio ≥ transição **E** ventilação ≥ 70% capacidade.
-- Ciclo on/off respeita `nebulizador_min_duracao_seg` + `nebulizador_cooldown_seg` por galpão.
-- Bloqueio para pinteiro (idade < `protege_pintinho_ate_dias`).
-- Cancela imediato se UR sobe acima do alvo (anti-efeito-sauna).
+### 2. Não Perder Dados (rascunho persistente)
 
-### 3. Troca de ar durante aquecimento (brooding cycle)
+Persistir o formulário em `localStorage` com chave por lote: `mortalidade_draft_<loteId>`.
 
-Nova lógica no `climate-brain`: quando aquecedor está ON e idade ≤ 14d, força exaustão **mínima cíclica** (X seg ON / Y seg OFF) calculada pela equação:
+- Salvar a cada alteração (debounced 400ms): items, dataRegistro, horaRegistro, temperaturaC, umidadePct, motivo, submotivos, quantidade, pesoKg.
+- Ao abrir o dialog: se há rascunho, mostrar banner discreto:
+  > "Rascunho recuperado de há 12 min. [Continuar] [Descartar]"
+- Limpar rascunho **apenas** após `handleSave` bem-sucedido.
+- `handleClose()` deixa de resetar o estado — só fecha; ao reabrir os dados continuam.
+- Adicionar confirmação leve ao fechar com itens não salvos: toast "Rascunho salvo automaticamente".
 
-```
-vazao_necessaria_m3h = aves_vivas × peso_kg × vazao_min_m3h_por_kg(curva)
-duty_cycle = clamp(vazao_necessaria / capacidade_total_cfm, 0.05, 0.30)
-```
+### 3. Peso Médio das Aves Mortas
 
-Garante renovação para CO₂/NH₃ sem matar a temperatura. Parâmetros novos em `programa_ventilacao_galpao`:
+Calcular e exibir em tempo real conforme itens são adicionados:
 
-- `troca_ar_brooding_ativa` bool default true
-- `troca_ar_brooding_max_pct` int default 25
+- `pesoMedio = Σ(peso_kg_item × quantidade) / Σ(quantidade)`
+- Exibir junto dos totais que já existem (Natural / Eliminados / Total) um quarto card:
 
-### 4. IA embarcada por galpão (aprendizado contínuo)
-
-**Nova tabela `aprendizado_galpao**` (uma linha por galpão):
-
-```
-galpao_id PK
-offset_temp_aprendido_c        numeric default 0   -- ajuste no setpoint
-offset_ur_aprendido_pct        numeric default 0
-inercia_estimada_min           numeric default 30  -- tempo p/ T responder a ações
-fator_isolamento               numeric default 1.0 -- 1.0 = padrão; >1 esquenta mais
-fator_perda_calor_noturna      numeric default 1.0
-amostras_treinadas             int default 0
-ultimo_treino_em               timestamptz
-modelo_versao                  int default 1
-metricas_jsonb                 jsonb               -- MAE, drift, etc.
+```text
+[Natural: 12] [Eliminados: 3] [Total: 15] [Peso médio: 1,847 g]
 ```
 
-**Job `climate-learn` (cron 1×/hora)**: para cada galpão com ≥48h de log:
+- Comparar com a **meta de peso da idade do lote** (já existem `metas_peso_lote` no projeto):
+  - Buscar meta para `diasDesdeAlojamento`.
+  - Se `pesoMedio < 70% da meta` → badge âmbar "Refugo provável".
+  - Se entre 70%–95% → badge "Abaixo da meta".
+  - Se ≥ 95% → badge verde "Compatível".
+- Adicionar coluna "Peso médio mortas (7d)" no card de Histórico de Mortalidade já existente.
 
-- Lê `log_decisao_clima` + `leituras_sensores` últimas 72h.
-- Calcula divergência média entre `setpoint_alvo` e `temp_lida` por janela de 30 min após cada ação.
-- Estima `inercia_estimada_min` por correlação cruzada (tempo entre ação e 63% da resposta — método first-order).
-- Atualiza `offset_temp_aprendido_c` por média móvel exponencial (α=0,1) — limitado a ±2°C de segurança.
-- Detecta padrão diurno (galpão esquenta mais à tarde) e ajusta `fator_isolamento`.
-- Tudo é **determinístico/estatístico** (não precisa LLM). Opcional: usar Lovable AI (Gemini Flash) **apenas para gerar narrativa** ("Galpão 3 esquenta 2°C mais que padrão entre 13–16h, recomendado antecipar túnel em 30 min") exibida no painel.
+### 4. Outras Melhorias de UX no Cadastro
 
-### 5. Telas novas (mínimo viável)
+- **Auto-foco**: ao adicionar item, focar de volta no campo `quantidade` para registros em série.
+- **Atalhos de teclado**: `Enter` no peso adiciona o item (hoje precisa clicar "Adicionar").
+- **Validação visual progressiva**: marcar campo `pesoKg` em vermelho assim que vazio + tentativa de adicionar, ao invés de só toast.
+- **Quantidade máxima inteligente**: bloquear adicionar item se `Σ(quantidades) > avesVivasAtuais` com mensagem clara ("Restam X aves vivas").
+- **Última temperatura usada**: mostrar timestamp da leitura ("há 23 min") quando vier do IoT, para o usuário decidir se confia.
+- **Indicador "Salvando rascunho…"** no canto do dialog quando o debounce escreve no localStorage.
 
-- `**/climate-brain/:galpaoId**`: timeline 24h com setpoint vs leitura, ações tomadas, eventos, e card do "perfil aprendido" (offset, inércia, isolamento).
-- Botão **"Reset aprendizado"** (zera offsets).
-- Card no Dashboard: "Galpões com perfil divergente >1.5°C" (acionável).
+### Detalhes técnicos
 
-### 6. Cron e config
+Arquivos afetados:
+- `src/components/lotes/MortalidadeDialog.tsx` — todas as mudanças acima.
+- Novo hook `src/hooks/useMortalidadeDraft.ts` — wrapper de `localStorage` com debounce + serialização de `Date`.
+- Novo helper `src/lib/utils/calcularMinMaxDia.ts` — recebe leituras do sensor e devolve `{ min, max, horarioMin, horarioMax, atual }` para temp e umidade.
+- Reutilizar `metas_peso_lote` (já lida em `MetasPesoLote.tsx`) para a comparação de peso.
 
-```sql
-select cron.schedule('climate-brain-1min','* * * * *', ...);
-select cron.schedule('climate-learn-hourly','0 * * * *', ...);
--- Pausar crons antigos isolados de auto-ventilacao/auto-cortina (climate-brain os invoca)
-```
+Sem mudanças de schema. Sem novas tabelas. Tudo frontend + leituras já existentes.
 
----
+### Fora do escopo (sugiro para outra rodada)
 
-## Detalhes técnicos
-
-**Arquivos a criar/editar**
-
-- `supabase/migrations/...sql` — tabelas `aprendizado_galpao`, colunas novas em `programa_ventilacao_galpao`, alteração do log para incluir `modo_dominante` e `offset_aprendido_aplicado`.
-- `supabase/functions/climate-brain/index.ts` — coordenador.
-- `supabase/functions/auto-nebulizacao/index.ts` — driver de nebulização (chamado pelo brain).
-- `supabase/functions/climate-learn/index.ts` — job de aprendizado.
-- `src/pages/ClimateBrainGalpao.tsx` — visualização + ações.
-- `src/pages/ConfiguracaoVentilacao.tsx` — adiciona toggle "troca de ar brooding".
-- `src/pages/Configuracoes.tsx` + `src/App.tsx` — links/rotas.
-- (Opcional) `src/hooks/useAprendizadoGalpao.ts`.
-
-**Compatibilidade**: nenhum dado existente é alterado; offsets default = 0 → comportamento idêntico ao atual até treinar.
-
-**Segurança**: limites duros (offset ±2°C, ventilação ≥30% em pinteiro, nebulização nunca quebra UR>85%).
-
----
-
-## Pergunta antes de implementar
-
-Quer que eu inclua já a **narrativa via Lovable AI** ("o galpão 3 está se comportando assim porque...") ou mantemos só estatístico nesta onda e adicionamos depois? pode sim
+- Persistir rascunho no banco (multi-dispositivo) — `localStorage` resolve 95% dos casos hoje.
+- Análise IA de correlação peso médio mortas × ração consumida — depende de dados do lote.
+- Importação automática de pesagem de aves mortas via balança IoT.
