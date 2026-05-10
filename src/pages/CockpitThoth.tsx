@@ -9,6 +9,7 @@ import { ArrowLeft, Plane, RefreshCw } from 'lucide-react';
 import { WarningLights, createWarningLights } from '@/components/cockpit/WarningLights';
 import { ScoreOperacionalCard, calculateOperationalScore } from '@/components/cockpit/ScoreOperacionalCard';
 import { ProducaoEstoquePanel } from '@/components/cockpit/ProducaoEstoquePanel';
+import ClimateBrainAlertCard from '@/components/cockpit/ClimateBrainAlertCard';
 import { FinanceiroPanel } from '@/components/cockpit/FinanceiroPanel';
 import { ZootecnicoPanel } from '@/components/cockpit/ZootecnicoPanel';
 import { Loader2 } from 'lucide-react';
@@ -292,6 +293,8 @@ const CockpitThoth = () => {
         ) : (
           <WarningLights lights={warningLights} />
         )}
+
+        <ClimateBrainAlertCard integradoId={integradoId} />
 
         {/* Main Panels Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
