@@ -150,6 +150,8 @@ const ConfiguracaoVentilacao = () => {
           velocidade_alvo_ms_min: modo === "negativa_tunel" ? 2.0 : null,
           velocidade_alvo_ms_max: modo === "negativa_tunel" ? 3.0 : null,
           area_transversal_m2: area,
+          troca_ar_brooding_ativa: true,
+          troca_ar_brooding_max_pct: 25,
           ativo: true,
         });
       }
