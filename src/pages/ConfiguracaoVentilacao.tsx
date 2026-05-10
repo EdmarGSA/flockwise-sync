@@ -399,6 +399,48 @@ const ConfiguracaoVentilacao = () => {
             )}
 
             <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wind className="h-4 w-4" /> Troca de ar durante aquecimento (brooding)
+                </CardTitle>
+                <CardDescription>
+                  Quando o lote estiver em fase de aquecimento (≤14 dias), o Climate Brain força
+                  exaustão cíclica mínima para renovar CO₂/NH₃ sem matar a temperatura. O duty cycle
+                  cresce proporcional à idade até o máximo configurado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-4 items-end">
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <Label className="text-sm">Ativar troca de ar no brooding</Label>
+                    <p className="text-xs text-muted-foreground">Recomendado para todos os galpões</p>
+                  </div>
+                  <Switch
+                    checked={prog.troca_ar_brooding_ativa}
+                    onCheckedChange={(v) => setProg({ ...prog, troca_ar_brooding_ativa: v })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Duty cycle máximo (%)</Label>
+                  <Input
+                    type="number" min={5} max={50}
+                    value={prog.troca_ar_brooding_max_pct}
+                    onChange={(e) =>
+                      setProg({
+                        ...prog,
+                        troca_ar_brooding_max_pct: Math.max(5, Math.min(50, Number(e.target.value) || 25)),
+                      })
+                    }
+                    disabled={!prog.troca_ar_brooding_ativa}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Entre 5% (dia 1) e o valor configurado (dia 14). Padrão 25%.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mb-6">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Estágios</CardTitle>
