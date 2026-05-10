@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import { calcularMinMaxDia, formatarHora, type MinMaxDia } from '@/lib/utils/calcularMinMaxDia';
+import { useDraftSaver, loadDraft, clearDraft, isDraftMeaningful } from '@/hooks/useMortalidadeDraft';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock, Thermometer, Droplets } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock, Thermometer, Droplets, Scale, Save, RotateCcw, ArrowDown, ArrowUp, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import MortalidadeSemanaDetalheDialog from './MortalidadeSemanaDetalheDialog';
@@ -92,6 +94,14 @@ export function MortalidadeDialog({
     diaFim: number;
   } | null>(null);
   const [savedMortalidadeId, setSavedMortalidadeId] = useState<string | null>(null);
+  const [climaDia, setClimaDia] = useState<MinMaxDia | null>(null);
+  const [galpaoIdLote, setGalpaoIdLote] = useState<string | null>(null);
+  const [draftRecuperado, setDraftRecuperado] = useState<{ savedAt: string } | null>(null);
+  const [draftCheckedKey, setDraftCheckedKey] = useState<string | null>(null);
+  const [metaPesoIdade, setMetaPesoIdade] = useState<number | null>(null);
+  const [tentouAdicionar, setTentouAdicionar] = useState(false);
+  const quantidadeRef = useRef<HTMLInputElement>(null);
+  const pesoRef = useRef<HTMLInputElement>(null);
 
   const getSemanaRange = (semana: number): { diaInicio: number; diaFim: number } => {
     switch (semana) {
@@ -107,54 +117,62 @@ export function MortalidadeDialog({
 
   const diasDesdeAlojamento = calcularIdadeLote(dataAlojamento);
 
-  // Auto-fill temperature/humidity from IoT sensors
+  // Auto-fill temperature/humidity from IoT sensors — fetches all readings of the day
   useEffect(() => {
     if (open && loteId && integradoId) {
       fetchSensorData();
     }
-  }, [open, loteId, integradoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loteId, integradoId, dataRegistro]);
 
   const fetchSensorData = async () => {
     try {
-      // Get galpao_id from lote
-      const { data: lote } = await supabase
-        .from('lotes')
-        .select('galpao_id')
-        .eq('id', loteId)
-        .single();
+      // Get galpao_id from lote (cached)
+      let galpaoId = galpaoIdLote;
+      if (!galpaoId) {
+        const { data: lote } = await supabase
+          .from('lotes')
+          .select('galpao_id')
+          .eq('id', loteId)
+          .single();
+        if (!lote?.galpao_id) {
+          setClimaDia(null);
+          return;
+        }
+        galpaoId = lote.galpao_id;
+        setGalpaoIdLote(galpaoId);
+      }
 
-      if (!lote?.galpao_id) return;
-
-      // Get device linked to this galpao
-      const { data: device } = await supabase
+      // Get devices linked to this galpao
+      const { data: devices } = await supabase
         .from('dispositivos_iot')
         .select('id')
-        .eq('galpao_id', lote.galpao_id)
-        .eq('ativo', true)
-        .limit(1)
-        .maybeSingle();
+        .eq('galpao_id', galpaoId)
+        .eq('ativo', true);
 
-      if (!device) return;
+      if (!devices || devices.length === 0) {
+        setClimaDia(null);
+        return;
+      }
 
-      // Get latest reading
-      const { data: leitura } = await supabase
+      const deviceIds = devices.map((d) => d.id);
+      const dataStr = format(dataRegistro, 'yyyy-MM-dd');
+      const inicioDia = `${dataStr}T00:00:00`;
+      const fimDia = `${dataStr}T23:59:59`;
+
+      const { data: leituras } = await supabase
         .from('leituras_sensores')
         .select('temperatura_c, umidade_pct, lido_em')
-        .eq('dispositivo_id', device.id)
-        .order('lido_em', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .in('dispositivo_id', deviceIds)
+        .gte('lido_em', inicioDia)
+        .lte('lido_em', fimDia)
+        .order('lido_em', { ascending: true });
 
-      if (leitura) {
-        // Only auto-fill if reading is recent (< 2 hours)
-        const readingAge = Date.now() - new Date(leitura.lido_em).getTime();
-        if (readingAge < 2 * 60 * 60 * 1000) {
-          if (leitura.temperatura_c && !temperaturaC) setTemperaturaC(String(leitura.temperatura_c));
-          if (leitura.umidade_pct && !umidadePct) setUmidadePct(String(leitura.umidade_pct));
-        }
-      }
+      const resumo = calcularMinMaxDia(leituras || []);
+      setClimaDia(resumo.totalLeituras > 0 ? resumo : null);
     } catch (err) {
       console.error('Erro ao buscar dados do sensor:', err);
+      setClimaDia(null);
     }
   };
 
@@ -207,6 +225,114 @@ export function MortalidadeDialog({
     setTotalMortalidade(total);
   };
 
+  // ---- Meta de peso para idade do lote (interpolação linear entre marcos) ----
+  useEffect(() => {
+    if (!open || !loteId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('metas_peso')
+        .select('peso_inicial_kg, meta_7_dias_kg, meta_14_dias_kg, meta_21_dias_kg, meta_28_dias_kg, meta_35_dias_kg, meta_42_dias_kg')
+        .eq('lote_id', loteId)
+        .maybeSingle();
+      if (!data) { setMetaPesoIdade(null); return; }
+      const idade = Math.max(0, diasDesdeAlojamento);
+      const marcos: { dia: number; peso: number }[] = [
+        { dia: 0, peso: data.peso_inicial_kg },
+        { dia: 7, peso: data.meta_7_dias_kg },
+        { dia: 14, peso: data.meta_14_dias_kg },
+        { dia: 21, peso: data.meta_21_dias_kg },
+        { dia: 28, peso: data.meta_28_dias_kg },
+        { dia: 35, peso: data.meta_35_dias_kg },
+        { dia: 42, peso: data.meta_42_dias_kg },
+      ];
+      if (idade >= 42) { setMetaPesoIdade(data.meta_42_dias_kg); return; }
+      for (let i = 0; i < marcos.length - 1; i++) {
+        const a = marcos[i]; const b = marcos[i + 1];
+        if (idade >= a.dia && idade <= b.dia) {
+          const t = b.dia === a.dia ? 0 : (idade - a.dia) / (b.dia - a.dia);
+          setMetaPesoIdade(a.peso + (b.peso - a.peso) * t);
+          return;
+        }
+      }
+      setMetaPesoIdade(data.peso_inicial_kg);
+    })();
+  }, [open, loteId, diasDesdeAlojamento]);
+
+  // ---- Draft: carregar ao abrir ----
+  useEffect(() => {
+    if (!open || !loteId) return;
+    if (draftCheckedKey === loteId) return;
+    setDraftCheckedKey(loteId);
+    const draft = loadDraft(loteId);
+    if (isDraftMeaningful(draft) && draft) {
+      try {
+        setItems(draft.items || []);
+        if (draft.dataRegistroISO) {
+          const d = new Date(draft.dataRegistroISO);
+          if (!isNaN(d.getTime())) setDataRegistro(d);
+        }
+        setHoraRegistro(draft.horaRegistro || '08:00');
+        setMotivo((draft.motivo as MotivoMortalidade) || 'natural');
+        setSubmotivos((draft.submotivos as SubmotivoEliminacao[]) || []);
+        setQuantidade(draft.quantidade || '');
+        setPesoKg(draft.pesoKg || '');
+        setTemperaturaC(draft.temperaturaC || '');
+        setUmidadePct(draft.umidadePct || '');
+        setDraftRecuperado({ savedAt: draft.savedAt });
+      } catch (e) {
+        console.error('Erro ao restaurar rascunho', e);
+      }
+    }
+  }, [open, loteId, draftCheckedKey]);
+
+  // Reset draft check when dialog fully closes
+  useEffect(() => {
+    if (!open) setDraftCheckedKey(null);
+  }, [open]);
+
+  // ---- Draft: salvar (debounced) enquanto aberto e não salvo ----
+  const { savingDraft } = useDraftSaver({
+    loteId,
+    enabled: open && !savedMortalidadeId,
+    build: () => ({
+      items,
+      dataRegistroISO: dataRegistro.toISOString(),
+      horaRegistro,
+      motivo,
+      submotivos,
+      quantidade,
+      pesoKg,
+      temperaturaC,
+      umidadePct,
+    }),
+    deps: [items, dataRegistro, horaRegistro, motivo, submotivos, quantidade, pesoKg, temperaturaC, umidadePct],
+  });
+
+  // ---- Peso médio das mortas (ponderado) ----
+  const pesoMedioMortas = useMemo(() => {
+    if (items.length === 0) return null;
+    let somaPeso = 0;
+    let somaQtd = 0;
+    for (const it of items) {
+      const p = parseFloat(it.pesoKg);
+      if (isNaN(p) || p <= 0) continue;
+      somaPeso += p * it.quantidade;
+      somaQtd += it.quantidade;
+    }
+    return somaQtd > 0 ? somaPeso / somaQtd : null;
+  }, [items]);
+
+  const pesoComparacao = useMemo(() => {
+    if (pesoMedioMortas == null || metaPesoIdade == null || metaPesoIdade <= 0) return null;
+    const ratio = pesoMedioMortas / metaPesoIdade;
+    if (ratio < 0.7) return { label: 'Refugo provável', color: 'amber', ratio } as const;
+    if (ratio < 0.95) return { label: 'Abaixo da meta', color: 'orange', ratio } as const;
+    return { label: 'Compatível com meta', color: 'green', ratio } as const;
+  }, [pesoMedioMortas, metaPesoIdade]);
+
+  const totalQtdItems = useMemo(() => items.reduce((a, i) => a + i.quantidade, 0), [items]);
+  const limiteAtingido = totalQtdItems >= quantidadeAves;
+
   const toggleSubmotivo = (sub: SubmotivoEliminacao) => {
     setSubmotivos(prev =>
       prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
@@ -214,17 +340,25 @@ export function MortalidadeDialog({
   };
 
   const handleAddItem = () => {
+    setTentouAdicionar(true);
     const qtd = parseInt(quantidade);
     if (isNaN(qtd) || qtd <= 0) {
       toast.error('Informe uma quantidade válida');
+      quantidadeRef.current?.focus();
       return;
     }
     if (!pesoKg || parseFloat(pesoKg) <= 0) {
       toast.error('Informe o peso das aves (obrigatório)');
+      pesoRef.current?.focus();
       return;
     }
     if (motivo === 'eliminado' && submotivos.length === 0) {
       toast.error('Selecione pelo menos um submotivo');
+      return;
+    }
+    if (totalQtdItems + qtd > quantidadeAves) {
+      const restantes = Math.max(0, quantidadeAves - totalQtdItems);
+      toast.error(`Restam apenas ${restantes} aves vivas disponíveis para registro`);
       return;
     }
 
@@ -240,6 +374,16 @@ export function MortalidadeDialog({
     setQuantidade('');
     setPesoKg('');
     setSubmotivos([]);
+    setTentouAdicionar(false);
+    // Foco de volta para registros em série
+    setTimeout(() => quantidadeRef.current?.focus(), 50);
+  };
+
+  const handleQtdPesoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddItem();
+    }
   };
 
   const handleRemoveItem = (id: string) => {
@@ -301,6 +445,9 @@ export function MortalidadeDialog({
 
       toast.success('Mortalidade registrada com sucesso!');
       setSavedMortalidadeId(mortalidadeData.id);
+      // Limpa o rascunho — registro persistido com sucesso
+      clearDraft(loteId);
+      setDraftRecuperado(null);
       onSuccess();
     } catch (error) {
       console.error('Erro ao salvar mortalidade:', error);
@@ -310,7 +457,7 @@ export function MortalidadeDialog({
     }
   };
 
-  const handleClose = () => {
+  const resetForm = () => {
     setItems([]);
     setDataRegistro(new Date());
     setHoraRegistro('08:00');
@@ -321,7 +468,24 @@ export function MortalidadeDialog({
     setTemperaturaC('');
     setUmidadePct('');
     setSavedMortalidadeId(null);
+    setDraftRecuperado(null);
+    setTentouAdicionar(false);
+  };
+
+  // Fecha o dialog. Se já salvou, limpa o form. Caso contrário mantém os dados (rascunho persistido).
+  const handleClose = () => {
+    if (savedMortalidadeId) {
+      resetForm();
+    } else if (items.length > 0 || quantidade || pesoKg) {
+      toast.info('Rascunho salvo — seus dados estarão aqui ao reabrir', { duration: 2500 });
+    }
     onOpenChange(false);
+  };
+
+  const handleDescartarRascunho = () => {
+    clearDraft(loteId);
+    resetForm();
+    toast.success('Rascunho descartado');
   };
 
   return (
@@ -333,9 +497,32 @@ export function MortalidadeDialog({
             <Skull className="w-5 h-5" />
             Registro de Mortalidade
           </DialogTitle>
+          {savingDraft && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Save className="w-3 h-3 animate-pulse" /> Salvando rascunho…
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Banner de Rascunho Recuperado */}
+          {draftRecuperado && !savedMortalidadeId && (
+            <Card className="border-primary/40 bg-primary/5">
+              <CardContent className="pt-3 pb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <RotateCcw className="w-4 h-4 text-primary" />
+                  <span>
+                    Rascunho recuperado · salvo {formatDistanceToNow(new Date(draftRecuperado.savedAt), { locale: ptBR, addSuffix: true })}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setDraftRecuperado(null)}>Continuar</Button>
+                  <Button size="sm" variant="outline" onClick={handleDescartarRascunho}>Descartar</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Histórico */}
           {dataAlojamento && diasDesdeAlojamento > 0 && (
             <Card className="border-amber-500/50 bg-amber-950/20">
@@ -458,6 +645,65 @@ export function MortalidadeDialog({
                 />
               </div>
             </div>
+
+            {/* Clima do dia (sensor IoT) */}
+            {climaDia && (
+              <Card className="border-blue-500/30 bg-blue-500/5">
+                <CardContent className="pt-3 pb-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Activity className="w-3.5 h-3.5 text-blue-500" />
+                    Clima do dia (sensor do galpão · {climaDia.totalLeituras} leituras)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-muted-foreground"><Thermometer className="w-3 h-3" /> Temperatura</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {climaDia.temp.min != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setTemperaturaC(String(climaDia.temp.min))}>
+                            <ArrowDown className="w-3 h-3" /> {climaDia.temp.min.toFixed(1)}° <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.temp.horarioMin)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.temp.max != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setTemperaturaC(String(climaDia.temp.max))}>
+                            <ArrowUp className="w-3 h-3" /> {climaDia.temp.max.toFixed(1)}° <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.temp.horarioMax)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.temp.atual != null && (
+                          <Badge className="gap-1 cursor-pointer" onClick={() => setTemperaturaC(String(climaDia.temp.atual))}>
+                            atual {climaDia.temp.atual.toFixed(1)}°
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-muted-foreground"><Droplets className="w-3 h-3" /> Umidade</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {climaDia.umid.min != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.min!)))}>
+                            <ArrowDown className="w-3 h-3" /> {Math.round(climaDia.umid.min)}% <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.umid.horarioMin)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.umid.max != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.max!)))}>
+                            <ArrowUp className="w-3 h-3" /> {Math.round(climaDia.umid.max)}% <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.umid.horarioMax)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.umid.atual != null && (
+                          <Badge className="gap-1 cursor-pointer" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.atual!)))}>
+                            atual {Math.round(climaDia.umid.atual)}%
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Toque em um valor para preencher o campo correspondente.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Input Form */}
@@ -496,18 +742,43 @@ export function MortalidadeDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Quantidade *</Label>
-                  <Input type="number" placeholder="Ex: 5" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} min={1} />
+                  <Label>Quantidade * <span className="text-xs text-muted-foreground font-normal">(restam {Math.max(0, quantidadeAves - totalQtdItems)})</span></Label>
+                  <Input
+                    ref={quantidadeRef}
+                    type="number"
+                    placeholder="Ex: 5"
+                    value={quantidade}
+                    onChange={(e) => setQuantidade(e.target.value)}
+                    onKeyDown={handleQtdPesoKeyDown}
+                    min={1}
+                    className={cn(tentouAdicionar && (!quantidade || parseInt(quantidade) <= 0) && 'border-destructive')}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Peso (kg) *</Label>
-                  <Input type="number" placeholder="Ex: 1.5" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} step="0.01" min={0.01} />
+                  <Input
+                    ref={pesoRef}
+                    type="number"
+                    placeholder="Ex: 1.5"
+                    value={pesoKg}
+                    onChange={(e) => setPesoKg(e.target.value)}
+                    onKeyDown={handleQtdPesoKeyDown}
+                    step="0.01"
+                    min={0.01}
+                    className={cn(tentouAdicionar && (!pesoKg || parseFloat(pesoKg) <= 0) && 'border-destructive')}
+                  />
                 </div>
               </div>
 
-              <Button onClick={handleAddItem} className="w-full gap-2">
+              {limiteAtingido && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Limite de aves vivas atingido ({totalQtdItems}/{quantidadeAves}).
+                </p>
+              )}
+
+              <Button onClick={handleAddItem} disabled={limiteAtingido} className="w-full gap-2">
                 <Plus className="w-4 h-4" />
-                Adicionar Item
+                Adicionar Item <span className="text-xs opacity-70">(Enter)</span>
               </Button>
             </CardContent>
           </Card>
@@ -574,6 +845,38 @@ export function MortalidadeDialog({
                   </span>
                   <span className="text-xl font-bold text-destructive">{getTotalGeral()} aves</span>
                 </div>
+
+                {pesoMedioMortas != null && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-2 text-sm">
+                        <Scale className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium">Peso médio das mortas:</span>
+                      </span>
+                      <span className="text-base font-bold">
+                        {pesoMedioMortas.toFixed(3)} kg
+                        <span className="text-xs text-muted-foreground ml-1">({Math.round(pesoMedioMortas * 1000)} g)</span>
+                      </span>
+                    </div>
+                    {pesoComparacao && metaPesoIdade != null && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">
+                          Meta da idade ({diasDesdeAlojamento}d): {metaPesoIdade.toFixed(3)} kg
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            pesoComparacao.color === 'amber' && 'text-amber-600 border-amber-500/40 bg-amber-500/10',
+                            pesoComparacao.color === 'orange' && 'text-orange-600 border-orange-500/40 bg-orange-500/10',
+                            pesoComparacao.color === 'green' && 'text-green-600 border-green-500/40 bg-green-500/10',
+                          )}
+                        >
+                          {pesoComparacao.label} · {(pesoComparacao.ratio * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
