@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { calcularIdadeLote, calcularIdadeNaData } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import { calcularMinMaxDia, formatarHora, type MinMaxDia } from '@/lib/utils/calcularMinMaxDia';
+import { useDraftSaver, loadDraft, clearDraft, isDraftMeaningful } from '@/hooks/useMortalidadeDraft';
 import {
   Dialog,
   DialogContent,
