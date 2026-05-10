@@ -26,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock, Thermometer, Droplets } from 'lucide-react';
+import { Plus, Trash2, Skull, AlertTriangle, CalendarIcon, Target, Clock, Thermometer, Droplets, Scale, Save, RotateCcw, ArrowDown, ArrowUp, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import MortalidadeSemanaDetalheDialog from './MortalidadeSemanaDetalheDialog';
