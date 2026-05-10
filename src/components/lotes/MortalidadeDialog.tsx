@@ -497,9 +497,32 @@ export function MortalidadeDialog({
             <Skull className="w-5 h-5" />
             Registro de Mortalidade
           </DialogTitle>
+          {savingDraft && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Save className="w-3 h-3 animate-pulse" /> Salvando rascunho…
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Banner de Rascunho Recuperado */}
+          {draftRecuperado && !savedMortalidadeId && (
+            <Card className="border-primary/40 bg-primary/5">
+              <CardContent className="pt-3 pb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <RotateCcw className="w-4 h-4 text-primary" />
+                  <span>
+                    Rascunho recuperado · salvo {formatDistanceToNow(new Date(draftRecuperado.savedAt), { locale: ptBR, addSuffix: true })}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setDraftRecuperado(null)}>Continuar</Button>
+                  <Button size="sm" variant="outline" onClick={handleDescartarRascunho}>Descartar</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Histórico */}
           {dataAlojamento && diasDesdeAlojamento > 0 && (
             <Card className="border-amber-500/50 bg-amber-950/20">
