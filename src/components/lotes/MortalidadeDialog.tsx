@@ -645,6 +645,65 @@ export function MortalidadeDialog({
                 />
               </div>
             </div>
+
+            {/* Clima do dia (sensor IoT) */}
+            {climaDia && (
+              <Card className="border-blue-500/30 bg-blue-500/5">
+                <CardContent className="pt-3 pb-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Activity className="w-3.5 h-3.5 text-blue-500" />
+                    Clima do dia (sensor do galpão · {climaDia.totalLeituras} leituras)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-muted-foreground"><Thermometer className="w-3 h-3" /> Temperatura</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {climaDia.temp.min != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setTemperaturaC(String(climaDia.temp.min))}>
+                            <ArrowDown className="w-3 h-3" /> {climaDia.temp.min.toFixed(1)}° <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.temp.horarioMin)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.temp.max != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setTemperaturaC(String(climaDia.temp.max))}>
+                            <ArrowUp className="w-3 h-3" /> {climaDia.temp.max.toFixed(1)}° <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.temp.horarioMax)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.temp.atual != null && (
+                          <Badge className="gap-1 cursor-pointer" onClick={() => setTemperaturaC(String(climaDia.temp.atual))}>
+                            atual {climaDia.temp.atual.toFixed(1)}°
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-muted-foreground"><Droplets className="w-3 h-3" /> Umidade</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {climaDia.umid.min != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.min!)))}>
+                            <ArrowDown className="w-3 h-3" /> {Math.round(climaDia.umid.min)}% <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.umid.horarioMin)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.umid.max != null && (
+                          <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.max!)))}>
+                            <ArrowUp className="w-3 h-3" /> {Math.round(climaDia.umid.max)}% <span className="text-[10px] text-muted-foreground">{formatarHora(climaDia.umid.horarioMax)}</span>
+                          </Badge>
+                        )}
+                        {climaDia.umid.atual != null && (
+                          <Badge className="gap-1 cursor-pointer" onClick={() => setUmidadePct(String(Math.round(climaDia.umid.atual!)))}>
+                            atual {Math.round(climaDia.umid.atual)}%
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Toque em um valor para preencher o campo correspondente.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Input Form */}
