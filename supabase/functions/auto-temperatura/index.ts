@@ -796,7 +796,7 @@ Deno.serve(async (req) => {
 
         for (const device of galpaoDevices) {
           try {
-            await syncTimersForDevice(supabase, accessToken, appId, region, device, lote.id, integradoId, ageDays);
+            await syncTimersForDevice(supabase, accessToken, appId, region, device, lote.id, integradoId, ageDays, { tempMin, tempMax });
           } catch (timerErr) {
             console.error(`auto-temperatura: timer sync failed for device ${device.device_id_ewelink}:`, timerErr);
           }
