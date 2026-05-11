@@ -8592,6 +8592,7 @@ export type Database = {
       }
       timers_seguranca_iot: {
         Row: {
+          canal_id: string | null
           created_at: string
           dispositivo_id: string
           estado_desejado: string
@@ -8601,14 +8602,24 @@ export type Database = {
           idade_lote_dias: number
           integrado_id: string
           intervalo_minutos: number | null
+          janela_horaria_fim: string | null
+          janela_horaria_inicio: string | null
           lote_id: string | null
+          modo: Database["public"]["Enums"]["modo_protecao_offline"]
+          origem_setpoint: Database["public"]["Enums"]["origem_setpoint_offline"]
+          setpoint_editado_em: string | null
+          setpoint_editado_por: string | null
           sincronizado: boolean
           sincronizado_em: string | null
+          temp_desliga_c: number | null
+          temp_liga_c: number | null
           timer_index_ewelink: number | null
           tipo_timer: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          umidade_max_pct: number | null
           updated_at: string
         }
         Insert: {
+          canal_id?: string | null
           created_at?: string
           dispositivo_id: string
           estado_desejado?: string
@@ -8618,14 +8629,24 @@ export type Database = {
           idade_lote_dias: number
           integrado_id: string
           intervalo_minutos?: number | null
+          janela_horaria_fim?: string | null
+          janela_horaria_inicio?: string | null
           lote_id?: string | null
+          modo?: Database["public"]["Enums"]["modo_protecao_offline"]
+          origem_setpoint?: Database["public"]["Enums"]["origem_setpoint_offline"]
+          setpoint_editado_em?: string | null
+          setpoint_editado_por?: string | null
           sincronizado?: boolean
           sincronizado_em?: string | null
+          temp_desliga_c?: number | null
+          temp_liga_c?: number | null
           timer_index_ewelink?: number | null
           tipo_timer: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          umidade_max_pct?: number | null
           updated_at?: string
         }
         Update: {
+          canal_id?: string | null
           created_at?: string
           dispositivo_id?: string
           estado_desejado?: string
@@ -8635,14 +8656,30 @@ export type Database = {
           idade_lote_dias?: number
           integrado_id?: string
           intervalo_minutos?: number | null
+          janela_horaria_fim?: string | null
+          janela_horaria_inicio?: string | null
           lote_id?: string | null
+          modo?: Database["public"]["Enums"]["modo_protecao_offline"]
+          origem_setpoint?: Database["public"]["Enums"]["origem_setpoint_offline"]
+          setpoint_editado_em?: string | null
+          setpoint_editado_por?: string | null
           sincronizado?: boolean
           sincronizado_em?: string | null
+          temp_desliga_c?: number | null
+          temp_liga_c?: number | null
           timer_index_ewelink?: number | null
           tipo_timer?: Database["public"]["Enums"]["tipo_timer_seguranca"]
+          umidade_max_pct?: number | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "timers_seguranca_iot_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "timers_seguranca_iot_dispositivo_id_fkey"
             columns: ["dispositivo_id"]
@@ -9489,6 +9526,7 @@ export type Database = {
         | "novogen_brown"
         | "dekalb_white"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
+      modo_protecao_offline: "temperatura" | "horario" | "hibrido"
       motivo_mortalidade: "natural" | "eliminado"
       natureza_conta: "devedora" | "credora"
       nfe_racao_status: "pendente_revisao" | "confirmada" | "rejeitada" | "erro"
@@ -9503,6 +9541,7 @@ export type Database = {
         | "recebida"
         | "cancelada"
         | "refaturamento"
+      origem_setpoint_offline: "curva" | "manual"
       recebimento_status:
         | "em_conferencia"
         | "divergente"
@@ -9758,6 +9797,7 @@ export const Constants = {
         "dekalb_white",
       ],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
+      modo_protecao_offline: ["temperatura", "horario", "hibrido"],
       motivo_mortalidade: ["natural", "eliminado"],
       natureza_conta: ["devedora", "credora"],
       nfe_racao_status: ["pendente_revisao", "confirmada", "rejeitada", "erro"],
@@ -9773,6 +9813,7 @@ export const Constants = {
         "cancelada",
         "refaturamento",
       ],
+      origem_setpoint_offline: ["curva", "manual"],
       recebimento_status: [
         "em_conferencia",
         "divergente",
