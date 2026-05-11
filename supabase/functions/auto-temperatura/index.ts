@@ -228,25 +228,41 @@ function buildEwelinkTimers(timers: { hora_inicio: string; hora_fim: string; est
   return result;
 }
 
+function calcSetpointsCurva(
+  funcao: string,
+  tempMin: number | null,
+  tempMax: number | null,
+): { temp_liga_c: number | null; temp_desliga_c: number | null } {
+  if (tempMin == null || tempMax == null) return { temp_liga_c: null, temp_desliga_c: null };
+  if (funcao === 'ventilacao') {
+    return { temp_liga_c: +(tempMax + 1).toFixed(2), temp_desliga_c: +(tempMax - 0.5).toFixed(2) };
+  }
+  if (funcao === 'aquecimento') {
+    return { temp_liga_c: +(tempMin - 1).toFixed(2), temp_desliga_c: +(tempMin + 0.5).toFixed(2) };
+  }
+  return { temp_liga_c: null, temp_desliga_c: null };
+}
+
 async function syncTimersForDevice(
   supabase: any, accessToken: string, appId: string, region: string,
-  device: any, loteId: string, integradoId: string, ageDays: number
+  device: any, loteId: string, integradoId: string, ageDays: number,
+  setpointsCurva?: { tempMin: number | null; tempMax: number | null },
 ) {
   // Check if timers need resync (age band changed)
-  const { data: existingTimer } = await supabase
+  const { data: existingRows } = await supabase
     .from("timers_seguranca_iot")
-    .select("idade_lote_dias")
+    .select("idade_lote_dias, origem_setpoint, modo, temp_liga_c, temp_desliga_c, janela_horaria_inicio, janela_horaria_fim, umidade_max_pct")
     .eq("dispositivo_id", device.id)
-    .eq("sincronizado", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  const previousAge = existingTimer?.idade_lote_dias ?? null;
+  const hasManual = (existingRows || []).some((r: any) => r.origem_setpoint === 'manual');
+  const previousAge = existingRows?.[0]?.idade_lote_dias ?? null;
   const faixaAtual = getFaixaIdade(ageDays);
   const faixaAnterior = previousAge !== null ? getFaixaIdade(previousAge) : null;
 
-  if (faixaAtual === faixaAnterior) return false; // No resync needed
+  // Se há setpoints manuais, NÃO recalcula — apenas garante que a faixa horária do firmware reflita o que o usuário pediu
+  if (hasManual && faixaAtual === faixaAnterior) return false;
+  if (faixaAtual === faixaAnterior && !hasManual) return false;
 
   const timers = calcularTimersParaIdade(ageDays, device.funcao_automacao);
   if (timers.length === 0) return false;
@@ -272,10 +288,20 @@ async function syncTimersForDevice(
   const result = await res.json();
   const success = result.error === 0;
 
-  // Clean old timers for this device
-  await supabase.from("timers_seguranca_iot").delete().eq("dispositivo_id", device.id);
+  // Preserva linhas manuais; remove só as automáticas
+  await supabase
+    .from("timers_seguranca_iot")
+    .delete()
+    .eq("dispositivo_id", device.id)
+    .eq("origem_setpoint", "curva");
 
-  // Insert new timer records
+  // Insert new timer records (origem=curva) com setpoints sugeridos da curva
+  const setpoints = calcSetpointsCurva(
+    device.funcao_automacao,
+    setpointsCurva?.tempMin ?? null,
+    setpointsCurva?.tempMax ?? null,
+  );
+
   for (let i = 0; i < timers.length; i++) {
     await supabase.from("timers_seguranca_iot").insert({
       dispositivo_id: device.id,
@@ -290,10 +316,14 @@ async function syncTimersForDevice(
       sincronizado: success,
       sincronizado_em: success ? new Date().toISOString() : null,
       timer_index_ewelink: i * 2,
+      modo: 'horario',
+      temp_liga_c: setpoints.temp_liga_c,
+      temp_desliga_c: setpoints.temp_desliga_c,
+      origem_setpoint: 'curva',
     });
   }
 
-  console.log(`timers: ${success ? 'synced' : 'FAILED'} for device ${device.device_id_ewelink} (age ${ageDays}, band ${faixaAtual})`);
+  console.log(`timers: ${success ? 'synced' : 'FAILED'} for device ${device.device_id_ewelink} (age ${ageDays}, band ${faixaAtual}, hasManual=${hasManual})`);
   return success;
 }
 
@@ -766,7 +796,7 @@ Deno.serve(async (req) => {
 
         for (const device of galpaoDevices) {
           try {
-            await syncTimersForDevice(supabase, accessToken, appId, region, device, lote.id, integradoId, ageDays);
+            await syncTimersForDevice(supabase, accessToken, appId, region, device, lote.id, integradoId, ageDays, { tempMin, tempMax });
           } catch (timerErr) {
             console.error(`auto-temperatura: timer sync failed for device ${device.device_id_ewelink}:`, timerErr);
           }

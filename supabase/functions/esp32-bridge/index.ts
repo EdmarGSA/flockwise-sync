@@ -187,8 +187,30 @@ Deno.serve(async (req) => {
         hora_fim: string;
         estado: "on" | "off";
       }> = [];
+      // Novo formato: regras por canal com prioridade temperatura > horário
+      const safety_rules: Array<{
+        canal: number;
+        funcao: string;
+        modo: "temperatura" | "horario" | "hibrido";
+        temp_liga_c: number | null;
+        temp_desliga_c: number | null;
+        umidade_max_pct: number | null;
+        janela_horaria: { inicio: string; fim: string } | null;
+        fallback_horario: { hora_inicio: string; hora_fim: string; estado: "on" | "off" } | null;
+        origem: "curva" | "manual";
+      }> = [];
       const schedule_24h: Record<string, ScheduleSlot[]> = {};
       let lote: any = null;
+
+      // Carrega regras de proteção offline (com setpoints) para todos os canais deste dispositivo
+      const { data: protRows } = await supabase
+        .from("timers_seguranca_iot")
+        .select("canal_id, dispositivo_id, modo, temp_liga_c, temp_desliga_c, umidade_max_pct, janela_horaria_inicio, janela_horaria_fim, hora_inicio, hora_fim, estado_desejado, origem_setpoint")
+        .eq("dispositivo_id", device.id);
+      const protByCanal = new Map<string, any>();
+      for (const r of protRows ?? []) {
+        if ((r as any).canal_id) protByCanal.set((r as any).canal_id, r);
+      }
 
       if (device.galpao_id) {
         const { data: l } = await supabase
@@ -206,16 +228,50 @@ Deno.serve(async (req) => {
             Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / 86400000) + 1,
           );
           for (const c of canais ?? []) {
-            const t = calcularTimerSeguranca(idade, (c as any).funcao_automacao);
-            if (t) safety_timers.push({ canal: (c as any).canal_numero, ...t });
+            const canalAny = c as any;
+            const t = calcularTimerSeguranca(idade, canalAny.funcao_automacao);
+            if (t) safety_timers.push({ canal: canalAny.canal_numero, ...t });
+
+            // Monta safety_rule por canal a partir de timers_seguranca_iot (quando vinculado por canal_id)
+            const prot = protByCanal.get(canalAny.id);
+            if (prot) {
+              safety_rules.push({
+                canal: canalAny.canal_numero,
+                funcao: canalAny.funcao_automacao,
+                modo: prot.modo ?? "horario",
+                temp_liga_c: prot.temp_liga_c ?? null,
+                temp_desliga_c: prot.temp_desliga_c ?? null,
+                umidade_max_pct: prot.umidade_max_pct ?? null,
+                janela_horaria: prot.janela_horaria_inicio && prot.janela_horaria_fim
+                  ? { inicio: prot.janela_horaria_inicio, fim: prot.janela_horaria_fim }
+                  : null,
+                fallback_horario: t
+                  ? { hora_inicio: t.hora_inicio, hora_fim: t.hora_fim, estado: t.estado }
+                  : null,
+                origem: prot.origem_setpoint ?? "curva",
+              });
+            } else if (t) {
+              // sem registro específico do canal — emite regra horário a partir do cálculo padrão
+              safety_rules.push({
+                canal: canalAny.canal_numero,
+                funcao: canalAny.funcao_automacao,
+                modo: "horario",
+                temp_liga_c: null,
+                temp_desliga_c: null,
+                umidade_max_pct: null,
+                janela_horaria: null,
+                fallback_horario: { hora_inicio: t.hora_inicio, hora_fim: t.hora_fim, estado: t.estado },
+                origem: "curva",
+              });
+            }
 
             // Schedule 24h apenas para canais de iluminação com automação ativa
-            if ((c as any).tipo_equipamento === "iluminacao" && (c as any).automacao_ativa) {
+            if (canalAny.tipo_equipamento === "iluminacao" && canalAny.automacao_ativa) {
               const faixa = await carregarFaixaAtiva(
                 supabase, lote.id, lote.integrado_id,
                 lote.programa_iluminacao_id, idade,
               );
-              schedule_24h[String((c as any).canal_numero)] = montarSchedule24h(faixa);
+              schedule_24h[String(canalAny.canal_numero)] = montarSchedule24h(faixa);
             }
           }
         }
@@ -236,7 +292,8 @@ Deno.serve(async (req) => {
         device: { id: device.id, nome: device.nome, galpao_id: device.galpao_id },
         canais: canais || [],
         intervalo_telemetria_seg: 60,
-        safety_timers,
+        safety_timers,        // legado — manter para compatibilidade firmware antigo
+        safety_rules,         // novo: prioridade temperatura > horário
         schedule_24h,
         programa_versao,
         rtc: {
@@ -249,6 +306,7 @@ Deno.serve(async (req) => {
           restaurar_ultimo_estado: true,
           aplicar_schedule_offline: true,
           max_horas_sem_sync_para_safety: 24,
+          sensor_falho_fallback: "horario",   // se sensor local falhar, usa fallback_horario
         },
       });
     }

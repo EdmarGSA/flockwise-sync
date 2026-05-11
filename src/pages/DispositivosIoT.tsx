@@ -21,6 +21,7 @@ import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialo
 import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
 import { SaudeIoTPanel } from '@/components/iot/SaudeIoTPanel';
 import { DispositivoIluminacaoCard } from '@/components/iot/DispositivoIluminacaoCard';
+import { ProtecaoOfflineCard } from '@/components/iot/ProtecaoOfflineCard';
 import { HeartPulse } from 'lucide-react';
 
 interface Dispositivo {
@@ -1189,83 +1190,21 @@ export default function DispositivosIoT() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Group timers by device */}
-                    {(() => {
-                      const grouped = new Map<string, any[]>();
-                      timersSeguranca.forEach((t: any) => {
-                        const devId = t.dispositivo_id;
-                        if (!grouped.has(devId)) grouped.set(devId, []);
-                        grouped.get(devId)!.push(t);
-                      });
-                      return Array.from(grouped.entries()).map(([devId, timers]) => {
-                        const dev = dispositivos.find(d => d.id === devId);
-                        const allSynced = timers.every((t: any) => t.sincronizado);
-                        const idade = timers[0]?.idade_lote_dias;
-                        return (
-                          <Card key={devId} className={allSynced ? 'border-primary/30' : 'border-destructive/30'}>
-                            <CardContent className="py-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  {allSynced ? (
-                                    <ShieldCheck className="h-5 w-5 text-primary" />
-                                  ) : (
-                                    <ShieldAlert className="h-5 w-5 text-destructive" />
-                                  )}
-                                  <div>
-                                    <p className="font-medium text-foreground">{dev?.nome || devId}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Idade do lote: {idade} dias • {allSynced ? 'Protegido' : 'Desatualizado'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <Badge variant={allSynced ? 'secondary' : 'destructive'} className="text-xs">
-                                  {allSynced ? '🛡️ Protegido' : '⚠️ Desatualizado'}
-                                </Badge>
-                              </div>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead>Horário</TableHead>
-                                    <TableHead>Ação</TableHead>
-                                    <TableHead>Sincronizado</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {timers.map((t: any) => (
-                                    <TableRow key={t.id}>
-                                      <TableCell className="text-sm">
-                                        {t.tipo_timer === 'aquecimento_noturno' ? '🔥 Aquecimento' :
-                                         t.tipo_timer === 'ventilacao_diurno' ? '💨 Ventilação' :
-                                         '🔄 Ciclo'}
-                                      </TableCell>
-                                      <TableCell className="text-sm font-mono">
-                                        {t.hora_inicio?.slice(0, 5)} → {t.hora_fim?.slice(0, 5)}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant={t.estado_desejado === 'on' ? 'default' : 'outline'} className="text-xs">
-                                          {t.estado_desejado === 'on' ? 'Ligar' : 'Desligar'}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        {t.sincronizado ? (
-                                          <span className="text-xs text-primary">
-                                            ✓ {t.sincronizado_em ? formatDistanceToNow(new Date(t.sincronizado_em), { addSuffix: true, locale: ptBR }) : ''}
-                                          </span>
-                                        ) : (
-                                          <span className="text-xs text-destructive">✗ Pendente</span>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </CardContent>
-                          </Card>
-                        );
-                      });
-                    })()}
+                  <div className="space-y-3">
+                    {timersSeguranca.map((t: any) => {
+                      const dev = dispositivos.find(d => d.id === t.dispositivo_id);
+                      const leitura = dev ? leituras[dev.id] : undefined;
+                      const hasSensorLocal = leitura?.temperatura_c != null;
+                      return (
+                        <ProtecaoOfflineCard
+                          key={t.id}
+                          timer={t}
+                          deviceName={dev?.nome || 'Dispositivo'}
+                          hasSensorLocal={hasSensorLocal}
+                          onSaved={fetchTimers}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1279,10 +1218,10 @@ export default function DispositivosIoT() {
                   Como funciona a Proteção Offline?
                 </h4>
                 <ul className="text-sm text-muted-foreground space-y-1.5 list-disc ml-5">
-                  <li><strong>Automação cloud (primária):</strong> Lê temperatura real dos sensores e toma decisões inteligentes a cada 5 minutos</li>
-                  <li><strong>Timers de segurança (fallback):</strong> Programados no firmware do Sonoff, executam por horário fixo mesmo sem internet</li>
-                  <li><strong>Atualização automática:</strong> Quando o lote muda de faixa de idade, os timers são recalculados e reprogramados</li>
-                  <li><strong>Prioridade:</strong> Se a internet voltar, a automação cloud retoma o controle imediatamente</li>
+                  <li><strong>Prioridade 1 — Sensor local:</strong> Quando o dispositivo tem sensor (ex.: ESP32-S3), ele decide LIGAR/DESLIGAR pela temperatura medida no galpão, não pelo relógio.</li>
+                  <li><strong>Prioridade 2 — Janela horária:</strong> Funciona como reforço (ex.: nebulizar só entre 10h e 18h) ou como única regra para dispositivos sem sensor (Sonoff básico).</li>
+                  <li><strong>Prioridade 3 — Cloud (Climate Brain):</strong> Quando a internet volta, a automação na nuvem retoma o controle com curva, ITH e aprendizado.</li>
+                  <li><strong>Setpoints:</strong> Vêm da curva climática por padrão. Você pode editar manualmente em cada dispositivo abaixo — a edição é preservada e não é sobrescrita pelo "Ressincronizar".</li>
                 </ul>
               </CardContent>
             </Card>
