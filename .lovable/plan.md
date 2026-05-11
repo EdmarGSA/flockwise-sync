@@ -1,86 +1,102 @@
-## Análise da Tela Atual de Registro de Mortalidade
+## Problema
 
-`MortalidadeDialog.tsx` (619 linhas) hoje:
-- Usa apenas a **última leitura** do sensor IoT (se < 2h) para preencher temperatura/umidade — um único ponto, fácil de subestimar estresse térmico real do dia.
-- **Perde tudo** ao fechar o dialog: `handleClose()` reseta items, peso, quantidade, submotivos, temperatura, umidade, hora. Se o usuário fecha sem querer ou troca de tela, refaz do zero.
-- Pede `pesoKg` por item, mas **nunca mostra a média** — o usuário não tem feedback do peso médio acumulado das aves mortas no registro.
-- Não exibe histórico do peso médio das mortas vs meta de peso da idade.
+Hoje a aba **Proteção Offline** programa timers só por horário fixo (ex.: ventilação 11:00→15:00). Quando a internet cai, o equipamento liga pelo relógio, ignorando se o galpão está frio ou quente. Para um sistema climático, a prioridade tem que ser a **temperatura medida pelo sensor local**, não a hora.
 
-## Plano de Melhorias
+Além disso, o usuário quer poder **programar manualmente os setpoints** (não apenas herdar da curva), para ajustar à realidade do galpão.
 
-### 1. Temperatura e Umidade Mín/Máx do Dia (sensor IoT)
+## Objetivo
 
-Trocar o "snapshot" por uma faixa real do dia.
+1. Inverter a hierarquia: **temperatura primeiro, horário como reforço/limite opcional**.
+2. Permitir que o produtor **edite os setpoints offline** por canal direto na UI, com sugestão automática vinda da curva climática (e botão "Restaurar da curva").
 
-- Em `fetchSensorData()`, ao invés de pegar 1 leitura, buscar todas as leituras do galpão para a data selecionada (`dataRegistro`) e calcular:
-  - `tempMinDia / tempMaxDia / tempAtual`
-  - `umidMinDia / umidMaxDia / umidAtual`
-  - horários do mín e do máx
-- Reexecutar quando `dataRegistro` mudar (registros retroativos mostram mín/máx daquele dia).
-- Manter inputs `temperaturaC` / `umidadePct` editáveis (registro pontual no momento da mortalidade) e adicionar um **card de contexto climático do dia** abaixo:
+## Mudanças propostas
 
-```text
-┌─ Clima do dia (sensor galpão) ──────────────────┐
-│ Temp: 21.4° (06:12) ↔ 32.7° (14:48) | Atual 28.1│
-│ Umid: 58% ↔ 81%                     | Atual 67% │
-│ [Usar mín] [Usar máx] [Usar atual]              │
-└──────────────────────────────────────────────────┘
+### 1. Modelo de dados
+Adicionar à tabela que alimenta o card de proteção:
+
+- `modo`: `"temperatura"` | `"horario"` | `"hibrido"`
+- `temp_liga_c`, `temp_desliga_c` (histerese)
+- `umidade_max_pct` (opcional — para nebulização)
+- `janela_horaria_inicio`, `janela_horaria_fim` (opcionais — quando preenchidos, o setpoint só age dentro da janela)
+- `origem_setpoint`: `"curva"` | `"manual"` (mostra se foi herdado ou editado)
+- `setpoint_editado_em`, `setpoint_editado_por`
+
+Sonoff básico (sem sensor) cai automaticamente em `modo='horario'` e os campos de temperatura ficam desabilitados na UI.
+
+### 2. Lógica de cálculo (`calcularTimersSeguranca.ts`)
+Quando `origem_setpoint='curva'`, calcular a partir da curva climática por idade já existente:
+
+- **Ventilação**: `temp_liga = conforto_max + 1°C`, `temp_desliga = conforto_max − 0.5°C`
+- **Aquecimento**: `temp_liga = conforto_min − 1°C`, `temp_desliga = conforto_min + 0.5°C`
+- **Nebulização**: `temp > X` E `umidade < Y` (híbrido)
+
+Quando `origem_setpoint='manual'`, usar exatamente o que o usuário digitou — não recalcular ao mudar de faixa de idade. Mostrar um banner "Você está com setpoint manual; não acompanha a curva automaticamente".
+
+### 3. UI — aba Proteção Offline em `DispositivosIoT.tsx`
+
+**Substituir a tabela atual** por um card editável por canal:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Galpão Área 02 • 💨 Ventilação      [🌡️ Sensor OK]       │
+│ Idade do lote: 15 dias                                   │
+│                                                          │
+│ Modo:  ( ) Temperatura  ( ) Horário  (•) Híbrido         │
+│                                                          │
+│ Liga quando ≥ [ 30,5 ] °C                                │
+│ Desliga quando ≤ [ 29,0 ] °C    Histerese: 1,5 °C        │
+│ Umidade máxima: [ -- ] %    (opcional)                   │
+│                                                          │
+│ Janela horária (opcional): [ 10:00 ] → [ 18:00 ]         │
+│                                                          │
+│ Origem: Manual (editado em 11/05 por João)               │
+│ [↻ Restaurar da curva]   [💾 Salvar e sincronizar]       │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Botões aplicam o valor no input correspondente (UX rápida).
+Comportamento:
+- **Sugestão automática**: ao abrir, se `origem='curva'`, os campos vêm pré-preenchidos com o cálculo atual. Se o usuário editar qualquer campo, vira `'manual'`.
+- **Validação**: `temp_liga > temp_desliga` para ventilação; `temp_liga < temp_desliga` para aquecimento; histerese mínima de 0,3 °C; alerta se sair de uma faixa segura por idade (ex.: aquecer pintinho a < 28 °C nos primeiros 7 dias).
+- **Bloqueio inteligente**: para canal sem sensor, modo Temperatura/Híbrido fica desabilitado com tooltip "Este dispositivo não possui sensor de temperatura local".
+- **Resync**: salvar dispara `handleResyncTimers` automaticamente; botão manual também continua disponível no topo.
+- **Última ação**: mostrar abaixo do card "Ligou às 13:42 com 31,2 °C" usando os logs já existentes.
 
-Se não houver sensor, esconder o card e manter inputs manuais como hoje.
+Atualizar o card "Como funciona a Proteção Offline?":
+- **Prioridade 1 — Sensor local**: o ESP32 lê o sensor e decide na hora.
+- **Prioridade 2 — Janela horária**: limita quando o setpoint pode agir (ex.: nebulizar só 10–18h).
+- **Prioridade 3 — Cloud**: ao voltar a internet, o Climate Brain assume e ajusta com curva, ITH e aprendizado.
+- **Setpoints**: vêm da curva por padrão, mas podem ser editados manualmente por canal.
 
-### 2. Não Perder Dados (rascunho persistente)
+### 4. Firmware (`esp32-bridge` → `GET /config`)
+Devolver `safety_rules` no novo formato:
 
-Persistir o formulário em `localStorage` com chave por lote: `mortalidade_draft_<loteId>`.
-
-- Salvar a cada alteração (debounced 400ms): items, dataRegistro, horaRegistro, temperaturaC, umidadePct, motivo, submotivos, quantidade, pesoKg.
-- Ao abrir o dialog: se há rascunho, mostrar banner discreto:
-  > "Rascunho recuperado de há 12 min. [Continuar] [Descartar]"
-- Limpar rascunho **apenas** após `handleSave` bem-sucedido.
-- `handleClose()` deixa de resetar o estado — só fecha; ao reabrir os dados continuam.
-- Adicionar confirmação leve ao fechar com itens não salvos: toast "Rascunho salvo automaticamente".
-
-### 3. Peso Médio das Aves Mortas
-
-Calcular e exibir em tempo real conforme itens são adicionados:
-
-- `pesoMedio = Σ(peso_kg_item × quantidade) / Σ(quantidade)`
-- Exibir junto dos totais que já existem (Natural / Eliminados / Total) um quarto card:
-
-```text
-[Natural: 12] [Eliminados: 3] [Total: 15] [Peso médio: 1,847 g]
+```json
+{
+  "canal": 2,
+  "modo": "hibrido",
+  "temp_liga_c": 30.5,
+  "temp_desliga_c": 29.0,
+  "umidade_max_pct": null,
+  "janela_horaria": { "inicio": "10:00", "fim": "18:00" },
+  "fallback_horario": { "ligar": "11:00", "desligar": "15:00" }
+}
 ```
 
-- Comparar com a **meta de peso da idade do lote** (já existem `metas_peso_lote` no projeto):
-  - Buscar meta para `diasDesdeAlojamento`.
-  - Se `pesoMedio < 70% da meta` → badge âmbar "Refugo provável".
-  - Se entre 70%–95% → badge "Abaixo da meta".
-  - Se ≥ 95% → badge verde "Compatível".
-- Adicionar coluna "Peso médio mortas (7d)" no card de Histórico de Mortalidade já existente.
+ESP32-S3 compara com leitura do DHT local; usa `fallback_horario` apenas se o sensor falhar por > N minutos. Atualizar `docs/firmware/recuperacao-energia.md`.
 
-### 4. Outras Melhorias de UX no Cadastro
+### 5. Migração e compatibilidade
 
-- **Auto-foco**: ao adicionar item, focar de volta no campo `quantidade` para registros em série.
-- **Atalhos de teclado**: `Enter` no peso adiciona o item (hoje precisa clicar "Adicionar").
-- **Validação visual progressiva**: marcar campo `pesoKg` em vermelho assim que vazio + tentativa de adicionar, ao invés de só toast.
-- **Quantidade máxima inteligente**: bloquear adicionar item se `Σ(quantidades) > avesVivasAtuais` com mensagem clara ("Restam X aves vivas").
-- **Última temperatura usada**: mostrar timestamp da leitura ("há 23 min") quando vier do IoT, para o usuário decidir se confia.
-- **Indicador "Salvando rascunho…"** no canto do dialog quando o debounce escreve no localStorage.
+- Migration adiciona colunas nullable; registros antigos viram `modo='horario'`, `origem='curva'`.
+- `handleResyncTimers` recalcula só os canais com `origem='curva'`; manuais são preservados.
+- Sonoff básico continua funcionando como hoje (zero regressão).
 
-### Detalhes técnicos
+### 6. Fora de escopo
 
-Arquivos afetados:
-- `src/components/lotes/MortalidadeDialog.tsx` — todas as mudanças acima.
-- Novo hook `src/hooks/useMortalidadeDraft.ts` — wrapper de `localStorage` com debounce + serialização de `Date`.
-- Novo helper `src/lib/utils/calcularMinMaxDia.ts` — recebe leituras do sensor e devolve `{ min, max, horarioMin, horarioMax, atual }` para temp e umidade.
-- Reutilizar `metas_peso_lote` (já lida em `MetasPesoLote.tsx`) para a comparação de peso.
+- Não mexer na automação cloud (`auto-temperatura`, `climate-brain`) — já é temperatura-first.
+- Não alterar iluminação (continua por horário/fotoperíodo).
 
-Sem mudanças de schema. Sem novas tabelas. Tudo frontend + leituras já existentes.
+## Perguntas
 
-### Fora do escopo (sugiro para outra rodada)
-
-- Persistir rascunho no banco (multi-dispositivo) — `localStorage` resolve 95% dos casos hoje.
-- Análise IA de correlação peso médio mortas × ração consumida — depende de dados do lote.
-- Importação automática de pesagem de aves mortas via balança IoT.
+1. **Histerese mínima** entre liga/desliga: forçar **0,3 °C** ou deixar livre com aviso?
+2. Quando o sensor local falhar, o canal deve **cair no fallback de horário** ou **desligar por segurança** e alertar?
+3. Edição manual de setpoint deve ser **liberada para todos** ou **só para admin/veterinário** (criador apenas visualiza)?
