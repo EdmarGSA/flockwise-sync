@@ -1190,83 +1190,21 @@ export default function DispositivosIoT() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Group timers by device */}
-                    {(() => {
-                      const grouped = new Map<string, any[]>();
-                      timersSeguranca.forEach((t: any) => {
-                        const devId = t.dispositivo_id;
-                        if (!grouped.has(devId)) grouped.set(devId, []);
-                        grouped.get(devId)!.push(t);
-                      });
-                      return Array.from(grouped.entries()).map(([devId, timers]) => {
-                        const dev = dispositivos.find(d => d.id === devId);
-                        const allSynced = timers.every((t: any) => t.sincronizado);
-                        const idade = timers[0]?.idade_lote_dias;
-                        return (
-                          <Card key={devId} className={allSynced ? 'border-primary/30' : 'border-destructive/30'}>
-                            <CardContent className="py-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  {allSynced ? (
-                                    <ShieldCheck className="h-5 w-5 text-primary" />
-                                  ) : (
-                                    <ShieldAlert className="h-5 w-5 text-destructive" />
-                                  )}
-                                  <div>
-                                    <p className="font-medium text-foreground">{dev?.nome || devId}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Idade do lote: {idade} dias • {allSynced ? 'Protegido' : 'Desatualizado'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <Badge variant={allSynced ? 'secondary' : 'destructive'} className="text-xs">
-                                  {allSynced ? '🛡️ Protegido' : '⚠️ Desatualizado'}
-                                </Badge>
-                              </div>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead>Horário</TableHead>
-                                    <TableHead>Ação</TableHead>
-                                    <TableHead>Sincronizado</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {timers.map((t: any) => (
-                                    <TableRow key={t.id}>
-                                      <TableCell className="text-sm">
-                                        {t.tipo_timer === 'aquecimento_noturno' ? '🔥 Aquecimento' :
-                                         t.tipo_timer === 'ventilacao_diurno' ? '💨 Ventilação' :
-                                         '🔄 Ciclo'}
-                                      </TableCell>
-                                      <TableCell className="text-sm font-mono">
-                                        {t.hora_inicio?.slice(0, 5)} → {t.hora_fim?.slice(0, 5)}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant={t.estado_desejado === 'on' ? 'default' : 'outline'} className="text-xs">
-                                          {t.estado_desejado === 'on' ? 'Ligar' : 'Desligar'}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        {t.sincronizado ? (
-                                          <span className="text-xs text-primary">
-                                            ✓ {t.sincronizado_em ? formatDistanceToNow(new Date(t.sincronizado_em), { addSuffix: true, locale: ptBR }) : ''}
-                                          </span>
-                                        ) : (
-                                          <span className="text-xs text-destructive">✗ Pendente</span>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </CardContent>
-                          </Card>
-                        );
-                      });
-                    })()}
+                  <div className="space-y-3">
+                    {timersSeguranca.map((t: any) => {
+                      const dev = dispositivos.find(d => d.id === t.dispositivo_id);
+                      const leitura = dev ? leituras[dev.id] : undefined;
+                      const hasSensorLocal = leitura?.temperatura_c != null;
+                      return (
+                        <ProtecaoOfflineCard
+                          key={t.id}
+                          timer={t}
+                          deviceName={dev?.nome || 'Dispositivo'}
+                          hasSensorLocal={hasSensorLocal}
+                          onSaved={fetchTimers}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
