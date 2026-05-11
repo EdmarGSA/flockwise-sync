@@ -21,6 +21,7 @@ import { CanaisDispositivoDialog } from '@/components/iot/CanaisDispositivoDialo
 import { CanaisDispositivoList } from '@/components/iot/CanaisDispositivoList';
 import { SaudeIoTPanel } from '@/components/iot/SaudeIoTPanel';
 import { DispositivoIluminacaoCard } from '@/components/iot/DispositivoIluminacaoCard';
+import { ProtecaoOfflineCard } from '@/components/iot/ProtecaoOfflineCard';
 import { HeartPulse } from 'lucide-react';
 
 interface Dispositivo {
