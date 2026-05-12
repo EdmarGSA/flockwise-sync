@@ -224,6 +224,10 @@ Deno.serve(async (req) => {
     });
 
     resultados.push({ galpao: lote.galpao_id, modo, tempC, tempAlvo, ventPct, acaoNeb, trocaArDuty });
+    } catch (e: any) {
+      console.error("climate-brain loop error", lote.galpao_id, e?.message);
+      resultados.push({ galpao: lote.galpao_id, error: e?.message ?? String(e) });
+    }
   }
 
   // Dispara executores
