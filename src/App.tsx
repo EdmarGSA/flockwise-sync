@@ -444,6 +444,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/configuracoes/ambiencia" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <AmbienciaDashboard />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/configuracoes/financeiro" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
