@@ -40,6 +40,7 @@ import ConfiguracaoVentilacao from "./pages/ConfiguracaoVentilacao";
 import ConfiguracaoCortinas from "./pages/ConfiguracaoCortinas";
 import ConfiguracaoQualidadeAr from "./pages/ConfiguracaoQualidadeAr";
 import ClimateBrain from "./pages/ClimateBrain";
+import AmbienciaDashboard from "./pages/AmbienciaDashboard";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
@@ -440,6 +441,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ClimateBrain />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/ambiencia" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <AmbienciaDashboard />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
