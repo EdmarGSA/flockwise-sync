@@ -40,6 +40,7 @@ import ConfiguracaoVentilacao from "./pages/ConfiguracaoVentilacao";
 import ConfiguracaoCortinas from "./pages/ConfiguracaoCortinas";
 import ConfiguracaoQualidadeAr from "./pages/ConfiguracaoQualidadeAr";
 import ClimateBrain from "./pages/ClimateBrain";
+import AmbienciaDashboard from "./pages/AmbienciaDashboard";
 import ConfiguracaoFechamento from "./pages/ConfiguracaoFechamento";
 import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
