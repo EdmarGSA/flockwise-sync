@@ -1,102 +1,117 @@
-## Problema
 
-Hoje a aba **Proteção Offline** programa timers só por horário fixo (ex.: ventilação 11:00→15:00). Quando a internet cai, o equipamento liga pelo relógio, ignorando se o galpão está frio ou quente. Para um sistema climático, a prioridade tem que ser a **temperatura medida pelo sensor local**, não a hora.
-
-Além disso, o usuário quer poder **programar manualmente os setpoints** (não apenas herdar da curva), para ajustar à realidade do galpão.
-
-## Objetivo
-
-1. Inverter a hierarquia: **temperatura primeiro, horário como reforço/limite opcional**.
-2. Permitir que o produtor **edite os setpoints offline** por canal direto na UI, com sugestão automática vinda da curva climática (e botão "Restaurar da curva").
-
-## Mudanças propostas
-
-### 1. Modelo de dados
-Adicionar à tabela que alimenta o card de proteção:
-
-- `modo`: `"temperatura"` | `"horario"` | `"hibrido"`
-- `temp_liga_c`, `temp_desliga_c` (histerese)
-- `umidade_max_pct` (opcional — para nebulização)
-- `janela_horaria_inicio`, `janela_horaria_fim` (opcionais — quando preenchidos, o setpoint só age dentro da janela)
-- `origem_setpoint`: `"curva"` | `"manual"` (mostra se foi herdado ou editado)
-- `setpoint_editado_em`, `setpoint_editado_por`
-
-Sonoff básico (sem sensor) cai automaticamente em `modo='horario'` e os campos de temperatura ficam desabilitados na UI.
-
-### 2. Lógica de cálculo (`calcularTimersSeguranca.ts`)
-Quando `origem_setpoint='curva'`, calcular a partir da curva climática por idade já existente:
-
-- **Ventilação**: `temp_liga = conforto_max + 1°C`, `temp_desliga = conforto_max − 0.5°C`
-- **Aquecimento**: `temp_liga = conforto_min − 1°C`, `temp_desliga = conforto_min + 0.5°C`
-- **Nebulização**: `temp > X` E `umidade < Y` (híbrido)
-
-Quando `origem_setpoint='manual'`, usar exatamente o que o usuário digitou — não recalcular ao mudar de faixa de idade. Mostrar um banner "Você está com setpoint manual; não acompanha a curva automaticamente".
-
-### 3. UI — aba Proteção Offline em `DispositivosIoT.tsx`
-
-**Substituir a tabela atual** por um card editável por canal:
+## 1. Como o sistema gerencia a ambiência (visão geral)
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ Galpão Área 02 • 💨 Ventilação      [🌡️ Sensor OK]       │
-│ Idade do lote: 15 dias                                   │
-│                                                          │
-│ Modo:  ( ) Temperatura  ( ) Horário  (•) Híbrido         │
-│                                                          │
-│ Liga quando ≥ [ 30,5 ] °C                                │
-│ Desliga quando ≤ [ 29,0 ] °C    Histerese: 1,5 °C        │
-│ Umidade máxima: [ -- ] %    (opcional)                   │
-│                                                          │
-│ Janela horária (opcional): [ 10:00 ] → [ 18:00 ]         │
-│                                                          │
-│ Origem: Manual (editado em 11/05 por João)               │
-│ [↻ Restaurar da curva]   [💾 Salvar e sincronizar]       │
-└──────────────────────────────────────────────────────────┘
+                    ┌─────────────────────────────────────────┐
+                    │  SENSORES (Sonoff TH / ESP32 / NH3 etc) │
+                    └─────────────────┬───────────────────────┘
+                                      │ telemetria 1-5 min
+                  ┌───────────────────▼───────────────────┐
+                  │  sync-sensors  /  esp32-bridge        │
+                  │  → grava em leituras_sensores         │
+                  └───────────────────┬───────────────────┘
+                                      │
+        ┌─────────────────────────────▼────────────────────────────┐
+        │  CLIMATE-BRAIN  (cron 1/min)  — coordenador integrado    │
+        │  Lê: curva_climatica_ponto + aprendizado_galpao +        │
+        │      config_histerese + leituras_sensores + idade lote   │
+        │  Decide MODO DOMINANTE por galpão:                       │
+        │     AQUECIMENTO · CONFORTO · ALERTA_CALOR · EMERGENCIA   │
+        │  Loga em log_decisao_clima                               │
+        └────────┬───────────┬──────────┬──────────┬───────────────┘
+                 │           │          │          │
+       ┌─────────▼──┐ ┌──────▼─────┐ ┌──▼───────┐ ┌▼──────────────┐
+       │auto-       │ │auto-       │ │auto-     │ │auto-          │
+       │ventilacao  │ │cortina     │ │nebuliz.  │ │temperatura    │
+       │(estágio +  │ │(% abertura)│ │(UR/ciclo)│ │(aquecedores + │
+       │ duty bro.) │ │            │ │          │ │ proteção off) │
+       └─────┬──────┘ └─────┬──────┘ └────┬─────┘ └──────┬────────┘
+             └──────────────┴─────────────┴──────────────┘
+                                 │
+                ┌────────────────▼────────────────┐
+                │  DRIVERS DE COMANDO             │
+                │  • sync-sensors  → eWeLink Cloud → Sonoff  │
+                │  • esp32-bridge  → fila HTTP    → ESP32    │
+                └────────────────┬────────────────┘
+                                 │
+                ┌────────────────▼────────────────┐
+                │  CANAIS / DISPOSITIVOS no galpão│
+                │  Fallback offline: safety_rules │
+                │  gravadas em timers_seguranca   │
+                └─────────────────────────────────┘
 ```
 
-Comportamento:
-- **Sugestão automática**: ao abrir, se `origem='curva'`, os campos vêm pré-preenchidos com o cálculo atual. Se o usuário editar qualquer campo, vira `'manual'`.
-- **Validação**: `temp_liga > temp_desliga` para ventilação; `temp_liga < temp_desliga` para aquecimento; histerese mínima de 0,3 °C; alerta se sair de uma faixa segura por idade (ex.: aquecer pintinho a < 28 °C nos primeiros 7 dias).
-- **Bloqueio inteligente**: para canal sem sensor, modo Temperatura/Híbrido fica desabilitado com tooltip "Este dispositivo não possui sensor de temperatura local".
-- **Resync**: salvar dispara `handleResyncTimers` automaticamente; botão manual também continua disponível no topo.
-- **Última ação**: mostrar abaixo do card "Ligou às 13:42 com 31,2 °C" usando os logs já existentes.
+Camadas:
+- **Coleta**: `leituras_sensores` (T, UR, NH3, CO2, lux, vento, pressão).
+- **Coordenação**: `climate-brain` resolve um modo por galpão e chama os executores. `climate-learn` ajusta offsets aprendidos a cada hora (±2 °C).
+- **Execução**: cada `auto-*` aplica a regra do seu domínio respeitando histerese/cooldown.
+- **Comando físico**: `sync-sensors` (eWeLink) ou `esp32-bridge` (HTTP local).
+- **Proteção offline**: `timers_seguranca_iot` com `modo` (temperatura/horário/híbrido) gravados no firmware via `safety_rules`.
 
-Atualizar o card "Como funciona a Proteção Offline?":
-- **Prioridade 1 — Sensor local**: o ESP32 lê o sensor e decide na hora.
-- **Prioridade 2 — Janela horária**: limita quando o setpoint pode agir (ex.: nebulizar só 10–18h).
-- **Prioridade 3 — Cloud**: ao voltar a internet, o Climate Brain assume e ajusta com curva, ITH e aprendizado.
-- **Setpoints**: vêm da curva por padrão, mas podem ser editados manualmente por canal.
+## 2. Por que o Brain não está coletando dados do "Marcia Tibiri GP 01"
 
-### 4. Firmware (`esp32-bridge` → `GET /config`)
-Devolver `safety_rules` no novo formato:
+Diagnóstico executado agora no banco e nas edges:
 
-```json
-{
-  "canal": 2,
-  "modo": "hibrido",
-  "temp_liga_c": 30.5,
-  "temp_desliga_c": 29.0,
-  "umidade_max_pct": null,
-  "janela_horaria": { "inicio": "10:00", "fim": "18:00" },
-  "fallback_horario": { "ligar": "11:00", "desligar": "15:00" }
-}
+| Verificação | Resultado |
+|---|---|
+| Lote ativo no galpão | OK — `d8262634...` alojado em 25/04/2026 |
+| Sensores enviando | OK — 1.152 leituras nas últimas 24 h |
+| `auto-temperatura` rodando | OK — 471 decisões no dia |
+| Cron `climate-brain-1min` | Disparando 1×/min, status `succeeded` |
+| Logs da função `climate-brain` | **Vazios** |
+| Linhas em `log_decisao_clima` com `funcao_automacao='climate_brain'` | **0 (nunca rodou)** |
+| Chamada direta `POST /functions/v1/climate-brain` | **404 NOT_FOUND** |
+
+**Causa raiz #1 — Função não está implantada.**
+O código existe em `supabase/functions/climate-brain/index.ts` mas nunca foi deployada. O cron chama a URL e recebe 404 (o `pg_net` engole silenciosamente). Provavelmente as outras funções de coordenação (`auto-ventilacao`, `auto-cortina`, `auto-nebulizacao`, `climate-learn`) também estão sem deploy.
+
+**Causa raiz #2 — Bugs de coluna no `climate-brain`.**
+Mesmo após deploy, a função NÃO entregaria dados, porque consulta `leituras_sensores` com colunas inexistentes:
+
+```ts
+.from("leituras_sensores")
+  .eq("integrado_id", lote.integrado_id)   // ❌ coluna não existe
+  .gte("criado_em", since)                 // ❌ correto é lido_em
 ```
 
-ESP32-S3 compara com leitura do DHT local; usa `fallback_horario` apenas se o sensor falhar por > N minutos. Atualizar `docs/firmware/recuperacao-energia.md`.
+A tabela só tem: `dispositivo_id, temperatura_c, umidade_pct, lido_em, ...`. Filtro deve ser por `dispositivo_id ∈ dispositivos do galpão` e `lido_em` (não `integrado_id`/`criado_em`). Hoje a query falharia/retornaria vazio → "skip: sem_leituras" para todos os galpões.
 
-### 5. Migração e compatibilidade
+**Causa raiz #3 — Curva sem filtro por organização.**
+`curva_climatica_ponto` é buscada só por `dia_idade`, sem `integrado_id`/`curva_id`. Em multi-tenant pega o ponto de qualquer org.
 
-- Migration adiciona colunas nullable; registros antigos viram `modo='horario'`, `origem='curva'`.
-- `handleResyncTimers` recalcula só os canais com `origem='curva'`; manuais são preservados.
-- Sonoff básico continua funcionando como hoje (zero regressão).
+## 3. Como o Brain conecta nos dispositivos
 
-### 6. Fora de escopo
+O Brain **não fala direto com o hardware**. Ele:
+1. Resolve o modo dominante e grava em `log_decisao_clima`.
+2. Para nebulização, monta o array `decisoes` (galpão, ação, T, UR, vent%) e chama `auto-nebulizacao` via `fetch` interno com `SUPABASE_SERVICE_ROLE_KEY`.
+3. Dispara `auto-ventilacao` e `auto-cortina` (sem payload — eles releem o estado).
 
-- Não mexer na automação cloud (`auto-temperatura`, `climate-brain`) — já é temperatura-first.
-- Não alterar iluminação (continua por horário/fotoperíodo).
+Cada `auto-*`:
+- Lê `dispositivos_iot` filtrando por `funcao_automacao` e `galpao_id`.
+- Por canal/dispositivo, chama:
+  - **eWeLink** (Marcia GP 01 — todos os 4 dispositivos `driver=ewelink`):
+    `supabase.functions.invoke('sync-sensors', { action: 'control-device', device_id, switch })` → API eWeLink Cloud → Sonoff.
+  - **ESP32 local**:
+    `supabase.functions.invoke('esp32-bridge/command', { canalId, acao })` → fila lida pelo firmware via long-polling.
 
-## Perguntas
+Em queda de internet, o firmware aplica as `safety_rules` que já foram sincronizadas (modo temperatura > horário, conforme programado).
 
-1. **Histerese mínima** entre liga/desliga: forçar **0,3 °C** ou deixar livre com aviso?
-2. Quando o sensor local falhar, o canal deve **cair no fallback de horário** ou **desligar por segurança** e alertar?
-3. Edição manual de setpoint deve ser **liberada para todos** ou **só para admin/veterinário** (criador apenas visualiza)?
+## 4. Plano de correção (a executar quando aprovado)
+
+1. **Deploy das funções de coordenação** que estão presentes em `supabase/functions/` mas ausentes no runtime: `climate-brain`, `climate-learn`, `auto-ventilacao`, `auto-cortina`, `auto-nebulizacao` (e validar `auto-qualidade-ar`).
+2. **Corrigir queries do `climate-brain`**:
+   - Buscar `dispositivos_iot.id` do galpão e usar `.in("dispositivo_id", ids)` em `leituras_sensores`.
+   - Trocar `criado_em` por `lido_em` no `.gte()` e no `order`.
+   - Filtrar `curva_climatica_ponto` por `integrado_id` (e por `curva_id` ativa do galpão, se existir).
+3. **Hardening**:
+   - Try/catch por galpão para não derrubar o loop inteiro.
+   - Logar `skip` em `log_decisao_clima` (com `estado_decidido='skip'`) para dar visibilidade no dashboard quando faltam leituras/curva.
+   - Marcar `dispositivos_iot.ultimo_sync` quando o Brain processar.
+4. **Painel de saúde**: no `/configuracoes/climate-brain`, mostrar por galpão "última execução do Brain", "modo atual" e motivo do último skip — para que o usuário enxergue rapidamente quando algo trava.
+5. **Validação**: após o fix, chamar `POST /climate-brain` manualmente, conferir log do GP 01, e validar que `auto-nebulizacao` recebe a decisão.
+
+### Fora de escopo desta correção
+- Não mexer em curvas, programas ou regras de proteção offline (já entregues).
+- Não alterar `auto-temperatura` (que está OK e gerando 471 logs/dia).
+
+Posso seguir com este plano?

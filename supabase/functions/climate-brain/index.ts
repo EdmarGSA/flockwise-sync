@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   // Busca todos os lotes alojados
   const { data: lotes, error } = await supabase
     .from("lotes")
-    .select("id, integrado_id, galpao_id, data_alojamento")
+    .select("id, integrado_id, galpao_id, data_alojamento, linhagem, sexo")
     .eq("status", "alojado");
 
   if (error) {
@@ -52,20 +52,37 @@ Deno.serve(async (req) => {
 
   for (const lote of lotes ?? []) {
     if (!lote.galpao_id || !lote.data_alojamento) continue;
+    try {
 
     const idadeDias = Math.max(1, Math.floor(
       (Date.now() - new Date(lote.data_alojamento).getTime()) / 86400000) + 1);
 
-    // Curva alvo (busca a curva ativa da org via galpao->nucleo etc — usa o ponto da idade)
-    const { data: curvaPonto } = await supabase
+    // Curva alvo — escolhe curva por integrado_id + linhagem (ou pública como fallback)
+    let curvaId: string | null = null;
+    const { data: curvas } = await supabase
+      .from("curva_climatica_referencia")
+      .select("id, integrado_id, linhagem, publica")
+      .or(`integrado_id.eq.${lote.integrado_id},publica.eq.true`);
+    if (curvas && curvas.length) {
+      const exata = curvas.find((c: any) => c.integrado_id === lote.integrado_id && c.linhagem === lote.linhagem);
+      const linhagem = curvas.find((c: any) => c.linhagem === lote.linhagem);
+      const own = curvas.find((c: any) => c.integrado_id === lote.integrado_id);
+      curvaId = (exata ?? linhagem ?? own ?? curvas[0]).id;
+    }
+    const { data: curvaPonto } = curvaId ? await supabase
       .from("curva_climatica_ponto")
       .select("temp_alvo_c, temp_min_alarme_c, temp_max_alarme_c, ur_max_pct, ith_alarme_vermelho, vazao_min_m3h_por_kg")
+      .eq("curva_id", curvaId)
       .eq("dia_idade", idadeDias)
-      .limit(1)
-      .maybeSingle();
+      .maybeSingle() : { data: null };
 
     if (!curvaPonto) {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_curva" });
+      await supabase.from("log_decisao_clima").insert({
+        integrado_id: lote.integrado_id, galpao_id: lote.galpao_id, lote_id: lote.id,
+        funcao_automacao: "climate_brain", estado_decidido: "skip",
+        reason_chain: [`sem_curva (idade=${idadeDias}d, curvaId=${curvaId ?? "nenhuma"})`],
+      });
       continue;
     }
 
@@ -90,18 +107,38 @@ Deno.serve(async (req) => {
     const deadband = Number(hist?.deadband_temp_c ?? 0.5);
     const pintinhoAteDias = Number(hist?.protege_pintinho_ate_dias ?? 7);
 
-    // Leituras 5 min
-    const since = new Date(Date.now() - 5 * 60_000).toISOString();
+    // Leituras 5 min — busca dispositivos do galpão e filtra por dispositivo_id + lido_em
+    const { data: devs } = await supabase
+      .from("dispositivos_iot")
+      .select("id")
+      .eq("galpao_id", lote.galpao_id)
+      .eq("ativo", true);
+    const devIds = (devs ?? []).map((d: any) => d.id);
+    if (devIds.length === 0) {
+      resultados.push({ galpao: lote.galpao_id, skip: "sem_dispositivos" });
+      await supabase.from("log_decisao_clima").insert({
+        integrado_id: lote.integrado_id, galpao_id: lote.galpao_id, lote_id: lote.id,
+        funcao_automacao: "climate_brain", estado_decidido: "skip",
+        reason_chain: ["sem_dispositivos no galpão"],
+      });
+      continue;
+    }
+    const since = new Date(Date.now() - 15 * 60_000).toISOString();
     const { data: leituras } = await supabase
       .from("leituras_sensores")
       .select("temperatura_c, umidade_pct")
-      .eq("integrado_id", lote.integrado_id)
-      .gte("criado_em", since)
-      .order("criado_em", { ascending: false })
+      .in("dispositivo_id", devIds)
+      .gte("lido_em", since)
+      .order("lido_em", { ascending: false })
       .limit(50);
 
     if (!leituras || leituras.length === 0) {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_leituras" });
+      await supabase.from("log_decisao_clima").insert({
+        integrado_id: lote.integrado_id, galpao_id: lote.galpao_id, lote_id: lote.id,
+        funcao_automacao: "climate_brain", estado_decidido: "skip",
+        reason_chain: [`sem_leituras nos últimos 15 min (devs=${devIds.length})`],
+      });
       continue;
     }
     const temps = leituras.map((l: any) => Number(l.temperatura_c)).filter((n) => !isNaN(n));
@@ -187,6 +224,10 @@ Deno.serve(async (req) => {
     });
 
     resultados.push({ galpao: lote.galpao_id, modo, tempC, tempAlvo, ventPct, acaoNeb, trocaArDuty });
+    } catch (e: any) {
+      console.error("climate-brain loop error", lote.galpao_id, e?.message);
+      resultados.push({ galpao: lote.galpao_id, error: e?.message ?? String(e) });
+    }
   }
 
   // Dispara executores
