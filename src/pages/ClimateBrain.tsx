@@ -105,7 +105,10 @@ export default function ClimateBrain() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => navigate("/configuracoes/ambiencia")}>
+              <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard ambiência
+            </Button>
             <Button variant="outline" onClick={rodarBrain} disabled={running}>
               <Activity className={`h-4 w-4 mr-2 ${running ? "animate-pulse" : ""}`} />
               Rodar agora
