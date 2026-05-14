@@ -1,117 +1,70 @@
+# Tela de Temperatura do Lote — Módulo Veterinário
 
-## 1. Como o sistema gerencia a ambiência (visão geral)
+Nova tela em tela cheia em `/veterinario/:loteId/temperatura` para o veterinário acompanhar a ambiência térmica do lote, com histórico por sensor, mín/máx do dia e sugestão automática baseada na curva climática.
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │  SENSORES (Sonoff TH / ESP32 / NH3 etc) │
-                    └─────────────────┬───────────────────────┘
-                                      │ telemetria 1-5 min
-                  ┌───────────────────▼───────────────────┐
-                  │  sync-sensors  /  esp32-bridge        │
-                  │  → grava em leituras_sensores         │
-                  └───────────────────┬───────────────────┘
-                                      │
-        ┌─────────────────────────────▼────────────────────────────┐
-        │  CLIMATE-BRAIN  (cron 1/min)  — coordenador integrado    │
-        │  Lê: curva_climatica_ponto + aprendizado_galpao +        │
-        │      config_histerese + leituras_sensores + idade lote   │
-        │  Decide MODO DOMINANTE por galpão:                       │
-        │     AQUECIMENTO · CONFORTO · ALERTA_CALOR · EMERGENCIA   │
-        │  Loga em log_decisao_clima                               │
-        └────────┬───────────┬──────────┬──────────┬───────────────┘
-                 │           │          │          │
-       ┌─────────▼──┐ ┌──────▼─────┐ ┌──▼───────┐ ┌▼──────────────┐
-       │auto-       │ │auto-       │ │auto-     │ │auto-          │
-       │ventilacao  │ │cortina     │ │nebuliz.  │ │temperatura    │
-       │(estágio +  │ │(% abertura)│ │(UR/ciclo)│ │(aquecedores + │
-       │ duty bro.) │ │            │ │          │ │ proteção off) │
-       └─────┬──────┘ └─────┬──────┘ └────┬─────┘ └──────┬────────┘
-             └──────────────┴─────────────┴──────────────┘
-                                 │
-                ┌────────────────▼────────────────┐
-                │  DRIVERS DE COMANDO             │
-                │  • sync-sensors  → eWeLink Cloud → Sonoff  │
-                │  • esp32-bridge  → fila HTTP    → ESP32    │
-                └────────────────┬────────────────┘
-                                 │
-                ┌────────────────▼────────────────┐
-                │  CANAIS / DISPOSITIVOS no galpão│
-                │  Fallback offline: safety_rules │
-                │  gravadas em timers_seguranca   │
-                └─────────────────────────────────┘
-```
+## Onde encaixa
 
-Camadas:
-- **Coleta**: `leituras_sensores` (T, UR, NH3, CO2, lux, vento, pressão).
-- **Coordenação**: `climate-brain` resolve um modo por galpão e chama os executores. `climate-learn` ajusta offsets aprendidos a cada hora (±2 °C).
-- **Execução**: cada `auto-*` aplica a regra do seu domínio respeitando histerese/cooldown.
-- **Comando físico**: `sync-sensors` (eWeLink) ou `esp32-bridge` (HTTP local).
-- **Proteção offline**: `timers_seguranca_iot` com `modo` (temperatura/horário/híbrido) gravados no firmware via `safety_rules`.
+- Em `VeterinarioLote.tsx`, adicionar um botão **"Temperatura"** (ícone `Thermometer`, vermelho) no grid 2x2 de ações.
+- Rota nova `/veterinario/:loteId/temperatura` dentro do `ProtectedRoute` em `App.tsx`.
+- Tela cheia (não dialog) por causa dos gráficos e múltiplos sensores.
 
-## 2. Por que o Brain não está coletando dados do "Marcia Tibiri GP 01"
+## Estrutura da tela `VeterinarioTemperatura.tsx`
 
-Diagnóstico executado agora no banco e nas edges:
+4 blocos verticais, do mais resumido ao mais detalhado:
 
-| Verificação | Resultado |
+### 1. Cabeçalho de status
+- Temperatura média atual do galpão (média da última leitura `online=true` de cada sensor, janela 10 min).
+- Setpoint da curva para a idade do lote (cruzando `lotes.curva_climatica_id` + `idade_dias` em `curva_climatica_ponto`). Se lote sem curva, fallback para curva default da linhagem.
+- Faixa de alarme (mín/máx) da curva.
+- Badge de status: **OK** (dentro da faixa), **Atenção** (>±1 °C do alvo), **Crítico** (fora dos limites de alarme).
+
+### 2. Mín/Máx do dia
+2 queries agregadas em `leituras_sensores` (`MIN`, `MAX`, `AVG`, `COUNT` filtrando `dispositivo_id IN (...)` e `lido_em >= date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo')`).
+Mostra Mín / Máx / Média / Amplitude. Amplitude > 4 °C → alerta amarelo "oscilação alta".
+
+### 3. Sugestão automática (cartão destacado)
+Texto determinístico (sem IA), seguindo o padrão `mortality-registration-analysis-briefing`:
+
+| Situação | Sugestão |
 |---|---|
-| Lote ativo no galpão | OK — `d8262634...` alojado em 25/04/2026 |
-| Sensores enviando | OK — 1.152 leituras nas últimas 24 h |
-| `auto-temperatura` rodando | OK — 471 decisões no dia |
-| Cron `climate-brain-1min` | Disparando 1×/min, status `succeeded` |
-| Logs da função `climate-brain` | **Vazios** |
-| Linhas em `log_decisao_clima` com `funcao_automacao='climate_brain'` | **0 (nunca rodou)** |
-| Chamada direta `POST /functions/v1/climate-brain` | **404 NOT_FOUND** |
+| Média ≥ `temp_max_alarme_c` | "Acionar nebulização, abrir cortinas e aumentar ventilação." |
+| Média ≤ `temp_min_alarme_c` | "Verificar aquecimento, fechar cortinas e revisar isolamento." |
+| Média entre alvo±1 e alarme | "Próximo ao limite — monitorar nas próximas 2h." |
+| Amplitude > 4 °C | "Oscilação alta no dia: possível falha de automação." |
+| Sensor offline > 30 min | "Sensor X sem comunicação — verificar energia/Wi-Fi." |
+| Tudo OK | "Ambiência dentro da curva. Nenhuma ação requerida." |
 
-**Causa raiz #1 — Função não está implantada.**
-O código existe em `supabase/functions/climate-brain/index.ts` mas nunca foi deployada. O cron chama a URL e recebe 404 (o `pg_net` engole silenciosamente). Provavelmente as outras funções de coordenação (`auto-ventilacao`, `auto-cortina`, `auto-nebulizacao`, `climate-learn`) também estão sem deploy.
+### 4. Histórico por dispositivo
+Lista de cards `Collapsible` — um por sensor do galpão (`dispositivos_iot.galpao_id = lote.galpao_id` e `ativo=true`).
 
-**Causa raiz #2 — Bugs de coluna no `climate-brain`.**
-Mesmo após deploy, a função NÃO entregaria dados, porque consulta `leituras_sensores` com colunas inexistentes:
+Cada card:
+- Nome + badge online/offline (`ultimo_sync < 10 min`)
+- Última leitura (temp + UR)
+- Mín/Máx do dia do sensor isolado
+- Sparkline 24h (reaproveitar `SensorSparkline` de `MonitoramentoClimaticoVet.tsx`)
+- Ao expandir: `LineChart` Recharts com seletor **24h / 7d / 14d**, eixos temp + UR sobrepostos, linhas tracejadas da faixa de alarme.
 
-```ts
-.from("leituras_sensores")
-  .eq("integrado_id", lote.integrado_id)   // ❌ coluna não existe
-  .gte("criado_em", since)                 // ❌ correto é lido_em
-```
+## Detalhes técnicos
 
-A tabela só tem: `dispositivo_id, temperatura_c, umidade_pct, lido_em, ...`. Filtro deve ser por `dispositivo_id ∈ dispositivos do galpão` e `lido_em` (não `integrado_id`/`criado_em`). Hoje a query falharia/retornaria vazio → "skip: sem_leituras" para todos os galpões.
+- **Hook único** `useTemperaturaLote(loteId)` retorna `{ sensores, leiturasPorSensor, minMaxDia, setpointCurva, statusGeral, sugestao }`. Centraliza queries para evitar N+1 (batch via `.in()`).
+- **Realtime**: canal `leituras_sensores` filtrado por `dispositivo_id IN (...)` com buffer de 5s para evitar re-render excessivo.
+- **Multi-tenant**: queries via `useIntegradoId`. RLS de `leituras_sensores` já filtra por org via `dispositivos_iot.integrado_id`.
+- **Curva fallback**: se `lotes.curva_climatica_id IS NULL`, usar curva default da linhagem (mesma lógica do edge `auto-temperatura`).
+- **Empty state**: se galpão sem dispositivos, exibir CTA "Cadastrar dispositivos" → `/dispositivos-iot`.
 
-**Causa raiz #3 — Curva sem filtro por organização.**
-`curva_climatica_ponto` é buscada só por `dia_idade`, sem `integrado_id`/`curva_id`. Em multi-tenant pega o ponto de qualquer org.
+## Arquivos
 
-## 3. Como o Brain conecta nos dispositivos
+**Novos**
+- `src/pages/VeterinarioTemperatura.tsx` — tela principal
+- `src/hooks/useTemperaturaLote.ts` — hook de dados
+- `src/lib/clima/sugestaoTemperatura.ts` — regras determinísticas
 
-O Brain **não fala direto com o hardware**. Ele:
-1. Resolve o modo dominante e grava em `log_decisao_clima`.
-2. Para nebulização, monta o array `decisoes` (galpão, ação, T, UR, vent%) e chama `auto-nebulizacao` via `fetch` interno com `SUPABASE_SERVICE_ROLE_KEY`.
-3. Dispara `auto-ventilacao` e `auto-cortina` (sem payload — eles releem o estado).
+**Editar**
+- `src/pages/VeterinarioLote.tsx` — adicionar botão "Temperatura" no grid 2x2
+- `src/App.tsx` — registrar rota `/veterinario/:loteId/temperatura`
 
-Cada `auto-*`:
-- Lê `dispositivos_iot` filtrando por `funcao_automacao` e `galpao_id`.
-- Por canal/dispositivo, chama:
-  - **eWeLink** (Marcia GP 01 — todos os 4 dispositivos `driver=ewelink`):
-    `supabase.functions.invoke('sync-sensors', { action: 'control-device', device_id, switch })` → API eWeLink Cloud → Sonoff.
-  - **ESP32 local**:
-    `supabase.functions.invoke('esp32-bridge/command', { canalId, acao })` → fila lida pelo firmware via long-polling.
-
-Em queda de internet, o firmware aplica as `safety_rules` que já foram sincronizadas (modo temperatura > horário, conforme programado).
-
-## 4. Plano de correção (a executar quando aprovado)
-
-1. **Deploy das funções de coordenação** que estão presentes em `supabase/functions/` mas ausentes no runtime: `climate-brain`, `climate-learn`, `auto-ventilacao`, `auto-cortina`, `auto-nebulizacao` (e validar `auto-qualidade-ar`).
-2. **Corrigir queries do `climate-brain`**:
-   - Buscar `dispositivos_iot.id` do galpão e usar `.in("dispositivo_id", ids)` em `leituras_sensores`.
-   - Trocar `criado_em` por `lido_em` no `.gte()` e no `order`.
-   - Filtrar `curva_climatica_ponto` por `integrado_id` (e por `curva_id` ativa do galpão, se existir).
-3. **Hardening**:
-   - Try/catch por galpão para não derrubar o loop inteiro.
-   - Logar `skip` em `log_decisao_clima` (com `estado_decidido='skip'`) para dar visibilidade no dashboard quando faltam leituras/curva.
-   - Marcar `dispositivos_iot.ultimo_sync` quando o Brain processar.
-4. **Painel de saúde**: no `/configuracoes/climate-brain`, mostrar por galpão "última execução do Brain", "modo atual" e motivo do último skip — para que o usuário enxergue rapidamente quando algo trava.
-5. **Validação**: após o fix, chamar `POST /climate-brain` manualmente, conferir log do GP 01, e validar que `auto-nebulizacao` recebe a decisão.
-
-### Fora de escopo desta correção
-- Não mexer em curvas, programas ou regras de proteção offline (já entregues).
-- Não alterar `auto-temperatura` (que está OK e gerando 471 logs/dia).
-
-Posso seguir com este plano?
+## Fora do escopo
+- Sem nova tabela (`leituras_sensores` já tem tudo).
+- Sem IA — sugestão determinística.
+- Sem duplicar `MonitoramentoClimaticoVet` (foco em lote único).
+- Sem controle de atuadores (continua em `/configuracoes/ambiencia`).
