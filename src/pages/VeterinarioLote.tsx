@@ -366,6 +366,15 @@ export default function VeterinarioLote() {
 
           <Button
             variant="outline"
+            onClick={() => navigate(`/veterinario/${lote.id}/temperatura`)}
+            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50"
+          >
+            <Thermometer className="w-6 h-6 text-red-500" />
+            <span className="text-sm font-medium">Temperatura</span>
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={() => setConsumoOpen(true)}
             className="h-20 flex-col gap-1 bg-card hover:bg-accent/50 col-span-2"
           >
