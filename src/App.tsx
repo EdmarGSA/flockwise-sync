@@ -287,6 +287,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/veterinario/:loteId/temperatura" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="veterinario">
+          <VeterinarioTemperatura />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/comercial" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="comercial">
