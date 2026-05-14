@@ -46,6 +46,7 @@ import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
 import Veterinario from "./pages/Veterinario";
 import VeterinarioLote from "./pages/VeterinarioLote";
+import VeterinarioTemperatura from "./pages/VeterinarioTemperatura";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
 import Comercial from "./pages/Comercial";
 import CadastroProdutosAnimais from "./pages/CadastroProdutosAnimais";
