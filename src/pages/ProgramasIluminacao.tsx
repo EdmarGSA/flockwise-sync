@@ -220,7 +220,11 @@ export default function ProgramasIluminacao() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => { if (confirmarSair()) navigate(-1); }}
+            onClick={() => {
+              if (!confirmarSair()) return;
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/configuracoes");
+            }}
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
