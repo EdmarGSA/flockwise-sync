@@ -1,70 +1,43 @@
-# Tela de Temperatura do Lote — Módulo Veterinário
+# Programas de Iluminação — salvar/atualizar confiável
 
-Nova tela em tela cheia em `/veterinario/:loteId/temperatura` para o veterinário acompanhar a ambiência térmica do lote, com histórico por sensor, mín/máx do dia e sugestão automática baseada na curva climática.
+## Diagnóstico
 
-## Onde encaixa
+Em `src/pages/ProgramasIluminacao.tsx`, todo `Input` de cada faixa chama `atualizarFaixa` no `onChange`, que dispara `supabase.update()` a cada tecla. Problemas observados:
 
-- Em `VeterinarioLote.tsx`, adicionar um botão **"Temperatura"** (ícone `Thermometer`, vermelho) no grid 2x2 de ações.
-- Rota nova `/veterinario/:loteId/temperatura` dentro do `ProtectedRoute` em `App.tsx`.
-- Tela cheia (não dialog) por causa dos gráficos e múltiplos sensores.
+1. **Race condition**: digitar "18" envia UPDATE com `1` e depois com `18`. Se o segundo resolver antes do `fetchFaixas` do primeiro, o `setFaixas` sobrescreve o valor recém-digitado pelo valor antigo do banco.
+2. **Sair antes do debounce de tecla**: ao mudar campo e clicar fora rápido (ou navegar), o `onChange` do número só dispara se o valor foi parseado; valores intermediários ("0", vazio) podem ser persistidos como último estado.
+3. **Sem indicador**: usuário não sabe se salvou. Sem botão explícito, sem aviso de "não salvo".
+4. **`horas_luz` recalculado só quando muda `blocos`**: alterar acender/apagar separadamente atualiza `blocos` mas o `fetchFaixas` posterior pode chegar antes do `update` do outro campo.
 
-## Estrutura da tela `VeterinarioTemperatura.tsx`
+## O que mudar (apenas frontend, no arquivo `ProgramasIluminacao.tsx`)
 
-4 blocos verticais, do mais resumido ao mais detalhado:
+### 1. Estado local com "draft" por faixa
+- Adicionar `Map<faixaId, Faixa>` de rascunhos editados (`drafts`) e `Set<faixaId>` de faixas modificadas (`dirty`).
+- `onChange` dos inputs **só atualiza o draft local**, não o banco.
+- Recalcular `horas_luz` no draft em tempo real (preview), mas só persistir ao salvar.
 
-### 1. Cabeçalho de status
-- Temperatura média atual do galpão (média da última leitura `online=true` de cada sensor, janela 10 min).
-- Setpoint da curva para a idade do lote (cruzando `lotes.curva_climatica_id` + `idade_dias` em `curva_climatica_ponto`). Se lote sem curva, fallback para curva default da linhagem.
-- Faixa de alarme (mín/máx) da curva.
-- Badge de status: **OK** (dentro da faixa), **Atenção** (>±1 °C do alvo), **Crítico** (fora dos limites de alarme).
+### 2. Botão "Salvar" por linha + "Salvar todas" no header
+- Coluna extra à direita com botão `Salvar` (ícone `Save`) habilitado quando a linha está dirty.
+- No header da tabela, botão `Salvar tudo` que itera sobre faixas dirty.
+- Ambos chamam um único `salvarFaixa(faixa)` que faz UPDATE com **todos os campos** da faixa de uma vez (atômico) e remove do `dirty` em caso de sucesso.
+- Após salvar tudo, um único `fetchFaixas` final.
 
-### 2. Mín/Máx do dia
-2 queries agregadas em `leituras_sensores` (`MIN`, `MAX`, `AVG`, `COUNT` filtrando `dispositivo_id IN (...)` e `lido_em >= date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo')`).
-Mostra Mín / Máx / Média / Amplitude. Amplitude > 4 °C → alerta amarelo "oscilação alta".
+### 3. Indicador visual
+- Linha dirty: fundo `bg-amber-50/50` ou borda esquerda âmbar + badge "não salvo".
+- Toast de sucesso/erro por operação.
 
-### 3. Sugestão automática (cartão destacado)
-Texto determinístico (sem IA), seguindo o padrão `mortality-registration-analysis-briefing`:
+### 4. Proteção ao sair
+- `useEffect` com `beforeunload` listener quando `dirty.size > 0` ("Há alterações não salvas").
+- No botão `ArrowLeft` (voltar), `confirm()` antes de navegar se houver dirty.
+- Ao trocar de aba (`Tabs onValueChange`), idem.
 
-| Situação | Sugestão |
-|---|---|
-| Média ≥ `temp_max_alarme_c` | "Acionar nebulização, abrir cortinas e aumentar ventilação." |
-| Média ≤ `temp_min_alarme_c` | "Verificar aquecimento, fechar cortinas e revisar isolamento." |
-| Média entre alvo±1 e alarme | "Próximo ao limite — monitorar nas próximas 2h." |
-| Amplitude > 4 °C | "Oscilação alta no dia: possível falha de automação." |
-| Sensor offline > 30 min | "Sensor X sem comunicação — verificar energia/Wi-Fi." |
-| Tudo OK | "Ambiência dentro da curva. Nenhuma ação requerida." |
-
-### 4. Histórico por dispositivo
-Lista de cards `Collapsible` — um por sensor do galpão (`dispositivos_iot.galpao_id = lote.galpao_id` e `ativo=true`).
-
-Cada card:
-- Nome + badge online/offline (`ultimo_sync < 10 min`)
-- Última leitura (temp + UR)
-- Mín/Máx do dia do sensor isolado
-- Sparkline 24h (reaproveitar `SensorSparkline` de `MonitoramentoClimaticoVet.tsx`)
-- Ao expandir: `LineChart` Recharts com seletor **24h / 7d / 14d**, eixos temp + UR sobrepostos, linhas tracejadas da faixa de alarme.
-
-## Detalhes técnicos
-
-- **Hook único** `useTemperaturaLote(loteId)` retorna `{ sensores, leiturasPorSensor, minMaxDia, setpointCurva, statusGeral, sugestao }`. Centraliza queries para evitar N+1 (batch via `.in()`).
-- **Realtime**: canal `leituras_sensores` filtrado por `dispositivo_id IN (...)` com buffer de 5s para evitar re-render excessivo.
-- **Multi-tenant**: queries via `useIntegradoId`. RLS de `leituras_sensores` já filtra por org via `dispositivos_iot.integrado_id`.
-- **Curva fallback**: se `lotes.curva_climatica_id IS NULL`, usar curva default da linhagem (mesma lógica do edge `auto-temperatura`).
-- **Empty state**: se galpão sem dispositivos, exibir CTA "Cadastrar dispositivos" → `/dispositivos-iot`.
+### 5. Switch "Padrão" e operações de criar/remover faixa/programa permanecem com persistência imediata (são ações discretas, não digitação).
 
 ## Arquivos
 
-**Novos**
-- `src/pages/VeterinarioTemperatura.tsx` — tela principal
-- `src/hooks/useTemperaturaLote.ts` — hook de dados
-- `src/lib/clima/sugestaoTemperatura.ts` — regras determinísticas
+- **Editar**: `src/pages/ProgramasIluminacao.tsx` (único arquivo)
 
-**Editar**
-- `src/pages/VeterinarioLote.tsx` — adicionar botão "Temperatura" no grid 2x2
-- `src/App.tsx` — registrar rota `/veterinario/:loteId/temperatura`
+## Fora de escopo
 
-## Fora do escopo
-- Sem nova tabela (`leituras_sensores` já tem tudo).
-- Sem IA — sugestão determinística.
-- Sem duplicar `MonitoramentoClimaticoVet` (foco em lote único).
-- Sem controle de atuadores (continua em `/configuracoes/ambiencia`).
+- Sem mudança de schema, sem mexer em `auto-iluminacao` edge function.
+- Sem alterar `CurvaFotoperiodoChart` (já consome `faixas` local — vai refletir o draft automaticamente).

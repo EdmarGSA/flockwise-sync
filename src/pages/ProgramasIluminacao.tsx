@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Lightbulb, Sun, Moon, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Lightbulb, Sun, Moon, Loader2, Save, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIntegradoId } from "@/hooks/useIntegradoId";
 import { toast } from "sonner";
@@ -39,12 +39,25 @@ interface Faixa {
   intensidade_pct: number;
 }
 
+function calcHorasLuz(blocos: Faixa["blocos"]): number {
+  const horas = blocos.reduce((acc, b) => {
+    const [hA, mA] = b.acender.split(":").map(Number);
+    const [hP, mP] = b.apagar.split(":").map(Number);
+    let diff = (hP * 60 + mP) - (hA * 60 + mA);
+    if (diff <= 0) diff += 1440;
+    return acc + diff / 60;
+  }, 0);
+  return Math.round(horas * 10) / 10;
+}
+
 export default function ProgramasIluminacao() {
   const navigate = useNavigate();
   const { integradoId } = useIntegradoId();
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [selecionado, setSelecionado] = useState<Programa | null>(null);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [novoOpen, setNovoOpen] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -72,10 +85,76 @@ export default function ProgramasIluminacao() {
       .eq("programa_id", programaId)
       .order("dia_inicio");
     setFaixas((data || []) as unknown as Faixa[]);
+    setDirty(new Set());
   };
 
   useEffect(() => { fetchProgramas(); /* eslint-disable-next-line */ }, [integradoId]);
-  useEffect(() => { if (selecionado) fetchFaixas(selecionado.id); }, [selecionado]);
+  useEffect(() => { if (selecionado) fetchFaixas(selecionado.id); /* eslint-disable-next-line */ }, [selecionado?.id]);
+
+  // Aviso ao fechar/recarregar
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty.size > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  const confirmarSair = (msg = "Há alterações não salvas. Sair mesmo assim?") => {
+    if (dirty.size === 0) return true;
+    return confirm(msg);
+  };
+
+  const editarFaixa = useCallback((id: string, patch: Partial<Faixa>) => {
+    setFaixas((prev) => prev.map((f) => {
+      if (f.id !== id) return f;
+      const next = { ...f, ...patch };
+      if (patch.blocos) next.horas_luz = calcHorasLuz(patch.blocos);
+      return next;
+    }));
+    setDirty((prev) => {
+      const n = new Set(prev);
+      n.add(id);
+      return n;
+    });
+  }, []);
+
+  const salvarFaixa = async (faixa: Faixa) => {
+    if (!faixa.id) return;
+    setSavingIds((s) => new Set(s).add(faixa.id!));
+    const { error } = await supabase
+      .from("programa_iluminacao_faixa")
+      .update({
+        dia_inicio: faixa.dia_inicio,
+        dia_fim: faixa.dia_fim,
+        horas_luz: faixa.horas_luz,
+        blocos: faixa.blocos,
+        ramp_up_min: faixa.ramp_up_min,
+        ramp_down_min: faixa.ramp_down_min,
+        intensidade_pct: faixa.intensidade_pct,
+      })
+      .eq("id", faixa.id);
+    setSavingIds((s) => { const n = new Set(s); n.delete(faixa.id!); return n; });
+    if (error) { toast.error(`Falha ao salvar: ${error.message}`); return false; }
+    setDirty((prev) => { const n = new Set(prev); n.delete(faixa.id!); return n; });
+    return true;
+  };
+
+  const salvarTudo = async () => {
+    const pendentes = faixas.filter((f) => f.id && dirty.has(f.id));
+    if (pendentes.length === 0) { toast.info("Nada para salvar"); return; }
+    let ok = 0;
+    for (const f of pendentes) {
+      const r = await salvarFaixa(f);
+      if (r) ok++;
+    }
+    if (ok === pendentes.length) toast.success(`${ok} faixa(s) atualizada(s)`);
+    else toast.warning(`${ok}/${pendentes.length} salvas — verifique erros`);
+    if (selecionado) fetchFaixas(selecionado.id);
+  };
 
   const criarPrograma = async () => {
     if (!integradoId || !novoNome.trim()) return;
@@ -104,6 +183,7 @@ export default function ProgramasIluminacao() {
 
   const adicionarFaixa = async () => {
     if (!selecionado) return;
+    if (!confirmarSair("Adicionar nova faixa descartará alterações não salvas. Continuar?")) return;
     const ultima = faixas[faixas.length - 1];
     const inicio = ultima ? ultima.dia_fim + 1 : 1;
     const { error } = await supabase.from("programa_iluminacao_faixa").insert({
@@ -116,26 +196,11 @@ export default function ProgramasIluminacao() {
     fetchFaixas(selecionado.id);
   };
 
-  const atualizarFaixa = async (faixa: Faixa, campo: keyof Faixa, valor: any) => {
-    const update: any = { [campo]: valor };
-    // sincroniza horas_luz com blocos quando muda acender/apagar
-    if (campo === "blocos") {
-      const horas = (valor as Faixa["blocos"]).reduce((acc, b) => {
-        const [hA, mA] = b.acender.split(":").map(Number);
-        const [hP, mP] = b.apagar.split(":").map(Number);
-        let diff = (hP * 60 + mP) - (hA * 60 + mA);
-        if (diff <= 0) diff += 1440;
-        return acc + diff / 60;
-      }, 0);
-      update.horas_luz = Math.round(horas * 10) / 10;
-    }
-    const { error } = await supabase.from("programa_iluminacao_faixa").update(update).eq("id", faixa.id!);
-    if (error) { toast.error(error.message); return; }
-    if (selecionado) fetchFaixas(selecionado.id);
-  };
-
   const removerFaixa = async (id: string) => {
-    await supabase.from("programa_iluminacao_faixa").delete().eq("id", id);
+    if (!confirm("Remover esta faixa?")) return;
+    const { error } = await supabase.from("programa_iluminacao_faixa").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    setDirty((prev) => { const n = new Set(prev); n.delete(id); return n; });
     if (selecionado) fetchFaixas(selecionado.id);
   };
 
@@ -152,12 +217,24 @@ export default function ProgramasIluminacao() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { if (confirmarSair()) navigate(-1); }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           <Lightbulb className="w-6 h-6 text-primary" />
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-foreground">Programas de Iluminação</h1>
             <p className="text-sm text-muted-foreground">Defina o fotoperíodo por faixa de idade do lote</p>
           </div>
+          {dirty.size > 0 && (
+            <Badge variant="outline" className="text-amber-600 border-amber-400 gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {dirty.size} não salva{dirty.size > 1 ? "s" : ""}
+            </Badge>
+          )}
           <Button onClick={() => setNovoOpen(true)}><Plus className="w-4 h-4 mr-2" />Novo programa</Button>
         </div>
 
@@ -168,7 +245,13 @@ export default function ProgramasIluminacao() {
             Nenhum programa cadastrado. Clique em "Novo programa" para começar.
           </CardContent></Card>
         ) : (
-          <Tabs value={selecionado?.id} onValueChange={(v) => setSelecionado(programas.find((p) => p.id === v) || null)}>
+          <Tabs
+            value={selecionado?.id}
+            onValueChange={(v) => {
+              if (!confirmarSair("Trocar de programa descartará alterações não salvas. Continuar?")) return;
+              setSelecionado(programas.find((p) => p.id === v) || null);
+            }}
+          >
             <TabsList className="flex flex-wrap h-auto">
               {programas.map((p) => (
                 <TabsTrigger key={p.id} value={p.id} className="gap-2">
@@ -205,6 +288,15 @@ export default function ProgramasIluminacao() {
                         />
                         <Label className="text-xs">Padrão p/ {selecionado.tipo_producao}</Label>
                       </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={salvarTudo}
+                        disabled={dirty.size === 0 || savingIds.size > 0}
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Salvar tudo {dirty.size > 0 ? `(${dirty.size})` : ""}
+                      </Button>
                       <Button variant="outline" size="sm" onClick={adicionarFaixa}>
                         <Plus className="w-4 h-4 mr-2" />Faixa
                       </Button>
@@ -225,44 +317,64 @@ export default function ProgramasIluminacao() {
                           <TableHead><Moon className="w-3 h-3 inline" /> Apagar</TableHead>
                           <TableHead>Ramp ↑/↓ (min)</TableHead>
                           <TableHead>Intensidade %</TableHead>
-                          <TableHead></TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {faixas.map((f) => {
                           const bloco = f.blocos?.[0] || { acender: "05:00", apagar: "23:00" };
+                          const isDirty = f.id ? dirty.has(f.id) : false;
+                          const isSaving = f.id ? savingIds.has(f.id) : false;
                           return (
-                            <TableRow key={f.id}>
+                            <TableRow
+                              key={f.id}
+                              className={isDirty ? "bg-amber-50/40 dark:bg-amber-950/20 border-l-2 border-l-amber-400" : ""}
+                            >
                               <TableCell className="flex gap-1 items-center">
                                 <Input type="number" className="w-16 h-8" value={f.dia_inicio}
-                                  onChange={(e) => atualizarFaixa(f, "dia_inicio", Number(e.target.value))} />
+                                  onChange={(e) => editarFaixa(f.id!, { dia_inicio: Number(e.target.value) })} />
                                 <span>–</span>
                                 <Input type="number" className="w-16 h-8" value={f.dia_fim}
-                                  onChange={(e) => atualizarFaixa(f, "dia_fim", Number(e.target.value))} />
+                                  onChange={(e) => editarFaixa(f.id!, { dia_fim: Number(e.target.value) })} />
                               </TableCell>
                               <TableCell><Badge variant="outline">{f.horas_luz}h</Badge></TableCell>
                               <TableCell>
                                 <Input type="time" className="w-28 h-8" value={bloco.acender}
-                                  onChange={(e) => atualizarFaixa(f, "blocos", [{ ...bloco, acender: e.target.value }])} />
+                                  onChange={(e) => editarFaixa(f.id!, { blocos: [{ ...bloco, acender: e.target.value }] })} />
                               </TableCell>
                               <TableCell>
                                 <Input type="time" className="w-28 h-8" value={bloco.apagar}
-                                  onChange={(e) => atualizarFaixa(f, "blocos", [{ ...bloco, apagar: e.target.value }])} />
+                                  onChange={(e) => editarFaixa(f.id!, { blocos: [{ ...bloco, apagar: e.target.value }] })} />
                               </TableCell>
                               <TableCell className="flex gap-1">
                                 <Input type="number" className="w-16 h-8" value={f.ramp_up_min}
-                                  onChange={(e) => atualizarFaixa(f, "ramp_up_min", Number(e.target.value))} />
+                                  onChange={(e) => editarFaixa(f.id!, { ramp_up_min: Number(e.target.value) })} />
                                 <Input type="number" className="w-16 h-8" value={f.ramp_down_min}
-                                  onChange={(e) => atualizarFaixa(f, "ramp_down_min", Number(e.target.value))} />
+                                  onChange={(e) => editarFaixa(f.id!, { ramp_down_min: Number(e.target.value) })} />
                               </TableCell>
                               <TableCell>
                                 <Input type="number" min={0} max={100} className="w-20 h-8" value={f.intensidade_pct}
-                                  onChange={(e) => atualizarFaixa(f, "intensidade_pct", Number(e.target.value))} />
+                                  onChange={(e) => editarFaixa(f.id!, { intensidade_pct: Number(e.target.value) })} />
                               </TableCell>
-                              <TableCell>
-                                <Button variant="ghost" size="icon" onClick={() => removerFaixa(f.id!)}>
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant={isDirty ? "default" : "ghost"}
+                                    size="sm"
+                                    disabled={!isDirty || isSaving}
+                                    onClick={async () => {
+                                      const ok = await salvarFaixa(f);
+                                      if (ok) toast.success("Faixa salva");
+                                    }}
+                                  >
+                                    {isSaving
+                                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                                      : <Save className="w-4 h-4" />}
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => removerFaixa(f.id!)}>
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -284,11 +396,12 @@ export default function ProgramasIluminacao() {
                 <Card className="mt-4 bg-muted/30">
                   <CardHeader><CardTitle className="text-sm">Como aplicar</CardTitle></CardHeader>
                   <CardContent className="text-xs text-muted-foreground space-y-1">
-                    <p>1. Cada lote pode ser vinculado a um programa em "Editar lote → Programa de iluminação".</p>
-                    <p>2. Lotes sem vínculo usam o programa marcado como <strong>padrão</strong> para o tipo de produção.</p>
-                    <p>3. Ramp-up/down simulam amanhecer/anoitecer suaves (apenas em canais com PWM via ESP32).</p>
-                    <p>4. Sonoff on/off: ignora intensidade e ramp — liga/desliga conforme o bloco.</p>
-                    <p>5. A automação roda a cada 1 minuto; mudanças aqui refletem no campo no próximo ciclo.</p>
+                    <p>1. Edite os campos da faixa e clique em <strong>Salvar</strong> (linha) ou <strong>Salvar tudo</strong> (topo). Linhas com alterações pendentes ficam destacadas em âmbar.</p>
+                    <p>2. Cada lote pode ser vinculado a um programa em "Editar lote → Programa de iluminação".</p>
+                    <p>3. Lotes sem vínculo usam o programa marcado como <strong>padrão</strong> para o tipo de produção.</p>
+                    <p>4. Ramp-up/down simulam amanhecer/anoitecer suaves (apenas em canais com PWM via ESP32).</p>
+                    <p>5. Sonoff on/off: ignora intensidade e ramp — liga/desliga conforme o bloco.</p>
+                    <p>6. A automação roda a cada 1 minuto; mudanças refletem no campo no próximo ciclo após salvar.</p>
                   </CardContent>
                 </Card>
               </TabsContent>
