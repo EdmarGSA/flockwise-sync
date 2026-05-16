@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar, Skull, Thermometer } from 'lucide-react';
+import { ArrowLeft, Target, Package, MessageSquare, Bird, Pill, Scissors, Scale, Calendar, Skull, Thermometer, FileText } from 'lucide-react';
 import { calcularIdadeLote } from '@/lib/utils';
 import { getStatusBadgeConfig } from '@/lib/utils/labels';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -376,10 +376,19 @@ export default function VeterinarioLote() {
           <Button
             variant="outline"
             onClick={() => setConsumoOpen(true)}
-            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50 col-span-2"
+            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50"
           >
             <Package className="w-6 h-6 text-purple-500" />
             <span className="text-sm font-medium">Consumo</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/veterinario/${lote.id}/relatorio-diario`)}
+            className="h-20 flex-col gap-1 bg-card hover:bg-accent/50 col-span-2"
+          >
+            <FileText className="w-6 h-6 text-blue-600" />
+            <span className="text-sm font-medium">Relatório Diário + IA</span>
           </Button>
         </div>
       </main>
