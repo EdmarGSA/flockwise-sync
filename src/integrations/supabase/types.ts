@@ -3565,6 +3565,7 @@ export type Database = {
       }
       lotes: {
         Row: {
+          analise_ia_relatorio: Json | null
           created_at: string
           criador_id: string | null
           curva_climatica_id: string | null
@@ -3599,6 +3600,7 @@ export type Database = {
           veterinario_id: string | null
         }
         Insert: {
+          analise_ia_relatorio?: Json | null
           created_at?: string
           criador_id?: string | null
           curva_climatica_id?: string | null
@@ -3635,6 +3637,7 @@ export type Database = {
           veterinario_id?: string | null
         }
         Update: {
+          analise_ia_relatorio?: Json | null
           created_at?: string
           criador_id?: string | null
           curva_climatica_id?: string | null
@@ -9361,6 +9364,15 @@ export type Database = {
       gerar_lote_interno_ovos: {
         Args: { p_integrado_id: string }
         Returns: string
+      }
+      get_benchmark_linhagem: {
+        Args: { p_integrado_id?: string; p_linhagem: string; p_sexo?: string }
+        Returns: {
+          amostra: number
+          mortalidade_acum_pct: number
+          peso_medio_kg: number
+          semana: number
+        }[]
       }
       get_criadores: {
         Args: never
