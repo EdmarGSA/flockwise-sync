@@ -46,6 +46,7 @@ import CadastroSilos from "./pages/CadastroSilos";
 import FabricaRacao from "./pages/FabricaRacao";
 import Veterinario from "./pages/Veterinario";
 import VeterinarioLote from "./pages/VeterinarioLote";
+import VeterinarioRelatorioDiario from "./pages/VeterinarioRelatorioDiario";
 import VeterinarioTemperatura from "./pages/VeterinarioTemperatura";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
 import Comercial from "./pages/Comercial";
@@ -291,6 +292,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="veterinario">
           <VeterinarioTemperatura />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/veterinario/:loteId/relatorio-diario" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="veterinario">
+          <VeterinarioRelatorioDiario />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
