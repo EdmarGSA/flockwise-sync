@@ -1,43 +1,101 @@
-# Programas de Iluminação — salvar/atualizar confiável
+# Relatório Diário do Lote + Analista Técnico IA
 
-## Diagnóstico
+Nova tela no módulo veterinário que mostra, por dia, todo o histórico do lote (clima, iluminação, mortalidade, pesagem, referência da linhagem) e gera uma análise técnica por IA usando os dados do próprio sistema, sem alucinação.
 
-Em `src/pages/ProgramasIluminacao.tsx`, todo `Input` de cada faixa chama `atualizarFaixa` no `onChange`, que dispara `supabase.update()` a cada tecla. Problemas observados:
+## Escopo
 
-1. **Race condition**: digitar "18" envia UPDATE com `1` e depois com `18`. Se o segundo resolver antes do `fetchFaixas` do primeiro, o `setFaixas` sobrescreve o valor recém-digitado pelo valor antigo do banco.
-2. **Sair antes do debounce de tecla**: ao mudar campo e clicar fora rápido (ou navegar), o `onChange` do número só dispara se o valor foi parseado; valores intermediários ("0", vazio) podem ser persistidos como último estado.
-3. **Sem indicador**: usuário não sabe se salvou. Sem botão explícito, sem aviso de "não salvo".
-4. **`horas_luz` recalculado só quando muda `blocos`**: alterar acender/apagar separadamente atualiza `blocos` mas o `fetchFaixas` posterior pode chegar antes do `update` do outro campo.
+**Rota:** `/veterinario/:loteId/relatorio-diario` (botão "Relatório Diário" em `VeterinarioLote.tsx`)
 
-## O que mudar (apenas frontend, no arquivo `ProgramasIluminacao.tsx`)
+**3 abas:** Diário · Análise IA · Exportar
 
-### 1. Estado local com "draft" por faixa
-- Adicionar `Map<faixaId, Faixa>` de rascunhos editados (`drafts`) e `Set<faixaId>` de faixas modificadas (`dirty`).
-- `onChange` dos inputs **só atualiza o draft local**, não o banco.
-- Recalcular `horas_luz` no draft em tempo real (preview), mas só persistir ao salvar.
+### Aba Diário
+Tabela por dia (alojamento → hoje), paginação semanal no desktop (`< Semana 3 >`), scroll vertical no mobile:
+- Data + idade (dias/semanas)
+- Clima por dispositivo IoT: temp/umid min/máx/média + faixa ideal da linhagem
+- Iluminação: horas programadas, acender/apagar, overrides do dia
+- Mortalidade: natural + eliminada (unidades e % acumulado)
+- Pesagem: peso médio, CV%, ganho diário; marcador a cada 7 dias com o padrão da linhagem
+- Coluna "vs Padrão": delta de peso e mortalidade vs Lohmann/Cobb/Ross
 
-### 2. Botão "Salvar" por linha + "Salvar todas" no header
-- Coluna extra à direita com botão `Salvar` (ícone `Save`) habilitado quando a linha está dirty.
-- No header da tabela, botão `Salvar tudo` que itera sobre faixas dirty.
-- Ambos chamam um único `salvarFaixa(faixa)` que faz UPDATE com **todos os campos** da faixa de uma vez (atômico) e remove do `dirty` em caso de sucesso.
-- Após salvar tudo, um único `fetchFaixas` final.
+**Matriz de dados ausentes:**
+| Caso | Renderização |
+|---|---|
+| Sensor offline o dia inteiro | célula cinza + "—" + tooltip "sensor offline" |
+| Sensor parcial (<6h de dados) | valor + ícone amarelo de aviso |
+| Sem pesagem no dia | "—" (não é erro) |
+| Sem mortalidade | "0" (valor válido) |
+| Sem iluminação programada | "—" + link "configurar programa" |
 
-### 3. Indicador visual
-- Linha dirty: fundo `bg-amber-50/50` ou borda esquerda âmbar + badge "não salvo".
-- Toast de sucesso/erro por operação.
+### Aba Análise IA
+Markdown gerado por `google/gemini-2.5-pro` (temperature 0.3), estruturado em:
+1. Resumo executivo (3 linhas)
+2. Performance vs linhagem (peso, CA, uniformidade)
+3. Tendência de mortalidade e correlação com clima
+4. Aderência ao programa de iluminação
+5. Sanidade (tratamentos ativos, autópsias, carência)
+6. **Recomendações priorizadas** (banner crítico no topo se houver gatilho)
+7. Riscos próximos 7 dias
 
-### 4. Proteção ao sair
-- `useEffect` com `beforeunload` listener quando `dirty.size > 0` ("Há alterações não salvas").
-- No botão `ArrowLeft` (voltar), `confirm()` antes de navegar se houver dirty.
-- Ao trocar de aba (`Tabs onValueChange`), idem.
+**Camada de gatilhos críticos (determinística, no backend — não na IA):**
+| Gatilho | Ação |
+|---|---|
+| Mortalidade diária > limiar do integrador | banner vermelho + sugerir coleta laboratorial |
+| Mortalidade acumulada > 1,5× padrão linhagem | banner laranja + revisar clima |
+| 3+ dias fora da faixa térmica | revisar ventilação/aquecimento |
+| Peso < 90% do padrão | auditar consumo/ração |
+| Medicação com carência ≤2 dias e abate marcado | bloquear abate |
+| Autópsia com achado infeccioso | notificar veterinário |
 
-### 5. Switch "Padrão" e operações de criar/remover faixa/programa permanecem com persistência imediata (são ações discretas, não digitação).
+Os gatilhos são detectados no backend, renderizados pelo frontend como banner próprio, e injetados como **contexto factual** no prompt da IA (ela contextualiza, não prioriza).
+
+**Anti-delírio:**
+- IA proibida de prescrever dosagens (apenas sugerir consultar veterinário)
+- Prompt recebe somente dados reais do JSON do endpoint 1
+- Validação pós-resposta: se vier marca/dosagem específica ou `state: failed`, descarta e mostra template determinístico
+- Cache em `lotes.analise_ia_relatorio jsonb` com `hash_dados` (não recalcula se nada mudou)
+
+### Aba Exportar
+- PDF via `window.print` (CSS print-friendly)
+- CSV client-side com os mesmos dados da aba Diário
+
+## Backend
+
+### Edge function `relatorio-lote-diario`
+- `?action=diario` — rápido, sem IA. Uma query por: `lotes`, `dispositivos_iot`, `leituras_sensores` (agregado por `date_trunc('day', lido_em)` com janela padrão **60 dias**), `mortalidade` + itens, `pesagens` + itens, `programa_iluminacao_faixa`, `override_iluminacao_canal`, `tratamentos`, `autopsias`. Calcula gatilhos críticos.
+- `?action=ia` — chama `?action=diario` internamente, monta prompt com dados + gatilhos, chama Gemini, valida resposta, persiste cache.
+
+### Migração
+- Nova RPC `get_benchmark_linhagem(linhagem, sexo, integrado_id)` retornando peso/mortalidade semanal de **lotes fechados** do mesmo integrado:
+  - filtro: `status = 'fechado'`
+  - mínimo: `quantidade_aves >= 5000`
+  - mínimo: 3 lotes na amostra
+  - janela: últimos 24 meses
+- Coluna `lotes.analise_ia_relatorio jsonb` (cache do markdown + hash + timestamp)
+
+### Fase 2 (não nesta entrega)
+Tabela `resumo_diario_sensores` + cron `pg_cron` noturno reagregando D-1 com `INSERT ... ON CONFLICT DO UPDATE`. Decisão: query direta resolve até ~500k linhas (frango corte 42d), postura longa (600d) entra na Fase 2.
 
 ## Arquivos
 
-- **Editar**: `src/pages/ProgramasIluminacao.tsx` (único arquivo)
+**Novos:**
+- `src/pages/VeterinarioRelatorioDiario.tsx`
+- `src/components/veterinario/relatorio/TabelaDiaria.tsx`
+- `src/components/veterinario/relatorio/AnaliseIATecnica.tsx`
+- `src/components/veterinario/relatorio/ExportarRelatorio.tsx`
+- `src/components/veterinario/relatorio/BannerGatilhosCriticos.tsx`
+- `src/hooks/useRelatorioDiarioLote.ts`
+- `src/hooks/useAnaliseIALote.ts`
+- `src/lib/veterinario/padroesLinhagem.ts`
+- `src/lib/veterinario/gatilhosCriticos.ts`
+- `supabase/functions/relatorio-lote-diario/index.ts`
+
+**Editar:**
+- `src/pages/VeterinarioLote.tsx` — botão "Relatório Diário"
+- `src/App.tsx` — registrar rota
 
 ## Fora de escopo
-
-- Sem mudança de schema, sem mexer em `auto-iluminacao` edge function.
-- Sem alterar `CurvaFotoperiodoChart` (já consome `faixas` local — vai refletir o draft automaticamente).
+- Tabela `resumo_diario_sensores` + cron (Fase 2)
+- Dados externos / cross-integrado benchmark
+- Notificação por e-mail/WhatsApp
+- Substituir `analise-mortalidade` existente
+- Novo schema de sensores/alarmes
