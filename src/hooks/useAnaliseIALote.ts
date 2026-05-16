@@ -13,18 +13,15 @@ export function useAnaliseIALote(loteId: string | undefined) {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase.functions.invoke('relatorio-lote-diario', {
-        body: { loteId }, method: 'POST',
-        headers: {},
-      });
-      // Re-call com action=ia via URL não funciona em invoke; usar fetch direto:
       const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
+      const PUB_KEY = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const session = (await supabase.auth.getSession()).data.session;
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/relatorio-lote-diario?action=ia`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          'apikey': PUB_KEY,
+          'Authorization': `Bearer ${session?.access_token || PUB_KEY}`,
         },
         body: JSON.stringify({ loteId }),
       });
