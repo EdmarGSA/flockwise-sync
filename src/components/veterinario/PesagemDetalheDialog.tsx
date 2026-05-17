@@ -77,23 +77,21 @@ export default function PesagemDetalheDialog({
     setLoading(false);
   };
 
-  // Calcular totais por sessão
+  // Totais por sessão (peso em KG)
   const calcularTotaisSessao = (itens: PesagemItem[]) => {
     const totalAves = itens.reduce((acc, item) => acc + item.quantidade_aves, 0);
-    const totalPeso = itens.reduce((acc, item) => acc + item.peso_liquido_kg, 0);
-    const mediaG = totalAves > 0 ? totalPeso / totalAves : 0;
-    return { totalAves, totalPeso, mediaG };
+    const totalPesoKg = itens.reduce((acc, item) => acc + Number(item.peso_liquido_kg || 0), 0);
+    const mediaKg = totalAves > 0 ? totalPesoKg / totalAves : 0;
+    return { totalAves, totalPesoKg, mediaKg };
   };
 
-  // Calcular consolidado do dia
   const calcularConsolidado = () => {
     const todosItens = sessoes.flatMap(s => s.itens);
     return calcularTotaisSessao(todosItens);
   };
 
   const consolidado = calcularConsolidado();
-  const mediaKg = consolidado.mediaG / 1000;
-  const diferencaRef = pesoReferencia ? ((mediaKg - pesoReferencia) / pesoReferencia) * 100 : null;
+  const diferencaRef = pesoReferencia ? ((consolidado.mediaKg - pesoReferencia) / pesoReferencia) * 100 : null;
 
   const dataFormatada = dataPesagem 
     ? format(new Date(dataPesagem + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })
@@ -141,11 +139,11 @@ export default function PesagemDetalheDialog({
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Peso Total</p>
-                        <p className="text-lg font-bold">{(consolidado.totalPeso / 1000).toFixed(2)} kg</p>
+                        <p className="text-lg font-bold">{consolidado.totalPesoKg.toFixed(2)} kg</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Média</p>
-                        <p className="text-lg font-bold">{consolidado.mediaG.toFixed(1)} g</p>
+                        <p className="text-lg font-bold">{(consolidado.mediaKg * 1000).toFixed(1)} g</p>
                       </div>
                     </div>
                     {pesoReferencia && diferencaRef !== null && (
@@ -186,15 +184,16 @@ export default function PesagemDetalheDialog({
                             </TableHeader>
                             <TableBody>
                               {sessao.itens.map((item, itemIndex) => {
-                                const mediaItem = item.quantidade_aves > 0 
-                                  ? item.peso_liquido_kg / item.quantidade_aves 
+                                const pesoKg = Number(item.peso_liquido_kg || 0);
+                                const mediaItemKg = item.quantidade_aves > 0 
+                                  ? pesoKg / item.quantidade_aves 
                                   : 0;
                                 return (
                                   <TableRow key={item.id}>
                                     <TableCell className="font-medium">{itemIndex + 1}</TableCell>
                                     <TableCell>{item.quantidade_aves}</TableCell>
-                                    <TableCell>{item.peso_liquido_kg.toFixed(1)} g</TableCell>
-                                    <TableCell className="text-right">{mediaItem.toFixed(1)} g</TableCell>
+                                    <TableCell>{pesoKg.toFixed(3)} kg</TableCell>
+                                    <TableCell className="text-right">{(mediaItemKg * 1000).toFixed(1)} g</TableCell>
                                   </TableRow>
                                 );
                               })}
@@ -209,8 +208,8 @@ export default function PesagemDetalheDialog({
                             <span>{totais.totalAves} aves</span>
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className="text-muted-foreground">{(totais.totalPeso / 1000).toFixed(2)} kg</span>
-                            <Badge variant="outline">{totais.mediaG.toFixed(1)} g</Badge>
+                            <span className="text-muted-foreground">{totais.totalPesoKg.toFixed(2)} kg</span>
+                            <Badge variant="outline">{(totais.mediaKg * 1000).toFixed(1)} g</Badge>
                           </div>
                         </div>
                       </CardContent>
