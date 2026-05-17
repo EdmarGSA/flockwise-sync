@@ -54,7 +54,7 @@ export const ZootecnicoPanel = ({ userId }: ZootecnicoPanelProps) => {
 
         if (refData && pesoAtual > 0) {
           const gpdReal = pesoAtual / diasVida; // kg per day
-          const gpdRef = refData.ganho_medio_diario_kg / 1000; // Convert g to kg
+          const gpdRef = Number(refData.ganho_medio_diario_kg) || 0; // já em kg/dia
 
           totalGpdReal += gpdReal;
           totalGpdRef += gpdRef;
