@@ -83,7 +83,7 @@ export default function PrevisaoConsumoLotesDialog({
             .maybeSingle();
 
           if (desempenho) {
-            const consumoKg = (Number(desempenho.consumo_diario_racao_kg) / 1000) * lote.quantidade_aves;
+            const consumoKg = Number(desempenho.consumo_diario_racao_kg) * lote.quantidade_aves;
             if (d === 0) consumo_dia1 = consumoKg;
             else if (d === 1) consumo_dia2 = consumoKg;
             else consumo_dia3 = consumoKg;
