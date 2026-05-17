@@ -71,8 +71,8 @@ async function calcularConsumoIntervalo(
 
   if (!data || data.length === 0) return 0;
 
-  const consumoTotalGramas = data.reduce((sum, d) => sum + d.consumo_diario_racao_kg, 0);
-  return (consumoTotalGramas * avesVivas) / 1000;
+  const consumoTotalKg = data.reduce((sum, d) => sum + (Number(d.consumo_diario_racao_kg) || 0), 0);
+  return consumoTotalKg * avesVivas;
 }
 
 /**
