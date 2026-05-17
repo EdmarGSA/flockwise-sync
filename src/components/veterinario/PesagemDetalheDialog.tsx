@@ -77,23 +77,21 @@ export default function PesagemDetalheDialog({
     setLoading(false);
   };
 
-  // Calcular totais por sessão
+  // Totais por sessão (peso em KG)
   const calcularTotaisSessao = (itens: PesagemItem[]) => {
     const totalAves = itens.reduce((acc, item) => acc + item.quantidade_aves, 0);
-    const totalPeso = itens.reduce((acc, item) => acc + item.peso_liquido_kg, 0);
-    const mediaG = totalAves > 0 ? totalPeso / totalAves : 0;
-    return { totalAves, totalPeso, mediaG };
+    const totalPesoKg = itens.reduce((acc, item) => acc + Number(item.peso_liquido_kg || 0), 0);
+    const mediaKg = totalAves > 0 ? totalPesoKg / totalAves : 0;
+    return { totalAves, totalPesoKg, mediaKg };
   };
 
-  // Calcular consolidado do dia
   const calcularConsolidado = () => {
     const todosItens = sessoes.flatMap(s => s.itens);
     return calcularTotaisSessao(todosItens);
   };
 
   const consolidado = calcularConsolidado();
-  const mediaKg = consolidado.mediaG / 1000;
-  const diferencaRef = pesoReferencia ? ((mediaKg - pesoReferencia) / pesoReferencia) * 100 : null;
+  const diferencaRef = pesoReferencia ? ((consolidado.mediaKg - pesoReferencia) / pesoReferencia) * 100 : null;
 
   const dataFormatada = dataPesagem 
     ? format(new Date(dataPesagem + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })
