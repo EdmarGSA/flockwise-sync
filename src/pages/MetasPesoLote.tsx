@@ -257,8 +257,8 @@ export default function MetasPesoLote() {
       setMetas(metas);
       setEditingMetas(metas);
     } else {
-      // peso_medio_pintinhos_kg está em gramas, converter para kg
-      const pesoInicialKg = loteData.peso_medio_pintinhos_kg ? Number(loteData.peso_medio_pintinhos_kg) / 1000 : 0;
+      // peso_medio_pintinhos_kg já em kg
+      const pesoInicialKg = loteData.peso_medio_pintinhos_kg ? Number(loteData.peso_medio_pintinhos_kg) : 0;
       if (pesoInicialKg > 0) {
         const calculatedMetas = calcularMetas(pesoInicialKg);
         setEditingMetas(calculatedMetas);
