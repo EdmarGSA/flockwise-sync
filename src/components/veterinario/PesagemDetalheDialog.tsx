@@ -139,11 +139,11 @@ export default function PesagemDetalheDialog({
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Peso Total</p>
-                        <p className="text-lg font-bold">{(consolidado.totalPeso / 1000).toFixed(2)} kg</p>
+                        <p className="text-lg font-bold">{consolidado.totalPesoKg.toFixed(2)} kg</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Média</p>
-                        <p className="text-lg font-bold">{consolidado.mediaG.toFixed(1)} g</p>
+                        <p className="text-lg font-bold">{(consolidado.mediaKg * 1000).toFixed(1)} g</p>
                       </div>
                     </div>
                     {pesoReferencia && diferencaRef !== null && (
