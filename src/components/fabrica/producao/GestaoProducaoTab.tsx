@@ -130,8 +130,8 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
             .maybeSingle();
 
           if (desempenho) {
-            // consumo_diario_racao_kg is per bird in grams
-            const consumoDiarioKg = (Number(desempenho.consumo_diario_racao_kg) / 1000) * lote.quantidade_aves;
+            // consumo_diario_racao_kg é por ave em kg
+            const consumoDiarioKg = Number(desempenho.consumo_diario_racao_kg) * lote.quantidade_aves;
             previsaoTotal += consumoDiarioKg;
           }
         }
