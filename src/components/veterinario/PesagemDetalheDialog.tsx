@@ -184,15 +184,16 @@ export default function PesagemDetalheDialog({
                             </TableHeader>
                             <TableBody>
                               {sessao.itens.map((item, itemIndex) => {
-                                const mediaItem = item.quantidade_aves > 0 
-                                  ? item.peso_liquido_kg / item.quantidade_aves 
+                                const pesoKg = Number(item.peso_liquido_kg || 0);
+                                const mediaItemKg = item.quantidade_aves > 0 
+                                  ? pesoKg / item.quantidade_aves 
                                   : 0;
                                 return (
                                   <TableRow key={item.id}>
                                     <TableCell className="font-medium">{itemIndex + 1}</TableCell>
                                     <TableCell>{item.quantidade_aves}</TableCell>
-                                    <TableCell>{item.peso_liquido_kg.toFixed(1)} g</TableCell>
-                                    <TableCell className="text-right">{mediaItem.toFixed(1)} g</TableCell>
+                                    <TableCell>{pesoKg.toFixed(3)} kg</TableCell>
+                                    <TableCell className="text-right">{(mediaItemKg * 1000).toFixed(1)} g</TableCell>
                                   </TableRow>
                                 );
                               })}
@@ -207,8 +208,8 @@ export default function PesagemDetalheDialog({
                             <span>{totais.totalAves} aves</span>
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className="text-muted-foreground">{(totais.totalPeso / 1000).toFixed(2)} kg</span>
-                            <Badge variant="outline">{totais.mediaG.toFixed(1)} g</Badge>
+                            <span className="text-muted-foreground">{totais.totalPesoKg.toFixed(2)} kg</span>
+                            <Badge variant="outline">{(totais.mediaKg * 1000).toFixed(1)} g</Badge>
                           </div>
                         </div>
                       </CardContent>
