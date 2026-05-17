@@ -2104,44 +2104,44 @@ export type Database = {
       }
       desempenho_aves: {
         Row: {
-          consumo_acumulado_racao_g: number
-          consumo_diario_racao_g: number
+          consumo_acumulado_racao_kg: number | null
+          consumo_diario_racao_kg: number | null
           conversao_alimentar_acumulada: number
           created_at: string
           dia: number
-          ganho_diario_g: number
-          ganho_medio_diario_g: number
+          ganho_diario_kg: number | null
+          ganho_medio_diario_kg: number | null
           id: string
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
-          peso_g: number
+          peso_kg: number | null
           sexo: Database["public"]["Enums"]["sexo_ave"]
           updated_at: string
         }
         Insert: {
-          consumo_acumulado_racao_g: number
-          consumo_diario_racao_g: number
+          consumo_acumulado_racao_kg?: number | null
+          consumo_diario_racao_kg?: number | null
           conversao_alimentar_acumulada: number
           created_at?: string
           dia: number
-          ganho_diario_g: number
-          ganho_medio_diario_g: number
+          ganho_diario_kg?: number | null
+          ganho_medio_diario_kg?: number | null
           id?: string
           linhagem: Database["public"]["Enums"]["linhagem_aves"]
-          peso_g: number
+          peso_kg?: number | null
           sexo: Database["public"]["Enums"]["sexo_ave"]
           updated_at?: string
         }
         Update: {
-          consumo_acumulado_racao_g?: number
-          consumo_diario_racao_g?: number
+          consumo_acumulado_racao_kg?: number | null
+          consumo_diario_racao_kg?: number | null
           conversao_alimentar_acumulada?: number
           created_at?: string
           dia?: number
-          ganho_diario_g?: number
-          ganho_medio_diario_g?: number
+          ganho_diario_kg?: number | null
+          ganho_medio_diario_kg?: number | null
           id?: string
           linhagem?: Database["public"]["Enums"]["linhagem_aves"]
-          peso_g?: number
+          peso_kg?: number | null
           sexo?: Database["public"]["Enums"]["sexo_ave"]
           updated_at?: string
         }
@@ -2149,13 +2149,13 @@ export type Database = {
       }
       desempenho_postura: {
         Row: {
-          consumo_diario_g: number
+          consumo_diario_kg: number | null
           created_at: string
           fase: Database["public"]["Enums"]["fase_postura"]
           id: string
           linhagem: Database["public"]["Enums"]["linhagem_postura"]
           ovos_ave_alojada: number | null
-          peso_g: number
+          peso_kg: number | null
           peso_ovo_g: number | null
           producao_percentual: number | null
           semana: number
@@ -2163,13 +2163,13 @@ export type Database = {
           viabilidade_percentual: number | null
         }
         Insert: {
-          consumo_diario_g: number
+          consumo_diario_kg?: number | null
           created_at?: string
           fase: Database["public"]["Enums"]["fase_postura"]
           id?: string
           linhagem: Database["public"]["Enums"]["linhagem_postura"]
           ovos_ave_alojada?: number | null
-          peso_g: number
+          peso_kg?: number | null
           peso_ovo_g?: number | null
           producao_percentual?: number | null
           semana: number
@@ -2177,13 +2177,13 @@ export type Database = {
           viabilidade_percentual?: number | null
         }
         Update: {
-          consumo_diario_g?: number
+          consumo_diario_kg?: number | null
           created_at?: string
           fase?: Database["public"]["Enums"]["fase_postura"]
           id?: string
           linhagem?: Database["public"]["Enums"]["linhagem_postura"]
           ovos_ave_alojada?: number | null
-          peso_g?: number
+          peso_kg?: number | null
           peso_ovo_g?: number | null
           producao_percentual?: number | null
           semana?: number
@@ -3588,7 +3588,7 @@ export type Database = {
             | null
           nucleo_id: string
           observacoes: string | null
-          peso_medio_pintinhos: number | null
+          peso_medio_pintinhos_kg: number | null
           programa_iluminacao_id: string | null
           quantidade_aves: number
           saida_abate: number | null
@@ -3625,7 +3625,7 @@ export type Database = {
             | null
           nucleo_id: string
           observacoes?: string | null
-          peso_medio_pintinhos?: number | null
+          peso_medio_pintinhos_kg?: number | null
           programa_iluminacao_id?: string | null
           quantidade_aves: number
           saida_abate?: number | null
@@ -3662,7 +3662,7 @@ export type Database = {
             | null
           nucleo_id?: string
           observacoes?: string | null
-          peso_medio_pintinhos?: number | null
+          peso_medio_pintinhos_kg?: number | null
           programa_iluminacao_id?: string | null
           quantidade_aves?: number
           saida_abate?: number | null
@@ -6028,27 +6028,27 @@ export type Database = {
           created_at: string
           id: string
           pesagem_id: string
-          peso_bruto_g: number
-          peso_liquido_g: number | null
-          peso_tara_g: number
+          peso_bruto_kg: number | null
+          peso_liquido_kg: number | null
+          peso_tara_kg: number | null
           quantidade_aves: number
         }
         Insert: {
           created_at?: string
           id?: string
           pesagem_id: string
-          peso_bruto_g: number
-          peso_liquido_g?: number | null
-          peso_tara_g?: number
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          peso_tara_kg?: number | null
           quantidade_aves: number
         }
         Update: {
           created_at?: string
           id?: string
           pesagem_id?: string
-          peso_bruto_g?: number
-          peso_liquido_g?: number | null
-          peso_tara_g?: number
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          peso_tara_kg?: number | null
           quantidade_aves?: number
         }
         Relationships: [
@@ -6774,7 +6774,7 @@ export type Database = {
           integrado_id: string
           ncm: string | null
           nome: string
-          peso_medio_referencia: number | null
+          peso_medio_referencia_kg: number | null
           preco_venda_base: number | null
           sku: string
           unidade_venda: string
@@ -6790,7 +6790,7 @@ export type Database = {
           integrado_id: string
           ncm?: string | null
           nome: string
-          peso_medio_referencia?: number | null
+          peso_medio_referencia_kg?: number | null
           preco_venda_base?: number | null
           sku: string
           unidade_venda?: string
@@ -6806,7 +6806,7 @@ export type Database = {
           integrado_id?: string
           ncm?: string | null
           nome?: string
-          peso_medio_referencia?: number | null
+          peso_medio_referencia_kg?: number | null
           preco_venda_base?: number | null
           sku?: string
           unidade_venda?: string

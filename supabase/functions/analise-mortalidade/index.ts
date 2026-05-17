@@ -84,7 +84,7 @@ serve(async (req) => {
     // 3. Fetch desempenho_aves reference (closest day)
     const { data: desempenhoRef } = await supabase
       .from("desempenho_aves")
-      .select("dia, peso_g, ganho_medio_diario_g, consumo_diario_racao_g, conversao_alimentar_acumulada")
+      .select("dia, peso_kg, ganho_medio_diario_kg, consumo_diario_racao_kg, conversao_alimentar_acumulada")
       .eq("linhagem", lote.linhagem || "cobb_500")
       .eq("sexo", lote.sexo || "misto")
       .gte("dia", Math.max(1, idadeDias - 2))
@@ -98,7 +98,7 @@ serve(async (req) => {
     // 4. Fetch last pesagens for GPD
     const { data: pesagens } = await supabase
       .from("pesagens")
-      .select("data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)")
+      .select("data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_kg, peso_tara_kg)")
       .eq("lote_id", lote_id)
       .order("data_pesagem", { ascending: false })
       .limit(5);
@@ -109,7 +109,7 @@ serve(async (req) => {
       const calcPeso = (p: any) => {
         const items = p.pesagem_itens || [];
         if (!items.length) return 0;
-        const totalPeso = items.reduce((s: number, i: any) => s + (i.peso_bruto_g - i.peso_tara_g), 0);
+        const totalPeso = items.reduce((s: number, i: any) => s + (i.peso_bruto_kg - i.peso_tara_kg), 0);
         const totalAves = items.reduce((s: number, i: any) => s + i.quantidade_aves, 0);
         return totalAves > 0 ? totalPeso / totalAves : 0;
       };
@@ -249,7 +249,7 @@ serve(async (req) => {
     let pontuacaoRisco = 0; // 0-10
 
     // A) Weight comparison
-    const pesoEsperado = refDia?.peso_g || 0;
+    const pesoEsperado = refDia?.peso_kg || 0;
     let pesoStatus = "sem_dados";
     if (pesoMedioReal > 0 && pesoEsperado > 0) {
       const ratioPeso = pesoMedioReal / pesoEsperado;
@@ -270,7 +270,7 @@ serve(async (req) => {
     }
 
     // B) GPD comparison
-    const gpdRef = refDia?.ganho_medio_diario_g || 0;
+    const gpdRef = refDia?.ganho_medio_diario_kg || 0;
     if (gpdReal > 0 && gpdRef > 0) {
       const ratioGpd = gpdReal / gpdRef;
       if (ratioGpd < 0.80) {

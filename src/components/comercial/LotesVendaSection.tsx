@@ -15,7 +15,7 @@ interface ProdutoAnimal {
   nome: string;
   unidade_venda: string;
   preco_venda_base: number;
-  peso_medio_referencia: number | null;
+  peso_medio_referencia_kg: number | null;
 }
 
 interface LoteDisponivel {
@@ -80,7 +80,7 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
 
       const { data, error } = await supabase
         .from('produtos_animais')
-        .select('id, nome, unidade_venda, preco_venda_base, peso_medio_referencia')
+        .select('id, nome, unidade_venda, preco_venda_base, peso_medio_referencia_kg')
         .eq('integrado_id', integradoId)
         .eq('ativo', true)
         .eq('grupo_animal_id', grupoId || '')
@@ -154,13 +154,13 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
         if (pesagemData) {
           const { data: itensData } = await supabase
             .from('pesagem_itens')
-            .select('quantidade_aves, peso_bruto_g, peso_tara_g')
+            .select('quantidade_aves, peso_bruto_kg, peso_tara_kg')
             .eq('pesagem_id', pesagemData.id);
 
           if (itensData && itensData.length > 0) {
             const totalAves = itensData.reduce((acc, item) => acc + item.quantidade_aves, 0);
-            const totalPesoLiquido = itensData.reduce((acc, item) => acc + (item.peso_bruto_g - item.peso_tara_g), 0);
-            ultimoPesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves / 1000 : null; // Convert to kg
+            const totalPesoLiquido = itensData.reduce((acc, item) => acc + (item.peso_bruto_kg - item.peso_tara_kg), 0);
+            ultimoPesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves : null; // já em kg
           }
         }
 

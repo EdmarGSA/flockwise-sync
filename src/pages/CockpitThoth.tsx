@@ -150,7 +150,7 @@ const CockpitThoth = () => {
 
               const { data: ref } = await supabase
                 .from('desempenho_aves')
-                .select('peso_g')
+                .select('peso_kg')
                 .eq('linhagem', lote.linhagem)
                 .eq('sexo', lote.sexo)
                 .eq('dia', diasVida)
@@ -158,7 +158,7 @@ const CockpitThoth = () => {
 
               if (metas && ref) {
                 const pesoReal = (metas.peso_inicial_kg + (metas.gpd_kg * diasVida)) * 1000; // kg to g
-                gpd = (pesoReal / ref.peso_g) * 100;
+                gpd = (pesoReal / ref.peso_kg) * 100;
               }
             }
           }

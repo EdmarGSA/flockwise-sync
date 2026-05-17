@@ -51,7 +51,7 @@ interface Lote {
   status: string;
   veterinario_id: string | null;
   integrado_id: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
   nucleo_id: string;
   galpao_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
@@ -141,7 +141,7 @@ export default function MeusLotes() {
         sexo,
         status,
         integrado_id,
-        peso_medio_pintinhos,
+        peso_medio_pintinhos_kg,
         nucleo_id,
         galpao_id,
         nucleo:nucleos(nome, tipo_producao),
@@ -986,7 +986,7 @@ export default function MeusLotes() {
             avesVivas={selectedLote.avesVivas || selectedLote.quantidade_aves}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
-            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos_kg}
             galpaoId={selectedLote.galpao_id}
             onSuccess={fetchLotes}
           />
@@ -1048,7 +1048,7 @@ export default function MeusLotes() {
             integradoId={selectedLote.integrado_id}
             dataAlojamento={selectedLote.data_alojamento || ''}
             quantidadeAlojada={selectedLote.quantidadeAlojada ?? selectedLote.quantidade_aves}
-            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos_kg}
             linhagem={selectedLote.linhagem}
             sexo={selectedLote.sexo}
             onSuccess={fetchLotes}

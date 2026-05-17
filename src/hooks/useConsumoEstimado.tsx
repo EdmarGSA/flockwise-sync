@@ -40,7 +40,7 @@ export function useConsumoEstimado() {
 
       const { data: consumoData, error } = await supabase
         .from('desempenho_aves')
-        .select('dia, consumo_diario_racao_g')
+        .select('dia, consumo_diario_racao_kg')
         .eq('linhagem', linhagem)
         .eq('sexo', sexo)
         .gte('dia', diaInicio)
@@ -56,7 +56,7 @@ export function useConsumoEstimado() {
         // Fallback: estimate based on last available day or average
         const { data: lastDay } = await supabase
           .from('desempenho_aves')
-          .select('consumo_diario_racao_g')
+          .select('consumo_diario_racao_kg')
           .eq('linhagem', linhagem)
           .eq('sexo', sexo)
           .lte('dia', diasDesdeAlojamento)
@@ -64,15 +64,15 @@ export function useConsumoEstimado() {
           .limit(1)
           .maybeSingle();
 
-        const consumoDiario = lastDay?.consumo_diario_racao_g || 150; // 150g default
-        const consumoTotal = (consumoDiario * avesVivas * diasAteEntrega) / 1000;
-        
+        const consumoDiarioKg = lastDay?.consumo_diario_racao_kg ?? 0.15; // 0.15 kg default
+        const consumoTotal = consumoDiarioKg * avesVivas * diasAteEntrega;
+
         return { consumoAteEntrega: consumoTotal, diasAteEntrega };
       }
 
       // Calculate total consumption in kg
-      const consumoTotalGramas = consumoData.reduce((sum, d) => sum + d.consumo_diario_racao_g, 0);
-      const consumoAteEntrega = (consumoTotalGramas * avesVivas) / 1000;
+      const consumoTotalKg = consumoData.reduce((sum, d) => sum + (Number(d.consumo_diario_racao_kg) || 0), 0);
+      const consumoAteEntrega = consumoTotalKg * avesVivas;
 
       return { consumoAteEntrega, diasAteEntrega };
     } catch (error) {

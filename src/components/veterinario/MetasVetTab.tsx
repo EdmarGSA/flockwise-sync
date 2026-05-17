@@ -16,7 +16,7 @@ interface Lote {
   data_alojamento: string | null;
   linhagem: string;
   sexo: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
 }
 
 interface MetasPeso {
@@ -41,7 +41,7 @@ export interface PesagemData {
 
 interface DesempenhoReferencia {
   dia: number;
-  peso_g: number;
+  peso_kg: number;
 }
 
 interface MortalidadePorSemana {
@@ -129,7 +129,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
     // Fetch desempenho referencia
     const { data: desempenhoData } = await supabase
       .from('desempenho_aves')
-      .select('dia, peso_g')
+      .select('dia, peso_kg')
       .eq('linhagem', lote.linhagem as 'cobb_500' | 'ross_308' | 'hubbard')
       .eq('sexo', lote.sexo as 'macho' | 'femea' | 'misto')
       .order('dia', { ascending: true });
@@ -145,7 +145,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         .select(`
           id,
           data_pesagem,
-          pesagem_itens (quantidade_aves, peso_liquido_g)
+          pesagem_itens (quantidade_aves, peso_liquido_kg)
         `)
         .eq('lote_id', loteId)
         .order('data_pesagem', { ascending: true });
@@ -163,7 +163,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         // Calcular média ponderada consolidada por dia - Dia 1 = dia do alojamento
         const processed = Object.entries(pesagensPorData).map(([data, { itens, sessoes }]) => {
           const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-          const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+          const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
           const dia = calcularIdadeNaData(lote.data_alojamento!, data);
           return { 
@@ -298,7 +298,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
     return {
       dia,
       meta: metas ? metas[metaKeys[dia]] || 0 : 0,
-      referencia: refData ? refData.peso_g / 1000 : undefined,
+      referencia: refData ? refData.peso_kg : undefined,
     };
   });
 
@@ -312,7 +312,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         dia: p.dia, 
         meta: 0, 
         real: p.peso_real_kg,
-        referencia: refData ? refData.peso_g / 1000 : undefined,
+        referencia: refData ? refData.peso_kg : undefined,
       } as any);
     }
   });
@@ -661,7 +661,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {pesagens.slice().reverse().map((pesagem) => {
                 const refData = desempenhoReferencia.find(d => d.dia === pesagem.dia);
-                const pesoRefKg = refData ? refData.peso_g / 1000 : null;
+                const pesoRefKg = refData ? refData.peso_kg : null;
                 const diferenca = pesoRefKg 
                   ? ((pesagem.peso_real_kg - pesoRefKg) / pesoRefKg) * 100 
                   : null;
@@ -676,8 +676,8 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
                   <button
                     key={pesagem.data_pesagem}
                     onClick={() => {
-                      const pesoRef = desempenhoReferencia.find(d => d.dia === pesagem.dia)?.peso_g;
-                      onPesagemClick?.(pesagem, pesoRef ? pesoRef / 1000 : undefined);
+                      const pesoRef = desempenhoReferencia.find(d => d.dia === pesagem.dia)?.peso_kg;
+                      onPesagemClick?.(pesagem, pesoRef ?? undefined);
                     }}
                     className="flex flex-col p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
                   >
@@ -690,7 +690,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
                       )}
                     </div>
                     <span className="font-bold text-base">
-                      {(pesagem.peso_real_kg * 1000).toFixed(0)}g
+                      {pesagem.peso_real_kg.toFixed(3)} kg
                     </span>
                     <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
                       <span>{pesagem.totalAves} aves</span>

@@ -22,7 +22,7 @@ interface LoteComDados {
   status: string;
   linhagem: string | null;
   sexo: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
   nucleo_nome: string;
   galpao_nome: string;
   mortalidade_total: number;
@@ -69,7 +69,7 @@ export default function CriadorPainel() {
         .from('lotes')
         .select(`
           id, integrado_id, nucleo_id, galpao_id, quantidade_aves,
-          data_alojamento, status, linhagem, sexo, peso_medio_pintinhos,
+          data_alojamento, status, linhagem, sexo, peso_medio_pintinhos_kg,
           nucleos!inner(nome),
           galpoes!inner(nome)
         `)
@@ -135,7 +135,7 @@ export default function CriadorPainel() {
             status: lote.status,
             linhagem: lote.linhagem,
             sexo: lote.sexo,
-            peso_medio_pintinhos: lote.peso_medio_pintinhos,
+            peso_medio_pintinhos_kg: lote.peso_medio_pintinhos_kg,
             nucleo_nome: lote.nucleos?.nome || '',
             galpao_nome: lote.galpoes?.nome || '',
             mortalidade_total: mortalidadeTotal,
@@ -337,7 +337,7 @@ export default function CriadorPainel() {
             integradoId={selectedLote.integrado_id}
             galpaoId={selectedLote.galpao_id}
             avesVivas={selectedLote.aves_vivas}
-            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos}
+            pesoInicialPintinhos={selectedLote.peso_medio_pintinhos_kg}
             diasDesdeAlojamento={selectedLote.dias}
             dataAlojamento={selectedLote.data_alojamento}
             linhagem={selectedLote.linhagem as any}

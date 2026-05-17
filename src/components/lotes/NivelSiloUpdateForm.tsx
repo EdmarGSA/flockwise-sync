@@ -159,15 +159,15 @@ export function NivelSiloUpdateForm({
           // (simplified: use current diasDesdeAlojamento as approximation)
           const { data: consumoData } = await supabase
             .from('desempenho_aves')
-            .select('dia, consumo_diario_racao_g')
+            .select('dia, consumo_diario_racao_kg')
             .eq('linhagem', linhagem)
             .eq('sexo', sexo)
             .gte('dia', 1)
             .lte('dia', diasDesdeAlojamento);
 
           if (consumoData && consumoData.length > 0) {
-            const consumoTotalGramas = consumoData.reduce((sum, d) => sum + d.consumo_diario_racao_g, 0);
-            const consumoEstimado = (consumoTotalGramas * avesVivas) / 1000; // Convert to kg
+            const consumoTotalKg = consumoData.reduce((sum, d) => sum + (Number(d.consumo_diario_racao_kg) || 0), 0);
+            const consumoEstimado = consumoTotalKg * avesVivas;
             const expected = totalRecebido - consumoEstimado;
             setNivelEsperado(Math.max(0, expected));
           } else {
@@ -210,15 +210,15 @@ export function NivelSiloUpdateForm({
           const diaInicio = Math.max(1, diasDesdeAlojamento - diasDesdeUltimaAtualizacao);
           const { data: consumoData } = await supabase
             .from('desempenho_aves')
-            .select('dia, consumo_diario_racao_g')
+            .select('dia, consumo_diario_racao_kg')
             .eq('linhagem', linhagem)
             .eq('sexo', sexo)
             .gte('dia', diaInicio)
             .lte('dia', diasDesdeAlojamento);
 
           if (consumoData && consumoData.length > 0) {
-            const consumoTotalGramas = consumoData.reduce((sum, d) => sum + d.consumo_diario_racao_g, 0);
-            consumoEstimado = (consumoTotalGramas * avesVivas) / 1000; // Convert to kg
+            const consumoTotalKg = consumoData.reduce((sum, d) => sum + (Number(d.consumo_diario_racao_kg) || 0), 0);
+            consumoEstimado = consumoTotalKg * avesVivas;
           }
         }
       }

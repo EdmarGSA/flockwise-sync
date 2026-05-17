@@ -108,13 +108,13 @@ export default function PrevisaoConsumoDialog({
       // 3. Fetch all desempenho_aves for efficiency (batch query)
       const { data: desempenhoData } = await supabase
         .from('desempenho_aves')
-        .select('linhagem, sexo, dia, consumo_diario_racao_g');
+        .select('linhagem, sexo, dia, consumo_diario_racao_kg');
 
       // Create a lookup map for desempenho
       const desempenhoMap: Record<string, number> = {};
       (desempenhoData || []).forEach(d => {
         const key = `${d.linhagem}-${d.sexo}-${d.dia}`;
-        desempenhoMap[key] = Number(d.consumo_diario_racao_g);
+        desempenhoMap[key] = Number(d.consumo_diario_racao_kg);
       });
 
       // Map to aggregate consumption by product
@@ -156,10 +156,10 @@ export default function PrevisaoConsumoDialog({
 
           const fase = produtoAtual.fases_animal as { id: string; nome: string; dia_inicio: number; dia_fim: number };
 
-          // Get theoretical consumption from desempenho map
+          // Get theoretical consumption from desempenho map (already in kg/ave/dia)
           const desempenhoKey = `${lote.linhagem}-${lote.sexo}-${diaFuturo}`;
-          const consumoGramas = desempenhoMap[desempenhoKey] || 0;
-          const consumoKg = (consumoGramas / 1000) * lote.quantidade_aves;
+          const consumoPorAveKg = desempenhoMap[desempenhoKey] || 0;
+          const consumoKg = consumoPorAveKg * lote.quantidade_aves;
 
           // Initialize if not exists
           if (!consumoPorProduto[produtoAtual.id]) {

@@ -213,7 +213,7 @@ export function useLoteAnalytics() {
           .in('lote_id', loteIds),
         supabase
           .from('pesagens')
-          .select('lote_id, consumo_real_kg, conversao_alimentar, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_g)')
+          .select('lote_id, consumo_real_kg, conversao_alimentar, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_kg)')
           .in('lote_id', loteIds)
           .order('data_pesagem', { ascending: false }),
         supabase
@@ -285,10 +285,10 @@ export function useLoteAnalytics() {
         const ultimaPesagem = pesagensData.find(p => p.lote_id === lote.id);
         let pesoAtual = 0;
         if (ultimaPesagem?.pesagem_itens) {
-          const itens = ultimaPesagem.pesagem_itens as { quantidade_aves: number; peso_liquido_g: number }[];
+          const itens = ultimaPesagem.pesagem_itens as { quantidade_aves: number; peso_liquido_kg: number }[];
           const totalAves = itens.reduce((acc, i) => acc + (i.quantidade_aves || 0), 0);
-          const totalPeso = itens.reduce((acc, i) => acc + (i.peso_liquido_g || 0), 0);
-          // peso_liquido_g é armazenado em kg por compatibilidade
+          const totalPeso = itens.reduce((acc, i) => acc + (i.peso_liquido_kg || 0), 0);
+          // peso_liquido_kg agora armazenado em kg na base
           pesoAtual = totalAves > 0 ? totalPeso / totalAves : 0;
         }
 
@@ -298,11 +298,11 @@ export function useLoteAnalytics() {
                d.linhagem === lote.linhagem && 
                d.sexo === lote.sexo
         );
-        const pesoReferencia = desempenhoRef?.peso_g ? desempenhoRef.peso_g / 1000 : 0;
+        const pesoReferencia = desempenhoRef?.peso_kg ?? 0;
         
-        // Consumo estimado baseado na tabela de referência
-        const consumoEstimadoKg = desempenhoRef?.consumo_acumulado_racao_g 
-          ? (desempenhoRef.consumo_acumulado_racao_g / 1000) * avesVivas 
+        // Consumo estimado baseado na tabela de referência (já em kg)
+        const consumoEstimadoKg = desempenhoRef?.consumo_acumulado_racao_kg 
+          ? desempenhoRef.consumo_acumulado_racao_kg * avesVivas 
           : 0;
         
         // Usar consumo real: 1) pesagem, 2) cálculo do silo, 3) estimado
@@ -361,7 +361,7 @@ export function useLoteAnalytics() {
             let diaReferenciaEquivalente: number | null = null;
             
             for (const ref of desempenhoFiltrado) {
-              const pesoRefKg = ref.peso_g / 1000;
+              const pesoRefKg = Number(ref.peso_kg) || 0;
               const diferenca = Math.abs(pesoRefKg - pesoAtual);
               if (diferenca < menorDiferenca) {
                 menorDiferenca = diferenca;

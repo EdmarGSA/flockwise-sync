@@ -123,15 +123,15 @@ export default function GestaoProducaoTab({ integradoId }: GestaoProducaoTabProp
 
           const { data: desempenho } = await supabase
             .from('desempenho_aves')
-            .select('consumo_diario_racao_g')
+            .select('consumo_diario_racao_kg')
             .eq('linhagem', lote.linhagem)
             .eq('sexo', lote.sexo)
             .eq('dia', diaRef)
             .maybeSingle();
 
           if (desempenho) {
-            // consumo_diario_racao_g is per bird in grams
-            const consumoDiarioKg = (Number(desempenho.consumo_diario_racao_g) / 1000) * lote.quantidade_aves;
+            // consumo_diario_racao_kg é por ave em kg
+            const consumoDiarioKg = Number(desempenho.consumo_diario_racao_kg) * lote.quantidade_aves;
             previsaoTotal += consumoDiarioKg;
           }
         }

@@ -46,7 +46,7 @@ export const ZootecnicoPanel = ({ userId }: ZootecnicoPanelProps) => {
         // Get reference weight for this day
         const { data: refData } = await supabase
           .from('desempenho_aves')
-          .select('peso_g, ganho_medio_diario_g')
+          .select('peso_kg, ganho_medio_diario_kg')
           .eq('linhagem', lote.linhagem)
           .eq('sexo', lote.sexo)
           .eq('dia', diasVida)
@@ -54,7 +54,7 @@ export const ZootecnicoPanel = ({ userId }: ZootecnicoPanelProps) => {
 
         if (refData && pesoAtual > 0) {
           const gpdReal = pesoAtual / diasVida; // kg per day
-          const gpdRef = refData.ganho_medio_diario_g / 1000; // Convert g to kg
+          const gpdRef = Number(refData.ganho_medio_diario_kg) || 0; // já em kg/dia
 
           totalGpdReal += gpdReal;
           totalGpdRef += gpdRef;

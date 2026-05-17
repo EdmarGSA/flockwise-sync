@@ -27,7 +27,7 @@ export default function ProdutoAnimalForm({ integradoId, onSuccess, onCancel }: 
     descricao: '',
     unidade_venda: 'KG',
     preco_venda_base: 0,
-    peso_medio_referencia: 0,
+    peso_medio_referencia_kg: 0,
     ncm: '',
     cest: ''
   });
@@ -80,7 +80,7 @@ export default function ProdutoAnimalForm({ integradoId, onSuccess, onCancel }: 
           grupo_animal_id: formData.grupo_animal_id,
           unidade_venda: formData.unidade_venda,
           preco_venda_base: formData.preco_venda_base || 0,
-          peso_medio_referencia: formData.peso_medio_referencia || null,
+          peso_medio_referencia_kg: formData.peso_medio_referencia_kg || null,
           ncm: formData.ncm.trim() || null,
           cest: formData.cest.trim() || null
         });
@@ -185,8 +185,8 @@ export default function ProdutoAnimalForm({ integradoId, onSuccess, onCancel }: 
             type="number"
             min="0"
             step="0.001"
-            value={formData.peso_medio_referencia || ''}
-            onChange={(e) => setFormData({ ...formData, peso_medio_referencia: parseFloat(e.target.value) || 0 })}
+            value={formData.peso_medio_referencia_kg || ''}
+            onChange={(e) => setFormData({ ...formData, peso_medio_referencia_kg: parseFloat(e.target.value) || 0 })}
             placeholder="0.000"
           />
         </div>

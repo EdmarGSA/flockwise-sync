@@ -190,14 +190,14 @@ const [stats, setStats] = useState({
 
             const { data: desempenho } = await supabase
               .from('desempenho_aves')
-              .select('consumo_diario_racao_g')
+              .select('consumo_diario_racao_kg')
               .eq('linhagem', lote.linhagem)
               .eq('sexo', lote.sexo)
               .eq('dia', diaFuturo)
               .maybeSingle();
 
             if (desempenho) {
-              const consumoKg = (Number(desempenho.consumo_diario_racao_g) / 1000) * lote.quantidade_aves;
+              const consumoKg = Number(desempenho.consumo_diario_racao_kg) * lote.quantidade_aves;
               previsaoConsumo3d += consumoKg;
             }
           }

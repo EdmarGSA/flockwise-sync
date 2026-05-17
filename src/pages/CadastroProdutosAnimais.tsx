@@ -22,7 +22,7 @@ interface ProdutoAnimal {
   descricao: string | null;
   unidade_venda: string;
   preco_venda_base: number;
-  peso_medio_referencia: number | null;
+  peso_medio_referencia_kg: number | null;
   ncm: string | null;
   ativo: boolean;
   grupo_animal: { id: string; nome: string } | null;
@@ -57,7 +57,7 @@ export default function CadastroProdutosAnimais() {
           descricao,
           unidade_venda,
           preco_venda_base,
-          peso_medio_referencia,
+          peso_medio_referencia_kg,
           ncm,
           ativo,
           grupo_animal:grupos_animal(id, nome)
@@ -208,8 +208,8 @@ export default function CadastroProdutosAnimais() {
                           R$ {produto.preco_venda_base.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {produto.peso_medio_referencia 
-                            ? `${produto.peso_medio_referencia.toFixed(3)} kg`
+                          {produto.peso_medio_referencia_kg 
+                            ? `${produto.peso_medio_referencia_kg.toFixed(3)} kg`
                             : '-'
                           }
                         </TableCell>

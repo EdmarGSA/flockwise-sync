@@ -124,22 +124,22 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
       // For now, estimate based on desempenho_aves table
       const { data: desempenhoData } = await supabase
         .from('desempenho_aves')
-        .select('consumo_acumulado_racao_g')
+        .select('consumo_acumulado_racao_kg')
         .eq('linhagem', lote.linhagem || 'cobb_500')
         .eq('sexo', lote.sexo || 'misto')
         .eq('dia', diasAlojados)
         .limit(1);
 
       if (desempenhoData && desempenhoData.length > 0) {
-        // Estimate: consumo_acumulado * aves_vivas / 1000
-        const consumoEstimado = (desempenhoData[0].consumo_acumulado_racao_g * avesVivas) / 1000;
+        // Estimate: consumo_acumulado (kg/ave) * aves_vivas
+        const consumoEstimado = Number(desempenhoData[0].consumo_acumulado_racao_kg) * avesVivas;
         setConsumoTotalKg(consumoEstimado);
       }
 
       // Fetch pesagens
       const { data: pesagensData } = await supabase
         .from('pesagens')
-        .select('data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_g)')
+        .select('data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_kg)')
         .eq('lote_id', loteId)
         .order('data_pesagem', { ascending: true });
 
@@ -150,7 +150,7 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
           let totalPeso = 0;
           p.pesagem_itens.forEach((item: any) => {
             totalAves += item.quantidade_aves || 0;
-            totalPeso += item.peso_liquido_g || 0;
+            totalPeso += item.peso_liquido_kg || 0;
           });
           if (totalAves > 0) {
             pesagensProcessed.push({
@@ -202,9 +202,9 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
   }, [consumoTotalKg, avesVivas, diasAlojados]);
 
   const ultimoPesoKg = useMemo(() => {
-    if (pesagens.length === 0) return lote.peso_medio_pintinhos || 0.042;
+    if (pesagens.length === 0) return lote.peso_medio_pintinhos_kg || 0.042;
     return pesagens[pesagens.length - 1].peso_kg;
-  }, [pesagens, lote.peso_medio_pintinhos]);
+  }, [pesagens, lote.peso_medio_pintinhos_kg]);
 
   const conversaoAlimentar = useMemo(() => {
     if (ultimoPesoKg <= 0 || avesVivas <= 0) return 0;
