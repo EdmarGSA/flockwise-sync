@@ -147,8 +147,8 @@ export async function calcularNivelSilo(input: SiloLevelInput): Promise<SiloLeve
     return result;
   }
 
-  result.consumoEstimado = (desempenho.consumo_acumulado_racao_kg * avesVivas) / 1000;
-  result.consumoDiarioEstimado = (desempenho.consumo_diario_racao_kg * avesVivas) / 1000;
+  result.consumoEstimado = Number(desempenho.consumo_acumulado_racao_kg) * avesVivas;
+  result.consumoDiarioEstimado = Number(desempenho.consumo_diario_racao_kg) * avesVivas;
 
   // Default: nível = recebido - consumo acumulado
   let nivelSiloCalculado = result.totalRecebido - result.consumoEstimado;
