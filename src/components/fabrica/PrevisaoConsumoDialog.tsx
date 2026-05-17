@@ -156,10 +156,10 @@ export default function PrevisaoConsumoDialog({
 
           const fase = produtoAtual.fases_animal as { id: string; nome: string; dia_inicio: number; dia_fim: number };
 
-          // Get theoretical consumption from desempenho map
+          // Get theoretical consumption from desempenho map (already in kg/ave/dia)
           const desempenhoKey = `${lote.linhagem}-${lote.sexo}-${diaFuturo}`;
-          const consumoGramas = desempenhoMap[desempenhoKey] || 0;
-          const consumoKg = (consumoGramas / 1000) * lote.quantidade_aves;
+          const consumoPorAveKg = desempenhoMap[desempenhoKey] || 0;
+          const consumoKg = consumoPorAveKg * lote.quantidade_aves;
 
           // Initialize if not exists
           if (!consumoPorProduto[produtoAtual.id]) {
