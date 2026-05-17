@@ -131,8 +131,8 @@ export function LoteDashboardTab({ loteId, lote }: LoteDashboardTabProps) {
         .limit(1);
 
       if (desempenhoData && desempenhoData.length > 0) {
-        // Estimate: consumo_acumulado * aves_vivas / 1000
-        const consumoEstimado = (desempenhoData[0].consumo_acumulado_racao_kg * avesVivas) / 1000;
+        // Estimate: consumo_acumulado (kg/ave) * aves_vivas
+        const consumoEstimado = Number(desempenhoData[0].consumo_acumulado_racao_kg) * avesVivas;
         setConsumoTotalKg(consumoEstimado);
       }
 
