@@ -361,7 +361,7 @@ export function useLoteAnalytics() {
             let diaReferenciaEquivalente: number | null = null;
             
             for (const ref of desempenhoFiltrado) {
-              const pesoRefKg = ref.peso_kg / 1000;
+              const pesoRefKg = Number(ref.peso_kg) || 0;
               const diferenca = Math.abs(pesoRefKg - pesoAtual);
               if (diferenca < menorDiferenca) {
                 menorDiferenca = diferenca;
