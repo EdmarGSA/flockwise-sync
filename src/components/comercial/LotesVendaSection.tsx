@@ -160,7 +160,7 @@ export default function LotesVendaSection({ integradoId, onAddItem }: LotesVenda
           if (itensData && itensData.length > 0) {
             const totalAves = itensData.reduce((acc, item) => acc + item.quantidade_aves, 0);
             const totalPesoLiquido = itensData.reduce((acc, item) => acc + (item.peso_bruto_kg - item.peso_tara_kg), 0);
-            ultimoPesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves / 1000 : null; // Convert to kg
+            ultimoPesoMedio = totalAves > 0 ? totalPesoLiquido / totalAves : null; // já em kg
           }
         }
 
