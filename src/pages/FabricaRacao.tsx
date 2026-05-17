@@ -197,7 +197,7 @@ const [stats, setStats] = useState({
               .maybeSingle();
 
             if (desempenho) {
-              const consumoKg = (Number(desempenho.consumo_diario_racao_kg) / 1000) * lote.quantidade_aves;
+              const consumoKg = Number(desempenho.consumo_diario_racao_kg) * lote.quantidade_aves;
               previsaoConsumo3d += consumoKg;
             }
           }
