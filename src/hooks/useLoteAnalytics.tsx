@@ -288,7 +288,7 @@ export function useLoteAnalytics() {
           const itens = ultimaPesagem.pesagem_itens as { quantidade_aves: number; peso_liquido_kg: number }[];
           const totalAves = itens.reduce((acc, i) => acc + (i.quantidade_aves || 0), 0);
           const totalPeso = itens.reduce((acc, i) => acc + (i.peso_liquido_kg || 0), 0);
-          // peso_liquido_kg é armazenado em kg por compatibilidade
+          // peso_liquido_kg agora armazenado em kg na base
           pesoAtual = totalAves > 0 ? totalPeso / totalAves : 0;
         }
 
@@ -298,11 +298,11 @@ export function useLoteAnalytics() {
                d.linhagem === lote.linhagem && 
                d.sexo === lote.sexo
         );
-        const pesoReferencia = desempenhoRef?.peso_kg ? desempenhoRef.peso_kg / 1000 : 0;
+        const pesoReferencia = desempenhoRef?.peso_kg ?? 0;
         
-        // Consumo estimado baseado na tabela de referência
+        // Consumo estimado baseado na tabela de referência (já em kg)
         const consumoEstimadoKg = desempenhoRef?.consumo_acumulado_racao_kg 
-          ? (desempenhoRef.consumo_acumulado_racao_kg / 1000) * avesVivas 
+          ? desempenhoRef.consumo_acumulado_racao_kg * avesVivas 
           : 0;
         
         // Usar consumo real: 1) pesagem, 2) cálculo do silo, 3) estimado
