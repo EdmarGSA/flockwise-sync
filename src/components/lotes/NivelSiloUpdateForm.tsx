@@ -166,8 +166,8 @@ export function NivelSiloUpdateForm({
             .lte('dia', diasDesdeAlojamento);
 
           if (consumoData && consumoData.length > 0) {
-            const consumoTotalGramas = consumoData.reduce((sum, d) => sum + d.consumo_diario_racao_kg, 0);
-            const consumoEstimado = (consumoTotalGramas * avesVivas) / 1000; // Convert to kg
+            const consumoTotalKg = consumoData.reduce((sum, d) => sum + (Number(d.consumo_diario_racao_kg) || 0), 0);
+            const consumoEstimado = consumoTotalKg * avesVivas;
             const expected = totalRecebido - consumoEstimado;
             setNivelEsperado(Math.max(0, expected));
           } else {
