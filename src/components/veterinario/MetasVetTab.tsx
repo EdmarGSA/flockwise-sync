@@ -298,7 +298,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
     return {
       dia,
       meta: metas ? metas[metaKeys[dia]] || 0 : 0,
-      referencia: refData ? refData.peso_kg / 1000 : undefined,
+      referencia: refData ? refData.peso_kg : undefined,
     };
   });
 
@@ -312,7 +312,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
         dia: p.dia, 
         meta: 0, 
         real: p.peso_real_kg,
-        referencia: refData ? refData.peso_kg / 1000 : undefined,
+        referencia: refData ? refData.peso_kg : undefined,
       } as any);
     }
   });
@@ -661,7 +661,7 @@ export default function MetasVetTab({ loteId, lote, onPesagemClick }: MetasVetTa
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {pesagens.slice().reverse().map((pesagem) => {
                 const refData = desempenhoReferencia.find(d => d.dia === pesagem.dia);
-                const pesoRefKg = refData ? refData.peso_kg / 1000 : null;
+                const pesoRefKg = refData ? refData.peso_kg : null;
                 const diferenca = pesoRefKg 
                   ? ((pesagem.peso_real_kg - pesoRefKg) / pesoRefKg) * 100 
                   : null;

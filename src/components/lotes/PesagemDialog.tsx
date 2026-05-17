@@ -302,7 +302,7 @@ export function PesagemDialog({
       
       if (data) {
         // Convert grams to kg
-        setPesoReferencia(data.peso_kg / 1000);
+        setPesoReferencia(data.peso_kg);
       } else {
         setPesoReferencia(null);
       }

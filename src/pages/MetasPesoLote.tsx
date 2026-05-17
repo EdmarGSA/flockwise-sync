@@ -543,13 +543,13 @@ export default function MetasPesoLote() {
         if (desempenhoData.length > 0) {
           // Peso de referência do dia da pesagem
           const refPesoPesagem = desempenhoData.find((d: any) => d.dia === diaDaPesagem);
-          pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_kg / 1000 : null;
+          pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_kg : null;
 
           // Encontrar dia cujo peso_kg mais se aproxima do peso medido
           let menorDiferenca = Infinity;
           for (const ref of desempenhoData) {
             // Converter peso de referência para kg para comparar
-            const pesoRefKg = (ref as any).peso_kg / 1000;
+            const pesoRefKg = (ref as any).peso_kg;
             const diferenca = Math.abs(pesoRefKg - pesoMedioKg);
             if (diferenca < menorDiferenca) {
               menorDiferenca = diferenca;
@@ -638,7 +638,7 @@ export default function MetasPesoLote() {
             let menorDif = Infinity;
             for (const ref of desempenhoData) {
               // Converter peso de referência para kg para comparar
-              const pesoRefKg = (ref as any).peso_kg / 1000;
+              const pesoRefKg = (ref as any).peso_kg;
               const dif = Math.abs(pesoRefKg - pesoMedioDiaKg);
               if (dif < menorDif) {
                 menorDif = dif;
@@ -771,7 +771,7 @@ export default function MetasPesoLote() {
     return {
       dia,
       meta: editingMetas ? editingMetas[metaKeys[dia]] || 0 : 0,
-      referencia: refData ? refData.peso_kg / 1000 : undefined,
+      referencia: refData ? refData.peso_kg : undefined,
     };
   });
 
@@ -785,7 +785,7 @@ export default function MetasPesoLote() {
         dia: p.dia, 
         meta: 0, 
         real: p.peso_real_kg,
-        referencia: refData ? refData.peso_kg / 1000 : undefined,
+        referencia: refData ? refData.peso_kg : undefined,
       } as any);
     }
   });
@@ -995,7 +995,7 @@ export default function MetasPesoLote() {
                         ].map(({ dia, key }) => {
                           const metaValue = (editingMetas as any)[key] as number;
                           const refData = desempenhoReferencia.find(d => d.dia === dia);
-                          const refValue = refData ? refData.peso_kg / 1000 : 0;
+                          const refValue = refData ? refData.peso_kg : 0;
                           const diff = refValue > 0 ? ((metaValue - refValue) / refValue) * 100 : 0;
                           
                           return (
@@ -1087,7 +1087,7 @@ export default function MetasPesoLote() {
                             onClick={() => {
                               const getRefValue = (dia: number) => {
                                 const ref = desempenhoReferencia.find(d => d.dia === dia);
-                                return ref ? ref.peso_kg / 1000 : 0;
+                                return ref ? ref.peso_kg : 0;
                               };
                               const pesoInicial = getRefValue(0);
                               const meta42 = getRefValue(42);
@@ -1474,7 +1474,7 @@ export default function MetasPesoLote() {
                               setPesagemSelecionada({
                                 dataPesagem: p.data_pesagem,
                                 dia: p.dia,
-                                pesoReferencia: refData ? refData.peso_kg / 1000 : undefined
+                                pesoReferencia: refData ? refData.peso_kg : undefined
                               });
                             }}
                           >
