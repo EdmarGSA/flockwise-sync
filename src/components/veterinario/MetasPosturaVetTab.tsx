@@ -14,13 +14,13 @@ interface Lote {
   data_alojamento: string | null;
   linhagem_postura: string | null;
   sexo: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
 }
 
 interface DesempenhoPostura {
   semana: number;
-  peso_g: number;
-  consumo_diario_g: number;
+  peso_kg: number;
+  consumo_diario_kg: number;
   producao_percentual: number | null;
   peso_ovo_g: number | null;
   ovos_ave_alojada: number | null;
@@ -81,7 +81,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
     if (lote.linhagem_postura) {
       const { data: desempenhoData } = await supabase
         .from('desempenho_postura')
-        .select('semana, peso_g, consumo_diario_g, producao_percentual, peso_ovo_g, ovos_ave_alojada, viabilidade_percentual, fase')
+        .select('semana, peso_kg, consumo_diario_kg, producao_percentual, peso_ovo_g, ovos_ave_alojada, viabilidade_percentual, fase')
         .eq('linhagem', lote.linhagem_postura as any)
         .order('semana', { ascending: true });
 
@@ -96,7 +96,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
         .from('pesagens')
         .select(`
           data_pesagem,
-          pesagem_itens (quantidade_aves, peso_liquido_g)
+          pesagem_itens (quantidade_aves, peso_liquido_kg)
         `)
         .eq('lote_id', loteId)
         .order('data_pesagem', { ascending: true });
@@ -104,7 +104,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
       if (pesagensData) {
         const processed = pesagensData.map((p: any) => {
           const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-          const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+          const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
           const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
           const semana = Math.ceil(calcularIdadeNaData(lote.data_alojamento!, p.data_pesagem) / 7);
           return { semana, peso_real_g: pesoMedio };
@@ -176,7 +176,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
 
   // Last weight and reference
   const ultimoPeso = pesagens.length > 0 ? pesagens[pesagens.length - 1].peso_real_g : null;
-  const pesoRefAtual = desempenhoRef.find(d => d.semana === semanasLote)?.peso_g || null;
+  const pesoRefAtual = desempenhoRef.find(d => d.semana === semanasLote)?.peso_kg || null;
 
   // Current production (for production phase)
   const ultimaProducao = producaoData.length > 0 ? producaoData[producaoData.length - 1].producao_percentual : null;
@@ -187,7 +187,7 @@ export default function MetasPosturaVetTab({ loteId, lote }: MetasPosturaVetTabP
     const pesagemReal = pesagens.find(p => p.semana === d.semana);
     return {
       semana: d.semana,
-      referencia: d.peso_g,
+      referencia: d.peso_kg,
       real: pesagemReal?.peso_real_g || null,
     };
   });

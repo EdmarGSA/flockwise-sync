@@ -80,8 +80,8 @@ interface SiloInfo {
 
 interface DesempenhoAves {
   dia: number;
-  peso_g: number;
-  consumo_acumulado_racao_g: number;
+  peso_kg: number;
+  consumo_acumulado_racao_kg: number;
   conversao_alimentar_acumulada: number;
 }
 
@@ -241,7 +241,7 @@ export function PesagemDialog({
 
       const { data } = await supabase
         .from('desempenho_aves')
-        .select('dia, peso_g, consumo_acumulado_racao_g, conversao_alimentar_acumulada')
+        .select('dia, peso_kg, consumo_acumulado_racao_kg, conversao_alimentar_acumulada')
         .eq('linhagem', linhagem)
         .eq('sexo', sexo)
         .order('dia', { ascending: true });
@@ -294,7 +294,7 @@ export function PesagemDialog({
       
       const { data } = await supabase
         .from('desempenho_aves')
-        .select('peso_g')
+        .select('peso_kg')
         .eq('linhagem', linhagem)
         .eq('sexo', sexo)
         .eq('dia', diasDesdeAlojamento)
@@ -302,7 +302,7 @@ export function PesagemDialog({
       
       if (data) {
         // Convert grams to kg
-        setPesoReferencia(data.peso_g / 1000);
+        setPesoReferencia(data.peso_kg / 1000);
       } else {
         setPesoReferencia(null);
       }
@@ -328,7 +328,7 @@ export function PesagemDialog({
 
       const { data: pesagens } = await supabase
         .from('pesagens')
-        .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
+        .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_kg, peso_tara_kg)')
         .eq('lote_id', loteId);
       
       // Períodos centrados nos marcos semanais com janela de +/- 2 dias
@@ -374,7 +374,7 @@ export function PesagemDialog({
             const dias = calcularIdadeNaData(dataAlojamento, pesagem.data_pesagem);
             if (dias >= periodo.diasMin && dias <= periodo.diasMax) {
               pesagem.pesagem_itens?.forEach((item: any) => {
-                const liquido = (item.peso_bruto_g || 0) - (item.peso_tara_g || 0);
+                const liquido = (item.peso_bruto_kg || 0) - (item.peso_tara_kg || 0);
                 pesoLiquidoTotal += liquido;
                 quantidadeTotal += item.quantidade_aves || 0;
               });
@@ -643,10 +643,10 @@ export function PesagemDialog({
     
     // Find the day with closest weight to measured weight
     let closestDay = desempenhoData[0];
-    let minDiff = Math.abs(desempenhoData[0].peso_g - pesoMedioGramas);
+    let minDiff = Math.abs(desempenhoData[0].peso_kg - pesoMedioGramas);
     
     for (const d of desempenhoData) {
-      const diff = Math.abs(d.peso_g - pesoMedioGramas);
+      const diff = Math.abs(d.peso_kg - pesoMedioGramas);
       if (diff < minDiff) {
         minDiff = diff;
         closestDay = d;
@@ -697,8 +697,8 @@ export function PesagemDialog({
       const itensToInsert = itens.map(item => ({
         pesagem_id: pesagem.id,
         quantidade_aves: item.quantidade_aves,
-        peso_bruto_g: item.peso_bruto_kg,
-        peso_tara_g: item.peso_tara_kg,
+        peso_bruto_kg: item.peso_bruto_kg,
+        peso_tara_kg: item.peso_tara_kg,
       }));
 
       const { error: itensError } = await supabase

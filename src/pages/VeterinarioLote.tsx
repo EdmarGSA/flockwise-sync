@@ -30,7 +30,7 @@ interface Lote {
   linhagem_postura: string | null;
   sexo: string;
   status: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
   galpao_id: string | null;
   nucleo: { nome: string; tipo_producao: string } | null;
   galpao: { nome: string } | null;
@@ -87,7 +87,7 @@ export default function VeterinarioLote() {
         linhagem_postura,
         sexo,
         status,
-        peso_medio_pintinhos,
+        peso_medio_pintinhos_kg,
         galpao_id,
         nucleo:nucleos(nome, tipo_producao),
         galpao:galpoes(nome)
@@ -279,7 +279,7 @@ export default function VeterinarioLote() {
               <Scale className="w-6 h-6 text-emerald-500/60 shrink-0" />
               <div className="min-w-0">
                 <p className="text-lg font-bold truncate">
-                  {lote.peso_medio_pintinhos ? `${lote.peso_medio_pintinhos.toFixed(3)}` : '-'}
+                  {lote.peso_medio_pintinhos_kg ? `${lote.peso_medio_pintinhos_kg.toFixed(3)}` : '-'}
                 </p>
                 <p className="text-[10px] text-muted-foreground uppercase">Peso Ini. (kg)</p>
               </div>

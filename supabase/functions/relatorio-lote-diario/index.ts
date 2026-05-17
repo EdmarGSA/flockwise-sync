@@ -60,7 +60,7 @@ async function buildDiario(supabase: any, loteId: string) {
       .gte("lido_em", inicioISO).lt("lido_em", fimISO),
     supabase.from("mortalidade").select("id,data_registro,mortalidade_itens(motivo,quantidade)")
       .eq("lote_id", loteId).order("data_registro"),
-    supabase.from("pesagens").select("id,data_pesagem,consumo_real_kg,conversao_alimentar,pesagem_itens(quantidade_aves,peso_bruto_g,peso_tara_g)")
+    supabase.from("pesagens").select("id,data_pesagem,consumo_real_kg,conversao_alimentar,pesagem_itens(quantidade_aves,peso_bruto_kg,peso_tara_kg)")
       .eq("lote_id", loteId).order("data_pesagem"),
     lote.programa_iluminacao_id
       ? supabase.from("programa_iluminacao_faixa").select("dia_inicio,dia_fim,horas_luz,blocos")
@@ -112,7 +112,7 @@ async function buildDiario(supabase: any, loteId: string) {
   for (const p of pesRes.data || []) {
     const itens = p.pesagem_itens || [];
     if (!itens.length) continue;
-    const medias = itens.map((it: any) => (it.peso_bruto_g - it.peso_tara_g) / (it.quantidade_aves || 1) / 1000);
+    const medias = itens.map((it: any) => (it.peso_bruto_kg - it.peso_tara_kg) / (it.quantidade_aves || 1) / 1000);
     const media = medias.reduce((a: number, b: number) => a + b, 0) / medias.length;
     let cv: number | null = null;
     if (medias.length > 1) {

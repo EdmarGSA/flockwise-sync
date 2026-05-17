@@ -122,14 +122,14 @@ export default function DiagnosticoLoteCard({
       let pesoMedioLote: number | null = null;
       const { data: pesagens } = await supabase
         .from('pesagens')
-        .select('pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
+        .select('pesagem_itens(quantidade_aves, peso_bruto_kg, peso_tara_kg)')
         .eq('lote_id', loteId)
         .order('data_pesagem', { ascending: false })
         .limit(1);
 
       if (pesagens && pesagens.length > 0) {
         const items = pesagens[0].pesagem_itens || [];
-        const totalPeso = items.reduce((s: number, i: any) => s + ((i.peso_bruto_g || 0) - (i.peso_tara_g || 0)), 0);
+        const totalPeso = items.reduce((s: number, i: any) => s + ((i.peso_bruto_kg || 0) - (i.peso_tara_kg || 0)), 0);
         const totalAves = items.reduce((s: number, i: any) => s + (i.quantidade_aves || 0), 0);
         if (totalAves > 0) pesoMedioLote = totalPeso / totalAves; // in grams
       }

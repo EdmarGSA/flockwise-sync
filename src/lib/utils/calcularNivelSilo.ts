@@ -50,7 +50,7 @@ function calcularTotalRecebido(
 
 /**
  * Calcula o consumo estimado dia a dia no intervalo [diaInicio, diaFim].
- * Soma consumo_diario_racao_g de cada dia individualmente (não multiplica fixo).
+ * Soma consumo_diario_racao_kg de cada dia individualmente (não multiplica fixo).
  */
 async function calcularConsumoIntervalo(
   linhagem: 'cobb_500' | 'ross_308' | 'hubbard',
@@ -63,7 +63,7 @@ async function calcularConsumoIntervalo(
 
   const { data } = await supabase
     .from('desempenho_aves')
-    .select('dia, consumo_diario_racao_g')
+    .select('dia, consumo_diario_racao_kg')
     .eq('linhagem', linhagem)
     .eq('sexo', sexo)
     .gte('dia', Math.max(1, diaInicio))
@@ -71,7 +71,7 @@ async function calcularConsumoIntervalo(
 
   if (!data || data.length === 0) return 0;
 
-  const consumoTotalGramas = data.reduce((sum, d) => sum + d.consumo_diario_racao_g, 0);
+  const consumoTotalGramas = data.reduce((sum, d) => sum + d.consumo_diario_racao_kg, 0);
   return (consumoTotalGramas * avesVivas) / 1000;
 }
 
@@ -134,7 +134,7 @@ export async function calcularNivelSilo(input: SiloLevelInput): Promise<SiloLeve
   // 2. Fetch consumo acumulado e diário do dia atual
   const { data: desempenho } = await supabase
     .from('desempenho_aves')
-    .select('consumo_acumulado_racao_g, consumo_diario_racao_g')
+    .select('consumo_acumulado_racao_kg, consumo_diario_racao_kg')
     .eq('linhagem', linhagem)
     .eq('sexo', sexo)
     .lte('dia', Math.max(diasDesdeAlojamento, 1))
@@ -147,8 +147,8 @@ export async function calcularNivelSilo(input: SiloLevelInput): Promise<SiloLeve
     return result;
   }
 
-  result.consumoEstimado = (desempenho.consumo_acumulado_racao_g * avesVivas) / 1000;
-  result.consumoDiarioEstimado = (desempenho.consumo_diario_racao_g * avesVivas) / 1000;
+  result.consumoEstimado = (desempenho.consumo_acumulado_racao_kg * avesVivas) / 1000;
+  result.consumoDiarioEstimado = (desempenho.consumo_diario_racao_kg * avesVivas) / 1000;
 
   // Default: nível = recebido - consumo acumulado
   let nivelSiloCalculado = result.totalRecebido - result.consumoEstimado;

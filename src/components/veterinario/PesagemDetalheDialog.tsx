@@ -12,7 +12,7 @@ import { ptBR } from 'date-fns/locale';
 interface PesagemItem {
   id: string;
   quantidade_aves: number;
-  peso_liquido_g: number;
+  peso_liquido_kg: number;
 }
 
 interface PesagemSessao {
@@ -55,7 +55,7 @@ export default function PesagemDetalheDialog({
       .select(`
         id,
         created_at,
-        pesagem_itens (id, quantidade_aves, peso_liquido_g)
+        pesagem_itens (id, quantidade_aves, peso_liquido_kg)
       `)
       .eq('lote_id', loteId)
       .eq('data_pesagem', dataPesagem)
@@ -68,7 +68,7 @@ export default function PesagemDetalheDialog({
         itens: p.pesagem_itens.map((item: any) => ({
           id: item.id,
           quantidade_aves: item.quantidade_aves,
-          peso_liquido_g: item.peso_liquido_g
+          peso_liquido_kg: item.peso_liquido_kg
         }))
       }));
       setSessoes(sessoesProcessadas);
@@ -80,7 +80,7 @@ export default function PesagemDetalheDialog({
   // Calcular totais por sessão
   const calcularTotaisSessao = (itens: PesagemItem[]) => {
     const totalAves = itens.reduce((acc, item) => acc + item.quantidade_aves, 0);
-    const totalPeso = itens.reduce((acc, item) => acc + item.peso_liquido_g, 0);
+    const totalPeso = itens.reduce((acc, item) => acc + item.peso_liquido_kg, 0);
     const mediaG = totalAves > 0 ? totalPeso / totalAves : 0;
     return { totalAves, totalPeso, mediaG };
   };
@@ -187,13 +187,13 @@ export default function PesagemDetalheDialog({
                             <TableBody>
                               {sessao.itens.map((item, itemIndex) => {
                                 const mediaItem = item.quantidade_aves > 0 
-                                  ? item.peso_liquido_g / item.quantidade_aves 
+                                  ? item.peso_liquido_kg / item.quantidade_aves 
                                   : 0;
                                 return (
                                   <TableRow key={item.id}>
                                     <TableCell className="font-medium">{itemIndex + 1}</TableCell>
                                     <TableCell>{item.quantidade_aves}</TableCell>
-                                    <TableCell>{item.peso_liquido_g.toFixed(1)} g</TableCell>
+                                    <TableCell>{item.peso_liquido_kg.toFixed(1)} g</TableCell>
                                     <TableCell className="text-right">{mediaItem.toFixed(1)} g</TableCell>
                                   </TableRow>
                                 );

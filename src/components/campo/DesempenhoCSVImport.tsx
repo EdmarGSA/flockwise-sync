@@ -18,24 +18,24 @@ interface ParsedRow {
   linhagem: LinhagemAves;
   sexo: SexoAve;
   dia: number;
-  peso_g: number;
-  ganho_diario_g: number;
-  ganho_medio_diario_g: number;
+  peso_kg: number;
+  ganho_diario_kg: number;
+  ganho_medio_diario_kg: number;
   conversao_alimentar_acumulada: number;
-  consumo_diario_racao_g: number;
-  consumo_acumulado_racao_g: number;
+  consumo_diario_racao_kg: number;
+  consumo_acumulado_racao_kg: number;
 }
 
 const EXPECTED_HEADERS = [
   'linhagem',
   'sexo',
   'dia',
-  'peso_g',
-  'ganho_diario_g',
-  'ganho_medio_diario_g',
+  'peso_kg',
+  'ganho_diario_kg',
+  'ganho_medio_diario_kg',
   'conversao_alimentar_acumulada',
-  'consumo_diario_racao_g',
-  'consumo_acumulado_racao_g'
+  'consumo_diario_racao_kg',
+  'consumo_acumulado_racao_kg'
 ];
 
 const VALID_LINHAGENS: LinhagemAves[] = ['cobb_500', 'ross_308', 'hubbard'];
@@ -98,12 +98,12 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
           linhagem,
           sexo,
           dia: parseInt(values[headerIndices['dia']]) || 0,
-          peso_g: parseFloat(values[headerIndices['peso_g']]) || 0,
-          ganho_diario_g: parseFloat(values[headerIndices['ganho_diario_g']]) || 0,
-          ganho_medio_diario_g: parseFloat(values[headerIndices['ganho_medio_diario_g']]) || 0,
+          peso_kg: parseFloat(values[headerIndices['peso_kg']]) || 0,
+          ganho_diario_kg: parseFloat(values[headerIndices['ganho_diario_kg']]) || 0,
+          ganho_medio_diario_kg: parseFloat(values[headerIndices['ganho_medio_diario_kg']]) || 0,
           conversao_alimentar_acumulada: parseFloat(values[headerIndices['conversao_alimentar_acumulada']]) || 0,
-          consumo_diario_racao_g: parseFloat(values[headerIndices['consumo_diario_racao_g']]) || 0,
-          consumo_acumulado_racao_g: parseFloat(values[headerIndices['consumo_acumulado_racao_g']]) || 0,
+          consumo_diario_racao_kg: parseFloat(values[headerIndices['consumo_diario_racao_kg']]) || 0,
+          consumo_acumulado_racao_kg: parseFloat(values[headerIndices['consumo_acumulado_racao_kg']]) || 0,
         };
 
         rows.push(row);
@@ -196,7 +196,7 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
           Importar CSV de Desempenho
         </CardTitle>
         <CardDescription>
-          Formato esperado (separador: ponto e vírgula): linhagem;sexo;dia;peso_g;ganho_diario_g;ganho_medio_diario_g;conversao_alimentar_acumulada;consumo_diario_racao_g;consumo_acumulado_racao_g
+          Formato esperado (separador: ponto e vírgula): linhagem;sexo;dia;peso_kg;ganho_diario_kg;ganho_medio_diario_kg;conversao_alimentar_acumulada;consumo_diario_racao_kg;consumo_acumulado_racao_kg
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -280,7 +280,7 @@ export function DesempenhoCSVImport({ onSuccess }: DesempenhoCSVImportProps) {
                         <td className="px-3 py-2">{row.linhagem}</td>
                         <td className="px-3 py-2">{row.sexo}</td>
                         <td className="px-3 py-2 text-right">{row.dia}</td>
-                        <td className="px-3 py-2 text-right">{row.peso_g}</td>
+                        <td className="px-3 py-2 text-right">{row.peso_kg}</td>
                         <td className="px-3 py-2 text-right">{row.conversao_alimentar_acumulada.toFixed(3)}</td>
                       </tr>
                     ))}

@@ -27,7 +27,7 @@ interface Lote {
   data_alojamento: string | null;
   linhagem: string;
   sexo: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
   galpao_id: string | null;
   nucleo: { nome: string } | null;
   galpao: { nome: string } | null;
@@ -60,10 +60,10 @@ interface PesagemSelecionada {
 
 interface DesempenhoReferencia {
   dia: number;
-  peso_g: number;
-  ganho_diario_g: number;
-  consumo_diario_racao_g: number;
-  consumo_acumulado_racao_g: number;
+  peso_kg: number;
+  ganho_diario_kg: number;
+  consumo_diario_racao_kg: number;
+  consumo_acumulado_racao_kg: number;
   conversao_alimentar_acumulada: number;
 }
 
@@ -185,7 +185,7 @@ export default function MetasPesoLote() {
         data_alojamento,
         linhagem,
         sexo,
-        peso_medio_pintinhos,
+        peso_medio_pintinhos_kg,
         galpao_id,
         nucleo:nucleos(nome),
         galpao:galpoes(nome)
@@ -257,8 +257,8 @@ export default function MetasPesoLote() {
       setMetas(metas);
       setEditingMetas(metas);
     } else {
-      // peso_medio_pintinhos está em gramas, converter para kg
-      const pesoInicialKg = loteData.peso_medio_pintinhos ? Number(loteData.peso_medio_pintinhos) / 1000 : 0;
+      // peso_medio_pintinhos_kg está em gramas, converter para kg
+      const pesoInicialKg = loteData.peso_medio_pintinhos_kg ? Number(loteData.peso_medio_pintinhos_kg) / 1000 : 0;
       if (pesoInicialKg > 0) {
         const calculatedMetas = calcularMetas(pesoInicialKg);
         setEditingMetas(calculatedMetas);
@@ -279,7 +279,7 @@ export default function MetasPesoLote() {
     // Fetch desempenho de referência
     const { data: desempenhoData } = await supabase
       .from('desempenho_aves')
-      .select('dia, peso_g, ganho_diario_g, consumo_diario_racao_g, consumo_acumulado_racao_g, conversao_alimentar_acumulada')
+      .select('dia, peso_kg, ganho_diario_kg, consumo_diario_racao_kg, consumo_acumulado_racao_kg, conversao_alimentar_acumulada')
       .eq('linhagem', loteData.linhagem)
       .eq('sexo', loteData.sexo)
       .order('dia', { ascending: true });
@@ -299,7 +299,7 @@ export default function MetasPesoLote() {
         total_recebido_kg,
         pesagem_itens (
           quantidade_aves,
-          peso_liquido_g
+          peso_liquido_kg
         )
       `)
       .eq('lote_id', loteId)
@@ -320,7 +320,7 @@ export default function MetasPesoLote() {
       // Calcular média ponderada consolidada por dia - usando +1 para dia do alojamento = Dia 1
       const pesagensProcessed: PesagemData[] = Object.entries(pesagensPorData).map(([data, { itens, sessoes }]) => {
         const totalAves = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-        const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+        const totalPeso = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
         const dia = calcularIdadeNaData(loteData.data_alojamento, data);
         
@@ -469,8 +469,8 @@ export default function MetasPesoLote() {
         const dadosDia = pesagensPorData[ultimaData];
         const itensDia = dadosDia.itens;
         const totalAves = itensDia.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-        const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
-        // peso_liquido_g já está em kg (nomenclatura incorreta no banco)
+        const totalPeso = itensDia.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
+        // peso_liquido_kg já está em kg (nomenclatura incorreta no banco)
         const pesoMedioKg = totalAves > 0 ? totalPeso / totalAves : 0;
         const diaDaPesagem = calcularIdadeNaData(loteData.data_alojamento, ultimaData);
 
@@ -543,13 +543,13 @@ export default function MetasPesoLote() {
         if (desempenhoData.length > 0) {
           // Peso de referência do dia da pesagem
           const refPesoPesagem = desempenhoData.find((d: any) => d.dia === diaDaPesagem);
-          pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_g / 1000 : null;
+          pesoReferencia = refPesoPesagem ? refPesoPesagem.peso_kg / 1000 : null;
 
-          // Encontrar dia cujo peso_g mais se aproxima do peso medido
+          // Encontrar dia cujo peso_kg mais se aproxima do peso medido
           let menorDiferenca = Infinity;
           for (const ref of desempenhoData) {
             // Converter peso de referência para kg para comparar
-            const pesoRefKg = (ref as any).peso_g / 1000;
+            const pesoRefKg = (ref as any).peso_kg / 1000;
             const diferenca = Math.abs(pesoRefKg - pesoMedioKg);
             if (diferenca < menorDiferenca) {
               menorDiferenca = diferenca;
@@ -578,8 +578,8 @@ export default function MetasPesoLote() {
           const dados = pesagensPorData[dataPes];
           const itens = dados.itens;
           const totalAvesDia = itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-          const totalPesoDia = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
-          // peso_liquido_g já está em kg
+          const totalPesoDia = itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
+          // peso_liquido_kg já está em kg
           const pesoMedioDiaKg = totalAvesDia > 0 ? totalPesoDia / totalAvesDia : 0;
           const diaPes = calcularIdadeNaData(loteData.data_alojamento, dataPes);
           
@@ -638,7 +638,7 @@ export default function MetasPesoLote() {
             let menorDif = Infinity;
             for (const ref of desempenhoData) {
               // Converter peso de referência para kg para comparar
-              const pesoRefKg = (ref as any).peso_g / 1000;
+              const pesoRefKg = (ref as any).peso_kg / 1000;
               const dif = Math.abs(pesoRefKg - pesoMedioDiaKg);
               if (dif < menorDif) {
                 menorDif = dif;
@@ -771,7 +771,7 @@ export default function MetasPesoLote() {
     return {
       dia,
       meta: editingMetas ? editingMetas[metaKeys[dia]] || 0 : 0,
-      referencia: refData ? refData.peso_g / 1000 : undefined,
+      referencia: refData ? refData.peso_kg / 1000 : undefined,
     };
   });
 
@@ -785,7 +785,7 @@ export default function MetasPesoLote() {
         dia: p.dia, 
         meta: 0, 
         real: p.peso_real_kg,
-        referencia: refData ? refData.peso_g / 1000 : undefined,
+        referencia: refData ? refData.peso_kg / 1000 : undefined,
       } as any);
     }
   });
@@ -961,9 +961,9 @@ export default function MetasPesoLote() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label>Peso Inicial (kg)</Label>
-                          {lote?.peso_medio_pintinhos && (
+                          {lote?.peso_medio_pintinhos_kg && (
                             <span className="text-xs text-muted-foreground">
-                              Do lote: {Number(lote.peso_medio_pintinhos).toFixed(3)} kg
+                              Do lote: {Number(lote.peso_medio_pintinhos_kg).toFixed(3)} kg
                             </span>
                           )}
                         </div>
@@ -976,7 +976,7 @@ export default function MetasPesoLote() {
                               ...editingMetas,
                               peso_inicial_kg: parseFloat(e.target.value) || 0
                             })}
-                            placeholder={lote?.peso_medio_pintinhos ? `${Number(lote.peso_medio_pintinhos).toFixed(3)}` : 'Digite o peso inicial'}
+                            placeholder={lote?.peso_medio_pintinhos_kg ? `${Number(lote.peso_medio_pintinhos_kg).toFixed(3)}` : 'Digite o peso inicial'}
                           />
                           <Button variant="outline" onClick={handleRecalcular} size="icon" title="Recalcular">
                             <TrendingUp className="w-4 h-4" />
@@ -995,7 +995,7 @@ export default function MetasPesoLote() {
                         ].map(({ dia, key }) => {
                           const metaValue = (editingMetas as any)[key] as number;
                           const refData = desempenhoReferencia.find(d => d.dia === dia);
-                          const refValue = refData ? refData.peso_g / 1000 : 0;
+                          const refValue = refData ? refData.peso_kg / 1000 : 0;
                           const diff = refValue > 0 ? ((metaValue - refValue) / refValue) * 100 : 0;
                           
                           return (
@@ -1087,7 +1087,7 @@ export default function MetasPesoLote() {
                             onClick={() => {
                               const getRefValue = (dia: number) => {
                                 const ref = desempenhoReferencia.find(d => d.dia === dia);
-                                return ref ? ref.peso_g / 1000 : 0;
+                                return ref ? ref.peso_kg / 1000 : 0;
                               };
                               const pesoInicial = getRefValue(0);
                               const meta42 = getRefValue(42);
@@ -1430,9 +1430,9 @@ export default function MetasPesoLote() {
                                   <Badge variant="secondary" className="ml-2">Hoje</Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="text-center">{d.peso_g.toFixed(0)}</TableCell>
-                              <TableCell className="text-center">{d.ganho_diario_g.toFixed(1)}</TableCell>
-                              <TableCell className="text-center">{d.consumo_diario_racao_g.toFixed(1)}</TableCell>
+                              <TableCell className="text-center">{d.peso_kg.toFixed(0)}</TableCell>
+                              <TableCell className="text-center">{d.ganho_diario_kg.toFixed(1)}</TableCell>
+                              <TableCell className="text-center">{d.consumo_diario_racao_kg.toFixed(1)}</TableCell>
                               <TableCell className="text-center">{d.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
                             </TableRow>
                           ))}
@@ -1474,7 +1474,7 @@ export default function MetasPesoLote() {
                               setPesagemSelecionada({
                                 dataPesagem: p.data_pesagem,
                                 dia: p.dia,
-                                pesoReferencia: refData ? refData.peso_g / 1000 : undefined
+                                pesoReferencia: refData ? refData.peso_kg / 1000 : undefined
                               });
                             }}
                           >

@@ -98,7 +98,7 @@ export default function EstimuloPostura() {
       if (ids.length) {
         const { data: pesagens } = await supabase
           .from('pesagens')
-          .select('id, lote_id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_g, peso_tara_g)')
+          .select('id, lote_id, data_pesagem, pesagem_itens(quantidade_aves, peso_bruto_kg, peso_tara_kg)')
           .in('lote_id', ids)
           .gte('data_pesagem', new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10));
         const acc: Record<string, { sum: number; n: number }> = {};
@@ -106,7 +106,7 @@ export default function EstimuloPostura() {
           (p.pesagem_itens ?? []).forEach((it: any) => {
             const q = Number(it.quantidade_aves) || 0;
             if (!q) return;
-            const kg = (Number(it.peso_bruto_g) - Number(it.peso_tara_g)) / q;
+            const kg = (Number(it.peso_bruto_kg) - Number(it.peso_tara_kg)) / q;
             acc[p.lote_id] = acc[p.lote_id] || { sum: 0, n: 0 };
             acc[p.lote_id].sum += kg;
             acc[p.lote_id].n += 1;

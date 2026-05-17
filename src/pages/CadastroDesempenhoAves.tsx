@@ -27,11 +27,11 @@ interface DesempenhoAve {
   dia: number;
   linhagem: Linhagem;
   sexo: SexoAve;
-  peso_g: number;
-  ganho_diario_g: number;
-  ganho_medio_diario_g: number;
-  consumo_diario_racao_g: number;
-  consumo_acumulado_racao_g: number;
+  peso_kg: number;
+  ganho_diario_kg: number;
+  ganho_medio_diario_kg: number;
+  consumo_diario_racao_kg: number;
+  consumo_acumulado_racao_kg: number;
   conversao_alimentar_acumulada: number;
 }
 
@@ -39,11 +39,11 @@ interface FormData {
   dia: number;
   linhagem: Linhagem;
   sexo: SexoAve;
-  peso_g: number;
-  ganho_diario_g: number;
-  ganho_medio_diario_g: number;
-  consumo_diario_racao_g: number;
-  consumo_acumulado_racao_g: number;
+  peso_kg: number;
+  ganho_diario_kg: number;
+  ganho_medio_diario_kg: number;
+  consumo_diario_racao_kg: number;
+  consumo_acumulado_racao_kg: number;
   conversao_alimentar_acumulada: number;
 }
 
@@ -88,8 +88,8 @@ interface DesempenhoPostura {
   semana: number;
   linhagem: string;
   fase: string;
-  peso_g: number;
-  consumo_diario_g: number;
+  peso_kg: number;
+  consumo_diario_kg: number;
   producao_percentual: number | null;
   peso_ovo_g: number | null;
   ovos_ave_alojada: number | null;
@@ -199,8 +199,8 @@ function PosturaReferenceTab() {
                     <TableCell>
                       <Badge variant="secondary">{fasePosturaLabels[item.fase] || item.fase}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">{item.peso_g.toFixed(0)}</TableCell>
-                    <TableCell className="text-right">{item.consumo_diario_g.toFixed(1)}</TableCell>
+                    <TableCell className="text-right">{item.peso_kg.toFixed(0)}</TableCell>
+                    <TableCell className="text-right">{item.consumo_diario_kg.toFixed(1)}</TableCell>
                     <TableCell className="text-right">{item.producao_percentual?.toFixed(1) ?? '-'}</TableCell>
                     <TableCell className="text-right">{item.peso_ovo_g?.toFixed(1) ?? '-'}</TableCell>
                     <TableCell className="text-right">{item.ovos_ave_alojada?.toFixed(1) ?? '-'}</TableCell>
@@ -239,11 +239,11 @@ export default function CadastroDesempenhoAves() {
     dia: 0,
     linhagem: 'cobb_500',
     sexo: 'misto',
-    peso_g: 0,
-    ganho_diario_g: 0,
-    ganho_medio_diario_g: 0,
-    consumo_diario_racao_g: 0,
-    consumo_acumulado_racao_g: 0,
+    peso_kg: 0,
+    ganho_diario_kg: 0,
+    ganho_medio_diario_kg: 0,
+    consumo_diario_racao_kg: 0,
+    consumo_acumulado_racao_kg: 0,
     conversao_alimentar_acumulada: 0,
   });
 
@@ -320,11 +320,11 @@ export default function CadastroDesempenhoAves() {
         dia: item.dia,
         linhagem: item.linhagem,
         sexo: item.sexo,
-        peso_g: item.peso_g,
-        ganho_diario_g: item.ganho_diario_g,
-        ganho_medio_diario_g: item.ganho_medio_diario_g,
-        consumo_diario_racao_g: item.consumo_diario_racao_g,
-        consumo_acumulado_racao_g: item.consumo_acumulado_racao_g,
+        peso_kg: item.peso_kg,
+        ganho_diario_kg: item.ganho_diario_kg,
+        ganho_medio_diario_kg: item.ganho_medio_diario_kg,
+        consumo_diario_racao_kg: item.consumo_diario_racao_kg,
+        consumo_acumulado_racao_kg: item.consumo_acumulado_racao_kg,
         conversao_alimentar_acumulada: item.conversao_alimentar_acumulada,
       });
     } else {
@@ -333,11 +333,11 @@ export default function CadastroDesempenhoAves() {
         dia: 0,
         linhagem: 'cobb_500',
         sexo: 'misto',
-        peso_g: 0,
-        ganho_diario_g: 0,
-        ganho_medio_diario_g: 0,
-        consumo_diario_racao_g: 0,
-        consumo_acumulado_racao_g: 0,
+        peso_kg: 0,
+        ganho_diario_kg: 0,
+        ganho_medio_diario_kg: 0,
+        consumo_diario_racao_kg: 0,
+        consumo_acumulado_racao_kg: 0,
         conversao_alimentar_acumulada: 0,
       });
     }
@@ -354,11 +354,11 @@ export default function CadastroDesempenhoAves() {
             dia: formData.dia,
             linhagem: formData.linhagem,
             sexo: formData.sexo,
-            peso_g: formData.peso_g,
-            ganho_diario_g: formData.ganho_diario_g,
-            ganho_medio_diario_g: formData.ganho_medio_diario_g,
-            consumo_diario_racao_g: formData.consumo_diario_racao_g,
-            consumo_acumulado_racao_g: formData.consumo_acumulado_racao_g,
+            peso_kg: formData.peso_kg,
+            ganho_diario_kg: formData.ganho_diario_kg,
+            ganho_medio_diario_kg: formData.ganho_medio_diario_kg,
+            consumo_diario_racao_kg: formData.consumo_diario_racao_kg,
+            consumo_acumulado_racao_kg: formData.consumo_acumulado_racao_kg,
             conversao_alimentar_acumulada: formData.conversao_alimentar_acumulada,
           })
           .eq('id', editingItem.id);
@@ -372,11 +372,11 @@ export default function CadastroDesempenhoAves() {
             dia: formData.dia,
             linhagem: formData.linhagem,
             sexo: formData.sexo,
-            peso_g: formData.peso_g,
-            ganho_diario_g: formData.ganho_diario_g,
-            ganho_medio_diario_g: formData.ganho_medio_diario_g,
-            consumo_diario_racao_g: formData.consumo_diario_racao_g,
-            consumo_acumulado_racao_g: formData.consumo_acumulado_racao_g,
+            peso_kg: formData.peso_kg,
+            ganho_diario_kg: formData.ganho_diario_kg,
+            ganho_medio_diario_kg: formData.ganho_medio_diario_kg,
+            consumo_diario_racao_kg: formData.consumo_diario_racao_kg,
+            consumo_acumulado_racao_kg: formData.consumo_acumulado_racao_kg,
             conversao_alimentar_acumulada: formData.conversao_alimentar_acumulada,
           });
 
@@ -609,9 +609,9 @@ export default function CadastroDesempenhoAves() {
                             <TableCell>
                               <Badge variant="secondary">{sexoLabels[item.sexo]}</Badge>
                             </TableCell>
-                            <TableCell className="text-right">{item.peso_g.toFixed(1)}</TableCell>
-                            <TableCell className="text-right">{item.ganho_diario_g.toFixed(1)}</TableCell>
-                            <TableCell className="text-right">{item.consumo_diario_racao_g.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.peso_kg.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.ganho_diario_kg.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{item.consumo_diario_racao_kg.toFixed(1)}</TableCell>
                             <TableCell className="text-right">{item.conversao_alimentar_acumulada.toFixed(3)}</TableCell>
                             <TableCell>
                               <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(item)}>
@@ -653,8 +653,8 @@ export default function CadastroDesempenhoAves() {
               <Input
                 type="number"
                 step="0.1"
-                value={formData.peso_g}
-                onChange={(e) => setFormData({ ...formData, peso_g: parseFloat(e.target.value) || 0 })}
+                value={formData.peso_kg}
+                onChange={(e) => setFormData({ ...formData, peso_kg: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-2">
@@ -688,8 +688,8 @@ export default function CadastroDesempenhoAves() {
               <Input
                 type="number"
                 step="0.1"
-                value={formData.ganho_diario_g}
-                onChange={(e) => setFormData({ ...formData, ganho_diario_g: parseFloat(e.target.value) || 0 })}
+                value={formData.ganho_diario_kg}
+                onChange={(e) => setFormData({ ...formData, ganho_diario_kg: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-2">
@@ -697,8 +697,8 @@ export default function CadastroDesempenhoAves() {
               <Input
                 type="number"
                 step="0.1"
-                value={formData.ganho_medio_diario_g}
-                onChange={(e) => setFormData({ ...formData, ganho_medio_diario_g: parseFloat(e.target.value) || 0 })}
+                value={formData.ganho_medio_diario_kg}
+                onChange={(e) => setFormData({ ...formData, ganho_medio_diario_kg: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-2">
@@ -706,8 +706,8 @@ export default function CadastroDesempenhoAves() {
               <Input
                 type="number"
                 step="0.1"
-                value={formData.consumo_diario_racao_g}
-                onChange={(e) => setFormData({ ...formData, consumo_diario_racao_g: parseFloat(e.target.value) || 0 })}
+                value={formData.consumo_diario_racao_kg}
+                onChange={(e) => setFormData({ ...formData, consumo_diario_racao_kg: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-2">
@@ -715,8 +715,8 @@ export default function CadastroDesempenhoAves() {
               <Input
                 type="number"
                 step="0.1"
-                value={formData.consumo_acumulado_racao_g}
-                onChange={(e) => setFormData({ ...formData, consumo_acumulado_racao_g: parseFloat(e.target.value) || 0 })}
+                value={formData.consumo_acumulado_racao_kg}
+                onChange={(e) => setFormData({ ...formData, consumo_acumulado_racao_kg: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-2 col-span-2">

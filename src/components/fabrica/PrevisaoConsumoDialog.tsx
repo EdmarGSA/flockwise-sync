@@ -108,13 +108,13 @@ export default function PrevisaoConsumoDialog({
       // 3. Fetch all desempenho_aves for efficiency (batch query)
       const { data: desempenhoData } = await supabase
         .from('desempenho_aves')
-        .select('linhagem, sexo, dia, consumo_diario_racao_g');
+        .select('linhagem, sexo, dia, consumo_diario_racao_kg');
 
       // Create a lookup map for desempenho
       const desempenhoMap: Record<string, number> = {};
       (desempenhoData || []).forEach(d => {
         const key = `${d.linhagem}-${d.sexo}-${d.dia}`;
-        desempenhoMap[key] = Number(d.consumo_diario_racao_g);
+        desempenhoMap[key] = Number(d.consumo_diario_racao_kg);
       });
 
       // Map to aggregate consumption by product

@@ -16,12 +16,12 @@ const formSchema = z.object({
   linhagem: z.enum(['cobb_500', 'ross_308', 'hubbard'] as const),
   sexo: z.enum(['macho', 'femea', 'misto'] as const),
   dia: z.coerce.number().min(0, 'Dia deve ser maior ou igual a 0'),
-  peso_g: z.coerce.number().min(0, 'Peso deve ser positivo'),
-  ganho_diario_g: z.coerce.number().min(0, 'Ganho diário deve ser positivo'),
-  ganho_medio_diario_g: z.coerce.number().min(0, 'Ganho médio diário deve ser positivo'),
+  peso_kg: z.coerce.number().min(0, 'Peso deve ser positivo'),
+  ganho_diario_kg: z.coerce.number().min(0, 'Ganho diário deve ser positivo'),
+  ganho_medio_diario_kg: z.coerce.number().min(0, 'Ganho médio diário deve ser positivo'),
   conversao_alimentar_acumulada: z.coerce.number().min(0, 'Conversão alimentar deve ser positiva'),
-  consumo_diario_racao_g: z.coerce.number().min(0, 'Consumo diário deve ser positivo'),
-  consumo_acumulado_racao_g: z.coerce.number().min(0, 'Consumo acumulado deve ser positivo'),
+  consumo_diario_racao_kg: z.coerce.number().min(0, 'Consumo diário deve ser positivo'),
+  consumo_acumulado_racao_kg: z.coerce.number().min(0, 'Consumo acumulado deve ser positivo'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,12 +41,12 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
       linhagem: desempenho.linhagem,
       sexo: desempenho.sexo,
       dia: desempenho.dia,
-      peso_g: Number(desempenho.peso_g),
-      ganho_diario_g: Number(desempenho.ganho_diario_g),
-      ganho_medio_diario_g: Number(desempenho.ganho_medio_diario_g),
+      peso_kg: Number(desempenho.peso_kg),
+      ganho_diario_kg: Number(desempenho.ganho_diario_kg),
+      ganho_medio_diario_kg: Number(desempenho.ganho_medio_diario_kg),
       conversao_alimentar_acumulada: Number(desempenho.conversao_alimentar_acumulada),
-      consumo_diario_racao_g: Number(desempenho.consumo_diario_racao_g),
-      consumo_acumulado_racao_g: Number(desempenho.consumo_acumulado_racao_g),
+      consumo_diario_racao_kg: Number(desempenho.consumo_diario_racao_kg),
+      consumo_acumulado_racao_kg: Number(desempenho.consumo_acumulado_racao_kg),
     },
   });
 
@@ -59,12 +59,12 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
           linhagem: values.linhagem,
           sexo: values.sexo,
           dia: values.dia,
-          peso_g: values.peso_g,
-          ganho_diario_g: values.ganho_diario_g,
-          ganho_medio_diario_g: values.ganho_medio_diario_g,
+          peso_kg: values.peso_kg,
+          ganho_diario_kg: values.ganho_diario_kg,
+          ganho_medio_diario_kg: values.ganho_medio_diario_kg,
           conversao_alimentar_acumulada: values.conversao_alimentar_acumulada,
-          consumo_diario_racao_g: values.consumo_diario_racao_g,
-          consumo_acumulado_racao_g: values.consumo_acumulado_racao_g,
+          consumo_diario_racao_kg: values.consumo_diario_racao_kg,
+          consumo_acumulado_racao_kg: values.consumo_acumulado_racao_kg,
         })
         .eq('id', desempenho.id);
 
@@ -148,7 +148,7 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="peso_g"
+            name="peso_kg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Peso (g)</FormLabel>
@@ -162,7 +162,7 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
 
           <FormField
             control={form.control}
-            name="ganho_diario_g"
+            name="ganho_diario_kg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Ganho Diário (g)</FormLabel>
@@ -176,7 +176,7 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
 
           <FormField
             control={form.control}
-            name="ganho_medio_diario_g"
+            name="ganho_medio_diario_kg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Ganho Médio Diário (g)</FormLabel>
@@ -204,7 +204,7 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
 
           <FormField
             control={form.control}
-            name="consumo_diario_racao_g"
+            name="consumo_diario_racao_kg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Consumo Diário de Ração (g)</FormLabel>
@@ -218,7 +218,7 @@ export function DesempenhoEditForm({ desempenho, onSuccess, onCancel }: Desempen
 
           <FormField
             control={form.control}
-            name="consumo_acumulado_racao_g"
+            name="consumo_acumulado_racao_kg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Consumo Acumulado de Ração (g)</FormLabel>

@@ -44,7 +44,7 @@ const linhagemPosturaLabels: Record<string, string> = {
 
 const loteSchema = z.object({
   quantidade_aves: z.string().min(1, 'Quantidade obrigatória'),
-  peso_medio_pintinhos: z.string().optional(),
+  peso_medio_pintinhos_kg: z.string().optional(),
   data_prevista_alojamento: z.date({ required_error: 'Data prevista obrigatória' }),
   data_alojamento: z.date().optional().nullable(),
   data_fechamento: z.date().optional().nullable(),
@@ -112,7 +112,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     resolver: zodResolver(loteSchema),
     defaultValues: {
       quantidade_aves: String(lote.quantidade_aves),
-      peso_medio_pintinhos: lote.peso_medio_pintinhos ? String(lote.peso_medio_pintinhos) : '',
+      peso_medio_pintinhos_kg: lote.peso_medio_pintinhos_kg ? String(lote.peso_medio_pintinhos_kg) : '',
       data_prevista_alojamento: parseISO(lote.data_prevista_alojamento),
       data_alojamento: lote.data_alojamento ? parseISO(lote.data_alojamento) : null,
       data_fechamento: lote.data_fechamento ? parseISO(lote.data_fechamento) : null,
@@ -194,7 +194,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
     // Buscar última pesagem e calcular peso médio
     const { data, error } = await supabase
       .from('pesagens')
-      .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_g)')
+      .select('id, data_pesagem, pesagem_itens(quantidade_aves, peso_liquido_kg)')
       .eq('lote_id', lote.id)
       .order('data_pesagem', { ascending: false })
       .limit(1);
@@ -209,10 +209,10 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       let totalPeso = 0;
       data[0].pesagem_itens.forEach((item: any) => {
         totalAves += item.quantidade_aves || 0;
-        totalPeso += item.peso_liquido_g || 0;
+        totalPeso += item.peso_liquido_kg || 0;
       });
       if (totalAves > 0) {
-        // peso_liquido_g armazenado em kg
+        // peso_liquido_kg armazenado em kg
         setUltimoPesoMedio(totalPeso / totalAves);
       }
     }
@@ -281,7 +281,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
         .from('lotes')
         .update({
           quantidade_aves: parseInt(data.quantidade_aves),
-          peso_medio_pintinhos: data.peso_medio_pintinhos ? parseFloat(data.peso_medio_pintinhos) : null,
+          peso_medio_pintinhos_kg: data.peso_medio_pintinhos_kg ? parseFloat(data.peso_medio_pintinhos_kg) : null,
           data_prevista_alojamento: format(data.data_prevista_alojamento, 'yyyy-MM-dd'),
           data_alojamento: data.data_alojamento ? format(data.data_alojamento, 'yyyy-MM-dd') : null,
           data_fechamento: data.data_fechamento ? format(data.data_fechamento, 'yyyy-MM-dd') : null,
@@ -362,7 +362,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
             <FormField
               control={form.control}
-              name="peso_medio_pintinhos"
+              name="peso_medio_pintinhos_kg"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Peso Médio Pintinhos (g)</FormLabel>

@@ -39,8 +39,8 @@ interface MetasPostura {
 
 interface DesempenhoReferencia {
   semana: number;
-  peso_g: number;
-  consumo_diario_g: number;
+  peso_kg: number;
+  consumo_diario_kg: number;
   producao_percentual: number | null;
   peso_ovo_g: number | null;
   ovos_ave_alojada: number | null;
@@ -177,7 +177,7 @@ export default function MetasPosturaLote() {
         data_pesagem,
         pesagem_itens (
           quantidade_aves,
-          peso_liquido_g
+          peso_liquido_kg
         )
       `)
       .eq('lote_id', loteId)
@@ -186,7 +186,7 @@ export default function MetasPosturaLote() {
     if (pesagensData && loteData.data_alojamento) {
       const pesagensProcessed: PesagemData[] = pesagensData.map((p: any) => {
         const totalAves = p.pesagem_itens.reduce((acc: number, item: any) => acc + item.quantidade_aves, 0);
-        const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_g || 0), 0);
+        const totalPeso = p.pesagem_itens.reduce((acc: number, item: any) => acc + (item.peso_liquido_kg || 0), 0);
         const pesoMedio = totalAves > 0 ? totalPeso / totalAves : 0;
         // Usar +1 para que dia do alojamento = Dia 1, semana 1 = dias 1-7
         const dias = calcularIdadeNaData(loteData.data_alojamento!, p.data_pesagem);
@@ -315,7 +315,7 @@ export default function MetasPosturaLote() {
       const pesagemReal = pesagens.find(p => p.semana === ref.semana);
       return {
         semana: ref.semana,
-        referencia: ref.peso_g,
+        referencia: ref.peso_kg,
         real: pesagemReal?.peso_real_g || null,
       };
     });
@@ -415,7 +415,7 @@ export default function MetasPosturaLote() {
                       Peso Referência
                     </div>
                     <p className="text-2xl font-bold">
-                      {pesoReferenciaAtual ? `${pesoReferenciaAtual.peso_g.toFixed(0)} g` : '-'}
+                      {pesoReferenciaAtual ? `${pesoReferenciaAtual.peso_kg.toFixed(0)} g` : '-'}
                     </p>
                     <p className="text-xs text-muted-foreground">Semana {semanasDesdeAlojamento}</p>
                   </CardContent>
@@ -429,12 +429,12 @@ export default function MetasPosturaLote() {
                     {ultimoPeso && pesoReferenciaAtual ? (
                       <>
                         <p className={`text-2xl font-bold ${
-                          ultimoPeso.peso_real_g >= pesoReferenciaAtual.peso_g ? 'text-primary' : 'text-destructive'
+                          ultimoPeso.peso_real_g >= pesoReferenciaAtual.peso_kg ? 'text-primary' : 'text-destructive'
                         }`}>
-                          {((ultimoPeso.peso_real_g / pesoReferenciaAtual.peso_g - 1) * 100).toFixed(1)}%
+                          {((ultimoPeso.peso_real_g / pesoReferenciaAtual.peso_kg - 1) * 100).toFixed(1)}%
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {ultimoPeso.peso_real_g >= pesoReferenciaAtual.peso_g ? 'Acima' : 'Abaixo'} da referência
+                          {ultimoPeso.peso_real_g >= pesoReferenciaAtual.peso_kg ? 'Acima' : 'Abaixo'} da referência
                         </p>
                       </>
                     ) : (

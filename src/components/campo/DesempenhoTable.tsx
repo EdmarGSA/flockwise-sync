@@ -96,12 +96,12 @@ export function DesempenhoTable({ data, loading, onEdit }: DesempenhoTableProps)
                       {filteredData.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell className="text-center font-medium">{row.dia}</TableCell>
-                          <TableCell className="text-right">{Number(row.peso_g).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="text-right">{Number(row.ganho_diario_g).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="text-right">{Number(row.ganho_medio_diario_g).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{Number(row.peso_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{Number(row.ganho_diario_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{Number(row.ganho_medio_diario_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-right">{Number(row.conversao_alimentar_acumulada).toLocaleString('pt-BR', { minimumFractionDigits: 3 })}</TableCell>
-                          <TableCell className="text-right">{Number(row.consumo_diario_racao_g).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="text-right">{Number(row.consumo_acumulado_racao_g).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{Number(row.consumo_diario_racao_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{Number(row.consumo_acumulado_racao_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                           {onEdit && (
                             <TableCell>
                               <Button variant="ghost" size="icon" onClick={() => onEdit(row)}>

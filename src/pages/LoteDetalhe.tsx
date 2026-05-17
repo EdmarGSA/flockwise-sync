@@ -50,7 +50,7 @@ interface LoteData {
   status: string;
   veterinario_id: string | null;
   integrado_id: string;
-  peso_medio_pintinhos: number | null;
+  peso_medio_pintinhos_kg: number | null;
   nucleo_id: string;
   galpao_id: string;
   nucleo: { nome: string; tipo_producao: string } | null;
@@ -114,7 +114,7 @@ export default function LoteDetalhe() {
         sexo,
         status,
         integrado_id,
-        peso_medio_pintinhos,
+        peso_medio_pintinhos_kg,
         nucleo_id,
         galpao_id,
         nucleo:nucleos(nome, tipo_producao),
@@ -531,7 +531,7 @@ export default function LoteDetalhe() {
         integradoId={lote.integrado_id}
         galpaoId={lote.galpao_id}
         avesVivas={avesVivas}
-        pesoInicialPintinhos={lote.peso_medio_pintinhos}
+        pesoInicialPintinhos={lote.peso_medio_pintinhos_kg}
         diasDesdeAlojamento={diasDesdeAlojamento}
         dataAlojamento={lote.data_alojamento}
         linhagem={lote.linhagem}
