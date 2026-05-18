@@ -1428,6 +1428,33 @@ export type Database = {
         }
         Relationships: []
       }
+      config_zonas_galpao: {
+        Row: {
+          created_at: string
+          dias_fim_pinteiro: number
+          integrado_id: string
+          min_minutos_sustentado: number
+          updated_at: string
+          usar_percentis_automacao: boolean
+        }
+        Insert: {
+          created_at?: string
+          dias_fim_pinteiro?: number
+          integrado_id: string
+          min_minutos_sustentado?: number
+          updated_at?: string
+          usar_percentis_automacao?: boolean
+        }
+        Update: {
+          created_at?: string
+          dias_fim_pinteiro?: number
+          integrado_id?: string
+          min_minutos_sustentado?: number
+          updated_at?: string
+          usar_percentis_automacao?: boolean
+        }
+        Relationships: []
+      }
       conforto_termico_ave: {
         Row: {
           created_at: string
@@ -2210,6 +2237,7 @@ export type Database = {
           modelo: string | null
           nome: string
           num_canais: number
+          peso_amostragem: number
           programa_versao: string | null
           regra_grupo: string | null
           suporta_anemometro: boolean | null
@@ -2222,6 +2250,7 @@ export type Database = {
           ultimo_boot_reason: string | null
           ultimo_sync: string | null
           updated_at: string
+          zona: string
         }
         Insert: {
           ativo?: boolean
@@ -2240,6 +2269,7 @@ export type Database = {
           modelo?: string | null
           nome: string
           num_canais?: number
+          peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
           suporta_anemometro?: boolean | null
@@ -2252,6 +2282,7 @@ export type Database = {
           ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
           updated_at?: string
+          zona?: string
         }
         Update: {
           ativo?: boolean
@@ -2270,6 +2301,7 @@ export type Database = {
           modelo?: string | null
           nome?: string
           num_canais?: number
+          peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
           suporta_anemometro?: boolean | null
@@ -2282,6 +2314,7 @@ export type Database = {
           ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
           updated_at?: string
+          zona?: string
         }
         Relationships: [
           {
@@ -3574,6 +3607,7 @@ export type Database = {
           data_fechamento: string | null
           data_prevista_alojamento: string
           data_prevista_saida: string | null
+          dias_fim_pinteiro: number | null
           fase_postura_atual: Database["public"]["Enums"]["fase_postura"] | null
           galpao_id: string
           horario_inicio_jejum: string | null
@@ -3609,6 +3643,7 @@ export type Database = {
           data_fechamento?: string | null
           data_prevista_alojamento: string
           data_prevista_saida?: string | null
+          dias_fim_pinteiro?: number | null
           fase_postura_atual?:
             | Database["public"]["Enums"]["fase_postura"]
             | null
@@ -3646,6 +3681,7 @@ export type Database = {
           data_fechamento?: string | null
           data_prevista_alojamento?: string
           data_prevista_saida?: string | null
+          dias_fim_pinteiro?: number | null
           fase_postura_atual?:
             | Database["public"]["Enums"]["fase_postura"]
             | null
