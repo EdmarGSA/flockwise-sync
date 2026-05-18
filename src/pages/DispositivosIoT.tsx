@@ -108,7 +108,9 @@ export default function DispositivosIoT() {
     galpao_id: string;
     auth_token: string;
     num_canais: number;
-  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
+    zona: 'pinteiro' | 'engorda' | 'postura' | 'externa' | 'geral';
+    peso_amostragem: number;
+  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
