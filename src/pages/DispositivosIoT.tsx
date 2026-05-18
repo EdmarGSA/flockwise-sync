@@ -400,11 +400,13 @@ export default function DispositivosIoT() {
       num_canais: isEsp32 ? newDevice.num_canais : 1,
       marca: isEsp32 ? 'ESP32-S3' : 'Sonoff',
       modelo: isEsp32 ? `${newDevice.num_canais}CH Relay` : null,
-    });
+      zona: newDevice.zona,
+      peso_amostragem: newDevice.peso_amostragem,
+    } as any);
     if (error) { toast.error(error.message.includes('duplicate') ? 'Dispositivo já cadastrado' : error.message); return; }
     toast.success('Dispositivo cadastrado');
     setAddDialogOpen(false);
-    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
+    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
     fetchData();
   };
 
