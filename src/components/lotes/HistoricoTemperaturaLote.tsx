@@ -12,12 +12,13 @@ import { useMemo } from 'react';
 interface Props {
   galpaoId: string;
   dataAlojamento: string;
+  loteId?: string;
   linhagem?: string;
   sexo?: string;
 }
 
-export function HistoricoTemperaturaLote({ galpaoId, dataAlojamento }: Props) {
-  const { dados, loading } = useHistoricoData({ galpaoId, dataAlojamento });
+export function HistoricoTemperaturaLote({ galpaoId, dataAlojamento, loteId }: Props) {
+  const { dados, loading } = useHistoricoData({ galpaoId, dataAlojamento, loteId });
   const insights = useMemo(() => gerarInsights(dados), [dados]);
 
   if (loading || dados.length === 0) return null;

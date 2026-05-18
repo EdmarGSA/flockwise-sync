@@ -1,8 +1,14 @@
 export interface DiaTemperatura {
   dia: number;
   data: string;
-  tempMin: number;
-  tempMax: number;
+  tempMin: number;      // mantido para compat (min sustentado ou mediana se nenhum pico durou)
+  tempMax: number;      // idem
+  tempMediana: number | null;
+  tempP5: number | null;
+  tempP95: number | null;
+  tempMinAbsoluto: number | null; // pico real (tooltip "Picos do dia")
+  tempMaxAbsoluto: number | null;
+  minutosForaFaixa: number; // min/dia fora da faixa de referência
   horarioMin: string;
   horarioMax: string;
   faixaMin?: number;
@@ -10,8 +16,12 @@ export interface DiaTemperatura {
   dentroFaixa: boolean | null;
   umidadeMin: number | null;
   umidadeMax: number | null;
+  umidadeMediana: number | null;
   umidadeDentroFaixa: boolean | null;
-  desvioTemp: number | null; // max deviation from ideal range in °C
+  desvioTemp: number | null;
+  sensoresUsados: number;
+  sensoresTotal: number;
+  zonaAtiva: string;
 }
 
 export interface RegraTemp {

@@ -1507,6 +1507,7 @@ export default function MetasPesoLote() {
               <HistoricoTemperaturaLote
                 galpaoId={lote.galpao_id}
                 dataAlojamento={lote.data_alojamento}
+                loteId={lote.id}
                 linhagem={lote.linhagem}
                 sexo={lote.sexo}
               />

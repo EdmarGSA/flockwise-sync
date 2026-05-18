@@ -108,7 +108,9 @@ export default function DispositivosIoT() {
     galpao_id: string;
     auth_token: string;
     num_canais: number;
-  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
+    zona: 'pinteiro' | 'engorda' | 'postura' | 'externa' | 'geral';
+    peso_amostragem: number;
+  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -398,11 +400,13 @@ export default function DispositivosIoT() {
       num_canais: isEsp32 ? newDevice.num_canais : 1,
       marca: isEsp32 ? 'ESP32-S3' : 'Sonoff',
       modelo: isEsp32 ? `${newDevice.num_canais}CH Relay` : null,
-    });
+      zona: newDevice.zona,
+      peso_amostragem: newDevice.peso_amostragem,
+    } as any);
     if (error) { toast.error(error.message.includes('duplicate') ? 'Dispositivo já cadastrado' : error.message); return; }
     toast.success('Dispositivo cadastrado');
     setAddDialogOpen(false);
-    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6 });
+    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
     fetchData();
   };
 
@@ -682,6 +686,34 @@ export default function DispositivosIoT() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Zona do sensor</Label>
+                      <Select value={newDevice.zona} onValueChange={(v: any) => setNewDevice({ ...newDevice, zona: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="geral">Geral (sempre ativo)</SelectItem>
+                          <SelectItem value="pinteiro">Pinteiro</SelectItem>
+                          <SelectItem value="engorda">Engorda</SelectItem>
+                          <SelectItem value="postura">Postura</SelectItem>
+                          <SelectItem value="externa">Externa (referência)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground mt-1">Pinteiro: usado nos primeiros dias. Externa não entra na média.</p>
+                    </div>
+                    <div>
+                      <Label>Peso na amostragem</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        value={newDevice.peso_amostragem}
+                        onChange={(e) => setNewDevice({ ...newDevice, peso_amostragem: Math.max(0, Math.min(2, Number(e.target.value) || 0)) })}
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">1.0 = padrão; reduza se sensor é ruim.</p>
+                    </div>
+                  </div>
                   <Button className="w-full" onClick={handleAddDevice}>Cadastrar Dispositivo</Button>
                 </div>
               </DialogContent>
@@ -812,6 +844,22 @@ export default function DispositivosIoT() {
                           )}
                           <Badge variant="secondary" className="text-xs">{dev.device_id_ewelink}</Badge>
                           {galpao && <Badge variant="outline" className="text-xs">{galpao.nome}</Badge>}
+                          <Badge
+                            variant="outline"
+                            className="text-xs cursor-pointer hover:bg-muted"
+                            onClick={async () => {
+                              const ordem = ['geral', 'pinteiro', 'engorda', 'postura', 'externa'];
+                              const atual = (dev as any).zona ?? 'geral';
+                              const proxima = ordem[(ordem.indexOf(atual) + 1) % ordem.length];
+                              const { error } = await supabase.from('dispositivos_iot').update({ zona: proxima } as any).eq('id', dev.id);
+                              if (error) { toast.error('Erro ao atualizar zona'); return; }
+                              toast.success(`Zona alterada para "${proxima}"`);
+                              fetchData();
+                            }}
+                            title="Clique para alternar a zona"
+                          >
+                            Zona: {(dev as any).zona ?? 'geral'}
+                          </Badge>
                           {dev.automacao_ativa && dev.funcao_automacao !== 'nenhuma' && (
                             <Badge variant="outline" className="text-xs text-primary border-primary/30 gap-0.5">
                               <Zap className="h-2.5 w-2.5" />

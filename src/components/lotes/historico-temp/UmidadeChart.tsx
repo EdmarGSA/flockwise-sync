@@ -6,11 +6,12 @@ interface Props {
 }
 
 export function UmidadeChart({ dados }: Props) {
-  const hasUmidade = dados.some(d => d.umidadeMin !== null);
+  const hasUmidade = dados.some(d => d.umidadeMediana !== null);
   if (!hasUmidade) return null;
 
   const chartData = dados.map(d => ({
     dia: `D${d.dia}`,
+    mediana: d.umidadeMediana,
     min: d.umidadeMin,
     max: d.umidadeMax,
   }));
@@ -28,13 +29,12 @@ export function UmidadeChart({ dados }: Props) {
               contentStyle={{ fontSize: 12 }}
               formatter={(value: number, name: string) => [
                 `${value?.toFixed(1)}%`,
-                name === 'max' ? 'Máxima' : 'Mínima',
+                name === 'mediana' ? 'Mediana' : name === 'max' ? 'Máxima' : 'Mínima',
               ]}
             />
             <ReferenceLine y={UMIDADE_MIN} stroke="hsl(var(--chart-2))" strokeDasharray="5 5" strokeWidth={1} />
             <ReferenceLine y={UMIDADE_MAX} stroke="hsl(var(--chart-2))" strokeDasharray="5 5" strokeWidth={1} />
-            <Area type="monotone" dataKey="max" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={2} dot={{ r: 2 }} />
-            <Area type="monotone" dataKey="min" stroke="hsl(var(--chart-5))" fill="hsl(var(--chart-5))" fillOpacity={0.1} strokeWidth={2} dot={{ r: 2 }} />
+            <Area type="monotone" dataKey="mediana" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.2} strokeWidth={2.5} dot={{ r: 2 }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
