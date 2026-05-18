@@ -6,11 +6,12 @@ interface Props {
 }
 
 export function UmidadeChart({ dados }: Props) {
-  const hasUmidade = dados.some(d => d.umidadeMin !== null);
+  const hasUmidade = dados.some(d => d.umidadeMediana !== null);
   if (!hasUmidade) return null;
 
   const chartData = dados.map(d => ({
     dia: `D${d.dia}`,
+    mediana: d.umidadeMediana,
     min: d.umidadeMin,
     max: d.umidadeMax,
   }));
