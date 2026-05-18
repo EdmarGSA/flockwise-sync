@@ -844,6 +844,22 @@ export default function DispositivosIoT() {
                           )}
                           <Badge variant="secondary" className="text-xs">{dev.device_id_ewelink}</Badge>
                           {galpao && <Badge variant="outline" className="text-xs">{galpao.nome}</Badge>}
+                          <Badge
+                            variant="outline"
+                            className="text-xs cursor-pointer hover:bg-muted"
+                            onClick={async () => {
+                              const ordem = ['geral', 'pinteiro', 'engorda', 'postura', 'externa'];
+                              const atual = (dev as any).zona ?? 'geral';
+                              const proxima = ordem[(ordem.indexOf(atual) + 1) % ordem.length];
+                              const { error } = await supabase.from('dispositivos_iot').update({ zona: proxima } as any).eq('id', dev.id);
+                              if (error) { toast.error('Erro ao atualizar zona'); return; }
+                              toast.success(`Zona alterada para "${proxima}"`);
+                              fetchData();
+                            }}
+                            title="Clique para alternar a zona"
+                          >
+                            Zona: {(dev as any).zona ?? 'geral'}
+                          </Badge>
                           {dev.automacao_ativa && dev.funcao_automacao !== 'nenhuma' && (
                             <Badge variant="outline" className="text-xs text-primary border-primary/30 gap-0.5">
                               <Zap className="h-2.5 w-2.5" />
