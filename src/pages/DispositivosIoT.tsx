@@ -686,6 +686,34 @@ export default function DispositivosIoT() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Zona do sensor</Label>
+                      <Select value={newDevice.zona} onValueChange={(v: any) => setNewDevice({ ...newDevice, zona: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="geral">Geral (sempre ativo)</SelectItem>
+                          <SelectItem value="pinteiro">Pinteiro</SelectItem>
+                          <SelectItem value="engorda">Engorda</SelectItem>
+                          <SelectItem value="postura">Postura</SelectItem>
+                          <SelectItem value="externa">Externa (referência)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground mt-1">Pinteiro: usado nos primeiros dias. Externa não entra na média.</p>
+                    </div>
+                    <div>
+                      <Label>Peso na amostragem</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        value={newDevice.peso_amostragem}
+                        onChange={(e) => setNewDevice({ ...newDevice, peso_amostragem: Math.max(0, Math.min(2, Number(e.target.value) || 0)) })}
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">1.0 = padrão; reduza se sensor é ruim.</p>
+                    </div>
+                  </div>
                   <Button className="w-full" onClick={handleAddDevice}>Cadastrar Dispositivo</Button>
                 </div>
               </DialogContent>
