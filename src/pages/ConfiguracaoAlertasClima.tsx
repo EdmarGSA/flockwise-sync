@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
 import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin, Activity } from "lucide-react";
+import { ZonasMetricasCard } from "@/components/lotes/historico-temp/ZonasMetricasCard";
 
 const alertaSchema = z.object({
   temp_max_critico: z.number().min(-10).max(50).nullable(),
@@ -438,6 +439,10 @@ const ConfiguracaoAlertasClima = () => {
             <TabsContent key={n.id} value={n.id} className="mt-4">{renderForm(n.id)}</TabsContent>
           ))}
         </Tabs>
+
+        <div className="mt-6">
+          <ZonasMetricasCard />
+        </div>
       </main>
     </div>
   );
