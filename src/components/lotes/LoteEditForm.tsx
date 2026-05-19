@@ -633,6 +633,31 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
 
           <FormField
             control={form.control}
+            name="dias_fim_pinteiro"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Dias de pinteiro deste lote (opcional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    placeholder={`Padrão da organização (${configOrg.diasFimPinteiro}d)`}
+                    disabled={!isEditable && !modoEdicaoAvancada}
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  Nos primeiros dias, só sensores marcados como “pinteiro/geral” entram na média de temperatura e umidade deste lote. Deixe em branco para usar o padrão.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="observacoes"
             render={({ field }) => (
               <FormItem>
