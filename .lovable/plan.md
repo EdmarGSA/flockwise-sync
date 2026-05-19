@@ -1,92 +1,78 @@
-## Problema
+## Contexto
 
-Decisões e exibição de temperatura/umidade do galpão usam **média simples** + **mín/máx absolutos** de todos os sensores ativos. Dois vieses:
+Fase 1 (visualização robusta com zonas + mediana/P5–P95/sustentado) já está no ar. Falta:
 
-1. **Fase de pinteiro**: aves ficam confinadas em ¼ do galpão (área aquecida). Sensores fora dessa zona puxam a média para baixo — sistema acha que está frio quando o pinteiro está OK.
-2. **Mín/Máx absolutos**: pico de 15 min (porta aberta, descarga de ração, falha já corrigida) vira "mínima do dia" e dispara alertas indevidos.
+1. Dar ao usuário **controle** sobre os parâmetros novos.
+2. Permitir **override por lote** dos dias de pinteiro.
+3. Deixar a **Fase 2 (automação)** plugada atrás da flag `usar_percentis_automacao`, desligada por padrão, para ativar depois de 1 ciclo de validação.
 
-## Solução em 3 camadas
+---
 
-### 1. Zona do sensor + modo do galpão
+## Passo 1 — UI de Configuração da Organização
 
-- `dispositivos_iot.zona`: enum `pinteiro | engorda | postura | externa | geral` (default `geral`).
-- `dispositivos_iot.peso_amostragem`: numérico 0.0–2.0 (default 1.0) — reduzir peso de sensor ruim sem desativar.
-- Derivar **modo ativo** do lote por idade:
-  - dias `1..dias_fim_pinteiro` → usa sensores `zona ∈ {pinteiro, geral}`.
-  - dias seguintes → usa `zona ∈ {engorda, postura, geral}` conforme `tipo_producao` do núcleo.
-  - Sensores fora da zona ativa ficam **visíveis** mas marcados "fora da zona ativa" e **não entram** na média/automação.
+Nova seção em `src/pages/ConfiguracaoAlertasClima.tsx` (ou card dedicado em `Configuracoes.tsx`) chamada **"Zonas e métricas robustas"**:
 
-### 2. Métricas robustas (substituem mín/máx puros)
+- **Dias de pinteiro** (input numérico, 1–60, default 14) — grava em `config_zonas_galpao.dias_fim_pinteiro`.
+- **Minutos para min/máx sustentado** (slider 5–60, default 20) — grava em `config_zonas_galpao.min_minutos_sustentado`. Tooltip: "Picos mais curtos que isso aparecem só como tooltip 'picos do dia', não disparam alerta."
+- **Usar percentis na automação** (switch, default OFF) — grava em `config_zonas_galpao.usar_percentis_automacao`. Badge "Beta — valide 1 ciclo antes de ativar".
+- Upsert por `integrado_id`. Usa `useConfigZonas` (já existe) + nova mutation no mesmo hook.
 
-Por dia, calcular:
-- **Mediana** das leituras.
-- **P5 / P95** como "min/max representativos".
-- **Tempo acumulado fora da faixa** (min/dia).
-- **Min/Max sustentados**: só conta se manteve por ≥ `min_minutos_sustentado` consecutivos.
+## Passo 2 — Override por lote
 
-Mín/Máx absolutos continuam disponíveis como tooltip "ver picos", mas o card padrão e os alertas usam **P5/P95 + tempo fora da faixa + min/max sustentados**.
+Em `src/components/lotes/LoteEditForm.tsx` (e no form de criação se for separado): novo campo opcional **"Dias de pinteiro deste lote"**:
 
-### 3. Agregação para decisões automáticas (fase 2)
+- Input numérico, nullable, placeholder dinâmico `"Padrão da organização (Xd)"` onde X vem de `useConfigZonas`.
+- Quando preenchido, grava em `lotes.dias_fim_pinteiro`; quando vazio, NULL (usa default da org).
+- Tooltip explicando que isso afeta quais sensores entram no cálculo nos primeiros dias.
 
-Inicialmente **só a visualização** muda. Automação (`climate-brain`, `auto-*`) entra em uma 2ª fase após validar 1 ciclo, atrás da flag `usar_percentis_automacao`.
+## Passo 3 — Indicador de modo ativo na tela do lote
 
-Quando ligar:
-- Filtrar leituras pela zona ativa do lote.
-- Aplicar `peso_amostragem` na média.
-- Média móvel das últimas 15 min + descartar outliers via IQR.
-- Logar em `log_decisao_clima.reason_chain`: `"zona_ativa=pinteiro, sensores_usados=2/5"`.
+Em `TemperaturaUmidadeCard.tsx` / no header do gráfico de histórico: badge mostrando `"Modo pinteiro — usando 2 de 5 sensores"` ou `"Modo engorda — 4 de 5 sensores"`, vindo de `sensoresUsados`/`sensoresTotal`/`zonaAtiva` já calculados em `useHistoricoData`. Só renderiza se houver mais de uma zona configurada.
 
-## Configuração (respostas do usuário)
+## Passo 4 — Preparação Fase 2 (sem ativar)
 
-- **Zonas**: `pinteiro | engorda | postura | externa | geral`. Sem entrada/saída/centro.
-- **Dias de pinteiro**: configurável.
-  - Default global por `integrado_id` em `config_zonas_galpao.dias_fim_pinteiro` (default 14).
-  - Override por **lote** em `lotes.dias_fim_pinteiro` (nullable) — quando preenchido, prevalece.
-  - UI permite ajustar no cadastro/edição do lote.
-- **Min/Máx sustentado**: configurável.
-  - `config_zonas_galpao.min_minutos_sustentado` (default 20, range 5–60).
-- **IQR/automação**: **fase 2**. Por ora, flag `usar_percentis_automacao = false` no default. Automação continua usando média simples por enquanto.
+Em `supabase/functions/climate-brain/index.ts` e nos `auto-*` (`auto-temperatura`, `auto-ventilacao`, `auto-cortina`, `auto-nebulizacao`):
 
-## Mudanças por arquivo
+- Carregar `config_zonas_galpao` + `lote.dias_fim_pinteiro` + zonas dos dispositivos.
+- Se `usar_percentis_automacao = false` (default): comportamento atual intacto — média simples de tudo.
+- Se `true`:
+  - Filtrar leituras pelas zonas ativas (`zonasAtivasPara` portado para Deno em `_shared/agregarLeituras.ts`).
+  - Aplicar `peso_amostragem` na média ponderada.
+  - Janela 15 min + IQR para descartar outliers.
+  - Logar em `log_decisao_clima.reason_chain`: `"zona_ativa=pinteiro, sensores=2/5, percentis=on"`.
+- **Não ativar** automaticamente. Só plugar a infra.
 
-**Migration**
-- `ALTER TABLE dispositivos_iot ADD zona text DEFAULT 'geral', ADD peso_amostragem numeric DEFAULT 1.0` + CHECK em zona.
-- `ALTER TABLE lotes ADD dias_fim_pinteiro int NULL`.
-- `CREATE TABLE config_zonas_galpao (integrado_id PK, dias_fim_pinteiro int DEFAULT 14, min_minutos_sustentado int DEFAULT 20, usar_percentis_automacao bool DEFAULT false)` + RLS por `integrado_id`.
+## Passo 5 — Documentação curta
 
-**Utilitários novos**
-- `src/lib/utils/agregarLeituras.ts`: `mediana`, `percentil(arr, p)`, `removerOutliersIQR`, `minMaxSustentado(arr, minMin)`, `tempoForaFaixa(arr, min, max)`.
-- `src/hooks/useConfigZonas.tsx`: lê `config_zonas_galpao` + override do lote.
+Adicionar nota em `docs/` (ou seção em `PoliticaRecuperacaoIoT.tsx`) explicando o modelo de zonas, min/máx sustentado e o roteiro de ativação da Fase 2.
 
-**Visualização (fase 1 — entra agora)**
-- `src/components/lotes/historico-temp/useHistoricoData.ts`: 
-  - JOIN com `dispositivos_iot` para pegar `zona`.
-  - Resolver zona ativa via idade do lote × `dias_fim_pinteiro` (lote ou config).
-  - Filtrar leituras pela zona ativa.
-  - Calcular mediana, p5, p95, min/max sustentados, tempo fora da faixa.
-- `src/lib/utils/calcularMinMaxDia.ts`: adicionar campos novos mantendo `min/max` para compat.
-- `src/hooks/useTemperaturaLote.ts`: expor mediana e p5/p95.
-- `src/components/lotes/historico-temp/DivergenciaKPIs.tsx`, `TemperaturaChart.tsx`, `UmidadeChart.tsx`, `HistoricoTable.tsx`, `TemperaturaUmidadeCard.tsx`: 
-  - Destaque: **Mediana** + faixa **P5–P95**.
-  - Nova KPI: **Tempo fora da faixa** (min/h).
-  - Badge: "Modo pinteiro – usando X de Y sensores".
-  - Mín/Máx absolutos viram tooltip "Picos do dia".
+---
 
-**UI de configuração**
-- `DispositivosIoT.tsx`: dropdown "Zona" + slider "Peso amostragem" por sensor.
-- `ConfiguracaoAlertasClima.tsx` (ou nova seção em Configuracoes): `dias_fim_pinteiro`, `min_minutos_sustentado`, `usar_percentis_automacao`.
-- `LoteEditForm.tsx`: campo opcional "Dias de pinteiro deste lote" com placeholder "Padrão da organização (Xd)".
+## Arquivos afetados
 
-**Fase 2 (depois de validar 1 ciclo — NÃO entra agora)**
-- `climate-brain/index.ts` + `auto-temperatura/auto-ventilacao/auto-cortina/auto-nebulizacao`: aplicar filtro de zona, peso, IQR. Atrás da flag `usar_percentis_automacao`.
-- `relatorio-lote-diario`: passar a reportar mediana/p5/p95/tempo fora da faixa.
+**Edita:**
+- `src/pages/ConfiguracaoAlertasClima.tsx` (nova seção) ou novo card em `Configuracoes.tsx`
+- `src/hooks/useConfigZonas.tsx` (adicionar mutation `salvar`)
+- `src/components/lotes/LoteEditForm.tsx` (+ form de criação, se existir separado)
+- `src/components/lotes/historico-temp/TemperaturaChart.tsx` (badge de modo ativo) ou novo `ModoAtivoBadge.tsx`
+- `supabase/functions/climate-brain/index.ts`
+- `supabase/functions/auto-temperatura/index.ts`
+- `supabase/functions/auto-ventilacao/index.ts`
+- `supabase/functions/auto-cortina/index.ts`
+- `supabase/functions/auto-nebulizacao/index.ts`
+
+**Cria:**
+- `supabase/functions/_shared/agregarLeituras.ts` (port Deno do utilitário JS)
+- (opcional) `src/components/lotes/historico-temp/ModoAtivoBadge.tsx`
+
+**Sem migration** — schema da Fase 1 já cobre tudo.
+
+---
 
 ## Rollout
 
-1. Migration + defaults seguros (`zona='geral'` mantém comportamento atual em automação).
-2. Utilitários + hook de config.
-3. Atualizar visualização (`useHistoricoData` + cards + tabela).
-4. UI para classificar zona dos sensores + configuração da org + override por lote.
-5. (Fase 2 futura) Ativar filtros na automação após 1 ciclo de validação.
+1. Passos 1–3 entram juntos (UI completa de Fase 1).
+2. Passo 4 entra desligado por flag — zero impacto operacional.
+3. Após você validar 1 ciclo com a visualização, basta ligar o switch "Usar percentis na automação" para a Fase 2 entrar em produção.
 
-Confirma para implementar a Fase 1?
+Confirma para implementar?
