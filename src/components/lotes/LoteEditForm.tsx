@@ -19,6 +19,7 @@ import { Database } from '@/integrations/supabase/types';
 import { SaidaLoteSection } from './SaidaLoteSection';
 import { PreviewAjusteAlojamento } from './PreviewAjusteAlojamento';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useConfigZonas } from '@/hooks/useConfigZonas';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,7 @@ const loteSchema = z.object({
   veterinario_id: z.string().optional(),
   programa_iluminacao_id: z.string().optional(),
   curva_climatica_id: z.string().optional(),
+  dias_fim_pinteiro: z.string().optional(),
   observacoes: z.string().optional(),
 });
 
@@ -79,6 +81,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
   const { integradoId } = useIntegradoId();
+  const { configOrg } = useConfigZonas();
   const [confirmAjustesOpen, setConfirmAjustesOpen] = useState(false);
   
   // Saída de Lote fields
@@ -121,6 +124,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
       veterinario_id: lote.veterinario_id || 'none',
       programa_iluminacao_id: (lote as any).programa_iluminacao_id || 'default',
       curva_climatica_id: (lote as any).curva_climatica_id || 'auto',
+      dias_fim_pinteiro: (lote as any).dias_fim_pinteiro != null ? String((lote as any).dias_fim_pinteiro) : '',
       observacoes: lote.observacoes || '',
     },
   });
@@ -290,6 +294,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
           veterinario_id: data.veterinario_id === 'none' ? null : data.veterinario_id || null,
           programa_iluminacao_id: !data.programa_iluminacao_id || data.programa_iluminacao_id === 'default' ? null : data.programa_iluminacao_id,
           curva_climatica_id: !data.curva_climatica_id || data.curva_climatica_id === 'auto' ? null : data.curva_climatica_id,
+          dias_fim_pinteiro: data.dias_fim_pinteiro && data.dias_fim_pinteiro.trim() !== '' ? parseInt(data.dias_fim_pinteiro) : null,
           observacoes: data.observacoes || null,
         })
         .eq('id', lote.id);
@@ -625,6 +630,31 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
               tipoProducao={isPostura ? 'postura' : 'frango_corte'}
             />
           )}
+
+          <FormField
+            control={form.control}
+            name="dias_fim_pinteiro"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Dias de pinteiro deste lote (opcional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    placeholder={`Padrão da organização (${configOrg.diasFimPinteiro}d)`}
+                    disabled={!isEditable && !modoEdicaoAvancada}
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  Nos primeiros dias, só sensores marcados como “pinteiro/geral” entram na média de temperatura e umidade deste lote. Deixe em branco para usar o padrão.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}
