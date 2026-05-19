@@ -19,6 +19,7 @@ import { Database } from '@/integrations/supabase/types';
 import { SaidaLoteSection } from './SaidaLoteSection';
 import { PreviewAjusteAlojamento } from './PreviewAjusteAlojamento';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
+import { useConfigZonas } from '@/hooks/useConfigZonas';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,7 @@ export function LoteEditForm({ lote, onSuccess, onCancel }: LoteEditFormProps) {
   const [ultimoPesoMedio, setUltimoPesoMedio] = useState<number | null>(null);
   const [modoEdicaoAvancada, setModoEdicaoAvancada] = useState(false);
   const { integradoId } = useIntegradoId();
+  const { configOrg } = useConfigZonas();
   const [confirmAjustesOpen, setConfirmAjustesOpen] = useState(false);
   
   // Saída de Lote fields
