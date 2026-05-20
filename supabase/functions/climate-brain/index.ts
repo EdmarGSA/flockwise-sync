@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
   // Busca todos os lotes alojados
   const { data: lotes, error } = await supabase
     .from("lotes")
-    .select("id, integrado_id, galpao_id, data_alojamento, linhagem, sexo, dias_fim_pinteiro, tipo_producao:nucleos(tipo_producao)")
+    .select("id, integrado_id, galpao_id, data_alojamento, linhagem, sexo, dias_fim_pinteiro")
     .eq("status", "alojado");
 
   if (error) {
