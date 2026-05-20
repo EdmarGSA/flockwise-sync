@@ -524,8 +524,8 @@ Deno.serve(async (req) => {
     }
 
     const { data: lotes, error: lotesErr } = await supabase
-      .from("lotes")
-      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id")
+     .from("lotes")
+      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id, dias_fim_pinteiro")
       .eq("status", "alojado")
       .not("data_alojamento", "is", null)
       .not("galpao_id", "is", null);
