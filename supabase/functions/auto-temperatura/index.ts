@@ -609,10 +609,19 @@ Deno.serve(async (req) => {
 
       // Get automation-enabled devices (incl. driver to route correctly)
       const { data: devices } = await supabase
-        .from("dispositivos_iot")
-        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver")
+       .from("dispositivos_iot")
+        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver, zona")
         .eq("integrado_id", integradoId)
         .eq("ativo", true);
+
+      // Config de zonas / métricas robustas (Fase 2 atrás de flag)
+      const { data: cfgZonasInt } = await supabase
+        .from("config_zonas_galpao")
+        .select("dias_fim_pinteiro, usar_percentis_automacao")
+        .eq("integrado_id", integradoId)
+        .maybeSingle();
+      const usarPercentisInt = !!cfgZonasInt?.usar_percentis_automacao;
+      const diasFimPinteiroOrg = Number(cfgZonasInt?.dias_fim_pinteiro ?? 14);
 
       // eWeLink-only automation: skip ESP32 devices here, they are driven via canais_dispositivo
       const automationDevices = (devices || []).filter(
