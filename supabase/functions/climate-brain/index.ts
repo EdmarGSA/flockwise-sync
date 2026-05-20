@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
       ur_lida: urPct,
       ith_calc: ithVal,
       setpoint_alvo: tempAlvo,
-      reason_chain: [motivo, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
+      reason_chain: [motivo, zonasReason, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
     });
 
     resultados.push({ galpao: lote.galpao_id, modo, tempC, tempAlvo, ventPct, acaoNeb, trocaArDuty });
