@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
     // Lote ativo
     const { data: lote } = await supabase
       .from("lotes")
-      .select("id, integrado_id, data_alojamento, status")
+      .select("id, integrado_id, data_alojamento, status, dias_fim_pinteiro")
       .eq("galpao_id", prog.galpao_id)
       .in("status", ["alojado"])
       .maybeSingle();
@@ -135,28 +135,59 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // Última leitura agregada (10 min)
-    const since = new Date(Date.now() - 10 * 60_000).toISOString();
-    const { data: leituras } = await supabase
-      .from("leituras_sensores")
-      .select("temperatura_c, umidade_pct, criado_em")
+    // Config zonas (Fase 2)
+    const { data: cfgZonas } = await supabase
+      .from("config_zonas_galpao")
+      .select("dias_fim_pinteiro, usar_percentis_automacao")
       .eq("integrado_id", prog.integrado_id)
-      .gte("criado_em", since)
-      .order("criado_em", { ascending: false })
-      .limit(50);
+      .maybeSingle();
+    const usarPercentis = !!cfgZonas?.usar_percentis_automacao;
+    const diasFimPinteiro = Number((lote as any).dias_fim_pinteiro ?? cfgZonas?.dias_fim_pinteiro ?? 14);
+    const idadeDiasVent = Math.max(1, Math.floor(
+      (Date.now() - new Date(lote.data_alojamento).getTime()) / 86400000) + 1);
+    const zonasAtivas = zonasAtivasPara(idadeDiasVent, null, diasFimPinteiro);
+
+    // Dispositivos do galpão (com zona)
+    const { data: devsVent } = await supabase
+      .from("dispositivos_iot")
+      .select("id, zona")
+      .eq("galpao_id", prog.galpao_id)
+      .eq("ativo", true);
+    const devsTodos = devsVent ?? [];
+    const devsFiltrados = usarPercentis
+      ? devsTodos.filter((d: any) => zonasAtivas.includes((d.zona ?? "geral") as any))
+      : devsTodos;
+    const devIds = (devsFiltrados.length ? devsFiltrados : devsTodos).map((d: any) => d.id);
+
+    // Última leitura agregada (10 min) por dispositivo
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { data: leituras } = devIds.length
+      ? await supabase
+          .from("leituras_sensores")
+          .select("temperatura_c, umidade_pct, criado_em")
+          .in("dispositivo_id", devIds)
+          .gte("criado_em", since)
+          .order("criado_em", { ascending: false })
+          .limit(200)
+      : { data: [] as any[] };
 
     if (!leituras || leituras.length === 0) {
       resultados.push({ galpao_id: prog.galpao_id, skip: "sem_leituras_recentes" });
       continue;
     }
-    const temps = leituras.map((l: any) => Number(l.temperatura_c)).filter((n) => !Number.isNaN(n));
-    const urs = leituras.map((l: any) => Number(l.umidade_pct)).filter((n) => !Number.isNaN(n));
+    let temps = leituras.map((l: any) => Number(l.temperatura_c)).filter((n) => !Number.isNaN(n));
+    let urs = leituras.map((l: any) => Number(l.umidade_pct)).filter((n) => !Number.isNaN(n));
+    if (usarPercentis) {
+      temps = removerOutliersIQR(temps);
+      if (urs.length) urs = removerOutliersIQR(urs);
+    }
     if (temps.length === 0) {
       resultados.push({ galpao_id: prog.galpao_id, skip: "leituras_invalidas" });
       continue;
     }
     const tempC = temps.reduce((a, b) => a + b, 0) / temps.length;
     const urPct = urs.length ? urs.reduce((a, b) => a + b, 0) / urs.length : 60;
+    const zonasReason = `zonas=${zonasAtivas.join(",")}, sensores=${devsFiltrados.length}/${devsTodos.length}, percentis=${usarPercentis ? "on" : "off"}`;
 
     // Histerese / ITH thresholds da organização
     const { data: hist } = await supabase
