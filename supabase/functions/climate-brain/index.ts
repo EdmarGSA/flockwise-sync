@@ -108,30 +108,44 @@ Deno.serve(async (req) => {
     const deadband = Number(hist?.deadband_temp_c ?? 0.5);
     const pintinhoAteDias = Number(hist?.protege_pintinho_ate_dias ?? 7);
 
-    // Leituras 5 min — busca dispositivos do galpão e filtra por dispositivo_id + lido_em
+    // Config de zonas / métricas robustas (Fase 2 atrás de flag)
+    const { data: cfgZonas } = await supabase
+      .from("config_zonas_galpao")
+      .select("dias_fim_pinteiro, usar_percentis_automacao, min_minutos_sustentado")
+      .eq("integrado_id", lote.integrado_id)
+      .maybeSingle();
+    const usarPercentis = !!cfgZonas?.usar_percentis_automacao;
+    const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? cfgZonas?.dias_fim_pinteiro ?? 14);
+    const zonasAtivas = zonasAtivasPara(idadeDias, null, diasFimPinteiro);
+
+    // Leituras 15 min — busca dispositivos do galpão e filtra por dispositivo_id + lido_em
     const { data: devs } = await supabase
       .from("dispositivos_iot")
-      .select("id")
+      .select("id, zona, peso_amostragem")
       .eq("galpao_id", lote.galpao_id)
       .eq("ativo", true);
-    const devIds = (devs ?? []).map((d: any) => d.id);
+    const devsTodos = devs ?? [];
+    const devsFiltrados = usarPercentis
+      ? devsTodos.filter((d: any) => zonasAtivas.includes((d.zona ?? "geral") as any))
+      : devsTodos;
+    const devIds = devsFiltrados.map((d: any) => d.id);
     if (devIds.length === 0) {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_dispositivos" });
       await supabase.from("log_decisao_clima").insert({
         integrado_id: lote.integrado_id, galpao_id: lote.galpao_id, lote_id: lote.id,
         funcao_automacao: "climate_brain", estado_decidido: "skip",
-        reason_chain: ["sem_dispositivos no galpão"],
+        reason_chain: [`sem_dispositivos ativos (zonas=${zonasAtivas.join(",")}, total=${devsTodos.length})`],
       });
       continue;
     }
     const since = new Date(Date.now() - 15 * 60_000).toISOString();
     const { data: leituras } = await supabase
       .from("leituras_sensores")
-      .select("temperatura_c, umidade_pct")
+      .select("temperatura_c, umidade_pct, dispositivo_id")
       .in("dispositivo_id", devIds)
       .gte("lido_em", since)
       .order("lido_em", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (!leituras || leituras.length === 0) {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_leituras" });
@@ -142,12 +156,35 @@ Deno.serve(async (req) => {
       });
       continue;
     }
-    const temps = leituras.map((l: any) => Number(l.temperatura_c)).filter((n) => !isNaN(n));
-    const urs = leituras.map((l: any) => Number(l.umidade_pct)).filter((n) => !isNaN(n));
-    if (!temps.length) continue;
-    const tempC = temps.reduce((a, b) => a + b, 0) / temps.length;
-    const urPct = urs.length ? urs.reduce((a, b) => a + b, 0) / urs.length : 60;
+    const tempsRaw = leituras.map((l: any) => Number(l.temperatura_c)).filter((n) => !isNaN(n));
+    const ursRaw = leituras.map((l: any) => Number(l.umidade_pct)).filter((n) => !isNaN(n));
+    if (!tempsRaw.length) continue;
+
+    let tempC: number;
+    let urPct: number;
+    if (usarPercentis) {
+      // Descarta picos curtos via IQR e pondera por peso_amostragem
+      const tempsFilt = removerOutliersIQR(tempsRaw);
+      const ursFilt = ursRaw.length ? removerOutliersIQR(ursRaw) : [];
+      const pesoPorDev = new Map<string, number>(
+        devsFiltrados.map((d: any) => [d.id, Number(d.peso_amostragem ?? 1)])
+      );
+      let somaT = 0, pesoT = 0, somaU = 0, pesoU = 0;
+      for (const l of leituras as any[]) {
+        const w = pesoPorDev.get(l.dispositivo_id) ?? 1;
+        const t = Number(l.temperatura_c);
+        const u = Number(l.umidade_pct);
+        if (!isNaN(t) && tempsFilt.includes(t)) { somaT += t * w; pesoT += w; }
+        if (!isNaN(u) && ursFilt.includes(u)) { somaU += u * w; pesoU += w; }
+      }
+      tempC = pesoT > 0 ? somaT / pesoT : tempsFilt.reduce((a, b) => a + b, 0) / tempsFilt.length;
+      urPct = pesoU > 0 ? somaU / pesoU : (ursFilt.length ? ursFilt.reduce((a, b) => a + b, 0) / ursFilt.length : 60);
+    } else {
+      tempC = tempsRaw.reduce((a, b) => a + b, 0) / tempsRaw.length;
+      urPct = ursRaw.length ? ursRaw.reduce((a, b) => a + b, 0) / ursRaw.length : 60;
+    }
     const ithVal = ith(tempC, urPct);
+    const zonasReason = `zonas=${zonasAtivas.join(",")}, sensores=${devsFiltrados.length}/${devsTodos.length}, percentis=${usarPercentis ? "on" : "off"}`;
 
     // Estado de ventilação atual (proxy de capacidade ativada)
     const { data: estagio } = await supabase
