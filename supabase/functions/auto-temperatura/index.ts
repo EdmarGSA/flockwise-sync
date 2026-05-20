@@ -714,9 +714,13 @@ Deno.serve(async (req) => {
         const tempMax = pontoHoje?.temp_max_alarme_c ?? Number(regra!.temp_max_c);
         const umidMax = pontoHoje?.ur_max_pct ?? (regra?.umidade_max_pct != null ? Number(regra.umidade_max_pct) : 70);
 
-        const allGalpaoDeviceIds = (devices || [])
-          .filter((d: any) => d.galpao_id === lote.galpao_id)
-          .map((d: any) => d.id);
+        const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? diasFimPinteiroOrg);
+        const zonasAtivas = zonasAtivasPara(ageDays, null, diasFimPinteiro);
+        const galpaoDevs = (devices || []).filter((d: any) => d.galpao_id === lote.galpao_id);
+        const galpaoDevsAtivos = usarPercentisInt
+          ? galpaoDevs.filter((d: any) => zonasAtivas.includes(((d as any).zona ?? "geral") as any))
+          : galpaoDevs;
+        const allGalpaoDeviceIds = (galpaoDevsAtivos.length ? galpaoDevsAtivos : galpaoDevs).map((d: any) => d.id);
 
         if (allGalpaoDeviceIds.length === 0) continue;
 
