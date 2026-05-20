@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
       temp_lida: tempC,
       ur_lida: urPct,
       ith_calc: ith(tempC, urPct),
-      reason_chain: reason,
+      reason_chain: [...reason, zonasReason],
       bloqueado_por: bloqueado,
     });
 
