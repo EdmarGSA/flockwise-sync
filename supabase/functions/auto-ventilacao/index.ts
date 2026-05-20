@@ -12,6 +12,7 @@
 // comandos pelo edge `sync-sensors` (driver eWeLink) ou `esp32-bridge` (esp32_http).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { removerOutliersIQR, zonasAtivasPara } from "../_shared/agregarLeituras.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
