@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { zonasAtivasPara } from "../_shared/agregarLeituras.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -524,8 +525,8 @@ Deno.serve(async (req) => {
     }
 
     const { data: lotes, error: lotesErr } = await supabase
-      .from("lotes")
-      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id")
+     .from("lotes")
+      .select("id, integrado_id, galpao_id, data_alojamento, curva_climatica_id, dias_fim_pinteiro")
       .eq("status", "alojado")
       .not("data_alojamento", "is", null)
       .not("galpao_id", "is", null);
@@ -608,10 +609,19 @@ Deno.serve(async (req) => {
 
       // Get automation-enabled devices (incl. driver to route correctly)
       const { data: devices } = await supabase
-        .from("dispositivos_iot")
-        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver")
+       .from("dispositivos_iot")
+        .select("id, device_id_ewelink, galpao_id, funcao_automacao, automacao_ativa, driver, zona")
         .eq("integrado_id", integradoId)
         .eq("ativo", true);
+
+      // Config de zonas / métricas robustas (Fase 2 atrás de flag)
+      const { data: cfgZonasInt } = await supabase
+        .from("config_zonas_galpao")
+        .select("dias_fim_pinteiro, usar_percentis_automacao")
+        .eq("integrado_id", integradoId)
+        .maybeSingle();
+      const usarPercentisInt = !!cfgZonasInt?.usar_percentis_automacao;
+      const diasFimPinteiroOrg = Number(cfgZonasInt?.dias_fim_pinteiro ?? 14);
 
       // eWeLink-only automation: skip ESP32 devices here, they are driven via canais_dispositivo
       const automationDevices = (devices || []).filter(
@@ -704,9 +714,13 @@ Deno.serve(async (req) => {
         const tempMax = pontoHoje?.temp_max_alarme_c ?? Number(regra!.temp_max_c);
         const umidMax = pontoHoje?.ur_max_pct ?? (regra?.umidade_max_pct != null ? Number(regra.umidade_max_pct) : 70);
 
-        const allGalpaoDeviceIds = (devices || [])
-          .filter((d: any) => d.galpao_id === lote.galpao_id)
-          .map((d: any) => d.id);
+        const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? diasFimPinteiroOrg);
+        const zonasAtivas = zonasAtivasPara(ageDays, null, diasFimPinteiro);
+        const galpaoDevs = (devices || []).filter((d: any) => d.galpao_id === lote.galpao_id);
+        const galpaoDevsAtivos = usarPercentisInt
+          ? galpaoDevs.filter((d: any) => zonasAtivas.includes(((d as any).zona ?? "geral") as any))
+          : galpaoDevs;
+        const allGalpaoDeviceIds = (galpaoDevsAtivos.length ? galpaoDevsAtivos : galpaoDevs).map((d: any) => d.id);
 
         if (allGalpaoDeviceIds.length === 0) continue;
 
