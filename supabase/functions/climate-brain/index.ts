@@ -5,6 +5,7 @@
 //   3. Aplica decisões em ventilação (estágio + duty cycle brooding) e nebulização.
 //   4. Loga em log_decisao_clima com modo_dominante e offset aplicado.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { removerOutliersIQR, zonasAtivasPara } from "../_shared/agregarLeituras.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
