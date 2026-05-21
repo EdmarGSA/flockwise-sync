@@ -1,0 +1,12 @@
+# GSA Tibiri
+
+> Plataforma integrada de gestão avícola: monitoramento de lotes em tempo real, IoT, fábrica de ração, financeiro, comercial e logística para granjas de corte e postura.
+
+A GSA Tibiri conecta produtores, integradoras, veterinários e fornecedores em um único sistema, com automação climática, controle de consumo, rastreabilidade de ovos e cockpit executivo.
+
+## Pages
+
+- [Página inicial](/): visão geral da plataforma, módulos e benefícios.
+- [Login / Cadastro](/auth): acesso de produtores, técnicos e parceiros.
+- [Termos de Uso](/termos-uso): condições de uso da plataforma.
+- [Política de Privacidade](/politica-privacidade): tratamento de dados conforme LGPD.
