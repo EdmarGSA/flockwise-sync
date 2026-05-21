@@ -36,19 +36,65 @@ Deno.serve(async (req) => {
       // Lote ativo no galpão
       const { data: lote } = await supabase
         .from("lotes")
-        .select("id, data_alojamento, integrado_id")
+        .select("id, data_alojamento, integrado_id, dias_fim_pinteiro, tipo_producao")
         .eq("galpao_id", prog.galpao_id)
         .eq("status", "alojado")
         .maybeSingle();
 
-      // Última leitura ambiente
-      const { data: leitura } = await supabase
-        .from("leituras_sensores")
-        .select("temperatura_c, umidade_pct, created_at")
-        .eq("galpao_id", prog.galpao_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
+      // Config zonas/percentis da org
+      const { data: cfgZ } = await supabase
+        .from("config_zonas_galpao")
+        .select("dias_fim_pinteiro, usar_percentis_automacao")
+        .eq("integrado_id", prog.integrado_id)
         .maybeSingle();
+      const usarPercentis = !!cfgZ?.usar_percentis_automacao;
+      const diasFimPinteiro =
+        (lote as any)?.dias_fim_pinteiro ?? cfgZ?.dias_fim_pinteiro ?? 14;
+
+      // Última leitura ambiente (15 min, agregada por zona quando flag ON)
+      let leitura: { temperatura_c: number | null; umidade_pct: number | null; created_at?: string } | null = null;
+      let zonasReason = "";
+      if (usarPercentis) {
+        const idadeDias = lote?.data_alojamento
+          ? Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / 86_400_000) + 1
+          : null;
+        const zonasAtivas = zonasAtivasPara(idadeDias, (lote as any)?.tipo_producao ?? null, diasFimPinteiro);
+        const { data: devs } = await supabase
+          .from("dispositivos_iot")
+          .select("id, zona")
+          .eq("galpao_id", prog.galpao_id)
+          .eq("ativo", true);
+        const ativos = (devs ?? []).filter((d: any) => zonasAtivas.includes(d.zona ?? "geral"));
+        const ids = ativos.map((d: any) => d.id);
+        if (ids.length > 0) {
+          const desde = new Date(Date.now() - 15 * 60_000).toISOString();
+          const { data: leituras } = await supabase
+            .from("leituras_sensores")
+            .select("temperatura_c, umidade_pct, created_at, dispositivo_id")
+            .in("dispositivo_id", ids)
+            .gte("created_at", desde);
+          const temps = removerOutliersIQR(((leituras ?? []).map((l: any) => l.temperatura_c).filter((v: any) => v != null)));
+          const urs = removerOutliersIQR(((leituras ?? []).map((l: any) => l.umidade_pct).filter((v: any) => v != null)));
+          leitura = {
+            temperatura_c: mean(temps),
+            umidade_pct: mean(urs),
+            created_at: new Date().toISOString(),
+          };
+          zonasReason = `zonas=${zonasAtivas.join("+")}, sensores=${ids.length}/${(devs ?? []).length}, percentis=on`;
+        } else {
+          zonasReason = `zonas=${zonasAtivas.join("+")}, sensores=0/${(devs ?? []).length}, percentis=on`;
+        }
+      } else {
+        const { data: l } = await supabase
+          .from("leituras_sensores")
+          .select("temperatura_c, umidade_pct, created_at")
+          .eq("galpao_id", prog.galpao_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        leitura = l as any;
+      }
+      if (zonasReason) reason.push(zonasReason);
 
       // Estágio de ventilação atual
       const { data: estagio } = await supabase
