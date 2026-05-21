@@ -343,6 +343,14 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      <Helmet>
+        <title>Entrar | GSA Tibiri - Acesso à Plataforma</title>
+        <meta name="description" content="Acesse sua conta GSA Tibiri para gerenciar lotes, IoT, fábrica de ração e financeiro da sua granja em tempo real." />
+        <link rel="canonical" href="https://gsatibiri.com/auth" />
+        <meta property="og:title" content="Entrar | GSA Tibiri" />
+        <meta property="og:description" content="Faça login para acessar sua granja na plataforma GSA Tibiri." />
+        <meta property="og:url" content="https://gsatibiri.com/auth" />
+      </Helmet>
       {/* Background effects */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(145_60%_20%_/_0.15),transparent_70%)]" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
