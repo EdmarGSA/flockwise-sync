@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +8,14 @@ const PoliticaPrivacidade = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Política de Privacidade | GSA Tibiri</title>
+        <meta name="description" content="Política de Privacidade do GSA Tibiri: como coletamos, usamos e protegemos dados pessoais em conformidade com a LGPD (Lei 13.709/2018)." />
+        <link rel="canonical" href="https://gsatibiri.com/politica-privacidade" />
+        <meta property="og:title" content="Política de Privacidade | GSA Tibiri" />
+        <meta property="og:description" content="Como tratamos seus dados pessoais conforme a LGPD." />
+        <meta property="og:url" content="https://gsatibiri.com/politica-privacidade" />
+      </Helmet>
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-6 gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar

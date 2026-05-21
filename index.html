@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GSA Tibiri - Gestão na Palma da Mão</title>
-    <meta name="description" content="Sistema integrado que conecta todas as rotinas de criação avícola em um único lugar. Logística, monitoramento em tempo real e gestão completa de sua operação.">
+    <title>GSA Tibiri - Gestão Avícola Integrada na Palma da Mão</title>
+    <meta name="description" content="Plataforma integrada para granjas: monitoramento em tempo real, logística, IoT, fábrica de ração, financeiro e gestão completa de lotes avícolas." />
     <meta name="author" content="GSA Tibiri" />
 
     <!-- PWA Meta Tags -->
@@ -15,20 +15,42 @@
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- Open Graph -->
+    <!-- Open Graph (fallback para crawlers sem JS; Helmet sobrescreve por rota) -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="GSA Tibiri - Gestão na Palma da Mão">
-    <meta property="og:description" content="Sistema integrado que conecta todas as rotinas de criação avícola em um único lugar. Logística, monitoramento em tempo real e gestão completa de sua operação.">
+    <meta property="og:site_name" content="GSA Tibiri" />
+    <meta property="og:title" content="GSA Tibiri - Gestão Avícola Integrada" />
+    <meta property="og:description" content="Sistema integrado que conecta todas as rotinas de criação avícola em um único lugar." />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/U8Sd1ge1fVXiod9ts3dhsDWPbnp2/social-images/social-1765881400692-logoGSAOficnal.png">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@gsatibiri" />
-    <meta name="twitter:title" content="GSA Tibiri - Gestão na Palma da Mão">
-    <meta name="twitter:description" content="Sistema integrado que conecta todas as rotinas de criação avícola em um único lugar. Logística, monitoramento em tempo real e gestão completa de sua operação.">
+    <meta name="twitter:title" content="GSA Tibiri - Gestão Avícola Integrada" />
+    <meta name="twitter:description" content="Sistema integrado que conecta todas as rotinas de criação avícola em um único lugar." />
     <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/U8Sd1ge1fVXiod9ts3dhsDWPbnp2/social-images/social-1765881400692-logoGSAOficnal.png">
-    
+
     <link rel="icon" type="image/x-icon" href="https://storage.googleapis.com/gpt-engineer-file-uploads/U8Sd1ge1fVXiod9ts3dhsDWPbnp2/uploads/1765968767960-ChatGPT Image 17 de dez. de 2025, 07_52_27.png">
+
+    <!-- Structured Data: Organization + WebSite -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "GSA Tibiri",
+        "url": "https://gsatibiri.com",
+        "logo": "https://storage.googleapis.com/gpt-engineer-file-uploads/U8Sd1ge1fVXiod9ts3dhsDWPbnp2/uploads/1765968767960-ChatGPT Image 17 de dez. de 2025, 07_52_27.png",
+        "description": "Plataforma integrada de gestão avícola: lotes, IoT, fábrica de ração, financeiro e logística.",
+        "sameAs": ["https://www.gsatibiri.com"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "GSA Tibiri",
+        "url": "https://gsatibiri.com"
+      }
+    </script>
   </head>
 
   <body>

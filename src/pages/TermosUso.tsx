@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +8,14 @@ const TermosUso = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Termos de Uso | GSA Tibiri</title>
+        <meta name="description" content="Termos de Uso da plataforma GSA Tibiri (FlockWise Sync): condições de acesso, responsabilidades e regras de utilização conforme a legislação brasileira." />
+        <link rel="canonical" href="https://gsatibiri.com/termos-uso" />
+        <meta property="og:title" content="Termos de Uso | GSA Tibiri" />
+        <meta property="og:description" content="Condições de acesso e utilização da plataforma GSA Tibiri." />
+        <meta property="og:url" content="https://gsatibiri.com/termos-uso" />
+      </Helmet>
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-6 gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar
