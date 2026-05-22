@@ -79,6 +79,7 @@ interface Galpao {
   latitude: number | null;
   longitude: number | null;
   inercia_termica_min: number | null;
+  usar_percentis_automacao: boolean | null;
   created_at: string;
   updated_at: string;
 }
