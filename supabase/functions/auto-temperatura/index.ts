@@ -716,8 +716,14 @@ Deno.serve(async (req) => {
 
         const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? diasFimPinteiroOrg);
         const zonasAtivas = zonasAtivasPara(ageDays, null, diasFimPinteiro);
+        // Override por galpão > flag da org > false
+        const { data: galpaoOverride } = await supabase
+          .from("galpoes").select("usar_percentis_automacao")
+          .eq("id", lote.galpao_id).maybeSingle();
+        const usarPercentisGalpao: boolean = (galpaoOverride?.usar_percentis_automacao
+          ?? usarPercentisInt ?? false) as boolean;
         const galpaoDevs = (devices || []).filter((d: any) => d.galpao_id === lote.galpao_id);
-        const galpaoDevsAtivos = usarPercentisInt
+        const galpaoDevsAtivos = usarPercentisGalpao
           ? galpaoDevs.filter((d: any) => zonasAtivas.includes(((d as any).zona ?? "geral") as any))
           : galpaoDevs;
         const allGalpaoDeviceIds = (galpaoDevsAtivos.length ? galpaoDevsAtivos : galpaoDevs).map((d: any) => d.id);
