@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin, Activity } from "lucide-react";
 import { ZonasMetricasCard } from "@/components/lotes/historico-temp/ZonasMetricasCard";
+import { OverridePercentisGalpaoCard } from "@/components/lotes/historico-temp/OverridePercentisGalpaoCard";
+import { ValidacaoSombraCard } from "@/components/lotes/historico-temp/ValidacaoSombraCard";
 
 const alertaSchema = z.object({
   temp_max_critico: z.number().min(-10).max(50).nullable(),
@@ -440,8 +442,10 @@ const ConfiguracaoAlertasClima = () => {
           ))}
         </Tabs>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
           <ZonasMetricasCard />
+          <OverridePercentisGalpaoCard />
+          <ValidacaoSombraCard />
         </div>
       </main>
     </div>
