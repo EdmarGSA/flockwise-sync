@@ -442,8 +442,10 @@ const ConfiguracaoAlertasClima = () => {
           ))}
         </Tabs>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
           <ZonasMetricasCard />
+          <OverridePercentisGalpaoCard />
+          <ValidacaoSombraCard />
         </div>
       </main>
     </div>
