@@ -31,7 +31,7 @@ export interface DivergenciaLog {
 }
 
 export function useValidacaoSombra(dias: number = 7) {
-  const integradoId = useIntegradoId();
+  const { integradoId } = useIntegradoId();
   const [loading, setLoading] = useState(true);
   const [agregados, setAgregados] = useState<AgregadoGalpao[]>([]);
   const [divergencias, setDivergencias] = useState<DivergenciaLog[]>([]);
