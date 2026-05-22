@@ -366,6 +366,47 @@ export type Database = {
           },
         ]
       }
+      aprendizado_zona_clima: {
+        Row: {
+          amostras: number
+          atualizado_em: string
+          galpao_id: string
+          hora_dia: number
+          id: string
+          integrado_id: string
+          offset_c: number
+          zona: string
+        }
+        Insert: {
+          amostras?: number
+          atualizado_em?: string
+          galpao_id: string
+          hora_dia: number
+          id?: string
+          integrado_id: string
+          offset_c?: number
+          zona: string
+        }
+        Update: {
+          amostras?: number
+          atualizado_em?: string
+          galpao_id?: string
+          hora_dia?: number
+          id?: string
+          integrado_id?: string
+          offset_c?: number
+          zona?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprendizado_zona_clima_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           ativo: boolean
@@ -2943,6 +2984,7 @@ export type Database = {
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
           total_aves: number | null
           updated_at: string
+          usar_percentis_automacao: boolean | null
           ventilador_quantidade: number
         }
         Insert: {
@@ -2970,6 +3012,7 @@ export type Database = {
           tipo_pressao: Database["public"]["Enums"]["tipo_pressao"]
           total_aves?: number | null
           updated_at?: string
+          usar_percentis_automacao?: boolean | null
           ventilador_quantidade?: number
         }
         Update: {
@@ -2997,6 +3040,7 @@ export type Database = {
           tipo_pressao?: Database["public"]["Enums"]["tipo_pressao"]
           total_aves?: number | null
           updated_at?: string
+          usar_percentis_automacao?: boolean | null
           ventilador_quantidade?: number
         }
         Relationships: [
@@ -3538,6 +3582,7 @@ export type Database = {
           bloqueado_por: string | null
           canal_id: string | null
           created_at: string
+          decisao_sombra: Json | null
           dispositivo_id: string | null
           estado_decidido: string | null
           estagio: string | null
@@ -3558,6 +3603,7 @@ export type Database = {
           bloqueado_por?: string | null
           canal_id?: string | null
           created_at?: string
+          decisao_sombra?: Json | null
           dispositivo_id?: string | null
           estado_decidido?: string | null
           estagio?: string | null
@@ -3578,6 +3624,7 @@ export type Database = {
           bloqueado_por?: string | null
           canal_id?: string | null
           created_at?: string
+          decisao_sombra?: Json | null
           dispositivo_id?: string | null
           estado_decidido?: string | null
           estagio?: string | null
