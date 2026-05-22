@@ -41,13 +41,13 @@ Deno.serve(async (req) => {
         .eq("status", "alojado")
         .maybeSingle();
 
-      // Config zonas/percentis da org
-      const { data: cfgZ } = await supabase
-        .from("config_zonas_galpao")
-        .select("dias_fim_pinteiro, usar_percentis_automacao")
-        .eq("integrado_id", prog.integrado_id)
-        .maybeSingle();
-      const usarPercentis = !!cfgZ?.usar_percentis_automacao;
+      // Override por galpão > flag da org > false
+      const [{ data: galpaoRow }, { data: cfgZ }] = await Promise.all([
+        supabase.from("galpoes").select("usar_percentis_automacao").eq("id", prog.galpao_id).maybeSingle(),
+        supabase.from("config_zonas_galpao").select("dias_fim_pinteiro, usar_percentis_automacao").eq("integrado_id", prog.integrado_id).maybeSingle(),
+      ]);
+      const usarPercentis: boolean = (galpaoRow?.usar_percentis_automacao
+        ?? cfgZ?.usar_percentis_automacao ?? false) as boolean;
       const diasFimPinteiro =
         (lote as any)?.dias_fim_pinteiro ?? cfgZ?.dias_fim_pinteiro ?? 14;
 
