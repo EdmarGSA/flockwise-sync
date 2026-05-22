@@ -135,13 +135,13 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // Config zonas (Fase 2)
-    const { data: cfgZonas } = await supabase
-      .from("config_zonas_galpao")
-      .select("dias_fim_pinteiro, usar_percentis_automacao")
-      .eq("integrado_id", prog.integrado_id)
-      .maybeSingle();
-    const usarPercentis = !!cfgZonas?.usar_percentis_automacao;
+    // Config zonas (Fase 2) + override por galpão (Fase 3)
+    const [{ data: galpaoRow }, { data: cfgZonas }] = await Promise.all([
+      supabase.from("galpoes").select("usar_percentis_automacao").eq("id", prog.galpao_id).maybeSingle(),
+      supabase.from("config_zonas_galpao").select("dias_fim_pinteiro, usar_percentis_automacao").eq("integrado_id", prog.integrado_id).maybeSingle(),
+    ]);
+    const usarPercentis: boolean = (galpaoRow?.usar_percentis_automacao
+      ?? cfgZonas?.usar_percentis_automacao ?? false) as boolean;
     const diasFimPinteiro = Number((lote as any).dias_fim_pinteiro ?? cfgZonas?.dias_fim_pinteiro ?? 14);
     const idadeDiasVent = Math.max(1, Math.floor(
       (Date.now() - new Date(lote.data_alojamento).getTime()) / 86400000) + 1);
