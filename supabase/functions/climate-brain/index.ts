@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const offsetTemp = Number(aprendizado?.offset_temp_aprendido_c ?? 0);
 
-    const tempAlvo = Number(curvaPonto.temp_alvo_c) + offsetTemp;
+    let tempAlvo = Number(curvaPonto.temp_alvo_c) + offsetTemp;
     const urMax = Number(curvaPonto.ur_max_pct ?? 70);
     const ithVermelho = Number(curvaPonto.ith_alarme_vermelho ?? 78);
     const tempMaxAlarme = Number(curvaPonto.temp_max_alarme_c);
