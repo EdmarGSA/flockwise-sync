@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
       ur_lida: ctxReal.urPct,
       ith_calc: ctxReal.ithVal,
       setpoint_alvo: tempAlvo,
-      reason_chain: [dReal.motivo, zonasReason, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
+      reason_chain: [dReal.motivo, zonasReason, `offset_zona=${offsetZona.toFixed(2)}°C (${fonteOffsetZona}@h${horaAtual})`, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
       decisao_sombra: dSombra ? {
         percentis: !percentisAtivo,
         modo: dSombra.modo,
