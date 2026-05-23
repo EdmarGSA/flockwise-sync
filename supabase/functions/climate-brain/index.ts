@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const offsetTemp = Number(aprendizado?.offset_temp_aprendido_c ?? 0);
 
-    const tempAlvo = Number(curvaPonto.temp_alvo_c) + offsetTemp;
+    let tempAlvo = Number(curvaPonto.temp_alvo_c) + offsetTemp;
     const urMax = Number(curvaPonto.ur_max_pct ?? 70);
     const ithVermelho = Number(curvaPonto.ith_alarme_vermelho ?? 78);
     const tempMaxAlarme = Number(curvaPonto.temp_max_alarme_c);
@@ -200,6 +200,28 @@ Deno.serve(async (req) => {
                          : cfgZonas?.usar_percentis_automacao != null ? "org" : "default";
     const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? cfgZonas?.dias_fim_pinteiro ?? 14);
     const zonasAtivas = zonasAtivasPara(idadeDias, null, diasFimPinteiro);
+
+    // v2: offset aprendido por zona × hora do dia
+    const horaAtual = new Date().getUTCHours();
+    let offsetZona = 0;
+    let fonteOffsetZona = "nenhuma";
+    try {
+      const { data: offsetsZona } = await supabase
+        .from("aprendizado_zona_clima")
+        .select("zona, offset_c, amostras")
+        .eq("galpao_id", lote.galpao_id)
+        .eq("hora_dia", horaAtual)
+        .in("zona", zonasAtivas);
+      const validos = (offsetsZona ?? []).filter((o: any) => Number(o.amostras) >= 10);
+      if (validos.length > 0) {
+        offsetZona = validos.reduce((s: number, o: any) => s + Number(o.offset_c), 0) / validos.length;
+        offsetZona = Math.max(-2, Math.min(2, offsetZona));
+        fonteOffsetZona = validos.map((o: any) => o.zona).join("+");
+        tempAlvo += offsetZona;
+      }
+    } catch (e) {
+      console.error("[climate-brain] erro offset zona:", e);
+    }
 
     // Dispositivos + leituras 15 min
     const { data: devs } = await supabase
@@ -289,7 +311,7 @@ Deno.serve(async (req) => {
       ur_lida: ctxReal.urPct,
       ith_calc: ctxReal.ithVal,
       setpoint_alvo: tempAlvo,
-      reason_chain: [dReal.motivo, zonasReason, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
+      reason_chain: [dReal.motivo, zonasReason, `offset_zona=${offsetZona.toFixed(2)}°C (${fonteOffsetZona}@h${horaAtual})`, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
       decisao_sombra: dSombra ? {
         percentis: !percentisAtivo,
         modo: dSombra.modo,

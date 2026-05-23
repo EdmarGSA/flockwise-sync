@@ -113,7 +113,96 @@ Deno.serve(async (req) => {
       ...(narrativa ? { narrativa_ia: narrativa, narrativa_atualizada_em: new Date().toISOString() } : {}),
     }, { onConflict: "galpao_id" });
 
-    treinados.push({ galpao: g.id, novoOffset, mae, amostras: logs.length });
+    // ===== v2: aprendizado por zona × hora_dia =====
+    // Para cada zona do galpão, coleta leituras das últimas 72h dos sensores daquela zona,
+    // agrupa por hora do dia, compara com o setpoint médio do log na mesma janela,
+    // e atualiza offset_c via EMA (α=0.1, ±2°C).
+    let zonasAtualizadas = 0;
+    try {
+      const { data: devs } = await supabase
+        .from("dispositivos_iot")
+        .select("id, zona")
+        .eq("galpao_id", g.id)
+        .eq("ativo", true);
+
+      const porZona = new Map<string, string[]>();
+      for (const d of devs ?? []) {
+        const z = (d as any).zona ?? "geral";
+        if (!porZona.has(z)) porZona.set(z, []);
+        porZona.get(z)!.push((d as any).id);
+      }
+
+      // Setpoint médio por hora-do-dia (do log já carregado)
+      const setpointHora = new Map<number, { soma: number; n: number }>();
+      for (const l of logs as any[]) {
+        const h = new Date(l.created_at).getUTCHours();
+        const sp = Number(l.setpoint_alvo);
+        if (!Number.isFinite(sp)) continue;
+        const acc = setpointHora.get(h) ?? { soma: 0, n: 0 };
+        acc.soma += sp; acc.n += 1;
+        setpointHora.set(h, acc);
+      }
+
+      for (const [zona, devIds] of porZona) {
+        if (devIds.length === 0) continue;
+        const { data: leituras } = await supabase
+          .from("leituras_sensores")
+          .select("temperatura_c, lido_em")
+          .in("dispositivo_id", devIds)
+          .gte("lido_em", since)
+          .not("temperatura_c", "is", null);
+
+        const tempHora = new Map<number, { soma: number; n: number }>();
+        for (const r of leituras ?? []) {
+          const t = Number((r as any).temperatura_c);
+          if (!Number.isFinite(t)) continue;
+          const h = new Date((r as any).lido_em).getUTCHours();
+          const acc = tempHora.get(h) ?? { soma: 0, n: 0 };
+          acc.soma += t; acc.n += 1;
+          tempHora.set(h, acc);
+        }
+
+        const { data: existentes } = await supabase
+          .from("aprendizado_zona_clima")
+          .select("hora_dia, offset_c, amostras")
+          .eq("galpao_id", g.id)
+          .eq("zona", zona);
+        const mapaExist = new Map<number, { offset_c: number; amostras: number }>(
+          (existentes ?? []).map((e: any) => [e.hora_dia, { offset_c: Number(e.offset_c), amostras: e.amostras }]),
+        );
+
+        const upserts: any[] = [];
+        for (const [h, accT] of tempHora) {
+          const accSp = setpointHora.get(h);
+          if (!accSp || accSp.n < 2 || accT.n < 3) continue;
+          const tempMed = accT.soma / accT.n;
+          const spMed = accSp.soma / accSp.n;
+          const div = tempMed - spMed;
+          const cur = mapaExist.get(h) ?? { offset_c: 0, amostras: 0 };
+          const novo = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, cur.offset_c + ALPHA * (-div)));
+          upserts.push({
+            integrado_id: integradoId,
+            galpao_id: g.id,
+            zona,
+            hora_dia: h,
+            offset_c: Number(novo.toFixed(2)),
+            amostras: cur.amostras + accT.n,
+            atualizado_em: new Date().toISOString(),
+          });
+        }
+
+        if (upserts.length > 0) {
+          await supabase
+            .from("aprendizado_zona_clima")
+            .upsert(upserts, { onConflict: "galpao_id,zona,hora_dia" });
+          zonasAtualizadas += upserts.length;
+        }
+      }
+    } catch (e) {
+      console.error("[climate-learn v2] erro aprendizado por zona:", e);
+    }
+
+    treinados.push({ galpao: g.id, novoOffset, mae, amostras: logs.length, zonas_buckets: zonasAtualizadas });
   }
 
   return new Response(JSON.stringify({ ok: true, treinados }), {
