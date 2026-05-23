@@ -201,6 +201,28 @@ Deno.serve(async (req) => {
     const diasFimPinteiro = Number(lote.dias_fim_pinteiro ?? cfgZonas?.dias_fim_pinteiro ?? 14);
     const zonasAtivas = zonasAtivasPara(idadeDias, null, diasFimPinteiro);
 
+    // v2: offset aprendido por zona × hora do dia
+    const horaAtual = new Date().getUTCHours();
+    let offsetZona = 0;
+    let fonteOffsetZona = "nenhuma";
+    try {
+      const { data: offsetsZona } = await supabase
+        .from("aprendizado_zona_clima")
+        .select("zona, offset_c, amostras")
+        .eq("galpao_id", lote.galpao_id)
+        .eq("hora_dia", horaAtual)
+        .in("zona", zonasAtivas);
+      const validos = (offsetsZona ?? []).filter((o: any) => Number(o.amostras) >= 10);
+      if (validos.length > 0) {
+        offsetZona = validos.reduce((s: number, o: any) => s + Number(o.offset_c), 0) / validos.length;
+        offsetZona = Math.max(-2, Math.min(2, offsetZona));
+        fonteOffsetZona = validos.map((o: any) => o.zona).join("+");
+        tempAlvo += offsetZona;
+      }
+    } catch (e) {
+      console.error("[climate-brain] erro offset zona:", e);
+    }
+
     // Dispositivos + leituras 15 min
     const { data: devs } = await supabase
       .from("dispositivos_iot")
