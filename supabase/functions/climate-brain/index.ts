@@ -430,6 +430,7 @@ Deno.serve(async (req) => {
     callFn("auto-ventilacao", {}),
     callFn("auto-cortina", {}),
     decisoesNeb.length > 0 ? callFn("auto-nebulizacao", { decisoes: decisoesNeb }) : Promise.resolve(),
+    callFn("brain-dispatcher", {}),
   ]);
 
   return new Response(JSON.stringify({ ok: true, processados: resultados.length, resultados }), {
