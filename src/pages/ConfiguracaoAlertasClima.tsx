@@ -16,6 +16,7 @@ import { ArrowLeft, Save, Thermometer, Wind, Droplets, CloudRain, Globe, MapPin,
 import { ZonasMetricasCard } from "@/components/lotes/historico-temp/ZonasMetricasCard";
 import { OverridePercentisGalpaoCard } from "@/components/lotes/historico-temp/OverridePercentisGalpaoCard";
 import { ValidacaoSombraCard } from "@/components/lotes/historico-temp/ValidacaoSombraCard";
+import { SensorDriftStatusCard } from "@/components/lotes/historico-temp/SensorDriftStatusCard";
 
 const alertaSchema = z.object({
   temp_max_critico: z.number().min(-10).max(50).nullable(),
