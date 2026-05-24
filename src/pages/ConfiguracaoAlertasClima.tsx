@@ -445,6 +445,7 @@ const ConfiguracaoAlertasClima = () => {
 
         <div className="mt-6 space-y-6">
           <ZonasMetricasCard />
+          <SensorDriftStatusCard integradoId={integradoId} />
           <OverridePercentisGalpaoCard />
           <ValidacaoSombraCard />
         </div>
