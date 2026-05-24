@@ -28,6 +28,7 @@ interface Aprendizado {
 interface GalpaoRow {
   id: string;
   nome: string;
+  automacao_brain: "off" | "shadow" | "auto";
   aprendizado?: Aprendizado;
 }
 
