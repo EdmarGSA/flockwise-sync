@@ -89,7 +89,7 @@ const Auth = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
   
-  const { signIn, signUp, user, loading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
   
 
@@ -244,9 +244,16 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await signUp(email, password, fullName);
+        const { error, needsEmailConfirmation } = await signUp(email, password, fullName);
         if (error) {
           toast.error("Erro no cadastro", { description: translateAuthError(error.message) });
+        } else if (needsEmailConfirmation) {
+          toast.success("Confira seu email", {
+            description: "Enviamos um link de confirmação. Após confirmar, faça login para acessar.",
+          });
+          setIsLogin(true);
+          setPassword('');
+          setConfirmPassword('');
         } else {
           toast.success("Conta criada!", { description: "Cadastro realizado com sucesso." });
           navigate('/home');
