@@ -1,83 +1,74 @@
-# Auditoria – Cadastro de Nova Organização (integrado_id)
 
-Escopo auditado: `src/pages/Auth.tsx`, `src/hooks/useAuth.tsx`, função `public.handle_new_user`, tabela `public.organizacoes`, `src/pages/CadastroOrganizacao.tsx` e `src/components/cadastro/OrganizacaoForm.tsx`.
+# Plano — Brain AI administrando dispositivos (Fase Sombra → Auto)
 
-Importante: a "organização" tem dois sentidos no projeto:
-- **integrado_id** (tenant) — criado automaticamente no signup (vira o próprio `user.id` do primeiro admin).
-- **organizacoes** (tabela) — dados cadastrais de empresas dentro de um tenant.
-Os dois fluxos foram auditados.
+## Objetivo
+Fechar o loop **decisão → atuação → verificação** do Climate Brain sobre **ventilação, nebulização, aquecimento e iluminação**, começando em **modo sombra** (só sugere, não aciona) e com travas de segurança fortes.
 
----
+## Como funciona hoje (baseline)
+- `climate-brain` roda a cada 1 min, calcula modo (CONFORTO/AQUECIMENTO/ALERTA/EMERGÊNCIA), grava em `log_decisao_clima` e dispara `auto-ventilacao`, `auto-cortina`, `auto-nebulizacao`.
+- Essas funções é que falam com eWeLink / `esp32-bridge`. O Brain hoje **não decide o estado físico** de cada relé — ele só sinaliza intenção.
+- Iluminação roda independente em `auto-iluminacao` (programa por idade).
 
-## 🔴 Críticos (segurança)
+## O que muda
 
-### C1. Spoofing de tenant via metadata do signup
-`handle_new_user` confia em `raw_user_meta_data->>'integrado_id'`:
-```
-target_integrado_id := COALESCE(
-  (new.raw_user_meta_data ->> 'integrado_id')::uuid,
-  new.id
-);
-```
-Qualquer cliente pode chamar `supabase.auth.signUp({ options: { data: { integrado_id: '<tenant-alvo>' } } })` e entrar como usuário **de outro tenant**. Hoje o front só envia `full_name`, mas a porta está aberta no servidor.
+### 1. Camada de "Comando do Brain" (nova)
+Tabela `comando_brain` (uma linha por intenção):
+- `galpao_id`, `funcao` (ventilacao/nebulizacao/aquecimento/iluminacao), `canal_id`
+- `estado_desejado` (on/off, pwm 0-100, estágio N)
+- `origem` = `brain_shadow` | `brain_auto` | `manual`
+- `motivo` (texto), `decisao_id` (FK `log_decisao_clima`)
+- `status`: `sugerido` | `aprovado` | `enviado` | `confirmado` | `falhou` | `ignorado`
+- `executado_em`, `confirmado_em`, `erro`
 
-**Correção:** ignorar `integrado_id` vindo do cliente. Aceitar vínculo a tenant existente **apenas** via fluxo controlado (edge function `criar-membro` que já existe). Para signup público, forçar `target_integrado_id := new.id`.
+Em **modo sombra** o Brain só insere com `status=sugerido`. O dispatcher real só atua quando `status=aprovado` (humano clica) ou quando o galpão estiver com `automacao_brain_ativa=true`.
 
-### C2. Auto-confirmação de email não verificada
-`signUp` em `useAuth` redireciona para `/` e o `handleSubmit` chama `navigate('/home')` imediatamente após signup. Se a confirmação por email estiver ativa (recomendado), o usuário não tem sessão e é deslogado para `/auth` sem mensagem. Precisa verificar `data.session` e exibir tela "verifique seu email" quando `session === null`.
+### 2. Toggle por galpão
+Coluna `galpoes.automacao_brain` enum (`off` | `shadow` | `auto`), default `shadow`. Card no Climate Brain mostra o estado e botão de "Pânico" que volta para `off` e desliga todos canais via `esp32-bridge`/eWeLink.
 
----
+### 3. Dispatcher único (`brain-dispatcher`, nova edge function)
+- Lê `comando_brain` pendentes elegíveis e executa via o driver certo (`esp32-bridge` ou eWeLink).
+- Após enviar, marca `enviado` e aguarda telemetria de retorno (estado do canal) — quando bater, vira `confirmado`. Se em 60s não confirmar, marca `falhou` e dispara alerta.
 
-## 🟠 Importantes (consistência / dados)
+### 4. Travas de segurança (todas obrigatórias antes de gerar `comando_brain`)
+- **Drift**: se algum sensor relevante do galpão está em `sensor_drift_status.excluido_agregacao=true` E sobraram <2 sensores válidos → não comanda, loga `bloqueado_drift`.
+- **Sustentação**: nova tabela `intencao_brain_pendente` guarda a intenção atual + `desde`; só vira `comando_brain` quando persistir por `min_minutos_sustentado` (já existe em `config_zonas_galpao`). Emergência (ITH vermelho/temp máx) pula essa janela.
+- **Cooldown**: coluna `canais_dispositivo.ultimo_comando_em` + `cooldown_seg` (default 90s ventilação, 30s nebulização, 300s aquecimento). Dispatcher rejeita se ainda no cooldown.
+- **Fallback offline**: se `dispositivos_iot.online=false`, marca comando como `falhou` imediatamente, dispara `dispatch_notificacao('brain_atuador_offline')` e tenta canal redundante se existir (`canais_dispositivo.canal_redundante_id`).
 
-### I1. Seed de dados de referência incompleto para novos tenants
-`handle_new_user` só cria: `profiles`, `user_roles(admin)`, `mortalidade_media` e programas de iluminação padrão. Faltam itens que `initialize_demo_data` cria (`config_silo`, `config_fechamento`, `areas`, `grupos_produto`, `categorias` básicas). Tenant novo nasce sem configurações essenciais → quebra telas de Silos, Fechamento etc.
-**Correção:** criar `seed_organizacao_padrao(integrado_id)` chamado por `handle_new_user` quando `target_integrado_id = new.id`, inserindo apenas dados estruturais (sem dados-demo de lotes/parceiros fictícios).
+### 5. Event-driven
+- Hoje o cron roda a cada 1 min. Vamos **manter** o cron como heartbeat de segurança, mas adicionar trigger:
+- Após `INSERT` em `leituras_sensores` (ou `eventos_dispositivo_iot` tipo telemetria), uma função `trigger_reavaliar_brain` enfileira o `galpao_id` numa tabela `brain_fila_reavaliacao` (com debounce de 10s por galpão).
+- Worker `brain-worker` (cron a cada 15s) consome a fila e roda `climate-brain` só para os galpões enfileirados — barato e responsivo.
 
-### I2. `CadastroOrganizacao.fetchData` filtra por `profile?.id` em vez de `profile.integrado_id`
-```ts
-.eq('integrado_id', profile?.id)
-```
-Funciona para o admin do tenant (id == integrado_id), mas membros (criador/veterinário) não enxergam nada. Deve ser `profile.integrado_id` para alinhar com a RLS.
+### 6. Iluminação no Brain
+Hoje `auto-iluminacao` decide sozinho. Vamos **manter ele como executor** mas o Brain passa a poder sobrescrever via `override_brain` em emergência (ex.: apagar luz se estresse térmico extremo durante o dia). Override expira automaticamente quando emergência sai.
 
-### I3. `OrganizacaoForm` não valida CNPJ nem unicidade
-- Sem validação de DV do CNPJ.
-- Sem checagem se o CNPJ já existe no tenant antes do insert.
-- `email` é salvo sem `.toLowerCase()/trim()`.
-**Correção:** validar 14 dígitos + DV, `unique (integrado_id, cnpj)` no banco (index parcial onde `cnpj is not null`), normalizar email.
+### 7. UI no Climate Brain
+- Cada card de galpão ganha:
+  - Badge do modo (`off`/`shadow`/`auto`)
+  - Tabela "Últimas sugestões" (origem `brain_shadow`) com botão **Aprovar** (cria `comando_brain` com `status=aprovado`)
+  - KPI: % sugestões aprovadas vs ignoradas nos últimos 7 dias (semáforo de confiança)
+- Nova página `/configuracoes/brain-automacao` para ligar `auto` por galpão depois que a confiança subir.
 
-### I4. Cadastro sem Google OAuth
-Diretriz do projeto pede Google habilitado por padrão. Hoje só há email/senha. Adicionar botão "Continuar com Google" no `Auth.tsx` e configurar provider.
+## Entregáveis técnicos
 
----
+| Item | Tipo |
+|---|---|
+| Migration: `galpoes.automacao_brain`, `canais_dispositivo.cooldown_seg / ultimo_comando_em / canal_redundante_id`, tabelas `comando_brain`, `intencao_brain_pendente`, `brain_fila_reavaliacao` + RLS por `integrado_id` | SQL |
+| Refactor `climate-brain` para gerar `intencao_brain_pendente` + checar drift/sustentação | Edge fn |
+| Nova `brain-dispatcher` (cron 15s, lê `comando_brain` aprovados/auto) | Edge fn |
+| Nova `brain-worker` (consome `brain_fila_reavaliacao`) + trigger SQL em `leituras_sensores` | Edge fn + SQL |
+| Tipo evento `brain_atuador_offline` + `brain_comando_falhou` em `tipos_evento_notificacao` | SQL |
+| `SensorDriftStatusCard` reaproveitado + novo `SugestoesBrainCard` no `ClimateBrain.tsx` | React |
+| Nova página `BrainAutomacao.tsx` (toggle por galpão + botão pânico) | React |
 
-## 🟡 Menores (UX / robustez)
+## Ordem de execução
+1. Migration + tipos de notificação.
+2. `brain-dispatcher` + UI de sugestão/aprovação (modo sombra já útil sem riscos).
+3. Trigger event-driven + `brain-worker`.
+4. Liberar toggle `auto` por galpão após 7 dias de sombra estável.
 
-- **M1.** `Auth.tsx` toast "Conta criada" sempre aparece mesmo quando o backend rejeita a sessão por confirmação pendente.
-- **M2.** `OrganizacaoForm.onSubmit` faz `update(values)` incluindo todo o objeto, sem proteger `integrado_id` — RLS protege, mas convém remover `integrado_id` do payload do update.
-- **M3.** Sem coluna `created_by` em `organizacoes` (boa para auditoria).
-- **M4.** `fetchProfile` é refeito sem tratar erro; se `profile` for null, `fetchData` nunca roda — mostrar estado vazio explicativo.
-- **M5.** Schema do signup permite senhas comuns ("Abcdef12") — habilitar política HIBP/leaked-password no projeto.
-
----
-
-## Plano de correção (ordem sugerida)
-
-1. **Hardening do `handle_new_user`** (migration):
-   - Ignorar `integrado_id` da metadata; sempre `new.id` em signup público.
-   - Criar helper `seed_organizacao_padrao(uuid)` para `config_silo`, `config_fechamento`, grupos/categorias mínimas.
-2. **Migration `organizacoes`**:
-   - Adicionar `created_by uuid default auth.uid()`.
-   - Índice único parcial `(integrado_id, cnpj) where cnpj is not null`.
-3. **`Auth.tsx` / `useAuth`**:
-   - Tratar resposta de `signUp` quando `data.session === null` (tela "verifique seu email").
-   - Adicionar login com Google (`signInWithOAuth`).
-4. **`CadastroOrganizacao.tsx`**: trocar filtro para `profile.integrado_id`.
-5. **`OrganizacaoForm.tsx`**: validar DV do CNPJ, normalizar email, remover `integrado_id` do update, mensagem de erro específica para violação de unique.
-6. **Configuração de Auth no Cloud**: habilitar "leaked password protection" e revisar se "auto-confirm" está desligado.
-
-## Itens fora deste plano (sinalizar, não alterar agora)
-- Onboarding pós-signup (wizard de organização, área, núcleo) — sugerido como próximo épico.
-- Migração de tenants existentes que tenham sido criados via spoofing (verificar `profiles` cuja `integrado_id != id` e não foram inseridos pela edge function de membros).
-
-Confirme e eu implemento na ordem acima (posso quebrar em PRs separadas se preferir).
+## Fora deste plano
+- Cortinas (você não marcou — segue como está).
+- Aprendizado de cooldowns ótimos por galpão (versão futura usando `climate-learn`).
+- Atuação preditiva (antecipar pico de calor pela previsão) — fica para fase 2.
