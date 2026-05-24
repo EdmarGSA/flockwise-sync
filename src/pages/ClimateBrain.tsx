@@ -198,6 +198,12 @@ export default function ClimateBrain() {
                         <RefreshCw className="h-4 w-4 mr-2" /> Resetar aprendizado
                       </Button>
                     )}
+                    <SugestoesBrainCard
+                      galpaoId={g.id}
+                      galpaoNome={g.nome}
+                      modoAtual={g.automacao_brain}
+                      onChange={carregar}
+                    />
                   </CardContent>
                 </Card>
               );
