@@ -43,9 +43,29 @@ const brasilApiSchema = z.object({
   email: z.string().max(100).nullable().optional(),
 });
 
+// Valida dígitos verificadores do CNPJ
+const isValidCNPJ = (raw: string): boolean => {
+  const cnpj = raw.replace(/\D/g, '');
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+  const calc = (base: string, weights: number[]) => {
+    const sum = base.split('').reduce((acc, n, i) => acc + parseInt(n, 10) * weights[i], 0);
+    const mod = sum % 11;
+    return mod < 2 ? 0 : 11 - mod;
+  };
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const d1 = calc(cnpj.slice(0, 12), w1);
+  const d2 = calc(cnpj.slice(0, 12) + d1, w2);
+  return d1 === parseInt(cnpj[12], 10) && d2 === parseInt(cnpj[13], 10);
+};
+
 const formSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  cnpj: z.string().optional(),
+  cnpj: z.string().optional().refine(
+    (v) => !v || v.replace(/\D/g, '').length === 0 || isValidCNPJ(v),
+    { message: "CNPJ inválido" }
+  ),
   inscricao_estadual: z.string().optional(),
   telefone: z.string().optional(),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
@@ -200,28 +220,49 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    
+
+    const payload = {
+      ...values,
+      email: values.email ? values.email.trim().toLowerCase() : values.email,
+      cnpj: values.cnpj ? values.cnpj.replace(/\D/g, '') : null,
+    };
+
     if (isEditing) {
+      // não permitir alteração de tenant via update
+      const { integrado_id: _omit, ...updatePayload } = payload as any;
       const { error } = await supabase
         .from('organizacoes')
-        .update(values)
+        .update(updatePayload)
         .eq('id', organizacao.id);
 
       if (error) {
         console.error(error);
-        toast.error("Erro ao atualizar");
+        if (error.code === '23505') {
+          toast.error("CNPJ já cadastrado nesta organização");
+        } else {
+          toast.error("Erro ao atualizar");
+        }
         setLoading(false);
         return;
       }
     } else {
+      if (!integradoId) {
+        toast.error("Não foi possível identificar a organização");
+        setLoading(false);
+        return;
+      }
       const { error } = await supabase.from('organizacoes').insert({
-        ...values,
+        ...payload,
         integrado_id: integradoId,
       } as any);
 
       if (error) {
         console.error(error);
-        toast.error("Erro ao salvar");
+        if (error.code === '23505') {
+          toast.error("CNPJ já cadastrado nesta organização");
+        } else {
+          toast.error("Erro ao salvar");
+        }
         setLoading(false);
         return;
       }

@@ -43,10 +43,15 @@ const CadastroOrganizacao = () => {
 
   const fetchData = async () => {
     setLoadingData(true);
+    if (!profile?.integrado_id) {
+      setOrganizacoes([]);
+      setLoadingData(false);
+      return;
+    }
     const { data } = await supabase
       .from('organizacoes')
       .select('*')
-      .eq('integrado_id', profile?.id);
+      .eq('integrado_id', profile.integrado_id);
     if (data) setOrganizacoes(data);
     setLoadingData(false);
   };
@@ -106,7 +111,7 @@ const CadastroOrganizacao = () => {
           <Card>
             <CardContent className="pt-6">
               <OrganizacaoForm 
-                integradoId={profile?.id} 
+                integradoId={profile?.integrado_id} 
                 organizacao={editingOrg}
                 onSuccess={handleSuccess}
                 onCancel={handleCancel}

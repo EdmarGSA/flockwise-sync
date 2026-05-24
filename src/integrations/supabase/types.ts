@@ -5419,6 +5419,7 @@ export type Database = {
           cidade: string | null
           cnpj: string | null
           created_at: string
+          created_by: string | null
           email: string | null
           endereco: string | null
           estado: string | null
@@ -5435,6 +5436,7 @@ export type Database = {
           cidade?: string | null
           cnpj?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
           endereco?: string | null
           estado?: string | null
@@ -5451,6 +5453,7 @@ export type Database = {
           cidade?: string | null
           cnpj?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
           endereco?: string | null
           estado?: string | null
@@ -9579,6 +9582,10 @@ export type Database = {
         }[]
       }
       same_organization: { Args: { _user_id: string }; Returns: boolean }
+      seed_organizacao_padrao: {
+        Args: { p_integrado_id: string }
+        Returns: undefined
+      }
       seed_programas_iluminacao_default: {
         Args: { p_integrado_id: string }
         Returns: undefined
