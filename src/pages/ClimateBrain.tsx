@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Brain, Sparkles, RefreshCw, Activity, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Brain, Sparkles, RefreshCw, Activity, LayoutDashboard, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import Header from "@/components/Header";
@@ -111,6 +111,9 @@ export default function ClimateBrain() {
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => navigate("/configuracoes/ambiencia")}>
               <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard ambiência
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/configuracoes/brain-automacao")}>
+              <ShieldAlert className="h-4 w-4 mr-2" /> Automação
             </Button>
             <Button variant="outline" onClick={rodarBrain} disabled={running}>
               <Activity className={`h-4 w-4 mr-2 ${running ? "animate-pulse" : ""}`} />
