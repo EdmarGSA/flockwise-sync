@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Brain, Sparkles, RefreshCw, Activity, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Brain, Sparkles, RefreshCw, Activity, LayoutDashboard, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import Header from "@/components/Header";
