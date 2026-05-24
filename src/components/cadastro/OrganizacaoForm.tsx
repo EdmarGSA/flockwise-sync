@@ -220,28 +220,49 @@ const OrganizacaoForm = ({ integradoId, organizacao, onSuccess, onCancel }: Orga
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    
+
+    const payload = {
+      ...values,
+      email: values.email ? values.email.trim().toLowerCase() : values.email,
+      cnpj: values.cnpj ? values.cnpj.replace(/\D/g, '') : null,
+    };
+
     if (isEditing) {
+      // não permitir alteração de tenant via update
+      const { integrado_id: _omit, ...updatePayload } = payload as any;
       const { error } = await supabase
         .from('organizacoes')
-        .update(values)
+        .update(updatePayload)
         .eq('id', organizacao.id);
 
       if (error) {
         console.error(error);
-        toast.error("Erro ao atualizar");
+        if (error.code === '23505') {
+          toast.error("CNPJ já cadastrado nesta organização");
+        } else {
+          toast.error("Erro ao atualizar");
+        }
         setLoading(false);
         return;
       }
     } else {
+      if (!integradoId) {
+        toast.error("Não foi possível identificar a organização");
+        setLoading(false);
+        return;
+      }
       const { error } = await supabase.from('organizacoes').insert({
-        ...values,
+        ...payload,
         integrado_id: integradoId,
       } as any);
 
       if (error) {
         console.error(error);
-        toast.error("Erro ao salvar");
+        if (error.code === '23505') {
+          toast.error("CNPJ já cadastrado nesta organização");
+        } else {
+          toast.error("Erro ao salvar");
+        }
         setLoading(false);
         return;
       }
