@@ -338,6 +338,85 @@ Deno.serve(async (req) => {
       } : null,
     });
 
+    // ────────────────────────────────────────────────
+    // Sugestões SHADOW: registra intenção em comando_brain
+    // (status=sugerido). O brain-dispatcher só atua se humano
+    // aprovar OU se galpao.automacao_brain='auto'.
+    // ────────────────────────────────────────────────
+    try {
+      const { data: galpaoMode } = await supabase
+        .from("galpoes")
+        .select("automacao_brain")
+        .eq("id", lote.galpao_id)
+        .maybeSingle();
+      const modoAuto = galpaoMode?.automacao_brain ?? "shadow";
+
+      if (modoAuto !== "off") {
+        const origem = modoAuto === "auto" ? "brain_auto" : "brain_shadow";
+        const sugestoes: any[] = [];
+
+        // Ventilação: estado desejado mapeado pelo modo
+        const ventAcao = dReal.modo === "AQUECIMENTO" ? "desligar" : "ligar";
+        sugestoes.push({
+          integrado_id: lote.integrado_id,
+          galpao_id: lote.galpao_id,
+          funcao: "ventilacao",
+          estado_desejado: { acao: ventAcao, pct: ventPct, modo: dReal.modo },
+          origem, motivo: dReal.motivo, status: "sugerido",
+        });
+
+        // Nebulização: ação direta da decisão
+        if (dReal.acaoNeb !== "manter") {
+          sugestoes.push({
+            integrado_id: lote.integrado_id,
+            galpao_id: lote.galpao_id,
+            funcao: "nebulizacao",
+            estado_desejado: { acao: dReal.acaoNeb },
+            origem, motivo: dReal.motivo, status: "sugerido",
+          });
+        }
+
+        // Aquecimento: só em AQUECIMENTO/EMERGENCIA invertido
+        if (dReal.modo === "AQUECIMENTO") {
+          sugestoes.push({
+            integrado_id: lote.integrado_id,
+            galpao_id: lote.galpao_id,
+            funcao: "aquecimento",
+            estado_desejado: { acao: "ligar", troca_ar_duty: trocaArDuty },
+            origem, motivo: dReal.motivo, status: "sugerido",
+          });
+        } else if (dReal.modo === "ALERTA_CALOR" || dReal.modo === "EMERGENCIA") {
+          sugestoes.push({
+            integrado_id: lote.integrado_id,
+            galpao_id: lote.galpao_id,
+            funcao: "aquecimento",
+            estado_desejado: { acao: "desligar" },
+            origem, motivo: dReal.motivo, status: "sugerido",
+          });
+        }
+
+        // Anti-duplicidade: só insere se não houver uma sugestão
+        // ativa para o mesmo galpão+função há menos de 2 min
+        for (const s of sugestoes) {
+          const { data: recente } = await supabase
+            .from("comando_brain")
+            .select("id, estado_desejado")
+            .eq("galpao_id", s.galpao_id)
+            .eq("funcao", s.funcao)
+            .in("status", ["sugerido", "aprovado", "enviado"])
+            .gte("created_at", new Date(Date.now() - 120_000).toISOString())
+            .limit(1)
+            .maybeSingle();
+          if (recente && JSON.stringify(recente.estado_desejado) === JSON.stringify(s.estado_desejado)) {
+            continue;
+          }
+          await supabase.from("comando_brain").insert(s);
+        }
+      }
+    } catch (e: any) {
+      console.error("[climate-brain] erro shadow:", e?.message);
+    }
+
     resultados.push({ galpao: lote.galpao_id, modo: dReal.modo, tempC: ctxReal.tempC,
                       tempAlvo, ventPct, acaoNeb: dReal.acaoNeb, trocaArDuty,
                       sombra: dSombra?.modo, divergente });
