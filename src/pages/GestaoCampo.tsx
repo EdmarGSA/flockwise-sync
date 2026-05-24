@@ -80,6 +80,7 @@ interface Galpao {
   longitude: number | null;
   inercia_termica_min: number | null;
   usar_percentis_automacao: boolean | null;
+  automacao_brain: Database['public']['Enums']['modo_automacao_brain'];
   created_at: string;
   updated_at: string;
 }

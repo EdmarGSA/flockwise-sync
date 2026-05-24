@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { useIntegradoId } from "@/hooks/useIntegradoId";
 import { supabase } from "@/integrations/supabase/client";
+import { SugestoesBrainCard } from "@/components/lotes/historico-temp/SugestoesBrainCard";
 
 interface Aprendizado {
   galpao_id: string;
@@ -27,6 +28,7 @@ interface Aprendizado {
 interface GalpaoRow {
   id: string;
   nome: string;
+  automacao_brain: "off" | "shadow" | "auto";
   aprendizado?: Aprendizado;
 }
 
@@ -43,7 +45,7 @@ export default function ClimateBrain() {
     setLoading(true);
     const { data: gs } = await supabase
       .from("galpoes")
-      .select("id, nome, nucleo:nucleos!inner(integrado_id)")
+      .select("id, nome, automacao_brain, nucleo:nucleos!inner(integrado_id)")
       .eq("ativo", true)
       .eq("nucleo.integrado_id", integradoId);
     const ids = (gs ?? []).map((g: any) => g.id);
@@ -53,7 +55,8 @@ export default function ClimateBrain() {
       .in("galpao_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
     const mapAp = new Map((aps ?? []).map((a: any) => [a.galpao_id, a]));
     setGalpoes((gs ?? []).map((g: any) => ({
-      id: g.id, nome: g.nome, aprendizado: mapAp.get(g.id) as any,
+      id: g.id, nome: g.nome, automacao_brain: g.automacao_brain ?? "shadow",
+      aprendizado: mapAp.get(g.id) as any,
     })));
     setLoading(false);
   };
@@ -195,6 +198,12 @@ export default function ClimateBrain() {
                         <RefreshCw className="h-4 w-4 mr-2" /> Resetar aprendizado
                       </Button>
                     )}
+                    <SugestoesBrainCard
+                      galpaoId={g.id}
+                      galpaoNome={g.nome}
+                      modoAtual={g.automacao_brain}
+                      onChange={carregar}
+                    />
                   </CardContent>
                 </Card>
               );

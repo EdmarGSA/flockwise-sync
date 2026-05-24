@@ -573,6 +573,35 @@ export type Database = {
           },
         ]
       }
+      brain_fila_reavaliacao: {
+        Row: {
+          enfileirado_em: string
+          galpao_id: string
+          integrado_id: string
+          motivo: string | null
+        }
+        Insert: {
+          enfileirado_em?: string
+          galpao_id: string
+          integrado_id: string
+          motivo?: string | null
+        }
+        Update: {
+          enfileirado_em?: string
+          galpao_id?: string
+          integrado_id?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_fila_reavaliacao_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: true
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cameras_canais: {
         Row: {
           ativo: boolean
@@ -813,7 +842,9 @@ export type Database = {
           ativo: boolean
           automacao_ativa: boolean
           canal_numero: number
+          canal_redundante_id: string | null
           cfm_nominal: number | null
+          cooldown_seg: number
           created_at: string
           dispositivo_id: string
           estado_atual: string | null
@@ -840,7 +871,9 @@ export type Database = {
           ativo?: boolean
           automacao_ativa?: boolean
           canal_numero: number
+          canal_redundante_id?: string | null
           cfm_nominal?: number | null
+          cooldown_seg?: number
           created_at?: string
           dispositivo_id: string
           estado_atual?: string | null
@@ -867,7 +900,9 @@ export type Database = {
           ativo?: boolean
           automacao_ativa?: boolean
           canal_numero?: number
+          canal_redundante_id?: string | null
           cfm_nominal?: number | null
+          cooldown_seg?: number
           created_at?: string
           dispositivo_id?: string
           estado_atual?: string | null
@@ -891,6 +926,13 @@ export type Database = {
           watts_nominal?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "canais_dispositivo_canal_redundante_id_fkey"
+            columns: ["canal_redundante_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "canais_dispositivo_dispositivo_id_fkey"
             columns: ["dispositivo_id"]
@@ -1088,6 +1130,81 @@ export type Database = {
             columns: ["vendedor_fornecedor_id"]
             isOneToOne: false
             referencedRelation: "vendedores_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comando_brain: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          canal_id: string | null
+          confirmado_em: string | null
+          created_at: string
+          decisao_id: string | null
+          enviado_em: string | null
+          erro: string | null
+          estado_desejado: Json
+          funcao: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id: string
+          id: string
+          integrado_id: string
+          motivo: string | null
+          origem: string
+          status: Database["public"]["Enums"]["status_comando_brain"]
+          updated_at: string
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          canal_id?: string | null
+          confirmado_em?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          estado_desejado: Json
+          funcao: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          motivo?: string | null
+          origem: string
+          status?: Database["public"]["Enums"]["status_comando_brain"]
+          updated_at?: string
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          canal_id?: string | null
+          confirmado_em?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          estado_desejado?: Json
+          funcao?: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          motivo?: string | null
+          origem?: string
+          status?: Database["public"]["Enums"]["status_comando_brain"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comando_brain_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_dispositivo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comando_brain_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
             referencedColumns: ["id"]
           },
         ]
@@ -2962,6 +3079,7 @@ export type Database = {
         Row: {
           altura: number
           ativo: boolean
+          automacao_brain: Database["public"]["Enums"]["modo_automacao_brain"]
           aves_por_m2: number | null
           bebedouro_quantidade: number
           bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
@@ -2990,6 +3108,7 @@ export type Database = {
         Insert: {
           altura: number
           ativo?: boolean
+          automacao_brain?: Database["public"]["Enums"]["modo_automacao_brain"]
           aves_por_m2?: number | null
           bebedouro_quantidade?: number
           bebedouro_tipo: Database["public"]["Enums"]["tipo_bebedouro"]
@@ -3018,6 +3137,7 @@ export type Database = {
         Update: {
           altura?: number
           ativo?: boolean
+          automacao_brain?: Database["public"]["Enums"]["modo_automacao_brain"]
           aves_por_m2?: number | null
           bebedouro_quantidade?: number
           bebedouro_tipo?: Database["public"]["Enums"]["tipo_bebedouro"]
@@ -3318,6 +3438,47 @@ export type Database = {
             columns: ["produto_fornecedor_id"]
             isOneToOne: false
             referencedRelation: "produto_fornecedor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intencao_brain_pendente: {
+        Row: {
+          desde: string
+          estado_desejado: Json
+          funcao: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id: string
+          id: string
+          integrado_id: string
+          motivo: string | null
+          ultima_observacao: string
+        }
+        Insert: {
+          desde?: string
+          estado_desejado: Json
+          funcao: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id: string
+          id?: string
+          integrado_id: string
+          motivo?: string | null
+          ultima_observacao?: string
+        }
+        Update: {
+          desde?: string
+          estado_desejado?: Json
+          funcao?: Database["public"]["Enums"]["funcao_automacao"]
+          galpao_id?: string
+          id?: string
+          integrado_id?: string
+          motivo?: string | null
+          ultima_observacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intencao_brain_pendente_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
             referencedColumns: ["id"]
           },
         ]
@@ -9681,6 +9842,7 @@ export type Database = {
         | "novogen_brown"
         | "dekalb_white"
       lote_status: "previsao" | "saiu_para_entrega" | "alojado" | "fechado"
+      modo_automacao_brain: "off" | "shadow" | "auto"
       modo_protecao_offline: "temperatura" | "horario" | "hibrido"
       motivo_mortalidade: "natural" | "eliminado"
       natureza_conta: "devedora" | "credora"
@@ -9705,6 +9867,14 @@ export type Database = {
         | "cancelado"
         | "divergente_preco"
       sexo_ave: "macho" | "femea" | "misto"
+      status_comando_brain:
+        | "sugerido"
+        | "aprovado"
+        | "enviado"
+        | "confirmado"
+        | "falhou"
+        | "ignorado"
+        | "bloqueado"
       status_pedido:
         | "rascunho"
         | "pendente_aprovacao"
@@ -9952,6 +10122,7 @@ export const Constants = {
         "dekalb_white",
       ],
       lote_status: ["previsao", "saiu_para_entrega", "alojado", "fechado"],
+      modo_automacao_brain: ["off", "shadow", "auto"],
       modo_protecao_offline: ["temperatura", "horario", "hibrido"],
       motivo_mortalidade: ["natural", "eliminado"],
       natureza_conta: ["devedora", "credora"],
@@ -9978,6 +10149,15 @@ export const Constants = {
         "divergente_preco",
       ],
       sexo_ave: ["macho", "femea", "misto"],
+      status_comando_brain: [
+        "sugerido",
+        "aprovado",
+        "enviado",
+        "confirmado",
+        "falhou",
+        "ignorado",
+        "bloqueado",
+      ],
       status_pedido: [
         "rascunho",
         "pendente_aprovacao",
