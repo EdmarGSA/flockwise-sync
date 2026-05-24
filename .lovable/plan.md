@@ -1,74 +1,64 @@
+# Brain AI — Iluminação Adaptativa
 
-# Plano — Brain AI administrando dispositivos (Fase Sombra → Auto)
+Hoje a iluminação é controlada por `programa_iluminacao_lote` (faixas fixas por idade) + edge function `auto-iluminacao` (1 min). O Brain AI vai virar a **camada de decisão acima** desse programa: em vez de seguir cegamente a faixa cadastrada, ele recalcula diariamente as **horas de luz / escuridão ideais** olhando para o lote real, e injeta o resultado como override no programa vigente — passando ainda pelo fluxo já existente de `comando_brain` (Sombra/Auto).
 
-## Objetivo
-Fechar o loop **decisão → atuação → verificação** do Climate Brain sobre **ventilação, nebulização, aquecimento e iluminação**, começando em **modo sombra** (só sugere, não aciona) e com travas de segurança fortes.
+## O que o Brain vai considerar
 
-## Como funciona hoje (baseline)
-- `climate-brain` roda a cada 1 min, calcula modo (CONFORTO/AQUECIMENTO/ALERTA/EMERGÊNCIA), grava em `log_decisao_clima` e dispara `auto-ventilacao`, `auto-cortina`, `auto-nebulizacao`.
-- Essas funções é que falam com eWeLink / `esp32-bridge`. O Brain hoje **não decide o estado físico** de cada relé — ele só sinaliza intenção.
-- Iluminação roda independente em `auto-iluminacao` (programa por idade).
+1. **Peso real x meta** (semanal): última pesagem média do lote vs curva da linhagem (`metas_peso` / `padroesLinhagem`).
+   - Atrasado → mais luz (estimula consumo).
+   - Adiantado / sobrepeso → mais escuridão (restringe).
+2. **Estrutura do galpão**: `tipo_pressao` (positiva/negativa), `comprimento × largura`, isolamento aprendido (`aprendizado_galpao.fator_isolamento`). Galpão "vazado" → ramp-up/down mais longo e intensidade menor no nascer/pôr-do-sol natural que entra.
+3. **Crepúsculo real do dia**: `weather_curva_solar` já guarda `crepusculo_civil_inicio/fim` e `nascer/pôr-do-sol` por núcleo. O Brain usa isso para:
+   - Ancorar "apagar luz artificial" no fim do crepúsculo civil (evita gasto desnecessário).
+   - Ancorar "acender" no início do crepúsculo da manhã quando precisa de fotofase >12h.
+4. **Horas de escuridão mínima** por fase:
+   - Corte: respeita escotofase mínima conforme idade (ex.: 4h após dia 7).
+   - Postura cria/recria: garante curva descendente até 8h.
+   - Postura produção: estímulo crescente até 16h, nunca menos que 8h escuro contínuo.
+5. **Nuvens / dia escuro** (já vem do `weather_forecast_horario.condicao_codigo` e `uv_index`): se for dia muito nublado, antecipa acendimento em X min.
 
-## O que muda
+## Saída do Brain (o que ele faz)
 
-### 1. Camada de "Comando do Brain" (nova)
-Tabela `comando_brain` (uma linha por intenção):
-- `galpao_id`, `funcao` (ventilacao/nebulizacao/aquecimento/iluminacao), `canal_id`
-- `estado_desejado` (on/off, pwm 0-100, estágio N)
-- `origem` = `brain_shadow` | `brain_auto` | `manual`
-- `motivo` (texto), `decisao_id` (FK `log_decisao_clima`)
-- `status`: `sugerido` | `aprovado` | `enviado` | `confirmado` | `falhou` | `ignorado`
-- `executado_em`, `confirmado_em`, `erro`
+Para cada galpão com lote ativo, 1×/dia (cron 03:30 local) + reavaliação event-driven quando entra pesagem nova:
 
-Em **modo sombra** o Brain só insere com `status=sugerido`. O dispatcher real só atua quando `status=aprovado` (humano clica) ou quando o galpão estiver com `automacao_brain_ativa=true`.
+1. Calcula `horas_luz_alvo` e janelas `acender_em` / `apagar_em` ajustadas ao crepúsculo do dia.
+2. Compara com a faixa cadastrada no `programa_iluminacao_lote` vigente.
+3. Se divergência ≥ 15 min ou ≥ 5% intensidade → cria registro em `override_iluminacao_brain` (nova tabela) válido para hoje, com `motivo` textual ("Peso 8% abaixo da meta — +30min luz") e gera `comando_brain` por canal de iluminação afetado.
+4. `auto-iluminacao` (já roda 1×/min) passa a **consultar overrides do Brain antes da faixa fixa**, e segue o mesmo dispatch já existente (esp32-bridge / eWeLink) com `cooldown_seg` e fallback.
+5. Em modo `sombra` aparece como sugestão no `SugestoesBrainCard` para o usuário aprovar; em `auto` é aplicado direto.
 
-### 2. Toggle por galpão
-Coluna `galpoes.automacao_brain` enum (`off` | `shadow` | `auto`), default `shadow`. Card no Climate Brain mostra o estado e botão de "Pânico" que volta para `off` e desliga todos canais via `esp32-bridge`/eWeLink.
+## Banco (migração)
 
-### 3. Dispatcher único (`brain-dispatcher`, nova edge function)
-- Lê `comando_brain` pendentes elegíveis e executa via o driver certo (`esp32-bridge` ou eWeLink).
-- Após enviar, marca `enviado` e aguarda telemetria de retorno (estado do canal) — quando bater, vira `confirmado`. Se em 60s não confirmar, marca `falhou` e dispara alerta.
+- `override_iluminacao_brain` (galpao_id, lote_id, data_ref, horas_luz, blocos jsonb, intensidade_pct, motivo, score_confianca, criado_em, expira_em, status). Uma linha ativa por galpão+dia. RLS por `integrado_id` + superadmin.
+- `aprendizado_iluminacao_lote` (galpao_id, lote_id, divergencia_peso_pct_acum, horas_luz_aplicadas_media, ganho_peso_observado, atualizado_em) — alimenta o ajuste fino EMA α=0.1, ±1h.
+- Coluna `peso_medio_recente_kg` materializada em `lotes` (atualizada por trigger em `pesagem_itens`) para o Brain não precisar agregar a cada decisão.
 
-### 4. Travas de segurança (todas obrigatórias antes de gerar `comando_brain`)
-- **Drift**: se algum sensor relevante do galpão está em `sensor_drift_status.excluido_agregacao=true` E sobraram <2 sensores válidos → não comanda, loga `bloqueado_drift`.
-- **Sustentação**: nova tabela `intencao_brain_pendente` guarda a intenção atual + `desde`; só vira `comando_brain` quando persistir por `min_minutos_sustentado` (já existe em `config_zonas_galpao`). Emergência (ITH vermelho/temp máx) pula essa janela.
-- **Cooldown**: coluna `canais_dispositivo.ultimo_comando_em` + `cooldown_seg` (default 90s ventilação, 30s nebulização, 300s aquecimento). Dispatcher rejeita se ainda no cooldown.
-- **Fallback offline**: se `dispositivos_iot.online=false`, marca comando como `falhou` imediatamente, dispara `dispatch_notificacao('brain_atuador_offline')` e tenta canal redundante se existir (`canais_dispositivo.canal_redundante_id`).
+## Edge functions
 
-### 5. Event-driven
-- Hoje o cron roda a cada 1 min. Vamos **manter** o cron como heartbeat de segurança, mas adicionar trigger:
-- Após `INSERT` em `leituras_sensores` (ou `eventos_dispositivo_iot` tipo telemetria), uma função `trigger_reavaliar_brain` enfileira o `galpao_id` numa tabela `brain_fila_reavaliacao` (com debounce de 10s por galpão).
-- Worker `brain-worker` (cron a cada 15s) consome a fila e roda `climate-brain` só para os galpões enfileirados — barato e responsivo.
+- **`brain-iluminacao`** (nova, cron 30min + invocada pelo trigger de pesagem): decide e grava overrides + comandos.
+- **`auto-iluminacao`** (alteração mínima): antes de resolver a faixa do programa, consulta `override_iluminacao_brain` ativo do dia e sobrescreve `horas_luz`, `blocos` e `intensidade_pct`.
+- **`weather-sync`**: sem mudança — já entrega o crepúsculo.
 
-### 6. Iluminação no Brain
-Hoje `auto-iluminacao` decide sozinho. Vamos **manter ele como executor** mas o Brain passa a poder sobrescrever via `override_brain` em emergência (ex.: apagar luz se estresse térmico extremo durante o dia). Override expira automaticamente quando emergência sai.
+## UI
 
-### 7. UI no Climate Brain
-- Cada card de galpão ganha:
-  - Badge do modo (`off`/`shadow`/`auto`)
-  - Tabela "Últimas sugestões" (origem `brain_shadow`) com botão **Aprovar** (cria `comando_brain` com `status=aprovado`)
-  - KPI: % sugestões aprovadas vs ignoradas nos últimos 7 dias (semáforo de confiança)
-- Nova página `/configuracoes/brain-automacao` para ligar `auto` por galpão depois que a confiança subir.
+- Em `ClimateBrain.tsx` (aba já existente) e em `LoteIluminacaoCard.tsx`: badge "Brain ajustou hoje: +30min luz (peso atrasado)" com link para histórico.
+- Em `BrainAutomacao.tsx`: incluir KPI "Iluminação ajustada" e função `iluminacao` na lista de comandos recentes.
+- Em `EstimuloPosturaDialog.tsx` / `ProgramasIluminacao.tsx`: indicador "Brain pode sobrepor este programa" quando o galpão está em modo `auto`/`shadow`.
 
-## Entregáveis técnicos
+## Segurança
 
-| Item | Tipo |
-|---|---|
-| Migration: `galpoes.automacao_brain`, `canais_dispositivo.cooldown_seg / ultimo_comando_em / canal_redundante_id`, tabelas `comando_brain`, `intencao_brain_pendente`, `brain_fila_reavaliacao` + RLS por `integrado_id` | SQL |
-| Refactor `climate-brain` para gerar `intencao_brain_pendente` + checar drift/sustentação | Edge fn |
-| Nova `brain-dispatcher` (cron 15s, lê `comando_brain` aprovados/auto) | Edge fn |
-| Nova `brain-worker` (consome `brain_fila_reavaliacao`) + trigger SQL em `leituras_sensores` | Edge fn + SQL |
-| Tipo evento `brain_atuador_offline` + `brain_comando_falhou` em `tipos_evento_notificacao` | SQL |
-| `SensorDriftStatusCard` reaproveitado + novo `SugestoesBrainCard` no `ClimateBrain.tsx` | React |
-| Nova página `BrainAutomacao.tsx` (toggle por galpão + botão pânico) | React |
+- Override do Brain limitado a **±90 min** vs faixa cadastrada e **±20 pp** de intensidade — clamp duro no edge.
+- Bloqueio se sensor de luminosidade em drift (quando existir) ou se dispositivo offline >10 min (já tratado em `marcar_dispositivos_offline_iot`).
+- Cooldown 90s entre comandos de iluminação por canal (já no `canais_dispositivo`).
+- Fallback: se `brain-iluminacao` falhar ou não houver override, `auto-iluminacao` usa a faixa do programa como hoje.
 
-## Ordem de execução
-1. Migration + tipos de notificação.
-2. `brain-dispatcher` + UI de sugestão/aprovação (modo sombra já útil sem riscos).
-3. Trigger event-driven + `brain-worker`.
-4. Liberar toggle `auto` por galpão após 7 dias de sombra estável.
+## Ordem de implementação
 
-## Fora deste plano
-- Cortinas (você não marcou — segue como está).
-- Aprendizado de cooldowns ótimos por galpão (versão futura usando `climate-learn`).
-- Atuação preditiva (antecipar pico de calor pela previsão) — fica para fase 2.
+1. Migração: `override_iluminacao_brain`, `aprendizado_iluminacao_lote`, coluna `lotes.peso_medio_recente_kg` + trigger.
+2. Edge `brain-iluminacao` (decisão + clamp + grava override + comando_brain).
+3. Patch em `auto-iluminacao` para honrar override.
+4. Cron 30min + gatilho event-driven em `pesagens`.
+5. UI: badge no card de iluminação, integração com `BrainAutomacao`.
+6. Job de aprendizado diário (acopla ao `climate-learn` existente).
+
+Quer que eu siga nessa ordem ou prefere que eu comece direto pelo edge + override sem o aprendizado adaptativo na primeira versão?
