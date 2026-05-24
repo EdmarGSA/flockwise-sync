@@ -461,6 +461,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/configuracoes/brain-automacao" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="configuracoes">
+          <BrainAutomacao />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/configuracoes/ambiencia" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="configuracoes">
