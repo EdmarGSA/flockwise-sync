@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { useIntegradoId } from "@/hooks/useIntegradoId";
 import { supabase } from "@/integrations/supabase/client";
+import { SugestoesBrainCard } from "@/components/lotes/historico-temp/SugestoesBrainCard";
 
 interface Aprendizado {
   galpao_id: string;
