@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
       ventilacao_pct: ventPct,
     });
 
-    const zonasReason = `zonas=${ctxReal.zonas.join(",")}, sensores=${ctxReal.sensoresUsados}/${ctxReal.sensoresTotal}, percentis=${percentisAtivo ? "on" : "off"}, fonte=${fontePercentis}`;
+    const zonasReason = `zonas=${ctxReal.zonas.join(",")}, sensores=${ctxReal.sensoresUsados}/${ctxReal.sensoresTotal}${sensoresExcluidosDrift > 0 ? ` (drift=-${sensoresExcluidosDrift})` : ""}, percentis=${percentisAtivo ? "on" : "off"}, fonte=${fontePercentis}`;
     const divergente = !!dSombra && dSombra.modo !== dReal.modo;
     const deltaT = ctxSombra ? Math.abs(ctxSombra.tempC - ctxReal.tempC) : 0;
 
