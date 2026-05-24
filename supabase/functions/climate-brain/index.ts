@@ -223,15 +223,27 @@ Deno.serve(async (req) => {
       console.error("[climate-brain] erro offset zona:", e);
     }
 
-    // Dispositivos + leituras 15 min
+    // Dispositivos + leituras 15 min (exclui sensores descalibrados críticos)
     const { data: devs } = await supabase
       .from("dispositivos_iot")
       .select("id, zona, peso_amostragem")
       .eq("galpao_id", lote.galpao_id)
       .eq("ativo", true);
-    const devsTodos = devs ?? [];
+    const devsRaw = devs ?? [];
+    let devsTodos = devsRaw;
+    let sensoresExcluidosDrift = 0;
+    if (devsRaw.length > 0) {
+      const { data: drift } = await supabase
+        .from("sensor_drift_status")
+        .select("dispositivo_id")
+        .in("dispositivo_id", devsRaw.map((d: any) => d.id))
+        .eq("excluido_agregacao", true);
+      const excl = new Set((drift ?? []).map((d: any) => d.dispositivo_id));
+      sensoresExcluidosDrift = excl.size;
+      devsTodos = devsRaw.filter((d: any) => !excl.has(d.id));
+    }
     if (devsTodos.length === 0) {
-      resultados.push({ galpao: lote.galpao_id, skip: "sem_dispositivos" });
+      resultados.push({ galpao: lote.galpao_id, skip: "sem_dispositivos_validos" });
       continue;
     }
     const since = new Date(Date.now() - 15 * 60_000).toISOString();
@@ -295,7 +307,7 @@ Deno.serve(async (req) => {
       ventilacao_pct: ventPct,
     });
 
-    const zonasReason = `zonas=${ctxReal.zonas.join(",")}, sensores=${ctxReal.sensoresUsados}/${ctxReal.sensoresTotal}, percentis=${percentisAtivo ? "on" : "off"}, fonte=${fontePercentis}`;
+    const zonasReason = `zonas=${ctxReal.zonas.join(",")}, sensores=${ctxReal.sensoresUsados}/${ctxReal.sensoresTotal}${sensoresExcluidosDrift > 0 ? ` (drift=-${sensoresExcluidosDrift})` : ""}, percentis=${percentisAtivo ? "on" : "off"}, fonte=${fontePercentis}`;
     const divergente = !!dSombra && dSombra.modo !== dReal.modo;
     const deltaT = ctxSombra ? Math.abs(ctxSombra.tempC - ctxReal.tempC) : 0;
 
