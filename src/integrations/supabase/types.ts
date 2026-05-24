@@ -7983,6 +7983,59 @@ export type Database = {
         }
         Relationships: []
       }
+      sensor_drift_status: {
+        Row: {
+          amostras: number
+          created_at: string
+          delta_temp_c: number | null
+          delta_ur_pct: number | null
+          dispositivo_id: string
+          excluido_agregacao: boolean
+          galpao_id: string | null
+          integrado_id: string
+          motivo: string | null
+          severidade: string
+          ultimo_check: string
+          updated_at: string
+        }
+        Insert: {
+          amostras?: number
+          created_at?: string
+          delta_temp_c?: number | null
+          delta_ur_pct?: number | null
+          dispositivo_id: string
+          excluido_agregacao?: boolean
+          galpao_id?: string | null
+          integrado_id: string
+          motivo?: string | null
+          severidade?: string
+          ultimo_check?: string
+          updated_at?: string
+        }
+        Update: {
+          amostras?: number
+          created_at?: string
+          delta_temp_c?: number | null
+          delta_ur_pct?: number | null
+          dispositivo_id?: string
+          excluido_agregacao?: boolean
+          galpao_id?: string | null
+          integrado_id?: string
+          motivo?: string | null
+          severidade?: string
+          ultimo_check?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensor_drift_status_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: true
+            referencedRelation: "dispositivos_iot"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       separacao_pedidos: {
         Row: {
           created_at: string
