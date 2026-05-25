@@ -108,9 +108,33 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
           }
         }
       }
+
+      // Override do Brain AI para hoje
+      if (galpaoId) {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const { data: brain } = await supabase
+          .from('override_iluminacao_brain')
+          .select('horas_luz, acender_hhmm, apagar_hhmm, intensidade_pct, motivo')
+          .eq('galpao_id', galpaoId)
+          .eq('data_ref', hoje)
+          .eq('status', 'ativo')
+          .maybeSingle();
+        if (brain) {
+          setBrainOverride({
+            horas_luz: Number(brain.horas_luz),
+            acender: brain.acender_hhmm,
+            apagar: brain.apagar_hhmm,
+            intensidade: brain.intensidade_pct,
+            motivo: brain.motivo,
+          });
+        } else {
+          setBrainOverride(null);
+        }
+      }
       setLoading(false);
     })();
   }, [integradoId, galpaoId, diasAlojados, programaIluminacaoId, tipoProducao]);
+
 
   const blocos = (faixaAtual?.blocos ?? []) as Bloco[];
 
