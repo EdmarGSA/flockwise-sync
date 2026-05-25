@@ -31,9 +31,11 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
   const [dispositivoId, setDispositivoId] = useState<string | null>(null);
   const [overridesAtivos, setOverridesAtivos] = useState<number>(0);
   const [proximoOverrideAte, setProximoOverrideAte] = useState<string | null>(null);
+  const [brainOverride, setBrainOverride] = useState<{ horas_luz: number; acender: string; apagar: string; intensidade: number; motivo: string } | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [estimuloOpen, setEstimuloOpen] = useState(false);
   const isPostura = tipoProducao === 'postura';
+
 
   useEffect(() => {
     if (!integradoId) return;
