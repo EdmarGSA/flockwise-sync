@@ -210,6 +210,18 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
                   ))}
                 </div>
               )}
+              {brainOverride && (
+                <div className="mt-2 p-2 rounded-md bg-primary/5 border border-primary/20 text-xs space-y-1">
+                  <div className="flex items-center gap-1 font-medium text-primary">
+                    <Brain className="w-3 h-3" />Decisão do Brain hoje
+                  </div>
+                  <div className="text-muted-foreground">
+                    {brainOverride.acender}–{brainOverride.apagar} · {brainOverride.horas_luz}h luz · {brainOverride.intensidade}%
+                  </div>
+                  <div className="text-muted-foreground italic">{brainOverride.motivo}</div>
+                </div>
+              )}
+
             </div>
           )}
         </CardContent>
