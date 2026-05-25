@@ -148,12 +148,18 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
               Iluminação
             </span>
             <div className="flex items-center gap-2">
+              {brainOverride && (
+                <Badge variant="outline" className="text-[10px] text-primary border-primary/40">
+                  <Brain className="w-3 h-3 mr-1" />Brain ajustou hoje
+                </Badge>
+              )}
               {overridesAtivos > 0 && (
                 <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
                   Override ativo{proximoOverrideAte ? ` até ${new Date(proximoOverrideAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
                   {overridesAtivos > 1 ? ` (+${overridesAtivos - 1})` : ''}
                 </Badge>
               )}
+
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
                 <Link to="/configuracoes/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
               </Button>
