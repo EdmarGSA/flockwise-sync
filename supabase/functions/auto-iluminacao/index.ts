@@ -241,14 +241,32 @@ Deno.serve(async (req) => {
                 faixaEfetiva = { ...faixa, blocos: [{ acender: fmt(nascerOff), apagar: fmt(porOff), intensidade_pct: faixa.intensidade_pct }] };
               }
             }
+
+            // 🧠 Sobrepõe com override do Brain AI (se houver para hoje neste galpão)
+            const brainOvr = brainByGalpao.get(dev.galpao_id);
+            if (brainOvr) {
+              faixaEfetiva = {
+                ...faixaEfetiva,
+                blocos: (Array.isArray(brainOvr.blocos) && brainOvr.blocos.length)
+                  ? brainOvr.blocos as Bloco[]
+                  : [{ acender: brainOvr.acender_hhmm, apagar: brainOvr.apagar_hhmm, intensidade_pct: brainOvr.intensidade_pct }],
+                intensidade_pct: brainOvr.intensidade_pct,
+                ramp_up_min: brainOvr.ramp_up_min ?? faixaEfetiva.ramp_up_min,
+                ramp_down_min: brainOvr.ramp_down_min ?? faixaEfetiva.ramp_down_min,
+                horas_luz: Number(brainOvr.horas_luz),
+              };
+            }
+
             const r = calcular(faixaEfetiva);
             estadoDesejado = r.ligado ? "on" : "off";
             intensidade = r.intensidade;
-            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}, ${r.intensidade}%`;
+            const tagBrain = brainOvr ? " 🧠brain" : "";
+            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}${tagBrain}, ${r.intensidade}%`;
           }
 
         }
       }
+
 
       const mudouEstado = canal.estado_atual !== estadoDesejado;
       const mudouIntensidade = canal.suporta_dimer && (canal.intensidade_atual ?? 0) !== intensidade;
