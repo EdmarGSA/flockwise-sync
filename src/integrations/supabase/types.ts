@@ -366,6 +366,63 @@ export type Database = {
           },
         ]
       }
+      aprendizado_iluminacao_lote: {
+        Row: {
+          ajuste_acumulado_h: number
+          amostras: number
+          atualizado_em: string
+          created_at: string
+          divergencia_peso_pct: number | null
+          galpao_id: string
+          ganho_peso_g_dia: number | null
+          horas_luz_aplicadas_media: number | null
+          id: string
+          integrado_id: string
+          lote_id: string
+        }
+        Insert: {
+          ajuste_acumulado_h?: number
+          amostras?: number
+          atualizado_em?: string
+          created_at?: string
+          divergencia_peso_pct?: number | null
+          galpao_id: string
+          ganho_peso_g_dia?: number | null
+          horas_luz_aplicadas_media?: number | null
+          id?: string
+          integrado_id: string
+          lote_id: string
+        }
+        Update: {
+          ajuste_acumulado_h?: number
+          amostras?: number
+          atualizado_em?: string
+          created_at?: string
+          divergencia_peso_pct?: number | null
+          galpao_id?: string
+          ganho_peso_g_dia?: number | null
+          horas_luz_aplicadas_media?: number | null
+          id?: string
+          integrado_id?: string
+          lote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprendizado_iluminacao_lote_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprendizado_iluminacao_lote_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: true
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aprendizado_zona_clima: {
         Row: {
           amostras: number
@@ -5626,6 +5683,87 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      override_iluminacao_brain: {
+        Row: {
+          acender_hhmm: string
+          apagar_hhmm: string
+          blocos: Json
+          created_at: string
+          data_ref: string
+          expira_em: string
+          galpao_id: string
+          horas_luz: number
+          id: string
+          integrado_id: string
+          intensidade_pct: number
+          lote_id: string | null
+          motivo: string
+          origem: string
+          ramp_down_min: number
+          ramp_up_min: number
+          score_confianca: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          acender_hhmm: string
+          apagar_hhmm: string
+          blocos?: Json
+          created_at?: string
+          data_ref?: string
+          expira_em?: string
+          galpao_id: string
+          horas_luz: number
+          id?: string
+          integrado_id: string
+          intensidade_pct?: number
+          lote_id?: string | null
+          motivo: string
+          origem?: string
+          ramp_down_min?: number
+          ramp_up_min?: number
+          score_confianca?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          acender_hhmm?: string
+          apagar_hhmm?: string
+          blocos?: Json
+          created_at?: string
+          data_ref?: string
+          expira_em?: string
+          galpao_id?: string
+          horas_luz?: number
+          id?: string
+          integrado_id?: string
+          intensidade_pct?: number
+          lote_id?: string | null
+          motivo?: string
+          origem?: string
+          ramp_down_min?: number
+          ramp_up_min?: number
+          score_confianca?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "override_iluminacao_brain_galpao_id_fkey"
+            columns: ["galpao_id"]
+            isOneToOne: false
+            referencedRelation: "galpoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "override_iluminacao_brain_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       override_iluminacao_canal: {
         Row: {

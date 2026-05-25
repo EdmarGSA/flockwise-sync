@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, Hand, ExternalLink, Loader2, Zap } from 'lucide-react';
+import { Lightbulb, Hand, ExternalLink, Loader2, Zap, Brain } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useIntegradoId } from '@/hooks/useIntegradoId';
@@ -31,9 +31,11 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
   const [dispositivoId, setDispositivoId] = useState<string | null>(null);
   const [overridesAtivos, setOverridesAtivos] = useState<number>(0);
   const [proximoOverrideAte, setProximoOverrideAte] = useState<string | null>(null);
+  const [brainOverride, setBrainOverride] = useState<{ horas_luz: number; acender: string; apagar: string; intensidade: number; motivo: string } | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [estimuloOpen, setEstimuloOpen] = useState(false);
   const isPostura = tipoProducao === 'postura';
+
 
   useEffect(() => {
     if (!integradoId) return;
@@ -106,9 +108,33 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
           }
         }
       }
+
+      // Override do Brain AI para hoje
+      if (galpaoId) {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const { data: brain } = await supabase
+          .from('override_iluminacao_brain')
+          .select('horas_luz, acender_hhmm, apagar_hhmm, intensidade_pct, motivo')
+          .eq('galpao_id', galpaoId)
+          .eq('data_ref', hoje)
+          .eq('status', 'ativo')
+          .maybeSingle();
+        if (brain) {
+          setBrainOverride({
+            horas_luz: Number(brain.horas_luz),
+            acender: brain.acender_hhmm,
+            apagar: brain.apagar_hhmm,
+            intensidade: brain.intensidade_pct,
+            motivo: brain.motivo,
+          });
+        } else {
+          setBrainOverride(null);
+        }
+      }
       setLoading(false);
     })();
   }, [integradoId, galpaoId, diasAlojados, programaIluminacaoId, tipoProducao]);
+
 
   const blocos = (faixaAtual?.blocos ?? []) as Bloco[];
 
@@ -122,12 +148,18 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
               Iluminação
             </span>
             <div className="flex items-center gap-2">
+              {brainOverride && (
+                <Badge variant="outline" className="text-[10px] text-primary border-primary/40">
+                  <Brain className="w-3 h-3 mr-1" />Brain ajustou hoje
+                </Badge>
+              )}
               {overridesAtivos > 0 && (
                 <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
                   Override ativo{proximoOverrideAte ? ` até ${new Date(proximoOverrideAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
                   {overridesAtivos > 1 ? ` (+${overridesAtivos - 1})` : ''}
                 </Badge>
               )}
+
               <Button asChild size="sm" variant="ghost" className="h-7 px-2">
                 <Link to="/configuracoes/iluminacao"><ExternalLink className="w-3.5 h-3.5 mr-1" />Programa</Link>
               </Button>
@@ -178,6 +210,18 @@ export function LoteIluminacaoCard({ loteId, galpaoId, diasAlojados, programaIlu
                   ))}
                 </div>
               )}
+              {brainOverride && (
+                <div className="mt-2 p-2 rounded-md bg-primary/5 border border-primary/20 text-xs space-y-1">
+                  <div className="flex items-center gap-1 font-medium text-primary">
+                    <Brain className="w-3 h-3" />Decisão do Brain hoje
+                  </div>
+                  <div className="text-muted-foreground">
+                    {brainOverride.acender}–{brainOverride.apagar} · {brainOverride.horas_luz}h luz · {brainOverride.intensidade}%
+                  </div>
+                  <div className="text-muted-foreground italic">{brainOverride.motivo}</div>
+                </div>
+              )}
+
             </div>
           )}
         </CardContent>

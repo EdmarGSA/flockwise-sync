@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4) Overrides ativos
+    // 4) Overrides manuais por canal
     const canalIds = canais.map((c) => c.id);
     const { data: overrides } = await supabase
       .from("override_iluminacao_canal")
@@ -185,6 +185,21 @@ Deno.serve(async (req) => {
 
     const overrideByCanal = new Map<string, any>();
     for (const o of overrides ?? []) if (!overrideByCanal.has(o.canal_id)) overrideByCanal.set(o.canal_id, o);
+
+    // 4b) Overrides do Brain AI (por galpão, válidos para o dia)
+    const hojeRef = new Date().toISOString().slice(0, 10);
+    const { data: brainOvrs } = galpaoIds.length
+      ? await supabase
+          .from("override_iluminacao_brain")
+          .select("galpao_id, horas_luz, acender_hhmm, apagar_hhmm, intensidade_pct, ramp_up_min, ramp_down_min, blocos")
+          .in("galpao_id", galpaoIds)
+          .eq("data_ref", hojeRef)
+          .eq("status", "ativo")
+          .gt("expira_em", new Date().toISOString())
+      : { data: [] as any[] };
+    const brainByGalpao = new Map<string, any>();
+    for (const b of brainOvrs ?? []) brainByGalpao.set(b.galpao_id, b);
+
 
     // 5) Decidir e aplicar para cada canal
     for (const canal of canais as any[]) {
@@ -226,14 +241,32 @@ Deno.serve(async (req) => {
                 faixaEfetiva = { ...faixa, blocos: [{ acender: fmt(nascerOff), apagar: fmt(porOff), intensidade_pct: faixa.intensidade_pct }] };
               }
             }
+
+            // 🧠 Sobrepõe com override do Brain AI (se houver para hoje neste galpão)
+            const brainOvr = brainByGalpao.get(dev.galpao_id);
+            if (brainOvr) {
+              faixaEfetiva = {
+                ...faixaEfetiva,
+                blocos: (Array.isArray(brainOvr.blocos) && brainOvr.blocos.length)
+                  ? brainOvr.blocos as Bloco[]
+                  : [{ acender: brainOvr.acender_hhmm, apagar: brainOvr.apagar_hhmm, intensidade_pct: brainOvr.intensidade_pct }],
+                intensidade_pct: brainOvr.intensidade_pct,
+                ramp_up_min: brainOvr.ramp_up_min ?? faixaEfetiva.ramp_up_min,
+                ramp_down_min: brainOvr.ramp_down_min ?? faixaEfetiva.ramp_down_min,
+                horas_luz: Number(brainOvr.horas_luz),
+              };
+            }
+
             const r = calcular(faixaEfetiva);
             estadoDesejado = r.ligado ? "on" : "off";
             intensidade = r.intensidade;
-            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}, ${r.intensidade}%`;
+            const tagBrain = brainOvr ? " 🧠brain" : "";
+            motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}${tagBrain}, ${r.intensidade}%`;
           }
 
         }
       }
+
 
       const mudouEstado = canal.estado_atual !== estadoDesejado;
       const mudouIntensidade = canal.suporta_dimer && (canal.intensidade_atual ?? 0) !== intensidade;
