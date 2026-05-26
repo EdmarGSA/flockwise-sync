@@ -86,16 +86,17 @@ Deno.serve(async (req) => {
       let canal: any = null;
 
       if (canalId) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, online, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id)")
           .eq("id", canalId)
           .maybeSingle();
+        if (error) console.error("[brain-dispatcher] erro select canal por id", canalId, error);
         canal = data;
       } else {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, online, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id)")
           .eq("integrado_id", cmd.integrado_id)
           .eq("funcao_automacao", cmd.funcao)
           .eq("automacao_ativa", true)
@@ -103,11 +104,13 @@ Deno.serve(async (req) => {
           .eq("dispositivos_iot.galpao_id", cmd.galpao_id)
           .limit(1)
           .maybeSingle();
+        if (error) console.error("[brain-dispatcher] erro select canal por funcao", cmd.funcao, error);
         canal = data;
         if (canal) canalId = canal.id;
       }
 
       if (!canal) {
+        console.warn("[brain-dispatcher] canal não encontrado", { cmd_id: cmd.id, canal_id: cmd.canal_id, funcao: cmd.funcao, galpao_id: cmd.galpao_id });
         await supabase.from("comando_brain").update({
           status: "falhou", erro: "Canal não encontrado para função",
         }).eq("id", cmd.id);
@@ -125,8 +128,12 @@ Deno.serve(async (req) => {
       }
 
       const dev = canal.dispositivos_iot;
+      // Online derivado de ultimo_sync (heartbeat ≤ 10 min). Sem coluna `online` na tabela.
+      const ultimoSyncMs = dev?.ultimo_sync ? new Date(dev.ultimo_sync).getTime() : 0;
+      const isOnline = !!dev?.ativo && ultimoSyncMs > 0 && (Date.now() - ultimoSyncMs) < 10 * 60_000;
       // Trava: dispositivo offline → tentar redundância
-      if (!dev?.online) {
+      if (!isOnline) {
+        console.warn("[brain-dispatcher] dispositivo offline", { cmd_id: cmd.id, ultimo_sync: dev?.ultimo_sync });
         if (canal.canal_redundante_id) {
           await supabase.from("comando_brain").update({
             canal_id: canal.canal_redundante_id,
