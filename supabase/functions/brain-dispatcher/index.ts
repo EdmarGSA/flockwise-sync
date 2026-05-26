@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       if (canalId) {
         const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
           .eq("id", canalId)
           .maybeSingle();
         if (error) console.error("[brain-dispatcher] erro select canal por id", canalId, error);
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       } else {
         const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
           .eq("integrado_id", cmd.integrado_id)
           .eq("funcao_automacao", cmd.funcao)
           .eq("automacao_ativa", true)
