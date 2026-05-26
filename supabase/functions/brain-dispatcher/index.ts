@@ -172,15 +172,28 @@ Deno.serve(async (req) => {
       if (dev.driver === "esp32_http") {
         driverRes = await chamarEsp32(canalId, acao);
       } else {
-        driverRes = await chamarEwelink(canal.dispositivo_id, canal.canal_numero, acao);
+        driverRes = await chamarEwelink(
+          cmd.integrado_id,
+          dev.device_id_ewelink,
+          canal.canal_numero,
+          dev.num_canais ?? 1,
+          acao,
+        );
       }
 
+      // Registra envio + estado e cooldown no canal
+      const nowIso = new Date().toISOString();
       await supabase.from("comando_brain").update({
         status: "enviado",
-        enviado_em: new Date().toISOString(),
+        enviado_em: nowIso,
       }).eq("id", cmd.id);
+      await supabase.from("canais_dispositivo").update({
+        estado_atual: acao === "ligar" ? "on" : "off",
+        ultimo_comando_em: nowIso,
+      }).eq("id", canalId);
 
       resultados.push({ id: cmd.id, ok: true, driver: dev.driver, res: driverRes });
+
     } catch (e: any) {
       await supabase.from("comando_brain").update({
         status: "falhou", erro: e?.message ?? String(e),
