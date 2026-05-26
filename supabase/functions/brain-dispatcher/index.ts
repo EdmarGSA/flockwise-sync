@@ -31,24 +31,34 @@ async function chamarEsp32(canalId: string, acao: "ligar" | "desligar") {
   return r.json();
 }
 
-async function chamarEwelink(dispositivoId: string, canalNumero: number, acao: "ligar" | "desligar") {
+async function chamarEwelink(
+  integradoId: string,
+  deviceIdEwelink: string,
+  canalNumero: number,
+  numCanais: number,
+  acao: "ligar" | "desligar",
+) {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-sensors`;
+  const body: Record<string, unknown> = {
+    action: "control-device",
+    integrado_id: integradoId,
+    device_id: deviceIdEwelink,
+    switch: acao === "ligar" ? "on" : "off",
+  };
+  // Multi-canal: eWeLink usa outlet 0-indexed
+  if (numCanais > 1) body.outlet = Math.max(0, (canalNumero ?? 1) - 1);
   const r = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
     },
-    body: JSON.stringify({
-      action: "command",
-      dispositivo_id: dispositivoId,
-      canal: canalNumero,
-      estado: acao === "ligar" ? "on" : "off",
-    }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`sync-sensors ${r.status}: ${await r.text()}`);
   return r.json();
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -86,16 +96,17 @@ Deno.serve(async (req) => {
       let canal: any = null;
 
       if (canalId) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, online, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
           .eq("id", canalId)
           .maybeSingle();
+        if (error) console.error("[brain-dispatcher] erro select canal por id", canalId, error);
         canal = data;
       } else {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, online, galpao_id)")
+          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
           .eq("integrado_id", cmd.integrado_id)
           .eq("funcao_automacao", cmd.funcao)
           .eq("automacao_ativa", true)
@@ -103,11 +114,13 @@ Deno.serve(async (req) => {
           .eq("dispositivos_iot.galpao_id", cmd.galpao_id)
           .limit(1)
           .maybeSingle();
+        if (error) console.error("[brain-dispatcher] erro select canal por funcao", cmd.funcao, error);
         canal = data;
         if (canal) canalId = canal.id;
       }
 
       if (!canal) {
+        console.warn("[brain-dispatcher] canal não encontrado", { cmd_id: cmd.id, canal_id: cmd.canal_id, funcao: cmd.funcao, galpao_id: cmd.galpao_id });
         await supabase.from("comando_brain").update({
           status: "falhou", erro: "Canal não encontrado para função",
         }).eq("id", cmd.id);
@@ -125,8 +138,12 @@ Deno.serve(async (req) => {
       }
 
       const dev = canal.dispositivos_iot;
+      // Online derivado de ultimo_sync (heartbeat ≤ 10 min). Sem coluna `online` na tabela.
+      const ultimoSyncMs = dev?.ultimo_sync ? new Date(dev.ultimo_sync).getTime() : 0;
+      const isOnline = !!dev?.ativo && ultimoSyncMs > 0 && (Date.now() - ultimoSyncMs) < 10 * 60_000;
       // Trava: dispositivo offline → tentar redundância
-      if (!dev?.online) {
+      if (!isOnline) {
+        console.warn("[brain-dispatcher] dispositivo offline", { cmd_id: cmd.id, ultimo_sync: dev?.ultimo_sync });
         if (canal.canal_redundante_id) {
           await supabase.from("comando_brain").update({
             canal_id: canal.canal_redundante_id,
@@ -155,15 +172,28 @@ Deno.serve(async (req) => {
       if (dev.driver === "esp32_http") {
         driverRes = await chamarEsp32(canalId, acao);
       } else {
-        driverRes = await chamarEwelink(canal.dispositivo_id, canal.canal_numero, acao);
+        driverRes = await chamarEwelink(
+          cmd.integrado_id,
+          dev.device_id_ewelink,
+          canal.canal_numero,
+          dev.num_canais ?? 1,
+          acao,
+        );
       }
 
+      // Registra envio + estado e cooldown no canal
+      const nowIso = new Date().toISOString();
       await supabase.from("comando_brain").update({
         status: "enviado",
-        enviado_em: new Date().toISOString(),
+        enviado_em: nowIso,
       }).eq("id", cmd.id);
+      await supabase.from("canais_dispositivo").update({
+        estado_atual: acao === "ligar" ? "on" : "off",
+        ultimo_comando_em: nowIso,
+      }).eq("id", canalId);
 
       resultados.push({ id: cmd.id, ok: true, driver: dev.driver, res: driverRes });
+
     } catch (e: any) {
       await supabase.from("comando_brain").update({
         status: "falhou", erro: e?.message ?? String(e),
