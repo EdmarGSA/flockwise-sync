@@ -31,24 +31,34 @@ async function chamarEsp32(canalId: string, acao: "ligar" | "desligar") {
   return r.json();
 }
 
-async function chamarEwelink(dispositivoId: string, canalNumero: number, acao: "ligar" | "desligar") {
+async function chamarEwelink(
+  integradoId: string,
+  deviceIdEwelink: string,
+  canalNumero: number,
+  numCanais: number,
+  acao: "ligar" | "desligar",
+) {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-sensors`;
+  const body: Record<string, unknown> = {
+    action: "control-device",
+    integrado_id: integradoId,
+    device_id: deviceIdEwelink,
+    switch: acao === "ligar" ? "on" : "off",
+  };
+  // Multi-canal: eWeLink usa outlet 0-indexed
+  if (numCanais > 1) body.outlet = Math.max(0, (canalNumero ?? 1) - 1);
   const r = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
     },
-    body: JSON.stringify({
-      action: "command",
-      dispositivo_id: dispositivoId,
-      canal: canalNumero,
-      estado: acao === "ligar" ? "on" : "off",
-    }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`sync-sensors ${r.status}: ${await r.text()}`);
   return r.json();
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
