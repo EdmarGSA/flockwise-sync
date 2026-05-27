@@ -1,37 +1,75 @@
-## Diagnóstico
+# Plano: SM-WT (IE Tecnologia) + ESP32-S3-Relay-6CH (Waveshare)
 
-As sugestões aprovadas (modo Sombra) **estão sendo despachadas**, mas todas falham com `erro: "Canal não encontrado para função"` — apesar do canal existir e estar correto.
+## Arquitetura — redundância dupla
 
-Causa raiz encontrada em `supabase/functions/brain-dispatcher/index.ts`:
-
-```ts
-.select("..., dispositivos_iot!inner(driver, online, galpao_id)")
+```
+                ┌─────────────────────────────┐
+                │   SM-WT (IE Tecnologia)     │
+                │   Temp + Umidade            │
+                └──────┬────────────────┬─────┘
+                       │                │
+            Wi-Fi/HTTP │                │ RS485 / Modbus RTU
+            (primário) │                │ (fallback local)
+                       ▼                ▼
+              ┌────────────────┐  ┌──────────────────────┐
+              │  edge function │  │  ESP32-S3-Relay-6CH  │
+              │  sm-wt-ingest  │  │  - lê SM-WT modbus   │
+              └────────┬───────┘  │  - controla 6 relés  │
+                       │          │  - envia /telemetry  │
+                       │          └──────────┬───────────┘
+                       │                     │
+                       ▼                     ▼
+              leituras_sensores  ← merge ←  esp32-bridge
+                       │
+                       ▼
+                 trigger_reavaliar_brain → climate-brain
 ```
 
-A coluna `online` **não existe** na tabela `dispositivos_iot`. As colunas reais são: `ativo`, `ultimo_sync`, `driver`, `galpao_id`, etc. O PostgREST devolve erro/`null`, o código entra no ramo `if (!canal)` e marca o comando como `falhou` com a mensagem enganosa "Canal não encontrado para função".
+**Regra de fusão:** a leitura Wi-Fi direta do SM-WT é a fonte primária. Se ela ficar > 5 min sem chegar, o backend usa automaticamente a leitura RS485 que vem dentro do `/telemetry` do ESP32. Ambas vão para `leituras_sensores` com campo `fonte` ('wifi_sensor' | 'rs485_bridge').
 
-Confirmado em produção:
-- Comando `cc0c55b9…` aprovado às 01:50 — `falhou`, sem `enviado_em`
-- Canal `55a21437…` existe, `automacao_ativa=true`, `ativo=true`, driver `ewelink`, `ultimo_sync` recente
+## O que será feito
 
-Status online real do dispositivo deve ser derivado de `ultimo_sync` (heartbeat), padrão usado no resto do projeto (memória `iot-latency-monitoring-and-alerts` define 10 min de offline).
+### 1. Banco de dados (migration)
+- `dispositivos_iot`: adicionar `tipo_dispositivo` ('controlador' | 'sensor'), `sensor_modelo` ('sm_wt'), `modbus_slave_id` (default 1), `modbus_baud` (default 9600), `sensor_serial`, `sensor_wifi_token` (para autenticar POST do SM-WT).
+- `leituras_sensores`: adicionar coluna `fonte` text ('wifi_sensor' | 'rs485_bridge' | 'esp32_interno').
+- Novo tipo de evento: `sensor_modbus_falha`, `sensor_wifi_offline`, `sensor_fallback_ativado`.
+- Função `registrar_leitura_sensor_unificada(p_dispositivo_id, p_temp, p_umid, p_fonte)`: insere em `leituras_sensores`, atualiza `dispositivos_iot.ultimo_sync`, e dispara `trigger_reavaliar_brain` apenas se for fonte primária OU se a primária estiver offline.
 
-## Correção
+### 2. Edge functions
+- **`sm-wt-ingest` (NOVA)**: endpoint HTTP que o SM-WT chama via Wi-Fi. Autentica via `sensor_wifi_token`. Aceita JSON `{serial, temperature, humidity, rssi, battery?}`. Grava com `fonte='wifi_sensor'`.
+- **`esp32-bridge` (EDITAR)**: aceitar `sensor` no body do `/telemetry` (`{temperature, humidity, modbus_error, modbus_slave_id}`). Gravar com `fonte='rs485_bridge'` somente se a última leitura Wi-Fi tiver > 5 min. Sempre registra evento em caso de `modbus_error`.
+- **`sm-wt-health-monitor` (NOVA, cron 5 min)**: detecta sensores Wi-Fi sem leitura há >10 min, marca como offline, dispara `dispatch_notificacao('sensor_wifi_offline')` e marca para o `esp32-bridge` priorizar RS485.
 
-Editar `supabase/functions/brain-dispatcher/index.ts`:
+### 3. Firmware ESP32-S3-Relay-6CH (documentação)
+Sketch Arduino entregue em `docs/ESP32-S3-BRIDGE.md`:
+- **Bibliotecas**: `WiFi`, `HTTPClient`, `ArduinoJson`, `Preferences` (NVS), `ModbusMaster`.
+- **Modbus RTU**: HardwareSerial2 nos pinos RS485 da placa (DE/RE pin conforme datasheet Waveshare), 9600 8N1, slave id 1.
+- **Loop**: a cada 60 s lê holding registers do SM-WT (T: registrador 0, UR: registrador 1, escala /10), envia `POST /esp32-bridge/telemetry` com `{channels:[...], sensor:{temperature, humidity, modbus_error}}`.
+- **NVS**: persiste `schedule_24h`, `boot_count`, `ultima_config` para sobreviver a queda de energia.
+- **Watchdog**: se Modbus falhar 3x seguidas, envia `modbus_error:true` e segue mandando estado dos relés.
 
-1. Remover `online` dos dois `.select(...)` em `canais_dispositivo` (ambos os ramos: `canalId` informado e busca por função).
-2. Substituir a checagem `if (!dev?.online)` por uma verificação derivada:
-   - `online = ultimo_sync && (Date.now() - new Date(ultimo_sync).getTime()) < 10 * 60_000`
-   - Para `driver === 'esp32_http'`, também tratar `ultima_inicializacao` como heartbeat válido.
-3. Manter o fluxo de fallback redundante e o alerta `brain_atuador_offline` quando o cálculo resultar em offline.
-4. Adicionar log explícito quando o canal realmente não for encontrado vs. quando o dispositivo estiver offline, para evitar futuras confusões.
+### 4. Documentação SM-WT Wi-Fi
+- `docs/SM-WT-INTEGRATION.md` com:
+  - Diagrama de fiação RS485 (A/B do SM-WT ↔ A/B do header RS485 da Waveshare, GND comum, 12 V para SM-WT).
+  - Procedimento de pareamento Wi-Fi do SM-WT (SSID/senha + URL do endpoint `sm-wt-ingest` + token).
+  - Tabela de registradores Modbus (T, UR, status).
+  - Procedimento de cadastro do dispositivo no painel (gera `sensor_wifi_token`, mostra QR de config).
 
-Nada mais muda — modos `shadow`/`auto`/`off`, cooldown, timeout de 60s e fluxo de aprovação continuam iguais.
+### 5. UI
+- `DispositivoIoTForm`: novo campo "Modelo do sensor" (sm_wt), "Slave ID Modbus", "Baud". Botão "Gerar token Wi-Fi do sensor" + cópia da URL/endpoint.
+- `CanaisDispositivoList` (card do controlador): badge "SM-WT Wi-Fi OK" / "SM-WT RS485 (fallback)" / "SM-WT offline" baseado em `leituras_sensores.fonte` mais recente.
+- `HistoricoTemperaturaLote`: linha indicadora quando `fonte = 'rs485_bridge'` para auditoria.
 
-## Validação
+### 6. Validação
+- `curl` em `sm-wt-ingest` simulando POST do sensor → verificar gravação com `fonte='wifi_sensor'`.
+- `curl` em `esp32-bridge/telemetry` com `sensor.temperature` → verificar que **NÃO** sobrescreve se Wi-Fi recente (< 5 min) existe.
+- Simular ausência Wi-Fi (parar de chamar `sm-wt-ingest`) por 6 min → próxima telemetria do ESP32 deve gravar fallback.
+- Confirmar que `climate-brain` continua respondendo às mudanças.
 
-1. Reaprovar (ou criar nova) sugestão do Brain pelo card "Sugestões do Brain".
-2. `curl` no `brain-dispatcher` e confirmar `status=enviado` em `comando_brain`.
-3. Verificar que `sync-sensors` recebeu `action=command` para o canal correto.
-4. Conferir nos logs do edge function que não há mais "Canal não encontrado" para canais válidos.
+## Premissas confirmadas
+- SM-WT escolhido suporta **ambas** as interfaces simultaneamente (Wi-Fi nativo + RS485/Modbus RTU).
+- Wi-Fi do SM-WT permite POST HTTP customizado para nosso endpoint (não exige cloud proprietária da IE Tecnologia). **Se o SM-WT só publicar em cloud da IE**, precisaremos de um webhook lá → ajusto `sm-wt-ingest` para receber esse formato.
+
+## Riscos
+- Endereçamento de registradores Modbus do SM-WT precisa do manual exato (assumido T=0x0000, UR=0x0001 ×10). Ajustável em firmware.
+- Latência: leitura Wi-Fi do SM-WT normalmente é 30–60 s; RS485 é instantânea. Cooldown do brain de 60 s já absorve isso.
