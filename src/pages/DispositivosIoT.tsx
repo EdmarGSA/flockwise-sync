@@ -707,6 +707,59 @@ export default function DispositivosIoT() {
                     </>
                   )}
 
+                  <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={newDevice.sm_wt_enabled}
+                        onChange={(e) => setNewDevice({ ...newDevice, sm_wt_enabled: e.target.checked })}
+                      />
+                      Sensor SM-WT (IE Tecnologia) acoplado
+                    </label>
+                    {newDevice.sm_wt_enabled && (
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <Label className="text-xs">Serial do SM-WT</Label>
+                          <Input
+                            placeholder="Ex: SMWT-001234"
+                            value={newDevice.sensor_serial}
+                            onChange={(e) => setNewDevice({ ...newDevice, sensor_serial: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Modbus Slave ID</Label>
+                            <Input type="number" min={1} max={247} value={newDevice.modbus_slave_id}
+                              onChange={(e) => setNewDevice({ ...newDevice, modbus_slave_id: Number(e.target.value) || 1 })} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Baud RS485</Label>
+                            <Input type="number" value={newDevice.modbus_baud}
+                              onChange={(e) => setNewDevice({ ...newDevice, modbus_baud: Number(e.target.value) || 9600 })} />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Token Wi-Fi do sensor</Label>
+                          <div className="flex gap-2">
+                            <Input value={newDevice.sensor_wifi_token} readOnly placeholder="Clique em Gerar" />
+                            {!newDevice.sensor_wifi_token ? (
+                              <Button type="button" variant="outline" size="sm" onClick={handleGenerateSensorToken}>Gerar</Button>
+                            ) : (
+                              <Button type="button" variant="outline" size="sm" onClick={handleCopySensorToken}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            URL POST: <code className="bg-muted px-1 rounded">{sensorIngestUrl}</code><br />
+                            Header: <code className="bg-muted px-1 rounded">x-sensor-token</code>. Veja docs/SM-WT-INTEGRATION.md.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+
                   <div>
                     <Label>Galpão (opcional)</Label>
                     <Select value={newDevice.galpao_id} onValueChange={(v) => setNewDevice({ ...newDevice, galpao_id: v })}>
