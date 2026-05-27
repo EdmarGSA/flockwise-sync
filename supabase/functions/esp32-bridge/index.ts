@@ -385,15 +385,46 @@ Deno.serve(async (req) => {
           .eq("ativo", true);
       }
 
-      // 1. Persistir leitura ambiental
+      // 1. Persistir leitura ambiental do próprio ESP32 (DHT interno, etc.)
       if (body.temperature !== undefined || body.humidity !== undefined) {
         await supabase.from("leituras_sensores").insert({
           dispositivo_id: device.id,
           temperatura_c: body.temperature ?? null,
           umidade_pct: body.humidity ?? null,
           online: body.online ?? true,
+          fonte: "esp32_interno",
           raw_data: body.raw ?? body,
         });
+      }
+
+      // 1b. Sensor externo via RS485/Modbus (SM-WT) — atua como fallback do Wi-Fi
+      if (body.sensor) {
+        if (body.sensor.modbus_error) {
+          await supabase.from("eventos_dispositivo_iot").insert({
+            dispositivo_id: device.id,
+            integrado_id: device.integrado_id,
+            tipo: "sensor_modbus_falha",
+            detalhes: { slave_id: body.sensor.modbus_slave_id ?? null },
+          });
+          await supabase
+            .from("dispositivos_iot")
+            .update({
+              sensor_ultimo_erro: "modbus_timeout",
+              sensor_ultimo_erro_em: new Date().toISOString(),
+            })
+            .eq("id", device.id);
+        } else if (
+          body.sensor.temperature !== undefined ||
+          body.sensor.humidity !== undefined
+        ) {
+          await supabase.rpc("registrar_leitura_sensor_unificada", {
+            p_dispositivo_id: device.id,
+            p_temperatura: body.sensor.temperature ?? null,
+            p_umidade: body.sensor.humidity ?? null,
+            p_fonte: "rs485_bridge",
+            p_raw: { slave_id: body.sensor.modbus_slave_id ?? null },
+          });
+        }
       }
 
       // 2. Atualizar estado de cada canal (firmware confirma o que aplicou)
