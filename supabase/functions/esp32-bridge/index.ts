@@ -31,6 +31,13 @@ interface TelemetryPayload {
   boot_reason?: "power_on" | "watchdog" | "manual" | "software" | "brownout" | "unknown";
   uptime_s?: number;
   programa_versao_aplicada?: string;
+  // Sensor externo (ex.: SM-WT RS485 lido pelo ESP32 como gateway Modbus)
+  sensor?: {
+    temperature?: number | null;
+    humidity?: number | null;
+    modbus_error?: boolean;
+    modbus_slave_id?: number;
+  };
   raw?: Record<string, unknown>;
 }
 
