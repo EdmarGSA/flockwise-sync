@@ -438,6 +438,24 @@ export default function DispositivosIoT() {
     }
   };
 
+  const handleGenerateSensorToken = () => {
+    const t = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    setNewDevice((prev) => ({ ...prev, sensor_wifi_token: t }));
+    toast.success('Token Wi-Fi do sensor gerado');
+  };
+
+  const handleCopySensorToken = async () => {
+    if (!newDevice.sensor_wifi_token) return;
+    try {
+      await navigator.clipboard.writeText(newDevice.sensor_wifi_token);
+      toast.success('Token copiado');
+    } catch {
+      toast.error('Erro ao copiar');
+    }
+  };
+
+  const sensorIngestUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sm-wt-ingest`;
+
   const handleDeleteDevice = async (id: string) => {
     const { error } = await supabase.from('dispositivos_iot').delete().eq('id', id);
     if (error) { toast.error(error.message); return; }
