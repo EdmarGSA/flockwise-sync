@@ -110,7 +110,12 @@ export default function DispositivosIoT() {
     num_canais: number;
     zona: 'pinteiro' | 'engorda' | 'postura' | 'externa' | 'geral';
     peso_amostragem: number;
-  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
+    sm_wt_enabled: boolean;
+    sensor_serial: string;
+    modbus_slave_id: number;
+    modbus_baud: number;
+    sensor_wifi_token: string;
+  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0, sm_wt_enabled: false, sensor_serial: '', modbus_slave_id: 1, modbus_baud: 9600, sensor_wifi_token: '' });
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
