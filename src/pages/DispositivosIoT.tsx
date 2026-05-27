@@ -407,6 +407,13 @@ export default function DispositivosIoT() {
       modelo: isEsp32 ? `${newDevice.num_canais}CH Relay` : null,
       zona: newDevice.zona,
       peso_amostragem: newDevice.peso_amostragem,
+      ...(newDevice.sm_wt_enabled ? {
+        sensor_modelo: 'sm_wt',
+        sensor_serial: newDevice.sensor_serial || null,
+        modbus_slave_id: newDevice.modbus_slave_id,
+        modbus_baud: newDevice.modbus_baud,
+        sensor_wifi_token: newDevice.sensor_wifi_token || null,
+      } : {}),
     } as any);
     if (error) { toast.error(error.message.includes('duplicate') ? 'Dispositivo já cadastrado' : error.message); return; }
     toast.success('Dispositivo cadastrado');
