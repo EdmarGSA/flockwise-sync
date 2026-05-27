@@ -2449,18 +2449,26 @@ export type Database = {
           id: string
           integrado_id: string
           marca: string | null
+          modbus_baud: number | null
+          modbus_slave_id: number | null
           modelo: string | null
           nome: string
           num_canais: number
           peso_amostragem: number
           programa_versao: string | null
           regra_grupo: string | null
+          sensor_modelo: string | null
+          sensor_serial: string | null
+          sensor_ultimo_erro: string | null
+          sensor_ultimo_erro_em: string | null
+          sensor_wifi_token: string | null
           suporta_anemometro: boolean | null
           suporta_co2: boolean | null
           suporta_lux: boolean | null
           suporta_manometro: boolean | null
           suporta_nh3: boolean | null
           tipo: string
+          tipo_dispositivo: string | null
           ultima_inicializacao: string | null
           ultimo_boot_reason: string | null
           ultimo_sync: string | null
@@ -2481,18 +2489,26 @@ export type Database = {
           id?: string
           integrado_id: string
           marca?: string | null
+          modbus_baud?: number | null
+          modbus_slave_id?: number | null
           modelo?: string | null
           nome: string
           num_canais?: number
           peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
+          sensor_modelo?: string | null
+          sensor_serial?: string | null
+          sensor_ultimo_erro?: string | null
+          sensor_ultimo_erro_em?: string | null
+          sensor_wifi_token?: string | null
           suporta_anemometro?: boolean | null
           suporta_co2?: boolean | null
           suporta_lux?: boolean | null
           suporta_manometro?: boolean | null
           suporta_nh3?: boolean | null
           tipo?: string
+          tipo_dispositivo?: string | null
           ultima_inicializacao?: string | null
           ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
@@ -2513,18 +2529,26 @@ export type Database = {
           id?: string
           integrado_id?: string
           marca?: string | null
+          modbus_baud?: number | null
+          modbus_slave_id?: number | null
           modelo?: string | null
           nome?: string
           num_canais?: number
           peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
+          sensor_modelo?: string | null
+          sensor_serial?: string | null
+          sensor_ultimo_erro?: string | null
+          sensor_ultimo_erro_em?: string | null
+          sensor_wifi_token?: string | null
           suporta_anemometro?: boolean | null
           suporta_co2?: boolean | null
           suporta_lux?: boolean | null
           suporta_manometro?: boolean | null
           suporta_nh3?: boolean | null
           tipo?: string
+          tipo_dispositivo?: string | null
           ultima_inicializacao?: string | null
           ultimo_boot_reason?: string | null
           ultimo_sync?: string | null
@@ -3690,6 +3714,7 @@ export type Database = {
           co2_ppm: number | null
           created_at: string
           dispositivo_id: string
+          fonte: string | null
           id: string
           lido_em: string
           lux: number | null
@@ -3705,6 +3730,7 @@ export type Database = {
           co2_ppm?: number | null
           created_at?: string
           dispositivo_id: string
+          fonte?: string | null
           id?: string
           lido_em?: string
           lux?: number | null
@@ -3720,6 +3746,7 @@ export type Database = {
           co2_ppm?: number | null
           created_at?: string
           dispositivo_id?: string
+          fonte?: string | null
           id?: string
           lido_em?: string
           lux?: number | null
@@ -9864,6 +9891,16 @@ export type Database = {
       }
       marcar_dispositivos_offline_iot: { Args: never; Returns: number }
       redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
+      registrar_leitura_sensor_unificada: {
+        Args: {
+          p_dispositivo_id: string
+          p_fonte: string
+          p_raw?: Json
+          p_temperatura: number
+          p_umidade: number
+        }
+        Returns: string
+      }
       reservar_estoque_ovos_fifo: {
         Args: {
           p_classificacao: Database["public"]["Enums"]["classificacao_peso_ovo"]

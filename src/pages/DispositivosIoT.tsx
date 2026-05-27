@@ -110,7 +110,12 @@ export default function DispositivosIoT() {
     num_canais: number;
     zona: 'pinteiro' | 'engorda' | 'postura' | 'externa' | 'geral';
     peso_amostragem: number;
-  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
+    sm_wt_enabled: boolean;
+    sensor_serial: string;
+    modbus_slave_id: number;
+    modbus_baud: number;
+    sensor_wifi_token: string;
+  }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0, sm_wt_enabled: false, sensor_serial: '', modbus_slave_id: 1, modbus_baud: 9600, sensor_wifi_token: '' });
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -402,11 +407,18 @@ export default function DispositivosIoT() {
       modelo: isEsp32 ? `${newDevice.num_canais}CH Relay` : null,
       zona: newDevice.zona,
       peso_amostragem: newDevice.peso_amostragem,
+      ...(newDevice.sm_wt_enabled ? {
+        sensor_modelo: 'sm_wt',
+        sensor_serial: newDevice.sensor_serial || null,
+        modbus_slave_id: newDevice.modbus_slave_id,
+        modbus_baud: newDevice.modbus_baud,
+        sensor_wifi_token: newDevice.sensor_wifi_token || null,
+      } : {}),
     } as any);
     if (error) { toast.error(error.message.includes('duplicate') ? 'Dispositivo já cadastrado' : error.message); return; }
     toast.success('Dispositivo cadastrado');
     setAddDialogOpen(false);
-    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0 });
+    setNewDevice({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0, sm_wt_enabled: false, sensor_serial: '', modbus_slave_id: 1, modbus_baud: 9600, sensor_wifi_token: '' });
     fetchData();
   };
 
@@ -425,6 +437,24 @@ export default function DispositivosIoT() {
       toast.error('Erro ao copiar');
     }
   };
+
+  const handleGenerateSensorToken = () => {
+    const t = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    setNewDevice((prev) => ({ ...prev, sensor_wifi_token: t }));
+    toast.success('Token Wi-Fi do sensor gerado');
+  };
+
+  const handleCopySensorToken = async () => {
+    if (!newDevice.sensor_wifi_token) return;
+    try {
+      await navigator.clipboard.writeText(newDevice.sensor_wifi_token);
+      toast.success('Token copiado');
+    } catch {
+      toast.error('Erro ao copiar');
+    }
+  };
+
+  const sensorIngestUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sm-wt-ingest`;
 
   const handleDeleteDevice = async (id: string) => {
     const { error } = await supabase.from('dispositivos_iot').delete().eq('id', id);
@@ -676,6 +706,59 @@ export default function DispositivosIoT() {
                       </div>
                     </>
                   )}
+
+                  <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={newDevice.sm_wt_enabled}
+                        onChange={(e) => setNewDevice({ ...newDevice, sm_wt_enabled: e.target.checked })}
+                      />
+                      Sensor SM-WT (IE Tecnologia) acoplado
+                    </label>
+                    {newDevice.sm_wt_enabled && (
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <Label className="text-xs">Serial do SM-WT</Label>
+                          <Input
+                            placeholder="Ex: SMWT-001234"
+                            value={newDevice.sensor_serial}
+                            onChange={(e) => setNewDevice({ ...newDevice, sensor_serial: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Modbus Slave ID</Label>
+                            <Input type="number" min={1} max={247} value={newDevice.modbus_slave_id}
+                              onChange={(e) => setNewDevice({ ...newDevice, modbus_slave_id: Number(e.target.value) || 1 })} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Baud RS485</Label>
+                            <Input type="number" value={newDevice.modbus_baud}
+                              onChange={(e) => setNewDevice({ ...newDevice, modbus_baud: Number(e.target.value) || 9600 })} />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Token Wi-Fi do sensor</Label>
+                          <div className="flex gap-2">
+                            <Input value={newDevice.sensor_wifi_token} readOnly placeholder="Clique em Gerar" />
+                            {!newDevice.sensor_wifi_token ? (
+                              <Button type="button" variant="outline" size="sm" onClick={handleGenerateSensorToken}>Gerar</Button>
+                            ) : (
+                              <Button type="button" variant="outline" size="sm" onClick={handleCopySensorToken}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            URL POST: <code className="bg-muted px-1 rounded">{sensorIngestUrl}</code><br />
+                            Header: <code className="bg-muted px-1 rounded">x-sensor-token</code>. Veja docs/SM-WT-INTEGRATION.md.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
 
                   <div>
                     <Label>Galpão (opcional)</Label>
