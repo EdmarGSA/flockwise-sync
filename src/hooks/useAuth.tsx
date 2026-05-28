@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // seja dono da própria organização (defesa contra falhas no trigger).
         if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
           setTimeout(() => {
-            supabase.rpc('ensure_my_admin_role' as any).catch(() => {});
+            (supabase.rpc('ensure_my_admin_role' as any) as unknown as Promise<unknown>).catch(() => {});
           }, 0);
         }
       }
