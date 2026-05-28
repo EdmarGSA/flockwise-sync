@@ -26,23 +26,40 @@ export const useModuleAccess = () => {
       return;
     }
 
-    try {
+    const fetchOnce = async () => {
       const { data, error } = await supabase.rpc('get_user_accessible_modules' as any, {
-        _user_id: user.id
+        _user_id: user.id,
       });
+      if (error) throw error;
+      return ((data as any[]) || []).map(m => ({
+        ...m,
+        nivel_acesso: (m.nivel_acesso || 'view') as NivelAcesso,
+      }));
+    };
 
-      if (error) {
-        console.error('Error fetching accessible modules:', error);
-        setAccessibleModules([]);
-      } else {
-        const modules = (data as any[])?.map(m => ({
-          ...m,
-          nivel_acesso: (m.nivel_acesso || 'view') as NivelAcesso
-        })) || [];
-        setAccessibleModules(modules);
+    try {
+      let modules = await fetchOnce();
+
+      // Auto-heal: dono de org sem admin (lista vazia ou muito reduzida)
+      // chama ensure_my_admin_role e refaz a busca se algo foi corrigido.
+      if (modules.length < 3) {
+        try {
+          const { data: fixed } = await supabase.rpc('ensure_my_admin_role' as any);
+          if (fixed === true) {
+            modules = await fetchOnce();
+          } else if (modules.length === 0) {
+            // Retry curto: trigger pode ainda estar comitando após signup
+            await new Promise(r => setTimeout(r, 800));
+            modules = await fetchOnce();
+          }
+        } catch (e) {
+          console.warn('ensure_my_admin_role failed:', e);
+        }
       }
+
+      setAccessibleModules(modules);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching accessible modules:', error);
       setAccessibleModules([]);
     } finally {
       setLoading(false);

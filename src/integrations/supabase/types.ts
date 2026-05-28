@@ -9825,6 +9825,7 @@ export type Database = {
         }
         Returns: number
       }
+      ensure_my_admin_role: { Args: never; Returns: boolean }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
       gerar_lote_interno_ovos: {
         Args: { p_integrado_id: string }
