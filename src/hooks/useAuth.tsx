@@ -27,6 +27,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Após login/signup com sessão, garante role de admin caso o usuário
+        // seja dono da própria organização (defesa contra falhas no trigger).
+        if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          setTimeout(() => {
+            supabase.rpc('ensure_my_admin_role' as any).catch(() => {});
+          }, 0);
+        }
       }
     );
 
@@ -64,6 +72,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     // Quando confirmação por email está ativa, signUp retorna user mas sem session.
     const needsEmailConfirmation = !error && !!data?.user && !data?.session;
+
+    // Se já temos sessão (auto-confirm), garante admin imediatamente.
+    if (!error && data?.session) {
+      try { await supabase.rpc('ensure_my_admin_role' as any); } catch {}
+    }
+
     return { error, needsEmailConfirmation };
   };
 
