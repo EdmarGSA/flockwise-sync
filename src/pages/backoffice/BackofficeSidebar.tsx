@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Users, HeartHandshake, Wrench, Bell, Globe2, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, HeartHandshake, Wrench, Bell, Globe2, ShieldCheck, UserPlus } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -15,6 +15,7 @@ import {
 
 const items = [
   { title: 'Dashboard', url: '/backoffice', icon: LayoutDashboard },
+  { title: 'Solicitações', url: '/backoffice/solicitacoes', icon: UserPlus },
   { title: 'Granjas', url: '/backoffice/granjas', icon: Building2 },
   { title: 'Usuários', url: '/backoffice/usuarios', icon: Users },
   { title: 'Customer Success', url: '/backoffice/cs', icon: HeartHandshake },
@@ -23,6 +24,7 @@ const items = [
   { title: 'Notificações', url: '/backoffice/notificacoes', icon: Bell },
   { title: 'Auditoria', url: '/backoffice/auditoria', icon: ShieldCheck },
 ];
+
 
 export function BackofficeSidebar() {
   const location = useLocation();

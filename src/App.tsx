@@ -80,6 +80,8 @@ import BackofficeFerramentas from "./pages/backoffice/BackofficeFerramentas";
 import BackofficeNotificacoes from "./pages/backoffice/BackofficeNotificacoes";
 import BackofficeAuditoria from "./pages/backoffice/BackofficeAuditoria";
 import BackofficeMapbox from "./pages/backoffice/BackofficeMapbox";
+import BackofficeSolicitacoes from "./pages/backoffice/BackofficeSolicitacoes";
+
 import NotFound from "./pages/NotFound";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import TermosUso from "./pages/TermosUso";
@@ -607,7 +609,9 @@ const AppRoutes = () => (
       <Route path="mapbox" element={<BackofficeMapbox />} />
       <Route path="notificacoes" element={<BackofficeNotificacoes />} />
       <Route path="auditoria" element={<BackofficeAuditoria />} />
+      <Route path="solicitacoes" element={<BackofficeSolicitacoes />} />
     </Route>
+
 
     {/* Vitrine pública do fornecedor */}
     <Route path="/vitrine/:id" element={<VitrineFornecedor />} />

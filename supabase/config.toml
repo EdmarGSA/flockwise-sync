@@ -80,3 +80,13 @@ verify_jwt = false
 
 [functions.sm-wt-health-monitor]
 verify_jwt = false
+
+[functions.approve-signup-request]
+verify_jwt = true
+
+[functions.reject-signup-request]
+verify_jwt = true
+
+[functions.cleanup-unapproved-google-user]
+verify_jwt = true
+
