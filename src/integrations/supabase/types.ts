@@ -8555,6 +8555,69 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_cadastro: {
+        Row: {
+          cidade: string | null
+          created_at: string
+          email: string
+          estado: string | null
+          full_name: string
+          id: string
+          integrado_id_criado: string | null
+          mensagem: string | null
+          motivo_reprovacao: string | null
+          nome_organizacao: string
+          origem: string
+          revisado_em: string | null
+          revisado_por: string | null
+          status: string
+          telefone: string | null
+          tipo_producao: string | null
+          updated_at: string
+          user_id_criado: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          created_at?: string
+          email: string
+          estado?: string | null
+          full_name: string
+          id?: string
+          integrado_id_criado?: string | null
+          mensagem?: string | null
+          motivo_reprovacao?: string | null
+          nome_organizacao: string
+          origem?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          status?: string
+          telefone?: string | null
+          tipo_producao?: string | null
+          updated_at?: string
+          user_id_criado?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          created_at?: string
+          email?: string
+          estado?: string | null
+          full_name?: string
+          id?: string
+          integrado_id_criado?: string | null
+          mensagem?: string | null
+          motivo_reprovacao?: string | null
+          nome_organizacao?: string
+          origem?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          status?: string
+          telefone?: string | null
+          tipo_producao?: string | null
+          updated_at?: string
+          user_id_criado?: string | null
+        }
+        Relationships: []
+      }
       solicitacoes_racao: {
         Row: {
           confirmado_por: string | null
