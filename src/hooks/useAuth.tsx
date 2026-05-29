@@ -1,17 +1,16 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -21,24 +20,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Após login/signup com sessão, garante role de admin caso o usuário
-        // seja dono da própria organização (defesa contra falhas no trigger).
         if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-          setTimeout(() => {
-            (supabase.rpc('ensure_my_admin_role' as any) as unknown as Promise<unknown>).catch(() => {});
-          }, 0);
+          const provider = (session.user.app_metadata as any)?.provider;
+          // OAuth (Google): se não tem profile, criar solicitação + cleanup + signOut
+          if (provider === 'google') {
+            setTimeout(async () => {
+              try {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+
+                if (!profile) {
+                  // Cria solicitação a partir do email/nome do Google
+                  const meta = session.user.user_metadata || {};
+                  const email = session.user.email || '';
+                  const fullName = (meta.full_name || meta.name || email.split('@')[0]) as string;
+
+                  await supabase.from('solicitacoes_cadastro' as any).insert({
+                    full_name: fullName,
+                    email: email.toLowerCase(),
+                    nome_organizacao: fullName,
+                    origem: 'google_oauth',
+                    status: 'pendente',
+                  });
+
+                  // Limpa o auth.users órfão
+                  try { await supabase.functions.invoke('cleanup-unapproved-google-user'); } catch {}
+
+                  await supabase.auth.signOut();
+                  toast.info('Solicitação enviada', {
+                    description: 'Sua conta Google ainda não foi aprovada. Te avisaremos por email assim que liberarmos.',
+                  });
+                  return;
+                }
+              } catch (e) {
+                console.warn('Google OAuth check failed:', e);
+              }
+              // Tem profile → garante role admin se for owner
+              try { await supabase.rpc('ensure_my_admin_role' as any); } catch {}
+            }, 0);
+          } else {
+            setTimeout(() => {
+              (supabase.rpc('ensure_my_admin_role' as any) as unknown as Promise<unknown>).catch(() => {});
+            }, 0);
+          }
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -49,36 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-          // NÃO enviar integrado_id daqui — handle_new_user ignora metadata pública.
-        },
-      },
-    });
-    // Quando confirmação por email está ativa, signUp retorna user mas sem session.
-    const needsEmailConfirmation = !error && !!data?.user && !data?.session;
-
-    // Se já temos sessão (auto-confirm), garante admin imediatamente.
-    if (!error && data?.session) {
-      try { await supabase.rpc('ensure_my_admin_role' as any); } catch {}
-    }
-
-    return { error, needsEmailConfirmation };
   };
 
   const signInWithGoogle = async () => {
@@ -99,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
