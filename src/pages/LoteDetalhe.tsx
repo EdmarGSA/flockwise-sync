@@ -324,12 +324,21 @@ export default function LoteDetalhe() {
 
         {/* Monitoramento IoT - Temperatura/Umidade e Iluminação */}
         {lote.status === 'alojado' && (
-          <TemperaturaUmidadeCard
-            galpaoId={lote.galpao_id}
-            loteId={lote.id}
-            programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
-            idadeDias={lote.data_alojamento ? Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)) + 1 : undefined}
-          />
+          <>
+            <TemperaturaUmidadeCard
+              galpaoId={lote.galpao_id}
+              loteId={lote.id}
+              programaIluminacaoId={(lote as any).programa_iluminacao_id ?? null}
+              idadeDias={lote.data_alojamento ? Math.floor((Date.now() - new Date(lote.data_alojamento).getTime()) / (1000 * 60 * 60 * 24)) + 1 : undefined}
+            />
+            <Button
+              variant="outline"
+              className="w-full mb-4"
+              onClick={() => navigate(`/meus-lotes/${lote.id}/ambiencia`)}
+            >
+              Ambiência & Iluminação em tempo real →
+            </Button>
+          </>
         )}
 
         {/* Alertas de Produção para lotes de postura */}
