@@ -21,6 +21,7 @@ import Home from "./pages/Home";
 import GestaoCampo from "./pages/GestaoCampo";
 import MeusLotes from "./pages/MeusLotes";
 import MetasPesoLote from "./pages/MetasPesoLote";
+import LoteAmbienciaControle from "./pages/LoteAmbienciaControle";
 import LoteDetalhe from "./pages/LoteDetalhe";
 import MetasPosturaLote from "./pages/MetasPosturaLote";
 import GestaoConsumo from "./pages/GestaoConsumo";
@@ -239,6 +240,13 @@ const AppRoutes = () => (
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="lotes">
           <LoteDetalhe />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/meus-lotes/:loteId/ambiencia" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="lotes">
+          <LoteAmbienciaControle />
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
