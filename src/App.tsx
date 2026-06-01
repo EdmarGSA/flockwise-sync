@@ -243,6 +243,13 @@ const AppRoutes = () => (
         </ModuleProtectedRoute>
       </ProtectedRoute>
     } />
+    <Route path="/meus-lotes/:loteId/ambiencia" element={
+      <ProtectedRoute>
+        <ModuleProtectedRoute moduleCode="lotes">
+          <LoteAmbienciaControle />
+        </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
     <Route path="/meus-lotes/:loteId/metas" element={
       <ProtectedRoute>
         <ModuleProtectedRoute moduleCode="lotes">
