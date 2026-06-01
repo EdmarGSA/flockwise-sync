@@ -52,7 +52,7 @@ export function KpiClimaLote({ leiturasUltimas, serieKpi, setpointAlvo }: Props)
         Icon={TrendIcon}
         label="ITH"
         value={ith != null ? ith.toFixed(0) : '—'}
-        sub={classITH?.label}
+        sub={classITH ?? undefined}
       />
     </div>
   );
