@@ -70,7 +70,7 @@ async function fetchAmbienciaLote(loteId: string): Promise<AmbienciaLoteData> {
   ] = await Promise.all([
     supabase
       .from('dispositivos_iot')
-      .select('id, nome, device_id_ewelink, driver, online, ultimo_sync, galpao_id, ativo, num_canais, funcao_automacao')
+      .select('id, nome, device_id_ewelink, driver, ultimo_sync, galpao_id, ativo, num_canais, funcao_automacao')
       .eq('galpao_id', lote.galpao_id)
       .eq('ativo', true),
     supabase.from('estagio_ventilacao_estado').select('*').eq('galpao_id', lote.galpao_id).maybeSingle(),
@@ -108,7 +108,11 @@ async function fetchAmbienciaLote(loteId: string): Promise<AmbienciaLoteData> {
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  const dispositivos: DispositivoIot[] = (devsRes.data as any[]) ?? [];
+  const ONLINE_MS = 10 * 60 * 1000;
+  const dispositivos: DispositivoIot[] = ((devsRes.data as any[]) ?? []).map((d) => ({
+    ...d,
+    online: !!d.ultimo_sync && Date.now() - new Date(d.ultimo_sync).getTime() < ONLINE_MS,
+  }));
   const devIds = dispositivos.map((d) => d.id);
 
   // 3) Canais + leituras + overrides canais — dependem de devIds
