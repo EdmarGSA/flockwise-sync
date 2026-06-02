@@ -70,7 +70,7 @@ async function fetchAmbienciaLote(loteId: string): Promise<AmbienciaLoteData> {
   ] = await Promise.all([
     supabase
       .from('dispositivos_iot')
-      .select('id, nome, device_id_ewelink, driver, online, ultimo_sync, galpao_id, ativo, num_canais, funcao_automacao')
+      .select('id, nome, device_id_ewelink, driver, ultimo_sync, galpao_id, ativo, num_canais, funcao_automacao')
       .eq('galpao_id', lote.galpao_id)
       .eq('ativo', true),
     supabase.from('estagio_ventilacao_estado').select('*').eq('galpao_id', lote.galpao_id).maybeSingle(),
