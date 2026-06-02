@@ -1,153 +1,114 @@
-## Objetivo
 
-Tela única **por lote** que mostre, em tempo real, todo o ecossistema de ambiência + iluminação do galpão:
-- **Alertas operacionais** (NOC) no topo: sensor mudo, dispositivo offline, sem ACK, Brain parado.
-- **Parâmetros configurados**: setpoints, faixa de temperatura do dia, histerese, fotoperíodo.
-- **Programação ativa**: curva climática + blocos de iluminação + override do Brain.
-- **Próxima ação prevista** (clima e iluminação) — interpretabilidade.
-- **Dados reais** dos sensores (T, UR, ITH, tendência 1 h).
-- **Status real-time dos dispositivos/canais** (ONLINE / OFFLINE / SEM ACK) em **cards no mobile** e tabela no desktop.
+# Plano de comercialização — GSA Tibiri
 
-Centraliza o que hoje está espalhado em `AmbienciaDashboard`, `LoteIluminacaoCard`, `TemperaturaUmidadeCard`, `DispositivoIluminacaoCard`, `SaudeIoTPanel`, `ClimateBrain`.
+## 1. Auditoria de custo de IA no sistema
 
-## Rota e navegação
+Hoje a plataforma usa IA do **Lovable AI Gateway** em apenas **2 pontos**:
 
-- Nova rota: `/lote/:loteId/ambiencia` — protegida por `ProtectedRoute` + `ModuleProtectedRoute` (módulo `iot`/`campo`).
-- Acesso a partir de `LoteDetalhe`, `LoteCard`, e clique no card do galpão no `AmbienciaDashboard` (com lote ativo).
+| # | Função | Modelo | Gatilho | Tokens estimados (in/out) | Custo por chamada* |
+|---|--------|--------|---------|---------------------------|--------------------|
+| 1 | `relatorio-lote-diario` (action=ia) | `google/gemini-2.5-pro` | Sob demanda (botão "Gerar análise IA"), com **cache por hash dos dados** | ~6.000 / ~1.500 | ~US$ 0,022 (~R$ 0,12) |
+| 2 | `climate-learn` | `google/gemini-3-flash-preview` | Cron **1×/hora por galpão** ativo (narrativa térmica curta ≤280 chars) | ~500 / ~120 | ~US$ 0,0002 (~R$ 0,001) |
 
-## Layout
+\*preços públicos Gemini, Nov/2025.
+
+### Projeção mensal por cliente típico (integradora 20 galpões, 20 lotes ativos)
+```text
+climate-learn : 20 galpões × 24h × 30d × R$0,001  ≈  R$  14,40/mês
+relatório IA  : 20 lotes × ~10 gerações/mês × R$0,12 ≈  R$  24,00/mês
+                                                      ──────────────
+                                            TOTAL ≈  R$  38,40/mês
+```
+Conclusão: **custo direto de IA é marginal (<R$ 50/mês mesmo em conta grande)**. O risco real está em:
+- Disparos não-cacheados do relatório (se o usuário gera 100x/dia → R$ 12/dia)
+- Futuras features de IA (briefing de mortalidade, brain de iluminação adaptativa, análise XML, etc.)
+
+### Salvaguardas recomendadas (técnicas, antes da venda)
+1. **Quota por organização** em `ai_usage_log` (tabela nova): contar tokens por `integrado_id` e bloquear ao atingir teto do plano.
+2. **Rate limit** no endpoint `?action=ia` (máx. 1 geração / 10 min / lote) — o cache já existe, mas validar no servidor.
+3. **Modelo escalável**: Flash para clientes Starter, Pro para Enterprise (já é a separação natural hoje).
+
+---
+
+## 2. Estrutura comercial — Modelo híbrido (base + por galpão)
+
+Todos os planos focam **integradoras**, ticket-alvo R$ 500–1.500/mês no Profissional. **IA sempre como add-on separado.**
+
+### Planos SEM IA (núcleo da oferta)
+
+| Plano | Base mensal | Galpão adicional | Inclui | Limite |
+|-------|-------------|------------------|--------|--------|
+| **Starter** | R$ 290 | R$ 35/galpão | Manejo de lotes, mortalidade, pesagem manual, fechamento, estoque básico, 2 usuários | até 4 galpões |
+| **Profissional** ⭐ | R$ 690 | R$ 45/galpão | Tudo do Starter + IoT (eWeLink/ESP32), automação climática (Climate Brain sem narrativa IA), iluminação programada, financeiro, veterinário, 10 usuários | até 20 galpões |
+| **Integradora** | R$ 1.490 | R$ 38/galpão | Tudo do Pro + multi-núcleos, mapa de risco de campo, Cockpit Thoth, ERP sync (fornecedores), backoffice de granjas, usuários ilimitados | sem limite |
+| **Enterprise / White-label** | Sob consulta | — | SSO/SAML, SLA, domínio próprio, onboarding dedicado, customizações | — |
+
+Exemplo de ticket: integradora com 15 galpões no Pro = **R$ 690 + 15×45 = R$ 1.365/mês**.
+
+### Add-ons opcionais (recorrentes)
+
+| Add-on | Preço | Margem racional |
+|--------|-------|-----------------|
+| **IA Insights** (relatório diário IA + narrativa Climate Brain + briefing mortalidade) | **R$ 149/mês** por até 10 lotes ativos + R$ 9/lote extra | Custo real ~R$ 5–15/cliente → margem ~90% |
+| **IA Insights Ilimitado** | **R$ 490/mês** | Para integradoras com >50 lotes |
+| Câmeras Intelbras DVR | R$ 39/galpão/mês | Cobre infra de snapshot |
+| Portal Fornecedor (mini-ERP B2B) | R$ 390/mês por fornecedor | Já existe a infra |
+| Integração ERP customizada | Setup R$ 4.500 + R$ 290/mês | |
+
+### Setup e contrato
+- Setup único: **R$ 1.500 (Starter)** / **R$ 3.500 (Pro)** / **R$ 8.900 (Integradora)** — cobre cadastro de núcleos, importação Lohmann, treinamento.
+- Desconto **2 meses grátis** no anual (16,7%).
+- **Trial 14 dias** com ambiente demo já existente.
+
+---
+
+## 3. Comparativo "Com IA" × "Sem IA" (pitch comercial)
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Header: Lote · Galpão · Idade · Linhagem · Pílula modo Brain │
-├──────────────────────────────────────────────────────────────┤
-│ ⚠ BARRA DE ALERTAS OPERACIONAIS (NOC)                        │
-│   • Sensor sem dados há 18 min                               │
-│   • Cortina sem ACK há 4 min                                 │
-│   • Brain sem decisão há 22 min                              │
-├──────────────────────────────────────────────────────────────┤
-│ KPIs: T · Alvo · Δ · UR · ITH · Tendência 1h                 │
-├──────────────────────────────────────────────────────────────┤
-│ PRÓXIMA AÇÃO                                                 │
-│  Clima: Ventilação estágio 3 quando T > 29.5°C               │
-│  Iluminação: 60% às 21:30 (em 12 min)                        │
-├──────────────────────────────────────────────────────────────┤
-│ Atuadores live (cards):                                      │
-│ [Vent 2/5] [Cortina 40%→60%] [Nebul on] [Aquec off]          │
-│ [Iluminação 80% · ramp-down 12min]                           │
-├──────────────────────────┬───────────────────────────────────┤
-│ Parâmetros ativos        │ Programação do dia                │
-├──────────────────────────┴───────────────────────────────────┤
-│ Dispositivos & canais (live)                                 │
-│  Desktop: tabela · Mobile: lista de cards                    │
-│  Badges: ONLINE / OFFLINE / SEM ACK                          │
-├──────────────────────────────────────────────────────────────┤
-│ Timeline de decisões do Brain (últimas 30)                   │
-└──────────────────────────────────────────────────────────────┘
+                          SEM IA (núcleo)         COM IA (add-on)
+─────────────────────────────────────────────────────────────────
+Relatório diário do lote  Tabelas + gráficos      + Análise narrativa Gemini Pro
+Climate Brain             Setpoints + offset      + Narrativa térmica horária
+Mortalidade               Lista + alertas         + Briefing diagnóstico
+Tomada de decisão         Operador interpreta     Insight pronto p/ gestor
+Custo p/ cliente          R$ 690–1.490            +R$ 149–490
+Custo Lovable             ~R$ 0                   ~R$ 5–40/cliente
+Margem bruta              ~95%                    ~90%
 ```
 
-## Bloco "Próxima ação"
+**Argumento de venda:** "A plataforma toma decisões por você (automações, alertas, gráficos). A IA **explica e prioriza** essas decisões para o tomador de decisão executivo."
 
-- **Iluminação**: deriva de `selecionarFaixa` + `calcularEstadoIluminacao` (já retorna `proximo_evento_min` e `proximo_evento_tipo`). Exibe `acender/apagar HH:MM · em N min · → X%`.
-- **Clima**: lê última decisão `log_decisao_clima` + histerese da config para descrever a próxima transição prevista (ex.: `Ventilação estágio 3 quando T > 29.5 °C` ou `Cortina abrir 20% quando T > setpoint+1 °C`). Se sem dados → "Brain aguardando leituras".
+---
 
-## Dispositivos & canais — badges de status
+## 4. Itens técnicos a implementar para sustentar a venda
 
-Estado derivado client-side:
-- `ONLINE` — `dispositivos_iot.online = true` e `ultimo_sync < 10 min`.
-- `OFFLINE` — `online = false` **ou** `ultimo_sync > 10 min`.
-- `SEM ACK` — comando enviado (`canais_dispositivo.ultimo_comando_em` recente) e `estado_atual` ainda não bateu com o alvo após > 90 s; **ou** `historico_estado_canal` sem entrada após o comando.
+Esses itens **não são código** ainda — só estarão prontos para implementação após aprovação:
 
-Cores via tokens semânticos (`bg-success`, `bg-warning`, `bg-destructive`).
+1. **Tabela `ai_usage_log`** (integrado_id, função, modelo, tokens_in, tokens_out, custo_estimado, criado_em).
+2. **Tabela `planos` + `assinaturas`** (plano_id, integrado_id, base_galpoes, addon_ia, ciclo, vence_em).
+3. **Hook `useIAEnabled()`** que lê `assinaturas.addon_ia` → esconde botões "Gerar IA" e desativa `chamarIA()` no `relatorio-lote-diario` quando off.
+4. **Quota guard** no edge function (retorna 402 quando estoura).
+5. **Página `/configuracao/plano`** com uso de IA do mês, galpões ativos, próximo ciclo.
+6. **Backoffice → BackofficeGranjas**: coluna "Plano", "Add-ons", "Uso IA mês".
+7. **Pagamento**: integrar **Stripe (Lovable Payments)** para cobrança recorrente em BRL com suporte a setup fee + assinatura + add-ons.
 
-## Barra de alertas operacionais (NOC)
+---
 
-`<BarraAlertasOperacionais>` no topo (acima dos KPIs), regras puras client-side:
-- Sensor mudo: nenhuma leitura há > 10 min.
-- Dispositivo offline: pelo menos 1 dispositivo do galpão offline.
-- Sem ACK: ≥ 1 canal com comando pendente.
-- Brain parado: última decisão `climate_brain` > 15 min.
-- Override Brain ativo hoje (informativo, não crítico).
+## 5. Cronograma sugerido (pós-aprovação)
 
-Cada alerta clicável → faz scroll/abre seção correspondente.
-
-## Mobile (≥ `md` = tabela; < `md` = cards)
-
-Card de canal no mobile:
+```text
+Semana 1  Tabelas planos/assinaturas/ai_usage_log + RLS
+Semana 2  useIAEnabled + quota guard + página /configuracao/plano
+Semana 3  Backoffice plano/uso + relatórios financeiros internos
+Semana 4  Integração Stripe (BRL), trial 14d, faturas
+Semana 5  Landing/pricing pública + onboarding comercial
 ```
-┌──────────────────────────────┐
-│ ESP32 Cortina      [ONLINE]  │
-│ Canal A · Cortina            │
-│ Aberto 60% → 80%             │
-│ ACK há 14 s                  │
-└──────────────────────────────┘
-```
-Padrão de cards já usado no projeto (memória mobile UX).
 
-## Realtime + debounce + cache
+---
 
-- **Cache local com `@tanstack/react-query`** (já presente):
-  - `useQuery(['ambiencia-lote', loteId])` com `staleTime: 30_000`, `refetchOnWindowFocus: false`.
-  - Realtime dispara apenas `queryClient.invalidateQueries(...)` (não busca direto).
-- **Debounce de 250 ms** no `useAmbienciaLote` agrupando eventos das 4 subscriptions (`log_decisao_clima`, `canais_dispositivo`, `dispositivos_iot`, `override_iluminacao_canal`/`brain`) antes de invalidar — evita render-storm quando o coordinator escreve várias linhas em sequência.
-- Fallback de polling 30 s (interval) só dispara se realtime ficar mudo > 60 s (heartbeat).
-- Indicador "ao vivo" (ponto verde piscando) + timestamp do último update.
+## 6. Próximos passos antes de codar
 
-## Fontes de dados (sem schema novo)
-
-- Decisão clima → `log_decisao_clima` (filtro `funcao_automacao = climate_brain`).
-- Atuadores → `estagio_ventilacao_estado`, `cortina_estado_atual`, `programa_nebulizacao_galpao`, `comando_brain`.
-- Telemetria sensores → leituras IoT do galpão (mesma fonte do `TemperaturaUmidadeCard` / `useTemperaturaLote`).
-- Programa iluminação → `programa_iluminacao_lote` + `programa_iluminacao_faixa` + `override_iluminacao_brain` + `override_iluminacao_canal`.
-- Curva climática / histerese → mesmas tabelas de `ConfiguracaoCurvaClimatica` / `ConfiguracaoHistereseClima`.
-- Dispositivos / canais / ACK → `dispositivos_iot`, `canais_dispositivo`, `historico_estado_canal`.
-
-## Componentes a criar
-
-- `src/pages/LoteAmbienciaControle.tsx`
-- `src/components/ambiencia/HeaderLoteAmbiencia.tsx`
-- `src/components/ambiencia/BarraAlertasOperacionais.tsx` (NOC)
-- `src/components/ambiencia/KpiClimaLote.tsx` (com sparkline 1 h)
-- `src/components/ambiencia/ProximaAcaoPanel.tsx` (clima + iluminação)
-- `src/components/ambiencia/AtuadoresLiveRow.tsx`
-- `src/components/ambiencia/ParametrosAtivosPanel.tsx`
-- `src/components/ambiencia/ProgramacaoDoDiaPanel.tsx` (reusa `CurvaFotoperiodoChart`)
-- `src/components/ambiencia/DispositivosCanaisTable.tsx` (responsivo: tabela ≥`md`, cards <`md`) com `StatusCanalBadge` (ONLINE/OFFLINE/SEM ACK).
-- `src/components/ambiencia/TimelineDecisoesBrain.tsx`
-- `src/hooks/useAmbienciaLote.ts` — react-query + 4 subscriptions com debounce 250 ms.
-
-## Reuso obrigatório (não duplicar)
-
-- `selecionarFaixa`, `calcularEstadoIluminacao`, `idadeLoteDias` (`src/lib/utils/calcularEstadoIluminacao.ts`).
-- `calcularITH`, `classificarITH`.
-- `useDeviceControl` para ação "Forçar".
-- `OverridesIluminacaoDialog`.
-- Extrair função pura de saúde IoT do `SaudeIoTPanel` (10 min) e função pura "SEM ACK" (compartilhada entre barra de alertas e badge do canal).
-
-## Permissões / multi-tenant
-
-- `useIntegradoId` em todas as queries.
-- `criador` / `veterinario` → somente leitura (sem botão "Forçar").
-- `admin` / `superadmin` ou `iot` com nível `edit+` → habilita overrides.
-
-## Detalhes técnicos
-
-- Sem mudanças de schema.
-- Nenhuma nova edge function.
-- Tipagem em `src/types/ambienciaLote.ts`.
-- Migration mínima só para adicionar ao `supabase_realtime` as tabelas que ainda não estão (`log_decisao_clima`, `canais_dispositivo`, `dispositivos_iot`, `override_iluminacao_canal`, `override_iluminacao_brain`); verificar antes — se já estiverem, pula.
-- Estados de borda: "Sensor sem dados", "Brain pausado", "Sem programa de iluminação vinculado".
-
-## Entregáveis
-
-1. Rota + página `LoteAmbienciaControle`.
-2. Hook `useAmbienciaLote` (react-query + realtime debounced 250 ms + heartbeat).
-3. 10 componentes listados.
-4. Botão de acesso no `LoteDetalhe`, `LoteCard` e `AmbienciaDashboard`.
-5. Migration de realtime só se necessária.
-
-## Fora do escopo (sugerido para depois)
-
-- Edição inline dos parâmetros (continua em Configurações).
-- Histórico longo (> 24 h) — usar `HistoricoTemperaturaLote`.
-- Novos tipos de alerta push — reusar tipos existentes.
+1. Confirmar tabela de preços final (valores acima são proposta inicial).
+2. Decidir se setup fee é **obrigatório** ou opcional/negociável.
+3. Validar se Climate Brain narrativa (hoje grátis) entra no add-on IA ou continua incluso (recomendo **mover para add-on**, já que é o uso recorrente mais caro).
+4. Aprovar Stripe (Lovable Payments) como gateway — ou indicar preferência.
