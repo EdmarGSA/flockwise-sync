@@ -51,6 +51,7 @@ import VeterinarioLote from "./pages/VeterinarioLote";
 import VeterinarioRelatorioDiario from "./pages/VeterinarioRelatorioDiario";
 import VeterinarioTemperatura from "./pages/VeterinarioTemperatura";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
+import ConfiguracaoPlano from "./pages/ConfiguracaoPlano";
 import Comercial from "./pages/Comercial";
 import CadastroProdutosAnimais from "./pages/CadastroProdutosAnimais";
 import Financeiro from "./pages/Financeiro";
@@ -490,6 +491,11 @@ const AppRoutes = () => (
         <ModuleProtectedRoute moduleCode="configuracoes">
           <ConfiguracaoFinanceiro />
         </ModuleProtectedRoute>
+      </ProtectedRoute>
+    } />
+    <Route path="/configuracoes/plano" element={
+      <ProtectedRoute>
+        <ConfiguracaoPlano />
       </ProtectedRoute>
     } />
     <Route path="/configuracoes/produtos-animais" element={

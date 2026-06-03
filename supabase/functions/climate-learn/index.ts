@@ -14,25 +14,32 @@ const corsHeaders = {
 const ALPHA = 0.1;
 const MAX_OFFSET = 2.0;
 
-async function gerarNarrativa(prompt: string): Promise<string | null> {
+const PRICING_FLASH = { in: 0.075, out: 0.30 }; // USD por 1M tokens
+const USD_BRL = 5.5;
+const MODELO_NARRATIVA = "google/gemini-3-flash-preview";
+
+async function gerarNarrativa(prompt: string): Promise<{ texto: string | null; tokens_in: number; tokens_out: number; custo_usd: number }> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) return null;
+  if (!apiKey) return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 };
   try {
     const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODELO_NARRATIVA,
         messages: [
           { role: "system", content: "Você é um especialista em climatização avícola. Gere uma narrativa curta (2-3 frases, máx 280 caracteres) em português brasileiro explicando o perfil térmico aprendido do galpão e dando uma recomendação prática." },
           { role: "user", content: prompt },
         ],
       }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 };
     const j = await r.json();
-    return j.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch { return null; }
+    const tokens_in = j?.usage?.prompt_tokens ?? 0;
+    const tokens_out = j?.usage?.completion_tokens ?? 0;
+    const custo_usd = (tokens_in * PRICING_FLASH.in + tokens_out * PRICING_FLASH.out) / 1_000_000;
+    return { texto: j.choices?.[0]?.message?.content?.trim() ?? null, tokens_in, tokens_out, custo_usd };
+  } catch { return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 }; }
 }
 
 Deno.serve(async (req) => {
@@ -92,13 +99,28 @@ Deno.serve(async (req) => {
     const novoOffset = Math.max(-MAX_OFFSET,
       Math.min(MAX_OFFSET, offsetAtual + ALPHA * (-divMedia)));
 
-    // Narrativa (gera se nunca gerou ou >24h)
+    // Narrativa (gera se nunca gerou ou >24h) — somente se org tiver add-on IA
     let narrativa: string | null = null;
     const precisaNarrativa = !existente?.narrativa_atualizada_em ||
       (Date.now() - new Date(existente.narrativa_atualizada_em).getTime()) > 24 * 3600_000;
     if (precisaNarrativa && divAbs > 0.5) {
-      const prompt = `Galpão "${g.nome}" — divergência média ${divMedia.toFixed(2)}°C entre setpoint e leitura, MAE ${mae.toFixed(2)}°C, amplitude diurna ${amplitude.toFixed(1)}°C, ${logs.length} amostras 72h. Offset aprendido aplicado: ${novoOffset.toFixed(2)}°C. Fator isolamento: ${fatorIsolamento.toFixed(2)}.`;
-      narrativa = await gerarNarrativa(prompt);
+      const { data: temIA } = await supabase.rpc("org_tem_addon", {
+        _integrado_id: integradoId, _codigo_addon: "ia_insights",
+      });
+      const { data: temIAUnl } = await supabase.rpc("org_tem_addon", {
+        _integrado_id: integradoId, _codigo_addon: "ia_ilimitado",
+      });
+      if (temIA || temIAUnl) {
+        const prompt = `Galpão "${g.nome}" — divergência média ${divMedia.toFixed(2)}°C entre setpoint e leitura, MAE ${mae.toFixed(2)}°C, amplitude diurna ${amplitude.toFixed(1)}°C, ${logs.length} amostras 72h. Offset aprendido aplicado: ${novoOffset.toFixed(2)}°C. Fator isolamento: ${fatorIsolamento.toFixed(2)}.`;
+        const res = await gerarNarrativa(prompt);
+        narrativa = res.texto;
+        await supabase.from("ai_usage_log").insert({
+          integrado_id: integradoId, funcao: "climate-learn", modelo: MODELO_NARRATIVA,
+          galpao_id: g.id, tokens_in: res.tokens_in, tokens_out: res.tokens_out,
+          custo_estimado_usd: res.custo_usd, custo_estimado_brl: res.custo_usd * USD_BRL,
+          cached: false, sucesso: !!res.texto,
+        });
+      }
     }
 
     await supabase.from("aprendizado_galpao").upsert({

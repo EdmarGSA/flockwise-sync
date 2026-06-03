@@ -241,9 +241,17 @@ async function buildDiario(supabase: any, loteId: string) {
   };
 }
 
-async function chamarIA(diario: any): Promise<string> {
+// Preços públicos Gemini (USD por 1M tokens) — atualizar quando necessário
+const PRICING_USD_PER_MTOK: Record<string, { in: number; out: number }> = {
+  "google/gemini-2.5-pro": { in: 1.25, out: 10.0 },
+  "google/gemini-3-flash-preview": { in: 0.075, out: 0.30 },
+};
+const USD_BRL = 5.5;
+const MODELO_IA = "google/gemini-2.5-pro";
+
+async function chamarIA(diario: any): Promise<{ markdown: string; tokens_in: number; tokens_out: number; custo_usd: number }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return "IA indisponível: chave não configurada.";
+  if (!LOVABLE_API_KEY) return { markdown: "IA indisponível: chave não configurada.", tokens_in: 0, tokens_out: 0, custo_usd: 0 };
 
   // Resumo compactado para o prompt
   const dias = diario.dias;
@@ -292,7 +300,7 @@ async function chamarIA(diario: any): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${LOVABLE_API_KEY}` },
     body: JSON.stringify({
-      model: "google/gemini-2.5-pro",
+      model: MODELO_IA,
       temperature: 0.3,
       messages: [
         { role: "system", content: systemPrompt },
@@ -305,13 +313,17 @@ async function chamarIA(diario: any): Promise<string> {
     throw new Error(`IA falhou (${resp.status}): ${txt.slice(0, 200)}`);
   }
   const json = await resp.json();
-  const md = json?.choices?.[0]?.message?.content || "";
+  let md = json?.choices?.[0]?.message?.content || "";
+  const tokens_in = json?.usage?.prompt_tokens ?? 0;
+  const tokens_out = json?.usage?.completion_tokens ?? 0;
+  const pricing = PRICING_USD_PER_MTOK[MODELO_IA] ?? { in: 0, out: 0 };
+  const custo_usd = (tokens_in * pricing.in + tokens_out * pricing.out) / 1_000_000;
 
   // Anti-delírio: bloqueia recomendações com marca/dosagem específica
   if (/\b\d+\s?(mg|ml|g)\/(kg|l|ave)\b/i.test(md)) {
-    return md + "\n\n> ⚠️ Algumas dosagens foram detectadas e devem ser ignoradas — sempre consulte o veterinário responsável.";
+    md = md + "\n\n> ⚠️ Algumas dosagens foram detectadas e devem ser ignoradas — sempre consulte o veterinário responsável.";
   }
-  return md;
+  return { markdown: md, tokens_in, tokens_out, custo_usd };
 }
 
 async function hashJson(obj: any): Promise<string> {
@@ -341,18 +353,53 @@ serve(async (req) => {
     }
 
     if (action === "ia") {
+      // Descobrir integrado_id do lote
+      const { data: loteInfo } = await supabase.from("lotes")
+        .select("integrado_id, analise_ia_relatorio").eq("id", loteId).single();
+      const integradoId = loteInfo?.integrado_id;
+
+      // Gate: a organização precisa ter o add-on de IA ativo
+      if (integradoId) {
+        const { data: temIA } = await supabase.rpc("org_tem_addon", {
+          _integrado_id: integradoId, _codigo_addon: "ia_insights",
+        });
+        const { data: temIAUnl } = await supabase.rpc("org_tem_addon", {
+          _integrado_id: integradoId, _codigo_addon: "ia_ilimitado",
+        });
+        if (!temIA && !temIAUnl) {
+          return new Response(JSON.stringify({
+            error: "ia_addon_required",
+            message: "Add-on de IA não está ativo nesta organização. Acesse Configurações → Plano para contratar.",
+          }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+
       // Cache via hash dos dados
       const hash = await hashJson({ dias: diario.dias, gatilhos: diario.gatilhos });
-      const { data: cacheLote } = await supabase.from("lotes")
-        .select("analise_ia_relatorio").eq("id", loteId).single();
-      const cache = cacheLote?.analise_ia_relatorio as any;
+      const cache = loteInfo?.analise_ia_relatorio as any;
       if (cache?.hash === hash && cache?.markdown) {
+        // Log de cache hit (sem custo)
+        if (integradoId) {
+          await supabase.from("ai_usage_log").insert({
+            integrado_id: integradoId, funcao: "relatorio-lote-diario", modelo: MODELO_IA,
+            lote_id: loteId, tokens_in: 0, tokens_out: 0,
+            custo_estimado_usd: 0, custo_estimado_brl: 0, cached: true, sucesso: true,
+          });
+        }
         return new Response(JSON.stringify({ ...diario, ia: { markdown: cache.markdown, cached: true, gerado_em: cache.gerado_em } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const markdown = await chamarIA(diario);
+      const { markdown, tokens_in, tokens_out, custo_usd } = await chamarIA(diario);
       const novoCache = { hash, markdown, gerado_em: new Date().toISOString() };
       await supabase.from("lotes").update({ analise_ia_relatorio: novoCache }).eq("id", loteId);
+      if (integradoId) {
+        await supabase.from("ai_usage_log").insert({
+          integrado_id: integradoId, funcao: "relatorio-lote-diario", modelo: MODELO_IA,
+          lote_id: loteId, tokens_in, tokens_out,
+          custo_estimado_usd: custo_usd, custo_estimado_brl: custo_usd * USD_BRL,
+          cached: false, sucesso: true,
+        });
+      }
       return new Response(JSON.stringify({ ...diario, ia: { markdown, cached: false, gerado_em: novoCache.gerado_em } }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
