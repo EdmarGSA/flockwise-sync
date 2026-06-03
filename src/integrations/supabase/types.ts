@@ -47,6 +47,60 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_log: {
+        Row: {
+          cached: boolean
+          created_at: string
+          custo_estimado_brl: number
+          custo_estimado_usd: number
+          erro: string | null
+          funcao: string
+          galpao_id: string | null
+          id: string
+          integrado_id: string
+          lote_id: string | null
+          modelo: string
+          sucesso: boolean
+          tokens_in: number
+          tokens_out: number
+          user_id: string | null
+        }
+        Insert: {
+          cached?: boolean
+          created_at?: string
+          custo_estimado_brl?: number
+          custo_estimado_usd?: number
+          erro?: string | null
+          funcao: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id: string
+          lote_id?: string | null
+          modelo: string
+          sucesso?: boolean
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string | null
+        }
+        Update: {
+          cached?: boolean
+          created_at?: string
+          custo_estimado_brl?: number
+          custo_estimado_usd?: number
+          erro?: string | null
+          funcao?: string
+          galpao_id?: string | null
+          id?: string
+          integrado_id?: string
+          lote_id?: string | null
+          modelo?: string
+          sucesso?: boolean
+          tokens_in?: number
+          tokens_out?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       alarmes_disparados: {
         Row: {
           acionado_em: string
@@ -496,6 +550,110 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      assinaturas: {
+        Row: {
+          cancelada_em: string | null
+          ciclo: Database["public"]["Enums"]["ciclo_cobranca"]
+          created_at: string
+          galpoes_contratados: number
+          id: string
+          iniciada_em: string
+          integrado_id: string
+          observacoes: string | null
+          plano_id: string
+          status: Database["public"]["Enums"]["assinatura_status"]
+          trial_termina_em: string | null
+          updated_at: string
+          vence_em: string | null
+        }
+        Insert: {
+          cancelada_em?: string | null
+          ciclo?: Database["public"]["Enums"]["ciclo_cobranca"]
+          created_at?: string
+          galpoes_contratados?: number
+          id?: string
+          iniciada_em?: string
+          integrado_id: string
+          observacoes?: string | null
+          plano_id: string
+          status?: Database["public"]["Enums"]["assinatura_status"]
+          trial_termina_em?: string | null
+          updated_at?: string
+          vence_em?: string | null
+        }
+        Update: {
+          cancelada_em?: string | null
+          ciclo?: Database["public"]["Enums"]["ciclo_cobranca"]
+          created_at?: string
+          galpoes_contratados?: number
+          id?: string
+          iniciada_em?: string
+          integrado_id?: string
+          observacoes?: string | null
+          plano_id?: string
+          status?: Database["public"]["Enums"]["assinatura_status"]
+          trial_termina_em?: string | null
+          updated_at?: string
+          vence_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assinaturas_addons: {
+        Row: {
+          addon_id: string
+          assinatura_id: string
+          ativo: boolean
+          cancelado_em: string | null
+          created_at: string
+          id: string
+          iniciado_em: string
+          quantidade: number
+        }
+        Insert: {
+          addon_id: string
+          assinatura_id: string
+          ativo?: boolean
+          cancelado_em?: string | null
+          created_at?: string
+          id?: string
+          iniciado_em?: string
+          quantidade?: number
+        }
+        Update: {
+          addon_id?: string
+          assinatura_id?: string
+          ativo?: boolean
+          cancelado_em?: string | null
+          created_at?: string
+          id?: string
+          iniciado_em?: string
+          quantidade?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_addons_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "planos_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_addons_assinatura_id_fkey"
+            columns: ["assinatura_id"]
+            isOneToOne: false
+            referencedRelation: "assinaturas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       autopsias: {
         Row: {
@@ -6573,6 +6731,120 @@ export type Database = {
           },
         ]
       }
+      planos: {
+        Row: {
+          ativo: boolean
+          codigo: Database["public"]["Enums"]["plano_codigo"]
+          created_at: string
+          descricao: string | null
+          id: string
+          inclui_erp_sync: boolean
+          inclui_financeiro: boolean
+          inclui_iot: boolean
+          inclui_multi_nucleos: boolean
+          inclui_veterinario: boolean
+          limite_galpoes: number | null
+          limite_usuarios: number | null
+          nome: string
+          ordem: number
+          preco_base_brl: number
+          preco_galpao_adicional_brl: number
+          publico: boolean
+          setup_fee_brl: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: Database["public"]["Enums"]["plano_codigo"]
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          inclui_erp_sync?: boolean
+          inclui_financeiro?: boolean
+          inclui_iot?: boolean
+          inclui_multi_nucleos?: boolean
+          inclui_veterinario?: boolean
+          limite_galpoes?: number | null
+          limite_usuarios?: number | null
+          nome: string
+          ordem?: number
+          preco_base_brl?: number
+          preco_galpao_adicional_brl?: number
+          publico?: boolean
+          setup_fee_brl?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: Database["public"]["Enums"]["plano_codigo"]
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          inclui_erp_sync?: boolean
+          inclui_financeiro?: boolean
+          inclui_iot?: boolean
+          inclui_multi_nucleos?: boolean
+          inclui_veterinario?: boolean
+          limite_galpoes?: number | null
+          limite_usuarios?: number | null
+          nome?: string
+          ordem?: number
+          preco_base_brl?: number
+          preco_galpao_adicional_brl?: number
+          publico?: boolean
+          setup_fee_brl?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      planos_addons: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          codigo: string
+          cota_inclusa: number | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          preco_brl: number
+          preco_excedente_brl: number | null
+          unidade: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string
+          codigo: string
+          cota_inclusa?: number | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          preco_brl?: number
+          preco_excedente_brl?: number | null
+          unidade?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          codigo?: string
+          cota_inclusa?: number | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          preco_brl?: number
+          preco_excedente_brl?: number | null
+          unidade?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       politica_recuperacao_iot: {
         Row: {
           aplicar_schedule_offline: boolean
@@ -9954,6 +10226,10 @@ export type Database = {
         Returns: undefined
       }
       marcar_dispositivos_offline_iot: { Args: never; Returns: number }
+      org_tem_addon: {
+        Args: { _codigo_addon: string; _integrado_id: string }
+        Returns: boolean
+      }
       redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
       registrar_leitura_sensor_unificada: {
         Args: {
@@ -10019,10 +10295,17 @@ export type Database = {
         | "fornecedor"
         | "vendedor_fornecedor"
         | "superadmin"
+      assinatura_status:
+        | "trial"
+        | "ativa"
+        | "atrasada"
+        | "cancelada"
+        | "suspensa"
       camera_evento_tipo: "motion" | "alarm" | "video_loss" | "tampering"
       camera_funcao: "monitoramento" | "seguranca" | "ambiente" | "contagem"
       camera_snapshot_tipo: "agendado" | "manual" | "evento_motion"
       camera_status: "online" | "offline" | "erro" | "nao_testado"
+      ciclo_cobranca: "mensal" | "anual"
       classificacao_ovo: "medio" | "grande" | "extra" | "jumbo"
       classificacao_peso_ovo:
         | "medio"
@@ -10098,6 +10381,7 @@ export type Database = {
         | "cancelada"
         | "refaturamento"
       origem_setpoint_offline: "curva" | "manual"
+      plano_codigo: "starter" | "profissional" | "integradora" | "enterprise"
       recebimento_status:
         | "em_conferencia"
         | "divergente"
@@ -10297,10 +10581,18 @@ export const Constants = {
         "vendedor_fornecedor",
         "superadmin",
       ],
+      assinatura_status: [
+        "trial",
+        "ativa",
+        "atrasada",
+        "cancelada",
+        "suspensa",
+      ],
       camera_evento_tipo: ["motion", "alarm", "video_loss", "tampering"],
       camera_funcao: ["monitoramento", "seguranca", "ambiente", "contagem"],
       camera_snapshot_tipo: ["agendado", "manual", "evento_motion"],
       camera_status: ["online", "offline", "erro", "nao_testado"],
+      ciclo_cobranca: ["mensal", "anual"],
       classificacao_ovo: ["medio", "grande", "extra", "jumbo"],
       classificacao_peso_ovo: ["medio", "grande", "extra", "jumbo", "quebrado"],
       conta_pagar_status: ["previsto", "pendente", "pago", "cancelado"],
@@ -10379,6 +10671,7 @@ export const Constants = {
         "refaturamento",
       ],
       origem_setpoint_offline: ["curva", "manual"],
+      plano_codigo: ["starter", "profissional", "integradora", "enterprise"],
       recebimento_status: [
         "em_conferencia",
         "divergente",
