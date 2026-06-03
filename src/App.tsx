@@ -51,6 +51,7 @@ import VeterinarioLote from "./pages/VeterinarioLote";
 import VeterinarioRelatorioDiario from "./pages/VeterinarioRelatorioDiario";
 import VeterinarioTemperatura from "./pages/VeterinarioTemperatura";
 import ConfiguracaoFinanceiro from "./pages/ConfiguracaoFinanceiro";
+import ConfiguracaoPlano from "./pages/ConfiguracaoPlano";
 import Comercial from "./pages/Comercial";
 import CadastroProdutosAnimais from "./pages/CadastroProdutosAnimais";
 import Financeiro from "./pages/Financeiro";
