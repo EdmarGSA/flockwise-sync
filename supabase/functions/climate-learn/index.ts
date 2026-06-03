@@ -99,13 +99,28 @@ Deno.serve(async (req) => {
     const novoOffset = Math.max(-MAX_OFFSET,
       Math.min(MAX_OFFSET, offsetAtual + ALPHA * (-divMedia)));
 
-    // Narrativa (gera se nunca gerou ou >24h)
+    // Narrativa (gera se nunca gerou ou >24h) — somente se org tiver add-on IA
     let narrativa: string | null = null;
     const precisaNarrativa = !existente?.narrativa_atualizada_em ||
       (Date.now() - new Date(existente.narrativa_atualizada_em).getTime()) > 24 * 3600_000;
     if (precisaNarrativa && divAbs > 0.5) {
-      const prompt = `Galpão "${g.nome}" — divergência média ${divMedia.toFixed(2)}°C entre setpoint e leitura, MAE ${mae.toFixed(2)}°C, amplitude diurna ${amplitude.toFixed(1)}°C, ${logs.length} amostras 72h. Offset aprendido aplicado: ${novoOffset.toFixed(2)}°C. Fator isolamento: ${fatorIsolamento.toFixed(2)}.`;
-      narrativa = await gerarNarrativa(prompt);
+      const { data: temIA } = await supabase.rpc("org_tem_addon", {
+        _integrado_id: integradoId, _codigo_addon: "ia_insights",
+      });
+      const { data: temIAUnl } = await supabase.rpc("org_tem_addon", {
+        _integrado_id: integradoId, _codigo_addon: "ia_ilimitado",
+      });
+      if (temIA || temIAUnl) {
+        const prompt = `Galpão "${g.nome}" — divergência média ${divMedia.toFixed(2)}°C entre setpoint e leitura, MAE ${mae.toFixed(2)}°C, amplitude diurna ${amplitude.toFixed(1)}°C, ${logs.length} amostras 72h. Offset aprendido aplicado: ${novoOffset.toFixed(2)}°C. Fator isolamento: ${fatorIsolamento.toFixed(2)}.`;
+        const res = await gerarNarrativa(prompt);
+        narrativa = res.texto;
+        await supabase.from("ai_usage_log").insert({
+          integrado_id: integradoId, funcao: "climate-learn", modelo: MODELO_NARRATIVA,
+          galpao_id: g.id, tokens_in: res.tokens_in, tokens_out: res.tokens_out,
+          custo_estimado_usd: res.custo_usd, custo_estimado_brl: res.custo_usd * USD_BRL,
+          cached: false, sucesso: !!res.texto,
+        });
+      }
     }
 
     await supabase.from("aprendizado_galpao").upsert({
