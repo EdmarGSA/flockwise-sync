@@ -29,6 +29,12 @@ const Configuracoes = () => {
 
   const menuItems = [
     {
+      title: "Plano e cobrança",
+      description: "Plano atual, add-ons e uso de IA",
+      icon: CreditCard,
+      path: "/configuracoes/plano"
+    },
+    {
       title: "Organização",
       description: "Cadastro e configuração da empresa",
       icon: Building2,
