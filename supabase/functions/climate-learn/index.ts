@@ -14,25 +14,32 @@ const corsHeaders = {
 const ALPHA = 0.1;
 const MAX_OFFSET = 2.0;
 
-async function gerarNarrativa(prompt: string): Promise<string | null> {
+const PRICING_FLASH = { in: 0.075, out: 0.30 }; // USD por 1M tokens
+const USD_BRL = 5.5;
+const MODELO_NARRATIVA = "google/gemini-3-flash-preview";
+
+async function gerarNarrativa(prompt: string): Promise<{ texto: string | null; tokens_in: number; tokens_out: number; custo_usd: number }> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) return null;
+  if (!apiKey) return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 };
   try {
     const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODELO_NARRATIVA,
         messages: [
           { role: "system", content: "Você é um especialista em climatização avícola. Gere uma narrativa curta (2-3 frases, máx 280 caracteres) em português brasileiro explicando o perfil térmico aprendido do galpão e dando uma recomendação prática." },
           { role: "user", content: prompt },
         ],
       }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 };
     const j = await r.json();
-    return j.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch { return null; }
+    const tokens_in = j?.usage?.prompt_tokens ?? 0;
+    const tokens_out = j?.usage?.completion_tokens ?? 0;
+    const custo_usd = (tokens_in * PRICING_FLASH.in + tokens_out * PRICING_FLASH.out) / 1_000_000;
+    return { texto: j.choices?.[0]?.message?.content?.trim() ?? null, tokens_in, tokens_out, custo_usd };
+  } catch { return { texto: null, tokens_in: 0, tokens_out: 0, custo_usd: 0 }; }
 }
 
 Deno.serve(async (req) => {
