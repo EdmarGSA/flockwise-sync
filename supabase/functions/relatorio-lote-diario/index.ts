@@ -353,18 +353,53 @@ serve(async (req) => {
     }
 
     if (action === "ia") {
+      // Descobrir integrado_id do lote
+      const { data: loteInfo } = await supabase.from("lotes")
+        .select("integrado_id, analise_ia_relatorio").eq("id", loteId).single();
+      const integradoId = loteInfo?.integrado_id;
+
+      // Gate: a organização precisa ter o add-on de IA ativo
+      if (integradoId) {
+        const { data: temIA } = await supabase.rpc("org_tem_addon", {
+          _integrado_id: integradoId, _codigo_addon: "ia_insights",
+        });
+        const { data: temIAUnl } = await supabase.rpc("org_tem_addon", {
+          _integrado_id: integradoId, _codigo_addon: "ia_ilimitado",
+        });
+        if (!temIA && !temIAUnl) {
+          return new Response(JSON.stringify({
+            error: "ia_addon_required",
+            message: "Add-on de IA não está ativo nesta organização. Acesse Configurações → Plano para contratar.",
+          }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+
       // Cache via hash dos dados
       const hash = await hashJson({ dias: diario.dias, gatilhos: diario.gatilhos });
-      const { data: cacheLote } = await supabase.from("lotes")
-        .select("analise_ia_relatorio").eq("id", loteId).single();
-      const cache = cacheLote?.analise_ia_relatorio as any;
+      const cache = loteInfo?.analise_ia_relatorio as any;
       if (cache?.hash === hash && cache?.markdown) {
+        // Log de cache hit (sem custo)
+        if (integradoId) {
+          await supabase.from("ai_usage_log").insert({
+            integrado_id: integradoId, funcao: "relatorio-lote-diario", modelo: MODELO_IA,
+            lote_id: loteId, tokens_in: 0, tokens_out: 0,
+            custo_estimado_usd: 0, custo_estimado_brl: 0, cached: true, sucesso: true,
+          });
+        }
         return new Response(JSON.stringify({ ...diario, ia: { markdown: cache.markdown, cached: true, gerado_em: cache.gerado_em } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const markdown = await chamarIA(diario);
+      const { markdown, tokens_in, tokens_out, custo_usd } = await chamarIA(diario);
       const novoCache = { hash, markdown, gerado_em: new Date().toISOString() };
       await supabase.from("lotes").update({ analise_ia_relatorio: novoCache }).eq("id", loteId);
+      if (integradoId) {
+        await supabase.from("ai_usage_log").insert({
+          integrado_id: integradoId, funcao: "relatorio-lote-diario", modelo: MODELO_IA,
+          lote_id: loteId, tokens_in, tokens_out,
+          custo_estimado_usd: custo_usd, custo_estimado_brl: custo_usd * USD_BRL,
+          cached: false, sucesso: true,
+        });
+      }
       return new Response(JSON.stringify({ ...diario, ia: { markdown, cached: false, gerado_em: novoCache.gerado_em } }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
