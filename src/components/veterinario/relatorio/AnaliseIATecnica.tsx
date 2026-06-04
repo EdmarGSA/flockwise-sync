@@ -2,13 +2,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, RefreshCw } from 'lucide-react';
 import { useAnaliseIALote } from '@/hooks/useAnaliseIALote';
+import { useIAEnabled } from '@/hooks/useAssinatura';
+import IAGateCard from '@/components/ia/IAGateCard';
 
 interface Props {
   loteId: string;
 }
 
 export default function AnaliseIATecnica({ loteId }: Props) {
+  const { enabled: iaEnabled, loading: iaLoading } = useIAEnabled();
   const { markdown, cached, geradoEm, loading, error, gerar } = useAnaliseIALote(loteId);
+
+  if (!iaLoading && !iaEnabled) {
+    return (
+      <IAGateCard descricao="Ative IA Insights para gerar relatórios técnicos narrativos do lote com diagnóstico e recomendações." />
+    );
+  }
+
+
 
   return (
     <Card>
