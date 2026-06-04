@@ -10258,6 +10258,10 @@ export type Database = {
         }[]
       }
       same_organization: { Args: { _user_id: string }; Returns: boolean }
+      seed_assinatura_trial: {
+        Args: { p_integrado_id: string }
+        Returns: string
+      }
       seed_organizacao_padrao: {
         Args: { p_integrado_id: string }
         Returns: undefined
