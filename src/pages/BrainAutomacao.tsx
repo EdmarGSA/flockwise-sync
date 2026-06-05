@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert, Activity, CheckCircle2, XCircle, AlertTriangle, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Activity, CheckCircle2, XCircle, AlertTriangle, Send, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { toast } from "sonner";
 
 import Header from "@/components/Header";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
@@ -109,6 +110,40 @@ export default function BrainAutomacao() {
     const { error } = await supabase.functions.invoke("brain-dispatcher", { body: {} });
     setActing(false);
     if (error) toast.error(error.message); else toast.success("Dispatcher executado");
+    carregar();
+  };
+
+  const aprovarComando = async (id: string) => {
+    const { error } = await supabase
+      .from("comando_brain")
+      .update({ status: "aprovado" })
+      .eq("id", id)
+      .eq("status", "sugerido");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Comando aprovado — será executado no próximo dispatcher");
+    // Roda dispatcher imediatamente para não esperar 15s
+    supabase.functions.invoke("brain-dispatcher", { body: {} }).catch(() => undefined);
+    carregar();
+  };
+
+  const recusarComando = async (id: string) => {
+    const { error } = await supabase
+      .from("comando_brain")
+      .update({ status: "ignorado", erro: "Recusado manualmente" })
+      .eq("id", id)
+      .eq("status", "sugerido");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Comando recusado");
+    carregar();
+  };
+
+  const mudarModoGalpao = async (galpaoId: string, modo: "off" | "shadow" | "auto") => {
+    const { error } = await supabase
+      .from("galpoes")
+      .update({ automacao_brain: modo })
+      .eq("id", galpaoId);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Galpão atualizado para ${modo.toUpperCase()}`);
     carregar();
   };
 
@@ -248,9 +283,18 @@ export default function BrainAutomacao() {
             ) : (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {galpoes.map((g) => (
-                  <div key={g.id} className="flex items-center justify-between p-2 rounded border bg-muted/30 text-sm">
-                    <span className="truncate">{g.nome}</span>
-                    {modoBadge(g.automacao_brain)}
+                  <div key={g.id} className="flex items-center justify-between gap-2 p-2 rounded border bg-muted/30 text-sm">
+                    <span className="truncate flex-1">{g.nome}</span>
+                    <Select value={g.automacao_brain} onValueChange={(v: any) => mudarModoGalpao(g.id, v)}>
+                      <SelectTrigger className="h-7 w-[110px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">OFF</SelectItem>
+                        <SelectItem value="shadow">SOMBRA</SelectItem>
+                        <SelectItem value="auto">AUTO</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 ))}
               </div>
@@ -287,6 +331,16 @@ export default function BrainAutomacao() {
                     <Badge variant={STATUS_COLOR[c.status] ?? "outline"} className="text-[10px]">
                       {c.status}
                     </Badge>
+                    {c.status === "sugerido" && (
+                      <>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-emerald-600" onClick={() => aprovarComando(c.id)} title="Aprovar">
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => recusarComando(c.id)} title="Recusar">
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
                     <span className="text-muted-foreground tabular-nums">
                       {new Date(c.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                     </span>

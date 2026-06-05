@@ -167,10 +167,25 @@ Deno.serve(async (req) => {
       faixasByPrograma.set(f.programa_id, arr);
     }
 
-    const defaultByOrg = new Map<string, string>(); // integrado_id -> programa_id default
+    // Default por (integrado_id + tipo_producao) — corte e postura têm programas distintos.
+    // Antes, postura caía no default de corte e ficava sempre OFF (ref. auditoria C3).
+    const defaultByOrgTipo = new Map<string, string>(); // `${integrado_id}|${tipo}` -> programa_id
     for (const p of programas ?? []) {
-      if (p.is_default && p.tipo_producao === "frango_corte" && !defaultByOrg.has(p.integrado_id)) {
-        defaultByOrg.set(p.integrado_id, p.id);
+      const key = `${p.integrado_id}|${p.tipo_producao}`;
+      if (p.is_default && !defaultByOrgTipo.has(key)) {
+        defaultByOrgTipo.set(key, p.id);
+      }
+    }
+
+    // Tipo de produção por galpão (via núcleo)
+    const tipoByGalpao = new Map<string, string>();
+    if (galpaoIds.length) {
+      const { data: galpoesTipo } = await supabase
+        .from("galpoes")
+        .select("id, nucleos!inner(tipo_producao)")
+        .in("id", galpaoIds);
+      for (const g of (galpoesTipo ?? []) as any[]) {
+        if (g.nucleos?.tipo_producao) tipoByGalpao.set(g.id, g.nucleos.tipo_producao);
       }
     }
 
@@ -218,11 +233,20 @@ Deno.serve(async (req) => {
         intensidade = ovr.intensidade_pct ?? (estadoDesejado === "on" ? 100 : 0);
         motivo = `override até ${ovr.ate_quando}`;
       } else {
-        const programaId = lote.programa_iluminacao_id ?? defaultByOrg.get(lote.integrado_id);
+        const tipo = tipoByGalpao.get(dev.galpao_id) ?? "frango_corte";
+        const programaId = lote.programa_iluminacao_id
+          ?? defaultByOrgTipo.get(`${lote.integrado_id}|${tipo}`);
         const programaFaixas = programaId ? faixasByPrograma.get(programaId) : null;
-        if (programaFaixas?.length) {
+        if (!programaFaixas?.length) {
+          motivo = `sem_programa: lote sem programa_iluminacao_id e sem default para tipo=${tipo}`;
+          log.push({ canal: canal.id, skip: motivo });
+        } else {
           const idade = idadeLoteDias(lote.data_alojamento);
           const faixa = programaFaixas.find((f) => idade >= f.dia_inicio && idade <= f.dia_fim);
+          if (!faixa) {
+            motivo = `sem_faixa: idade=${idadeLoteDias(lote.data_alojamento)}d fora das faixas do programa`;
+            log.push({ canal: canal.id, skip: motivo });
+          }
           if (faixa) {
             // Modo solar: substitui blocos pelos horários ancorados no nascer/pôr do dia
             let faixaEfetiva = faixa as Faixa;
