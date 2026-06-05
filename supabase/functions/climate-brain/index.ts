@@ -426,9 +426,9 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Apenas dispatcher e nebulização sob demanda — ventilação/cortina já têm cron próprio
+  // (evita double-fire e logs duplicados, ref. auditoria M3).
   await Promise.all([
-    callFn("auto-ventilacao", {}),
-    callFn("auto-cortina", {}),
     decisoesNeb.length > 0 ? callFn("auto-nebulizacao", { decisoes: decisoesNeb }) : Promise.resolve(),
     callFn("brain-dispatcher", {}),
   ]);
