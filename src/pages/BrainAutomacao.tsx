@@ -283,9 +283,18 @@ export default function BrainAutomacao() {
             ) : (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {galpoes.map((g) => (
-                  <div key={g.id} className="flex items-center justify-between p-2 rounded border bg-muted/30 text-sm">
-                    <span className="truncate">{g.nome}</span>
-                    {modoBadge(g.automacao_brain)}
+                  <div key={g.id} className="flex items-center justify-between gap-2 p-2 rounded border bg-muted/30 text-sm">
+                    <span className="truncate flex-1">{g.nome}</span>
+                    <Select value={g.automacao_brain} onValueChange={(v: any) => mudarModoGalpao(g.id, v)}>
+                      <SelectTrigger className="h-7 w-[110px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">OFF</SelectItem>
+                        <SelectItem value="shadow">SOMBRA</SelectItem>
+                        <SelectItem value="auto">AUTO</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 ))}
               </div>
@@ -322,6 +331,16 @@ export default function BrainAutomacao() {
                     <Badge variant={STATUS_COLOR[c.status] ?? "outline"} className="text-[10px]">
                       {c.status}
                     </Badge>
+                    {c.status === "sugerido" && (
+                      <>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-emerald-600" onClick={() => aprovarComando(c.id)} title="Aprovar">
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => recusarComando(c.id)} title="Recusar">
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
                     <span className="text-muted-foreground tabular-nums">
                       {new Date(c.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                     </span>
