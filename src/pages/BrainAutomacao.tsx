@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert, Activity, CheckCircle2, XCircle, AlertTriangle, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Activity, CheckCircle2, XCircle, AlertTriangle, Send, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { toast } from "sonner";
 
 import Header from "@/components/Header";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
@@ -109,6 +110,40 @@ export default function BrainAutomacao() {
     const { error } = await supabase.functions.invoke("brain-dispatcher", { body: {} });
     setActing(false);
     if (error) toast.error(error.message); else toast.success("Dispatcher executado");
+    carregar();
+  };
+
+  const aprovarComando = async (id: string) => {
+    const { error } = await supabase
+      .from("comando_brain")
+      .update({ status: "aprovado" })
+      .eq("id", id)
+      .eq("status", "sugerido");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Comando aprovado — será executado no próximo dispatcher");
+    // Roda dispatcher imediatamente para não esperar 15s
+    supabase.functions.invoke("brain-dispatcher", { body: {} }).catch(() => undefined);
+    carregar();
+  };
+
+  const recusarComando = async (id: string) => {
+    const { error } = await supabase
+      .from("comando_brain")
+      .update({ status: "ignorado", erro: "Recusado manualmente" })
+      .eq("id", id)
+      .eq("status", "sugerido");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Comando recusado");
+    carregar();
+  };
+
+  const mudarModoGalpao = async (galpaoId: string, modo: "off" | "shadow" | "auto") => {
+    const { error } = await supabase
+      .from("galpoes")
+      .update({ automacao_brain: modo })
+      .eq("id", galpaoId);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Galpão atualizado para ${modo.toUpperCase()}`);
     carregar();
   };
 
