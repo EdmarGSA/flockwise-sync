@@ -195,6 +195,7 @@ export function useAmbienciaLote(loteId: string | undefined) {
 
   const galpaoId = query.data?.lote?.galpao_id ?? null;
   const integradoId = query.data?.lote?.integrado_id ?? null;
+  const devIdsKey = (query.data?.dispositivos ?? []).map((d) => d.id).sort().join(',');
 
   const scheduleInvalidate = () => {
     lastEventAt.current = Date.now();
@@ -206,19 +207,27 @@ export function useAmbienciaLote(loteId: string | undefined) {
 
   useEffect(() => {
     if (!galpaoId || !integradoId) return;
-    const ch = supabase
-      .channel(`ambiencia-lote-${loteId}`)
+    // Pausa subscrição enquanto aba está oculta (reduz custo + ruído realtime).
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    const devIds = devIdsKey ? devIdsKey.split(',') : [];
+    const devFilter = devIds.length ? `dispositivo_id=in.(${devIds.join(',')})` : null;
+
+    const ch = supabase.channel(`ambiencia-lote-${loteId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'log_decisao_clima', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'canais_dispositivo' }, scheduleInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dispositivos_iot', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cortina_estado_atual', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'estagio_ventilacao_estado', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'override_iluminacao_brain', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'override_iluminacao_canal' }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leituras_sensores' }, scheduleInvalidate)
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'override_iluminacao_brain', filter: `galpao_id=eq.${galpaoId}` }, scheduleInvalidate);
 
-    // Heartbeat: se não recebemos eventos em > 60s, refetcha
+    // Filtra realtime por dispositivos do galpão para não receber tráfego de outros tenants.
+    if (devFilter) {
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'canais_dispositivo', filter: devFilter }, scheduleInvalidate)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leituras_sensores', filter: devFilter }, scheduleInvalidate);
+    }
+    ch.subscribe();
+
+    // Heartbeat: refetcha se não recebermos eventos em > 60s
     const hb = window.setInterval(() => {
       if (Date.now() - lastEventAt.current > HEARTBEAT_MS) {
         queryClient.invalidateQueries({ queryKey });
@@ -226,13 +235,20 @@ export function useAmbienciaLote(loteId: string | undefined) {
       }
     }, HEARTBEAT_MS);
 
+    // Re-subscreve quando aba volta a ficar visível
+    const onVisibility = () => {
+      if (!document.hidden) queryClient.invalidateQueries({ queryKey });
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       supabase.removeChannel(ch);
       window.clearInterval(hb);
+      document.removeEventListener('visibilitychange', onVisibility);
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galpaoId, integradoId, loteId]);
+  }, [galpaoId, integradoId, loteId, devIdsKey]);
 
   return query;
 }

@@ -36,6 +36,18 @@ export default function LoteAmbienciaControle() {
       </div>
     );
   }
+  if (!data.lote.galpao_id) {
+    return (
+      <div className="container max-w-7xl py-6">
+        <Card className="p-12 text-center space-y-2">
+          <div className="text-lg font-semibold">Lote sem galpão vinculado</div>
+          <div className="text-sm text-muted-foreground">
+            Vincule um galpão ao lote para habilitar leituras de sensores, automação e Brain.
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="container max-w-7xl py-4 md:py-6 space-y-4">
