@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - 15 * 60_000).toISOString();
     const { data: leituras } = await supabase
       .from("leituras_sensores")
-      .select("temperatura_c, umidade_pct, dispositivo_id")
+      .select("temperatura_c, umidade_pct, dispositivo_id, lido_em")
       .in("dispositivo_id", devsTodos.map((d: any) => d.id))
       .gte("lido_em", since)
       .order("lido_em", { ascending: false })
@@ -258,6 +258,12 @@ Deno.serve(async (req) => {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_leituras" });
       continue;
     }
+    // A4: idade da leitura mais recente (em minutos)
+    const idadeMaisRecenteMin = Math.round(
+      (Date.now() - new Date((leituras[0] as any).lido_em).getTime()) / 60000
+    );
+    const dadosFrescos = idadeMaisRecenteMin <= 10;
+
 
     // Computa AMBAS as decisões (real + sombra)
     const ctxOn = agregar(leituras, devsTodos, zonasAtivas, true);
@@ -323,7 +329,7 @@ Deno.serve(async (req) => {
       ur_lida: ctxReal.urPct,
       ith_calc: ctxReal.ithVal,
       setpoint_alvo: tempAlvo,
-      reason_chain: [dReal.motivo, zonasReason, `offset_zona=${offsetZona.toFixed(2)}°C (${fonteOffsetZona}@h${horaAtual})`, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
+      reason_chain: [dReal.motivo, zonasReason, `offset_zona=${offsetZona.toFixed(2)}°C (${fonteOffsetZona}@h${horaAtual})`, `dados_${dadosFrescos ? "frescos" : "stale"}=${idadeMaisRecenteMin}min`, ...(trocaArDuty ? [`troca_ar_duty=${trocaArDuty}%`] : [])],
       decisao_sombra: dSombra ? {
         percentis: !percentisAtivo,
         modo: dSombra.modo,
@@ -351,7 +357,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const modoAuto = galpaoMode?.automacao_brain ?? "shadow";
 
-      if (modoAuto !== "off") {
+      if (modoAuto !== "off" && dadosFrescos) {
         const origem = modoAuto === "auto" ? "brain_auto" : "brain_shadow";
         const sugestoes: any[] = [];
 
