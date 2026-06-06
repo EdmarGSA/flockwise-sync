@@ -216,7 +216,10 @@ Deno.serve(async (req) => {
     for (const b of brainOvrs ?? []) brainByGalpao.set(b.galpao_id, b);
 
 
-    // 5) Decidir e aplicar para cada canal
+    // 5) Decidir para cada canal e colecionar tarefas a executar em paralelo
+    type Tarefa = () => Promise<unknown>;
+    const tarefas: Tarefa[] = [];
+
     for (const canal of canais as any[]) {
       const dev = canal.dispositivos_iot;
       if (!dev?.ativo || !dev.galpao_id) continue;
@@ -248,7 +251,6 @@ Deno.serve(async (req) => {
             log.push({ canal: canal.id, skip: motivo });
           }
           if (faixa) {
-            // Modo solar: substitui blocos pelos horários ancorados no nascer/pôr do dia
             let faixaEfetiva = faixa as Faixa;
             if (faixa.modo_horario === "solar") {
               const nucleoId = nucleoByGalpao.get(dev.galpao_id);
@@ -266,7 +268,6 @@ Deno.serve(async (req) => {
               }
             }
 
-            // 🧠 Sobrepõe com override do Brain AI (se houver para hoje neste galpão)
             const brainOvr = brainByGalpao.get(dev.galpao_id);
             if (brainOvr) {
               faixaEfetiva = {
@@ -287,10 +288,8 @@ Deno.serve(async (req) => {
             const tagBrain = brainOvr ? " 🧠brain" : "";
             motivo = `idade ${idade}d, faixa ${faixa.dia_inicio}-${faixa.dia_fim}${faixa.modo_horario === "solar" ? " (solar)" : ""}${tagBrain}, ${r.intensidade}%`;
           }
-
         }
       }
-
 
       const mudouEstado = canal.estado_atual !== estadoDesejado;
       const mudouIntensidade = canal.suporta_dimer && (canal.intensidade_atual ?? 0) !== intensidade;
@@ -300,55 +299,70 @@ Deno.serve(async (req) => {
       acoes++;
       log.push({ canal: canal.id, motivo, estado: estadoDesejado, intensidade, reconciliacao: precisaReconciliar });
 
-      // Auditoria: registra mudança de estado em historico_estado_canal
-      if (mudouEstado || precisaReconciliar) {
-        await supabase.from("historico_estado_canal").insert({
-          canal_id: canal.id,
-          integrado_id: canal.integrado_id,
-          estado: estadoDesejado,
-          ligado_em: estadoDesejado === "on" ? new Date().toISOString() : null,
-          desligado_em: estadoDesejado === "off" ? new Date().toISOString() : null,
-          motivo: precisaReconciliar ? "reconciliacao_pos_falha" : (ovr ? "override" : "programa"),
-          contexto: { motivo, intensidade, lote_id: lote.id, reconciliacao: precisaReconciliar },
-        });
-      }
+      // Snapshot para a closure
+      const estadoFinal = estadoDesejado;
+      const intensidadeFinal = intensidade;
+      const motivoFinal = motivo;
+      const reconciliar = precisaReconciliar;
+      const _mudouEstado = mudouEstado;
+      const _ovr = ovr;
 
-      // Enviar comando conforme driver
-      if (dev.driver === "esp32_http") {
-        await supabase.functions.invoke("esp32-bridge/command", {
-          body: {
-            canalId: canal.id,
-            acao: estadoDesejado === "on" ? "ligar" : "desligar",
-            intensidade_pct: canal.suporta_dimer ? intensidade : undefined,
-          },
-        });
-      } else {
-        await supabase.functions.invoke("sync-sensors", {
-          body: {
-            action: "control-device",
+      tarefas.push(async () => {
+        if (_mudouEstado || reconciliar) {
+          await supabase.from("historico_estado_canal").insert({
+            canal_id: canal.id,
             integrado_id: canal.integrado_id,
-            device_id: dev.device_id_ewelink,
-            switch: estadoDesejado,
-          },
-        });
-        await supabase.from("canais_dispositivo")
-          .update({ estado_atual: estadoDesejado, ultimo_comando_em: new Date().toISOString() })
-          .eq("id", canal.id);
-      }
+            estado: estadoFinal,
+            ligado_em: estadoFinal === "on" ? new Date().toISOString() : null,
+            desligado_em: estadoFinal === "off" ? new Date().toISOString() : null,
+            motivo: reconciliar ? "reconciliacao_pos_falha" : (_ovr ? "override" : "programa"),
+            contexto: { motivo: motivoFinal, intensidade: intensidadeFinal, lote_id: lote.id, reconciliacao: reconciliar },
+          });
+        }
 
-      // Limpa flag e registra evento de reconciliação
-      if (precisaReconciliar) {
-        await supabase.from("canais_dispositivo")
-          .update({ recuperacao_apos_falha: false })
-          .eq("id", canal.id);
-        await supabase.from("eventos_dispositivo_iot").insert({
-          dispositivo_id: dev.id,
-          integrado_id: canal.integrado_id,
-          tipo: "reconciliacao",
-          detalhes: { canal_id: canal.id, estado: estadoDesejado, intensidade, motivo },
-        });
-      }
+        if (dev.driver === "esp32_http") {
+          await supabase.functions.invoke("esp32-bridge/command", {
+            body: {
+              canalId: canal.id,
+              acao: estadoFinal === "on" ? "ligar" : "desligar",
+              intensidade_pct: canal.suporta_dimer ? intensidadeFinal : undefined,
+            },
+          });
+        } else {
+          await supabase.functions.invoke("sync-sensors", {
+            body: {
+              action: "control-device",
+              integrado_id: canal.integrado_id,
+              device_id: dev.device_id_ewelink,
+              switch: estadoFinal,
+            },
+          });
+          await supabase.from("canais_dispositivo")
+            .update({ estado_atual: estadoFinal, ultimo_comando_em: new Date().toISOString() })
+            .eq("id", canal.id);
+        }
+
+        if (reconciliar) {
+          await supabase.from("canais_dispositivo")
+            .update({ recuperacao_apos_falha: false })
+            .eq("id", canal.id);
+          await supabase.from("eventos_dispositivo_iot").insert({
+            dispositivo_id: dev.id,
+            integrado_id: canal.integrado_id,
+            tipo: "reconciliacao",
+            detalhes: { canal_id: canal.id, estado: estadoFinal, intensidade: intensidadeFinal, motivo: motivoFinal },
+          });
+        }
+      });
     }
+
+    // Executa todas as tarefas em paralelo, tolerando falhas individuais
+    const resultados = await Promise.allSettled(tarefas.map((t) => t()));
+    const falhas = resultados.filter((r) => r.status === "rejected").length;
+    if (falhas > 0) {
+      log.push({ falhas_paralelas: falhas, total: tarefas.length });
+    }
+
 
     return new Response(
       JSON.stringify({ ok: true, acoes, duracao_ms: Date.now() - startedAt, log }),
