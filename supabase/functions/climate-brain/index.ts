@@ -357,7 +357,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const modoAuto = galpaoMode?.automacao_brain ?? "shadow";
 
-      if (modoAuto !== "off") {
+      if (modoAuto !== "off" && dadosFrescos) {
         const origem = modoAuto === "auto" ? "brain_auto" : "brain_shadow";
         const sugestoes: any[] = [];
 
