@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - 15 * 60_000).toISOString();
     const { data: leituras } = await supabase
       .from("leituras_sensores")
-      .select("temperatura_c, umidade_pct, dispositivo_id")
+      .select("temperatura_c, umidade_pct, dispositivo_id, lido_em")
       .in("dispositivo_id", devsTodos.map((d: any) => d.id))
       .gte("lido_em", since)
       .order("lido_em", { ascending: false })
@@ -258,6 +258,12 @@ Deno.serve(async (req) => {
       resultados.push({ galpao: lote.galpao_id, skip: "sem_leituras" });
       continue;
     }
+    // A4: idade da leitura mais recente (em minutos)
+    const idadeMaisRecenteMin = Math.round(
+      (Date.now() - new Date((leituras[0] as any).lido_em).getTime()) / 60000
+    );
+    const dadosFrescos = idadeMaisRecenteMin <= 10;
+
 
     // Computa AMBAS as decisões (real + sombra)
     const ctxOn = agregar(leituras, devsTodos, zonasAtivas, true);
