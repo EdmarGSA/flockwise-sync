@@ -10143,6 +10143,10 @@ export type Database = {
         Args: { semanas_vida: number }
         Returns: Database["public"]["Enums"]["fase_postura"]
       }
+      call_internal_edge: {
+        Args: { p_body?: Json; p_function: string }
+        Returns: number
+      }
       can_modify_data: { Args: never; Returns: boolean }
       cleanup_orphan_identities_for_email: {
         Args: { p_email: string }
