@@ -1,56 +1,80 @@
-# Por que aparece "SEM ACK" em Ambiência → Dispositivos & canais
+# Análise avançada de peso na mortalidade semanal
 
-## Diagnóstico
+Hoje, ao clicar no card da semana em **Mortalidade**, o `MortalidadeSemanaDetalheDialog` mostra apenas total, % vs meta, motivos e quebra por dia. Vamos enriquecê-lo com **peso médio das aves mortas/eliminadas** e **comparativo com o peso esperado do dia**, classificando automaticamente se o que sai do lote é **refugo** ou **ave em boa condição** — sinal clínico/manejo muito diferente.
 
-O badge do canal é calculado em `src/lib/ambiencia/statusCanal.ts`:
+## O que o sistema já tem (e vamos usar)
 
-- Se `ultimo_comando_em` é antigo (> 90 s) **e** `ultimo_estado_persistido_em` é nulo ou anterior ao comando → status vira `sem_ack`.
+- `mortalidade_itens.peso_kg` → peso total (kg) do lote de aves daquele registro (motivo+submotivo). Dividido por `quantidade` dá o **peso médio por ave morta/eliminada**.
+- `mortalidade_itens.motivo` (`natural` | `eliminado`) e `submotivo` (`locomotor` | `debilitado` | `refugo` | `outros`).
+- `pesagens` + `pesagem_itens` → peso médio real do lote por data (`peso_liquido_kg / quantidade_aves`).
+- `desempenho_aves` (linhagem + sexo + dia) → **peso referência** Cobb/Ross/Hubbard para o dia exato.
+- `lotes.data_alojamento`, `linhagem`, `sexo`, `peso_medio_pintinhos_kg` → idade e baseline.
+- `calcularIdadeNaData` já normaliza o dia da vida (consistente com os cards).
 
-Consultando o banco para os 3 canais da tela:
+## Lógica de análise (por dia da semana e agregado)
 
-```
-Ventilador Área 01 / Área 02 / Iluminação Granja
-driver = ewelink
-ultimo_comando_em       = ontem / há 2h
-ultimo_estado_persistido_em = NULL
-ultimo_estado_persistido    = NULL
-ultimo_sync (device)    = recente → "4/4 online" ok
-```
+Para cada registro de mortalidade da semana:
 
-Procurando quem escreve esses campos no projeto:
+1. **Peso médio por ave** = `peso_kg / quantidade` (ignorar quando `peso_kg` nulo ou 0; marcar como "sem peso informado").
+2. **Peso esperado do dia (`peso_ref`)**:
+   - Prioridade 1: pesagem real do lote mais próxima daquele dia (janela ±3 dias) → média ponderada.
+   - Prioridade 2: `desempenho_aves(linhagem, sexo, dia).peso_kg`.
+   - Prioridade 3: interpolação linear entre `peso_medio_pintinhos_kg` (dia 0) e o ponto disponível mais próximo.
+3. **Índice de refugo** `IR = peso_medio_morto / peso_ref`:
+   - `IR ≤ 0.70` → **Refugo severo** (sinal positivo de manejo: descarte correto)
+   - `0.70 < IR ≤ 0.85` → **Refugo** (ave abaixo do padrão)
+   - `0.85 < IR ≤ 1.10` → **Peso normal** (alerta: estamos perdendo aves de bom peso — investigar causa sanitária/ambiental)
+   - `IR > 1.10` → **Acima do padrão** (alerta crítico: perdendo as melhores aves — choque térmico, asfixia, ascite, problema agudo)
+4. **Cruzar com motivo**:
+   - `eliminado + submotivo=refugo + IR baixo` → coerente ✅
+   - `natural + IR ≥ 0.85` → alerta: causa não-seletiva, exigir nota/diagnóstico
+   - `eliminado + IR alto` → possível erro de classificação ou descarte indevido
 
-- `supabase/functions/esp32-bridge/index.ts` (linhas 439-441 e 482) — **única** rotina que grava `ultimo_estado_persistido` + `ultimo_estado_persistido_em`. Faz sentido: o ESP32 manda telemetria de volta com o estado real do canal.
-- `brain-dispatcher`, `auto-iluminacao`, `auto-temperatura` — quando comandam via eWeLink, atualizam **apenas** `ultimo_comando_em` e `estado_atual`. Nunca gravam o `_persistido_*`.
+## Mudanças de UI no `MortalidadeSemanaDetalheDialog`
 
-Resultado: todo canal eWeLink fica "SEM ACK" 90 s após o primeiro comando, mesmo funcionando perfeitamente. O dispositivo continua "ONLINE" (depende de `ultimo_sync`, que o `auto-sync-sensors` atualiza), mas o canal não.
+Adicionar três blocos novos, mantendo os existentes:
 
-A iluminação cai no mesmo bug; ela só "parece" diferente porque o último comando foi há ~2 h (mudança de programa) e a ventilação ficou há ~15 h, mas o motivo do badge é idêntico.
+### 1. Card "Perfil de peso da semana" (logo abaixo do total)
+- Peso médio das aves mortas (kg) — somente sobre itens com peso informado.
+- Peso de referência médio da semana (kg) e fonte usada (pesagem real / curva linhagem).
+- `IR` médio + badge classificatória (Refugo severo / Refugo / Peso normal / Acima do padrão) com cor semântica.
+- % de itens **sem peso informado** (incentiva o usuário a registrar o peso na próxima vez).
 
-## Correção proposta
+### 2. Enriquecer "Por Motivo"
+Para cada linha, além de quantidade e %, mostrar:
+- Peso médio dessa categoria (kg)
+- Mini-badge com IR e classificação ("Refugo", "Normal", "Acima")
+- Tooltip: "Esperado X kg • Real Y kg • desvio Z%"
 
-A API cloud eWeLink confirma o comando de forma **síncrona** (não há telemetria push como no ESP32). Logo, sucesso na chamada eWeLink **é** o ACK e deve ser persistido.
+### 3. Enriquecer "Por Dia"
+Cada dia ganha uma linha extra:
+- Peso médio do dia (mortas) vs peso esperado do dia (com seta ↑/↓ e %).
+- Submotivo refugo aparece em verde quando IR baixo; outros submotivos em âmbar/vermelho quando IR alto.
 
-Ajustar os 3 pontos que comandam canais eWeLink para, na mesma transação onde já atualizam `estado_atual` + `ultimo_comando_em`, também gravar:
+### 4. Insight automático (rodapé do dialog)
+Texto curto deterministico (sem IA, instantâneo) gerado a partir dos números:
+- Ex.: *"82% das aves descartadas estavam abaixo de 70% do peso ideal — descarte seletivo coerente."*
+- Ex.: *"Atenção: 60% da mortalidade natural ocorreu em aves com peso normal ou acima — investigar causa aguda (calor, ventilação, ascite)."*
 
-```ts
-ultimo_estado_persistido: estadoFinal,        // mesmo valor enviado
-ultimo_estado_persistido_em: nowIso,          // = ultimo_comando_em
-```
+## Trabalho técnico
 
-Arquivos:
+Tudo no frontend, sem alterar schema. Apenas o componente `MortalidadeSemanaDetalheDialog.tsx`:
 
-1. `supabase/functions/brain-dispatcher/index.ts` (~linha 190) — após `eweLinkSetSwitch` retornar ok.
-2. `supabase/functions/auto-iluminacao/index.ts` (~linha 341) — branch eWeLink.
-3. `supabase/functions/auto-temperatura/index.ts` (~linha 790) — branch eWeLink.
+1. Ajustar o `select` para trazer `peso_kg` dos itens.
+2. Buscar em paralelo:
+   - `pesagens` + `pesagem_itens` do lote no intervalo da semana (±3 dias).
+   - `desempenho_aves` filtrado por `linhagem`, `sexo` e `dia in (diaInicio..diaFim)`.
+   - `lotes` (peso pintinho, linhagem, sexo) — já temos via props parcialmente; carregar o que faltar.
+3. Criar utilitário `src/lib/utils/analiseMortalidade.ts` com:
+   - `pesoReferenciaPorDia(dia, ctx)` → resolve com a hierarquia descrita.
+   - `classificarIR(ir)` → `{ label, tone }`.
+   - `gerarInsight(resumo)` → string determinística.
+4. Estender estados `mortalidadePorDia` e `resumoPorMotivo` com `pesoMedio`, `pesoRef`, `ir`, `classificacao`.
+5. Renderizar os três blocos novos usando tokens do design system (sem cores cruas).
 
-Para ESP32 nada muda: o bridge continua sendo a fonte da verdade do ACK (estado real do firmware, não só o comando enviado).
+## Fora do escopo (proposta futura, não inclusa)
+- Tornar `peso_kg` obrigatório no `MortalidadeDialog`.
+- Persistir o snapshot de análise em uma tabela `mortalidade_analise_semanal` para histórico longitudinal.
+- Cruzar com temperatura/ambiência do dia para reforçar diagnóstico.
 
-## Validação
-
-- Recarregar `/meus-lotes/.../ambiencia` após próximo ciclo do `auto-iluminacao` (1 min) e `auto-ventilacao` — os 3 badges devem ficar verde `ONLINE`.
-- Forçar um comando manual via `useDeviceControl` para confirmar que o badge não volta para SEM ACK.
-- Confirmar via SQL que `ultimo_estado_persistido_em` passa a ser preenchido para `driver='ewelink'`.
-
-## Observação
-
-Não mexer em `src/lib/ambiencia/statusCanal.ts` — a regra de 90 s sem ACK é correta e útil para ESP32, onde a divergência entre comando e estado real indica falha física. Corrigir na origem (escrita do ACK) preserva o comportamento para os dois drivers.
+Confirma que sigo com essa implementação focada no dialog?
