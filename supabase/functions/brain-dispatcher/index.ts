@@ -187,10 +187,18 @@ Deno.serve(async (req) => {
         status: "enviado",
         enviado_em: nowIso,
       }).eq("id", cmd.id);
-      await supabase.from("canais_dispositivo").update({
-        estado_atual: acao === "ligar" ? "on" : "off",
+      const estadoFinal = acao === "ligar" ? "on" : "off";
+      const updateCanal: Record<string, unknown> = {
+        estado_atual: estadoFinal,
         ultimo_comando_em: nowIso,
-      }).eq("id", canalId);
+      };
+      // eWeLink confirma o comando de forma síncrona — sucesso da chamada já é ACK.
+      // ESP32 envia ACK real via /esp32-bridge/telemetry, então não preenchemos aqui.
+      if (dev.driver !== "esp32_http") {
+        updateCanal.ultimo_estado_persistido = estadoFinal;
+        updateCanal.ultimo_estado_persistido_em = nowIso;
+      }
+      await supabase.from("canais_dispositivo").update(updateCanal).eq("id", canalId);
 
       resultados.push({ id: cmd.id, ok: true, driver: dev.driver, res: driverRes });
 

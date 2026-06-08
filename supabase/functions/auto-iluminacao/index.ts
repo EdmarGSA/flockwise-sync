@@ -337,8 +337,15 @@ Deno.serve(async (req) => {
               switch: estadoFinal,
             },
           });
+          const nowIsoEw = new Date().toISOString();
+          // eWeLink confirma o comando de forma síncrona — sucesso = ACK.
           await supabase.from("canais_dispositivo")
-            .update({ estado_atual: estadoFinal, ultimo_comando_em: new Date().toISOString() })
+            .update({
+              estado_atual: estadoFinal,
+              ultimo_comando_em: nowIsoEw,
+              ultimo_estado_persistido: estadoFinal,
+              ultimo_estado_persistido_em: nowIsoEw,
+            })
             .eq("id", canal.id);
         }
 
