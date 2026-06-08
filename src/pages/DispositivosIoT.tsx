@@ -186,7 +186,7 @@ export default function DispositivosIoT() {
     setLoading(true);
 
     const [devRes, galpRes] = await Promise.all([
-      supabase.from('dispositivos_iot').select('*').eq('integrado_id', integradoId).order('nome'),
+      supabase.from('dispositivos_iot').select('id, integrado_id, galpao_id, device_id_ewelink, nome, tipo, marca, modelo, ativo, ultimo_sync, created_at, updated_at, funcao_automacao, automacao_ativa, regra_grupo, driver, endpoint_local, num_canais, ultima_inicializacao, boot_count, ultimo_boot_reason, programa_versao, suporta_nh3, suporta_co2, suporta_anemometro, suporta_manometro, suporta_lux, zona, peso_amostragem, tipo_dispositivo, sensor_modelo, modbus_slave_id, modbus_baud, sensor_serial, sensor_ultimo_erro, sensor_ultimo_erro_em').eq('integrado_id', integradoId).order('nome'),
       supabase.from('galpoes').select('id, nome, nucleo_id').eq('ativo', true),
     ]);
 

@@ -86,7 +86,7 @@ const CameraEditarDvr = () => {
       if (!id) return;
       const { data, error } = await supabase
         .from("cameras_dvr" as any)
-        .select("*")
+        .select("id, integrado_id, nome, marca, modelo, host, protocolo, porta_http, porta_https, porta_rtsp, usuario, num_canais, ativo, status_conexao, ultimo_sync, ultimo_erro, observacoes, created_at, updated_at")
         .eq("id", id)
         .maybeSingle();
       if (error || !data) {
