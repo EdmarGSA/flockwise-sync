@@ -793,6 +793,11 @@ Deno.serve(async (req) => {
             };
             if (decisao.state === "on") updateFields.ultimo_on_em = nowIso;
             else updateFields.ultimo_off_em = nowIso;
+            // ESP32 envia ACK real via bridge; demais drivers (eWeLink) confirmam síncrono.
+            if (dev.driver !== "esp32_http") {
+              updateFields.ultimo_estado_persistido = decisao.state;
+              updateFields.ultimo_estado_persistido_em = nowIso;
+            }
             await supabase.from("canais_dispositivo").update(updateFields).eq("id", canal.id);
 
             await supabase.from("log_automacao_temperatura").insert({
