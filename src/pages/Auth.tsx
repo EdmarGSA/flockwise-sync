@@ -64,8 +64,11 @@ const Auth = () => {
     setIsSendingReset(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: nextPath
+          ? `${window.location.origin}/auth?next=${encodeURIComponent(nextPath)}`
+          : `${window.location.origin}/auth`,
       });
+
       if (error) toast.error('Erro', { description: error.message });
       else {
         toast.success('Email enviado!', { description: 'Verifique sua caixa de entrada.' });
