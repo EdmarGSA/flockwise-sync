@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +52,9 @@ const Auth = () => {
 
   const { signIn, signInWithGoogle, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +99,10 @@ const Auth = () => {
         .select('fornecedor_global_id, vendedor_fornecedor_id, senha_alterada')
         .eq('id', currentUser.id)
         .maybeSingle();
-      if (profile?.vendedor_fornecedor_id || profile?.fornecedor_global_id) {
+      if (nextPath) {
+        toast.success('Bem-vindo!', { description: 'Login realizado com sucesso.' });
+        navigate(nextPath);
+      } else if (profile?.vendedor_fornecedor_id || profile?.fornecedor_global_id) {
         toast.success('Bem-vindo!', { description: 'Acesso ao Portal do Fornecedor.' });
         navigate('/portal-fornecedor');
       } else {

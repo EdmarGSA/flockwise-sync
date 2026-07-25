@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "sdk_version": "0.24.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://zqpjxtlfhxjtenhhzaax.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "gsa-tibiri-mcp",
+      "version": "0.1.0",
+      "title": "GSA Tibiri — Gestão Avícola"
+    },
+    "tools": [
+      {
+        "name": "listar_lotes",
+        "title": "Listar lotes",
+        "description": "Lista os lotes da organização do usuário (aves de corte e postura) com galpão, núcleo, idade em dias, quantidade alojada e status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "ativo",
+                "encerrado",
+                "todos"
+              ],
+              "description": "Filtro de status. Padrão: ativo."
+            },
+            "limite": {
+              "type": "integer",
+              "description": "Máximo de lotes retornados (padrão 25)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "resumo_lote",
+        "title": "Resumo zootécnico do lote",
+        "description": "Retorna o resumo de um lote: aves vivas, mortalidade acumulada (%), última pesagem (peso médio e conversão alimentar) e nível de silo mais recente.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "lote_id": {
+              "type": "string",
+              "description": "UUID do lote (obtido em listar_lotes)."
+            }
+          },
+          "required": [
+            "lote_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ambiencia_lote",
+        "title": "Ambiência do lote",
+        "description": "Leituras mais recentes de temperatura, umidade e ITH dos sensores IoT do galpão do lote, com estado de cada dispositivo (online/offline).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "lote_id": {
+              "type": "string",
+              "description": "UUID do lote (obtido em listar_lotes)."
+            }
+          },
+          "required": [
+            "lote_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "decisoes_brain",
+        "title": "Decisões recentes do Climate Brain",
+        "description": "Lista as decisões e comandos recentes do Climate Brain (ventilação, aquecimento, cortina, nebulização, iluminação) com status de execução.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limite": {
+              "type": "integer",
+              "description": "Máximo de comandos retornados (padrão 20)."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "sugerido",
+                "aprovado",
+                "enviado",
+                "confirmado",
+                "falhou",
+                "todos"
+              ],
+              "description": "Filtro por status do comando. Padrão: todos."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "registrar_mortalidade",
+        "title": "Registrar mortalidade",
+        "description": "Registra a mortalidade do dia de um lote, com quantidade por motivo e peso médio opcional das aves (kg). Cria ou reutiliza o registro da data informada.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "lote_id": {
+              "type": "string",
+              "description": "UUID do lote."
+            },
+            "data": {
+              "type": "string",
+              "description": "Data do registro no formato AAAA-MM-DD. Padrão: hoje."
+            },
+            "itens": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "description": "Motivo da baixa conforme cadastro do sistema (ex.: morte_natural, eliminacao, refugo)."
+                  },
+                  "quantidade": {
+                    "type": "integer",
+                    "description": "Quantidade de aves (inteiro positivo)."
+                  },
+                  "peso_kg": {
+                    "type": "number",
+                    "description": "Peso médio em KG das aves desse motivo (opcional, melhora a análise)."
+                  }
+                },
+                "required": [
+                  "motivo",
+                  "quantidade"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Itens de mortalidade. Informe ao menos um."
+            }
+          },
+          "required": [
+            "lote_id",
+            "itens"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
