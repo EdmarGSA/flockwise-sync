@@ -92,9 +92,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithGoogle = async () => {
     try {
+      // Preserva o destino solicitado (ex.: consentimento OAuth do MCP)
+      const raw = new URLSearchParams(window.location.search).get('next');
+      const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
       const { lovable } = await import('@/integrations/lovable/index');
       const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin,
+        redirect_uri: next
+          ? `${window.location.origin}/auth?next=${encodeURIComponent(next)}`
+          : window.location.origin,
       });
       if (result.error) return { error: result.error as Error };
       return { error: null };

@@ -85,6 +85,8 @@ import BackofficeMapbox from "./pages/backoffice/BackofficeMapbox";
 import BackofficeSolicitacoes from "./pages/backoffice/BackofficeSolicitacoes";
 
 import NotFound from "./pages/NotFound";
+import OAuthConsent from "./pages/OAuthConsent";
+
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import TermosUso from "./pages/TermosUso";
 import { CookieConsent } from "./components/CookieConsent";
@@ -180,6 +182,11 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
+    // Preserva o destino solicitado (ex.: consentimento OAuth do MCP)
+    const raw = new URLSearchParams(window.location.search).get("next");
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) {
+      return <Navigate to={raw} replace />;
+    }
     if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
     if (isCriador) return <Navigate to="/meus-lotes" replace />;
     if (isVeterinario) return <Navigate to="/veterinario" replace />;
@@ -187,12 +194,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/home" replace />;
   }
 
+
   return <>{children}</>;
 }
 
 const AppRoutes = () => (
   <Routes>
+    {/* MCP OAuth consent (handles its own auth redirect) */}
+    <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
     {/* Public routes - redirect to /home if logged in */}
+
     <Route path="/" element={
       <PublicRoute>
         <Index />
