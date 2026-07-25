@@ -91,7 +91,9 @@ const Cameras = () => {
     try {
       const res = await supabase
         .from("cameras_dvr" as any)
-        .select("*")
+        .select(
+          "id, integrado_id, nome, marca, modelo, host, protocolo, porta_http, porta_https, porta_rtsp, usuario, num_canais, ativo, status_conexao, ultimo_sync, ultimo_erro, observacoes, created_at, updated_at"
+        )
         .eq("integrado_id", id)
         .order("created_at", { ascending: false })
         .abortSignal(controller.signal);
