@@ -177,22 +177,26 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isVeterinario, loading: vetLoading } = useVeterinarioCheck();
   const { isIntegrado, loading: integradoLoading } = useIntegradoCheck();
 
-  if (authLoading || (user && (supplierLoading || criadorLoading || vetLoading || integradoLoading))) {
+  // Destino preservado (ex.: consentimento OAuth do MCP) tem prioridade e não
+  // depende das checagens de papel — evita ficar preso no loading após o Google.
+  const rawNext = new URLSearchParams(window.location.search).get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+
+  if (authLoading) return <LoadingScreen />;
+  if (user && nextPath) return <Navigate to={nextPath} replace />;
+
+  if (user && (supplierLoading || criadorLoading || vetLoading || integradoLoading)) {
     return <LoadingScreen />;
   }
 
   if (user) {
-    // Preserva o destino solicitado (ex.: consentimento OAuth do MCP)
-    const raw = new URLSearchParams(window.location.search).get("next");
-    if (raw && raw.startsWith("/") && !raw.startsWith("//")) {
-      return <Navigate to={raw} replace />;
-    }
     if (isSupplier) return <Navigate to="/portal-fornecedor" replace />;
     if (isCriador) return <Navigate to="/meus-lotes" replace />;
     if (isVeterinario) return <Navigate to="/veterinario" replace />;
     if (isIntegrado) return <Navigate to="/meus-lotes" replace />;
     return <Navigate to="/home" replace />;
   }
+
 
 
   return <>{children}</>;
