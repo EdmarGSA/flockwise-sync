@@ -3085,8 +3085,145 @@ export type Database = {
           },
         ]
       }
+      fechamento_cargas: {
+        Row: {
+          abatedouro: string | null
+          created_at: string
+          data_abate: string | null
+          fechamento_id: string
+          id: string
+          nota_produtor: string | null
+          peso_medio_kg: number | null
+          peso_total_kg: number
+          quantidade: number
+          updated_at: string
+        }
+        Insert: {
+          abatedouro?: string | null
+          created_at?: string
+          data_abate?: string | null
+          fechamento_id: string
+          id?: string
+          nota_produtor?: string | null
+          peso_medio_kg?: number | null
+          peso_total_kg?: number
+          quantidade?: number
+          updated_at?: string
+        }
+        Update: {
+          abatedouro?: string | null
+          created_at?: string
+          data_abate?: string | null
+          fechamento_id?: string
+          id?: string
+          nota_produtor?: string | null
+          peso_medio_kg?: number | null
+          peso_total_kg?: number
+          quantidade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamento_cargas_fechamento_id_fkey"
+            columns: ["fechamento_id"]
+            isOneToOne: false
+            referencedRelation: "fechamento_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fechamento_condenacoes: {
+        Row: {
+          codigo: string | null
+          created_at: string
+          descricao: string
+          fechamento_id: string
+          id: string
+          percentual: number | null
+          quantidade: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          codigo?: string | null
+          created_at?: string
+          descricao: string
+          fechamento_id: string
+          id?: string
+          percentual?: number | null
+          quantidade?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string | null
+          created_at?: string
+          descricao?: string
+          fechamento_id?: string
+          id?: string
+          percentual?: number | null
+          quantidade?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamento_condenacoes_fechamento_id_fkey"
+            columns: ["fechamento_id"]
+            isOneToOne: false
+            referencedRelation: "fechamento_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fechamento_descontos: {
+        Row: {
+          created_at: string
+          credito: number
+          debito: number
+          descricao: string
+          fechamento_id: string
+          id: string
+          updated_at: string
+          valor_por_cab: number | null
+        }
+        Insert: {
+          created_at?: string
+          credito?: number
+          debito?: number
+          descricao: string
+          fechamento_id: string
+          id?: string
+          updated_at?: string
+          valor_por_cab?: number | null
+        }
+        Update: {
+          created_at?: string
+          credito?: number
+          debito?: number
+          descricao?: string
+          fechamento_id?: string
+          id?: string
+          updated_at?: string
+          valor_por_cab?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamento_descontos_fechamento_id_fkey"
+            columns: ["fechamento_id"]
+            isOneToOne: false
+            referencedRelation: "fechamento_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fechamento_lotes: {
         Row: {
+          abatedouro: string | null
+          aval_calo_pata_pc: number | null
+          aval_checklist_pc: number | null
+          aval_condenacao_pc: number | null
+          aval_conversao_pc: number | null
           aves_abatidas: number
           aves_alojadas: number
           aves_condenadas_parcial: number | null
@@ -3096,33 +3233,60 @@ export type Database = {
           conv_ajustada_prev: number | null
           conversao_ajustada: number | null
           conversao_alimentar: number
+          conversao_prevista: number | null
           created_at: string
           data_abate: string
           data_alojamento: string
           fechado_por: string | null
           gpd_kg: number
+          hora_media_abate: string | null
           id: string
           idade_abate: number
           iee: number | null
           iep: number
           integrado_id: string
           lote_id: string
+          lote_integradora: string | null
           mortalidade_percentual: number
+          mortalidade_prevista: number | null
           ovos_por_ave_alojada: number | null
+          patas_condenadas: number | null
+          pc_calo_pata_previsto: number | null
+          pc_calo_pata_real: number | null
+          pc_condenacao_previsto: number | null
+          pc_condenacao_real: number | null
+          percentual_basico_partilha: number | null
           percentual_postura_medio: number | null
           peso_inicial_kg: number
           peso_medio_descarte_kg: number | null
           peso_medio_real_kg: number
           peso_projetado_kg: number | null
+          peso_recebido_kg: number | null
           peso_total_abatido_kg: number
+          preco_kg_frango: number | null
+          resultado_bruto_kg: number | null
+          resultado_bruto_pc: number | null
+          resultado_bruto_por_cab: number | null
+          resultado_bruto_valor: number | null
           semanas_producao: number | null
+          tecnico_responsavel: string | null
           tipo_producao: string | null
+          tipo_produto: string | null
           total_ovos_produzidos: number | null
           updated_at: string
+          valor_nf: number | null
+          valor_racao: number | null
+          valor_renda_bruta: number | null
+          valor_total_depositar: number | null
           valor_venda_aves: number | null
           viabilidade_percentual: number
         }
         Insert: {
+          abatedouro?: string | null
+          aval_calo_pata_pc?: number | null
+          aval_checklist_pc?: number | null
+          aval_condenacao_pc?: number | null
+          aval_conversao_pc?: number | null
           aves_abatidas: number
           aves_alojadas: number
           aves_condenadas_parcial?: number | null
@@ -3132,33 +3296,60 @@ export type Database = {
           conv_ajustada_prev?: number | null
           conversao_ajustada?: number | null
           conversao_alimentar: number
+          conversao_prevista?: number | null
           created_at?: string
           data_abate: string
           data_alojamento: string
           fechado_por?: string | null
           gpd_kg: number
+          hora_media_abate?: string | null
           id?: string
           idade_abate: number
           iee?: number | null
           iep: number
           integrado_id: string
           lote_id: string
+          lote_integradora?: string | null
           mortalidade_percentual: number
+          mortalidade_prevista?: number | null
           ovos_por_ave_alojada?: number | null
+          patas_condenadas?: number | null
+          pc_calo_pata_previsto?: number | null
+          pc_calo_pata_real?: number | null
+          pc_condenacao_previsto?: number | null
+          pc_condenacao_real?: number | null
+          percentual_basico_partilha?: number | null
           percentual_postura_medio?: number | null
           peso_inicial_kg: number
           peso_medio_descarte_kg?: number | null
           peso_medio_real_kg: number
           peso_projetado_kg?: number | null
+          peso_recebido_kg?: number | null
           peso_total_abatido_kg: number
+          preco_kg_frango?: number | null
+          resultado_bruto_kg?: number | null
+          resultado_bruto_pc?: number | null
+          resultado_bruto_por_cab?: number | null
+          resultado_bruto_valor?: number | null
           semanas_producao?: number | null
+          tecnico_responsavel?: string | null
           tipo_producao?: string | null
+          tipo_produto?: string | null
           total_ovos_produzidos?: number | null
           updated_at?: string
+          valor_nf?: number | null
+          valor_racao?: number | null
+          valor_renda_bruta?: number | null
+          valor_total_depositar?: number | null
           valor_venda_aves?: number | null
           viabilidade_percentual: number
         }
         Update: {
+          abatedouro?: string | null
+          aval_calo_pata_pc?: number | null
+          aval_checklist_pc?: number | null
+          aval_condenacao_pc?: number | null
+          aval_conversao_pc?: number | null
           aves_abatidas?: number
           aves_alojadas?: number
           aves_condenadas_parcial?: number | null
@@ -3168,29 +3359,51 @@ export type Database = {
           conv_ajustada_prev?: number | null
           conversao_ajustada?: number | null
           conversao_alimentar?: number
+          conversao_prevista?: number | null
           created_at?: string
           data_abate?: string
           data_alojamento?: string
           fechado_por?: string | null
           gpd_kg?: number
+          hora_media_abate?: string | null
           id?: string
           idade_abate?: number
           iee?: number | null
           iep?: number
           integrado_id?: string
           lote_id?: string
+          lote_integradora?: string | null
           mortalidade_percentual?: number
+          mortalidade_prevista?: number | null
           ovos_por_ave_alojada?: number | null
+          patas_condenadas?: number | null
+          pc_calo_pata_previsto?: number | null
+          pc_calo_pata_real?: number | null
+          pc_condenacao_previsto?: number | null
+          pc_condenacao_real?: number | null
+          percentual_basico_partilha?: number | null
           percentual_postura_medio?: number | null
           peso_inicial_kg?: number
           peso_medio_descarte_kg?: number | null
           peso_medio_real_kg?: number
           peso_projetado_kg?: number | null
+          peso_recebido_kg?: number | null
           peso_total_abatido_kg?: number
+          preco_kg_frango?: number | null
+          resultado_bruto_kg?: number | null
+          resultado_bruto_pc?: number | null
+          resultado_bruto_por_cab?: number | null
+          resultado_bruto_valor?: number | null
           semanas_producao?: number | null
+          tecnico_responsavel?: string | null
           tipo_producao?: string | null
+          tipo_produto?: string | null
           total_ovos_produzidos?: number | null
           updated_at?: string
+          valor_nf?: number | null
+          valor_racao?: number | null
+          valor_renda_bruta?: number | null
+          valor_total_depositar?: number | null
           valor_venda_aves?: number | null
           viabilidade_percentual?: number
         }
@@ -3200,6 +3413,53 @@ export type Database = {
             columns: ["lote_id"]
             isOneToOne: true
             referencedRelation: "lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fechamento_origem_pintos: {
+        Row: {
+          created_at: string
+          fechamento_id: string
+          id: string
+          idade_matriz: number | null
+          incubatorio: string | null
+          linhagem: string | null
+          lote_matriz: string | null
+          peso_pinto_kg: number | null
+          quantidade_alojada: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fechamento_id: string
+          id?: string
+          idade_matriz?: number | null
+          incubatorio?: string | null
+          linhagem?: string | null
+          lote_matriz?: string | null
+          peso_pinto_kg?: number | null
+          quantidade_alojada?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fechamento_id?: string
+          id?: string
+          idade_matriz?: number | null
+          incubatorio?: string | null
+          linhagem?: string | null
+          lote_matriz?: string | null
+          peso_pinto_kg?: number | null
+          quantidade_alojada?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamento_origem_pintos_fechamento_id_fkey"
+            columns: ["fechamento_id"]
+            isOneToOne: false
+            referencedRelation: "fechamento_lotes"
             referencedColumns: ["id"]
           },
         ]
@@ -10165,6 +10425,10 @@ export type Database = {
         Returns: number
       }
       ensure_my_admin_role: { Args: never; Returns: boolean }
+      fechamento_pertence_org: {
+        Args: { _fechamento_id: string }
+        Returns: boolean
+      }
       galpao_has_active_lote: { Args: { _galpao_id: string }; Returns: boolean }
       gerar_lote_interno_ovos: {
         Args: { p_integrado_id: string }
