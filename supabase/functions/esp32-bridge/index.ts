@@ -339,16 +339,21 @@ Deno.serve(async (req) => {
       const body = (await req.json()) as TelemetryPayload;
       if (!body.deviceId) return json({ error: "deviceId obrigatório" }, 400);
 
-      const { data: device } = await supabase
+      const { data: device, error: devErr } = await supabase
         .from("dispositivos_iot")
         .select("id, nome, auth_token, integrado_id, online, boot_count, ultima_inicializacao")
         .eq("device_id_ewelink", body.deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
+      if (devErr) {
+        console.error("telemetry: erro ao buscar dispositivo", devErr);
+        return json({ error: `Falha ao consultar dispositivo: ${devErr.message}` }, 500);
+      }
       if (!device) {
         return json({ message: "Dispositivo não registrado, ignorando" }, 200);
       }
+
 
       if (device.auth_token) {
         const provided = req.headers.get("x-device-token");
