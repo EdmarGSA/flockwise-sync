@@ -479,7 +479,10 @@ export function FechamentoLoteDialog({
           </div>
         ) : (
           <div className="space-y-6">
+            <ImportarRipiPdf loteId={loteId} integradoId={integradoId} onAplicar={aplicarRipi} />
+
             <Tabs defaultValue="abate">
+
               <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full">
                 <TabsTrigger value="abate">Abate</TabsTrigger>
                 <TabsTrigger value="cargas">Cargas</TabsTrigger>
