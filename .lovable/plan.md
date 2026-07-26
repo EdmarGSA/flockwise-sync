@@ -1,45 +1,45 @@
-## Diagnóstico: a maior parte das otimizações está ativa, mas a limpeza automática está quebrada
+# Integrar ESP32-S3-Relay-6CH + SM-WT na automação dos aviários
 
-O que já está funcionando (verificado agora): flags `smart_logging`, `smart_commands`, `crons_consolidados` e `event_driven_brain` ligadas; Climate Brain em modo watchdog (10 min) + eventos; dispatcher 1 min + evento; crons individuais de ventilação/cortina/temperatura/qualidade do ar desativados; Brain responde 200 OK.
+## Situação verificada
 
-O que **não** está funcionando — três rotinas de manutenção falham em toda execução por referenciarem colunas que não existem:
+O software já tem quase tudo pronto, mas **nenhum dos dois equipamentos está em uso hoje**:
 
-| Rotina | Erro real registrado | Efeito |
-|---|---|---|
-| `purge_ambiencia_historico` (diária 03:15) | `column "created_at" does not exist` em `eventos_dispositivo_iot` | Aborta no meio: **nenhuma** retenção é aplicada desde 26/07 |
-| `purge_pg_net_responses` (10 em 10 min) | `column "created" does not exist` em `net.http_request_queue` | Falha 144x/dia; fila HTTP nunca limpa |
-| `marcar_dispositivos_offline_iot` (5 em 5 min) | `column "online" does not exist` em `dispositivos_iot` | Falha 288x/dia; **dispositivo offline nunca é detectado/alertado** |
+- Os 4 dispositivos cadastrados no banco são todos `driver = ewelink`, 1 canal cada. Zero dispositivos `esp32_http`, zero sensores SM-WT (nenhum registro com serial/token).
+- Já existem: função `esp32-bridge` (endpoints `/config`, `/telemetry`, `/command`), função `sm-wt-ingest` (POST com `x-sensor-token`), monitor de saúde `sm-wt-health-monitor`, tela de cadastro em Dispositivos IoT com seleção de driver, geração de token Wi-Fi, campos Modbus (slave id, baud) e canais por dispositivo.
 
-Consequência medida agora: 67.194 leituras de sensores e 63.326 registros de decisão climática acima do prazo de retenção continuam no banco, e `cron.job_run_details` está com **465 MB** (444 MB só de tabela) — é hoje o maior objeto do banco de 709 MB.
+**Bug bloqueador encontrado:** a tabela `dispositivos_iot` **não possui a coluna `online`**, mas o `esp32-bridge` faz `select(... , online)` e `update({ online: true })` tanto no `/config` quanto no `/telemetry`. Como o erro não é checado, o dispositivo sempre vem nulo e o ESP32 recebe **404 "Dispositivo não registrado"** — ou seja, a integração ESP32 hoje não funciona nem com hardware conectado. O mesmo campo é usado no painel de saúde IoT.
 
-## Plano
+## Etapas
 
-### 1. Consertar as três rotinas quebradas
-- Reescrever `purge_ambiencia_historico` usando os nomes de coluna reais de cada tabela (conferir `eventos_dispositivo_iot` e demais antes de gerar o SQL) e envolver cada DELETE em bloco próprio com tratamento de erro, para que a falha em uma tabela não cancele a limpeza das outras.
-- Corrigir `purge_pg_net_responses`: `net.http_request_queue` não tem coluna de data — limpar apenas `net._http_response` por `created` e, para a fila, usar o critério suportado pela versão do pg_net.
-- Corrigir `marcar_dispositivos_offline_iot` para usar `ultimo_sync` (única coluna existente) como base do estado offline, gravando o evento de offline como hoje.
+### 1. Destravar o bridge (pré-requisito)
+- Migração: adicionar `dispositivos_iot.online boolean not null default false` (+ índice parcial) e alinhar a rotina `marcar_dispositivos_offline_iot` para escrever nessa coluna além dos eventos.
+- No `esp32-bridge`: tratar o `error` das consultas (hoje ignorado) e devolver 500 com mensagem clara em vez de "não registrado", para evitar novo diagnóstico cego.
+- Exigir `x-device-token` sempre que o dispositivo tiver `auth_token` também no `/config` (hoje só o `/telemetry` valida).
 
-### 2. Recuperar o espaço já ocupado
-- `TRUNCATE cron.job_run_details` (histórico de execuções, sem valor de negócio): libera ~465 MB de imediato.
-- Aplicar a retenção pendente em `leituras_sensores`, `log_decisao_clima`, `comando_brain` e `eventos_dispositivo_iot` já na mesma migração.
-- Acrescentar limpeza automática de `cron.job_run_details` (manter 2 dias) dentro da rotina diária, agora que ela vai rodar até o fim.
-- Observação honesta: após os DELETEs o espaço fica reservado para reuso do próprio banco; o tamanho em disco só encolhe de fato com `VACUUM FULL`, que não pode rodar dentro de migração. O `TRUNCATE` do histórico de cron, que é o item dominante, devolve o espaço na hora.
+### 2. Firmware do ESP32-S3-Relay-6CH
+Criar `firmware/esp32-relay-6ch/` (PlatformIO/Arduino) versionado no projeto, com:
+- Wi-Fi + provisionamento por AP de configuração (SSID, senha, `deviceId`, `authToken`, URL do bridge).
+- Loop: `GET /config` no boot e a cada 5 min; `POST /telemetry` a cada 60 s com estado dos 6 relés, `boot_reason`, `uptime_s` e `programa_versao_aplicada`.
+- Execução local do `schedule_24h` e das `safety_rules` gravadas em NVS — mantém luz, aquecimento e ventilação corretos mesmo sem internet (já é o contrato que o bridge devolve).
+- Leitura Modbus RTU do SM-WT pela porta RS485 da placa (slave id/baud vindos do `/config`), enviada em `sensor{}` no telemetry como fallback.
+- Watchdog, reconexão exponencial e reconciliação de estado após queda de energia.
 
-### 3. Monitorar as rotinas de manutenção
-- Registrar cada execução das purgas em `brain_metrics` (origem `purge`), com quantidade de linhas apagadas por tabela e erro quando houver — assim uma futura quebra aparece em vez de falhar em silêncio por semanas.
+### 3. Sensor SM-WT (Wi-Fi + RS485)
+- Documentar e validar as duas fontes: **primária** Wi-Fi (o sensor faz POST direto em `sm-wt-ingest` com `x-sensor-token`) e **fallback** RS485 via ESP32 (só grava se o Wi-Fi ficar >5 min sem enviar — regra já existente na RPC).
+- Se o firmware do SM-WT não permitir URL de destino customizada, o caminho oficial passa a ser o RS485 pelo ESP32; nesse caso ajustar a tela para deixar isso explícito no cadastro.
 
-### 4. Reduzir mais execuções (ganho adicional após as correções)
-- `auto-iluminacao` roda 1.440x/dia (1 em 1 min) mesmo sem lote alojado. Passar para 5 em 5 min e adicionar saída antecipada quando não há lote ativo com galpão. Programas de luz mudam por faixa de dia, não por minuto — não há perda de precisão relevante.
-- `intelbras-snapshot-all-5min` e `sm-wt-health-monitor-5min`: saída antecipada quando não existe câmera/dispositivo ativo, evitando trabalho e escrita inútil.
-- `marcar-disp-iot-offline`: 5 → 10 min (o próprio alerta de offline usa janela de 10 min).
+### 4. Comissionamento na interface
+- Novo passo-a-passo "Instalar dispositivo" na tela de Dispositivos IoT: gerar `deviceId` + `authToken`, mostrar a URL do bridge e um QR/JSON para colar no provisionamento do ESP32.
+- Mapeamento de canais guiado: CH1..CH6 → tipo de equipamento (iluminação, ventilação, aquecimento, cortina, nebulização) com aviso quando um canal fica sem função.
+- Tela de diagnóstico por dispositivo: último boot, motivo, versão de programa aplicada, ACK por canal, última leitura do sensor e erro Modbus.
 
-Estimativa somada: de ~7 mil chamadas internas/dia para ~1,2 mil, com as tabelas de log finalmente estabilizando de tamanho.
-
-### 5. Verificação
-Após aplicar: conferir em `cron.job_run_details` que as três rotinas passam a terminar com sucesso, que as contagens acima do prazo de retenção vão a zero e reportar o novo tamanho do banco.
+### 5. Validação em campo
+- Teste ponta a ponta: cadastro → `/config` 200 → telemetry chegando → comando manual liga/desliga com ACK → Climate Brain acionando o canal → simulação de queda de internet mantendo o schedule local.
+- Checklist elétrico documentado (relés secos, contatores, alimentação 7–36 V, aterramento do RS485).
 
 ## Detalhes técnicos
-Tudo em uma migração (funções `SECURITY DEFINER` já existentes, recriadas com `CREATE OR REPLACE`) mais ajustes de agendamento via `cron.alter_job`, e edição pontual das edge functions `auto-iluminacao`, `intelbras-snapshot-all` e `sm-wt-health-monitor` para a saída antecipada. Nenhuma mudança de comportamento visível na interface.
 
-## Fora do escopo (só sinalizando)
-`comando_brain` tem 17.599 registros com status `falhou`, sendo 8.528 "Canal não encontrado para função" e 7.283 "Sem confirmação de telemetria em 60s", todos anteriores a 03/07. É um problema de configuração de canais/ACK, não de custo de banco — posso investigar depois, se quiser.
+- Migração nova apenas para `online`; nenhuma tabela nova é necessária (`canais_dispositivo`, `timers_seguranca_iot`, `leituras_sensores` já cobrem o modelo).
+- `leituras_sensores` já tem `fonte` (`wifi_sensor`, `esp32_interno`, RS485) e coluna `online`, então a dedupe de fontes continua igual.
+- Nenhuma mudança no Climate Brain: ele já despacha por `canais_dispositivo`, independente de driver.
+- Firmware fica no repositório apenas como código-fonte para compilar/flashar; não afeta o build da aplicação web.
