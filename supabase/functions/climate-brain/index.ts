@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
     const divergente = !!dSombra && dSombra.modo !== dReal.modo;
     const deltaT = ctxSombra ? Math.abs(ctxSombra.tempC - ctxReal.tempC) : 0;
 
-    await supabase.from("log_decisao_clima").insert({
+    const logPayload = {
       integrado_id: lote.integrado_id,
       galpao_id: lote.galpao_id,
       lote_id: lote.id,
@@ -362,7 +362,32 @@ Deno.serve(async (req) => {
         delta_temp_c: Number(deltaT.toFixed(2)),
         motivo: dSombra.motivo,
       } : null,
-    });
+    };
+
+    // smart_logging: grava só quando a decisão muda ou a cada 15 min (heartbeat)
+    let deveLogar = true;
+    if (smartLogging) {
+      const { data: ultimoLog } = await supabase
+        .from("log_decisao_clima")
+        .select("estado_decidido, created_at")
+        .eq("galpao_id", lote.galpao_id)
+        .eq("funcao_automacao", "climate_brain")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ultimoLog) {
+        const mudou = ultimoLog.estado_decidido !== dReal.modo;
+        const velho = Date.now() - new Date(ultimoLog.created_at as string).getTime() >= HEARTBEAT_MS;
+        deveLogar = mudou || velho;
+      }
+    }
+    if (deveLogar) {
+      metrics.decisoes_alteradas++;
+      await supabase.from("log_decisao_clima").insert(logPayload);
+    } else {
+      metrics.decisoes_ignoradas++;
+    }
+
 
     // ────────────────────────────────────────────────
     // Sugestões SHADOW: registra intenção em comando_brain
