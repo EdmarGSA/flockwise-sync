@@ -23,8 +23,17 @@ Deno.serve(async (req) => {
     .eq("ativo", true)
     .not("sensor_wifi_token", "is", null);
 
+  if (!sensores?.length) {
+    return new Response(
+      JSON.stringify({ ok: true, verificados: 0, alertados: [] }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   const cutoff = new Date(Date.now() - 10 * 60_000).toISOString();
   const alertados: string[] = [];
+
+
 
   for (const s of sensores ?? []) {
     // última leitura Wi-Fi
