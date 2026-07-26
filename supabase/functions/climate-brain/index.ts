@@ -108,10 +108,24 @@ function decidir(ctx: AgregadoCtx, tempAlvo: number, urMax: number,
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const t0 = Date.now();
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // Feature flags (redução de custo do banco)
+  const flags: Record<string, boolean> = {};
+  try {
+    const { data: flagRows } = await supabase
+      .from("feature_flags_sistema")
+      .select("chave, ativo");
+    for (const f of flagRows ?? []) flags[f.chave] = !!f.ativo;
+  } catch (_e) { /* flags off por padrão */ }
+  const smartLogging = flags["smart_logging"] === true;
+  const smartCommands = flags["smart_commands"] === true;
+  const HEARTBEAT_MS = 15 * 60_000;
 
   const { data: lotes, error } = await supabase
     .from("lotes")
@@ -126,6 +140,12 @@ Deno.serve(async (req) => {
 
   const decisoesNeb: any[] = [];
   const resultados: any[] = [];
+  const metrics = {
+    galpoes: 0, sensores: 0,
+    decisoes_alteradas: 0, decisoes_ignoradas: 0,
+    comandos_enviados: 0, comandos_ignorados: 0,
+  };
+
 
   for (const lote of lotes ?? []) {
     if (!lote.galpao_id || !lote.data_alojamento) continue;
