@@ -3268,6 +3268,10 @@ export type Database = {
           resultado_bruto_pc: number | null
           resultado_bruto_por_cab: number | null
           resultado_bruto_valor: number | null
+          ripi_arquivo_path: string | null
+          ripi_dados_brutos: Json | null
+          ripi_importado_em: string | null
+          ripi_importado_por: string | null
           semanas_producao: number | null
           tecnico_responsavel: string | null
           tipo_producao: string | null
@@ -3331,6 +3335,10 @@ export type Database = {
           resultado_bruto_pc?: number | null
           resultado_bruto_por_cab?: number | null
           resultado_bruto_valor?: number | null
+          ripi_arquivo_path?: string | null
+          ripi_dados_brutos?: Json | null
+          ripi_importado_em?: string | null
+          ripi_importado_por?: string | null
           semanas_producao?: number | null
           tecnico_responsavel?: string | null
           tipo_producao?: string | null
@@ -3394,6 +3402,10 @@ export type Database = {
           resultado_bruto_pc?: number | null
           resultado_bruto_por_cab?: number | null
           resultado_bruto_valor?: number | null
+          ripi_arquivo_path?: string | null
+          ripi_dados_brutos?: Json | null
+          ripi_importado_em?: string | null
+          ripi_importado_por?: string | null
           semanas_producao?: number | null
           tecnico_responsavel?: string | null
           tipo_producao?: string | null
