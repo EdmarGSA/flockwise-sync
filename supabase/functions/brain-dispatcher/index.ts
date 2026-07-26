@@ -267,5 +267,5 @@ Deno.serve(async (req) => {
     });
   }
 
-  return json({ ok: true, processados: resultados.length, resultados, timeouts: travados?.length ?? 0 });
+  return json({ ok: true, processados: resultados.length, ignorados, resultados, timeouts: travados?.length ?? 0 });
 });
