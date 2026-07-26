@@ -116,7 +116,9 @@ export default function DispositivosIoT() {
     modbus_baud: number;
     sensor_wifi_token: string;
   }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0, sm_wt_enabled: false, sensor_serial: '', modbus_slave_id: 1, modbus_baud: 9600, sensor_wifi_token: '' });
+  const bridgeUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/esp32-bridge`;
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
+
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [ewelinkDevices, setEwelinkDevices] = useState<EwelinkApiDevice[]>([]);
@@ -704,8 +706,35 @@ export default function DispositivosIoT() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Use este token no header <code className="bg-muted px-1 rounded text-[10px]">x-device-token</code> do firmware.</p>
                       </div>
+
+                      <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+                        <p className="text-sm font-medium">Instalação guiada do controlador</p>
+                        <ol className="text-xs text-muted-foreground list-decimal pl-4 space-y-1">
+                          <li>Ligue a placa segurando o botão <strong>BOOT</strong> e conecte-se à rede Wi-Fi <code className="bg-muted px-1 rounded">GSA-Aviario-XXXX</code> (senha <code className="bg-muted px-1 rounded">gsa12345</code>).</li>
+                          <li>Abra <code className="bg-muted px-1 rounded">http://192.168.4.1</code> no celular.</li>
+                          <li>Informe o Wi-Fi do aviário, a URL do bridge, o Device ID e o token acima.</li>
+                          <li>Salve: a placa reinicia e aparece <strong>online</strong> aqui em até 1 minuto.</li>
+                        </ol>
+                        <div>
+                          <Label className="text-xs">URL do bridge</Label>
+                          <div className="flex gap-2">
+                            <Input readOnly value={bridgeUrl} className="text-xs" />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(bridgeUrl);
+                                toast.success('URL copiada');
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </>
                   )}
+
 
                   <div className="border rounded-md p-3 space-y-2 bg-muted/30">
                     <label className="flex items-center gap-2 text-sm font-medium">

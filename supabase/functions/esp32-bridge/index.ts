@@ -155,14 +155,28 @@ Deno.serve(async (req) => {
       const deviceId = url.searchParams.get("deviceId");
       if (!deviceId) return json({ error: "deviceId obrigatório" }, 400);
 
-      const { data: device } = await supabase
+      const { data: device, error: devErr } = await supabase
         .from("dispositivos_iot")
         .select("id, nome, num_canais, auth_token, galpao_id, integrado_id, online")
         .eq("device_id_ewelink", deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
+      // Erro de consulta não pode ser confundido com "não registrado" — devolve 500 explícito.
+      if (devErr) {
+        console.error("config: erro ao buscar dispositivo", devErr);
+        return json({ error: `Falha ao consultar dispositivo: ${devErr.message}` }, 500);
+      }
       if (!device) return json({ error: "Dispositivo não registrado" }, 404);
+
+      // Autenticação: se o dispositivo tem token, o ESP32 precisa enviá-lo também no /config
+      if (device.auth_token) {
+        const provided = req.headers.get("x-device-token");
+        if (provided !== device.auth_token) {
+          return json({ error: "Token inválido" }, 401);
+        }
+      }
+
 
       // Marca online + atualiza ultimo_sync
       const wasOffline = device.online === false;
@@ -325,16 +339,21 @@ Deno.serve(async (req) => {
       const body = (await req.json()) as TelemetryPayload;
       if (!body.deviceId) return json({ error: "deviceId obrigatório" }, 400);
 
-      const { data: device } = await supabase
+      const { data: device, error: devErr } = await supabase
         .from("dispositivos_iot")
         .select("id, nome, auth_token, integrado_id, online, boot_count, ultima_inicializacao")
         .eq("device_id_ewelink", body.deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
+      if (devErr) {
+        console.error("telemetry: erro ao buscar dispositivo", devErr);
+        return json({ error: `Falha ao consultar dispositivo: ${devErr.message}` }, 500);
+      }
       if (!device) {
         return json({ message: "Dispositivo não registrado, ignorando" }, 200);
       }
+
 
       if (device.auth_token) {
         const provided = req.headers.get("x-device-token");
@@ -427,18 +446,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 2. Atualizar estado de cada canal (firmware confirma o que aplicou)
+      // 2. ACK dos canais: o firmware confirma o que aplicou.
+      // Importante: NÃO sobrescreve `estado_atual` (estado desejado, definido pelo
+      // Brain/UI) — só grava o estado persistido, senão um comando recém-emitido
+      // seria revertido pela telemetria do ciclo anterior.
       if (body.channels && body.channels.length > 0) {
         await Promise.all(
           body.channels.map((ch) =>
             supabase
               .from("canais_dispositivo")
               .update({
-                estado_atual: ch.estado,
                 intensidade_atual: ch.intensidade_pct ?? undefined,
                 ultimo_estado_persistido: ch.estado,
                 ultimo_estado_persistido_em: new Date().toISOString(),
-                ultimo_comando_em: new Date().toISOString(),
               })
               .eq("dispositivo_id", device.id)
               .eq("canal_numero", ch.canal),
@@ -452,8 +472,35 @@ Deno.serve(async (req) => {
         .update({ ultimo_sync: new Date().toISOString(), online: true })
         .eq("id", device.id);
 
-      return json({ ok: true, device: device.nome, boot_detectado: !!isBoot });
+      // 4. Devolve o estado desejado de cada canal para o ESP32 reconciliar já
+      // neste ciclo (evita polling extra em /config para comandos manuais).
+      const { data: desejados } = await supabase
+        .from("canais_dispositivo")
+        .select("canal_numero, estado_atual, intensidade_atual, tipo_equipamento, automacao_ativa")
+        .eq("dispositivo_id", device.id)
+        .eq("ativo", true)
+        .order("canal_numero");
+
+      const { data: devVersao } = await supabase
+        .from("dispositivos_iot")
+        .select("programa_versao")
+        .eq("id", device.id)
+        .maybeSingle();
+
+      return json({
+        ok: true,
+        device: device.nome,
+        boot_detectado: !!isBoot,
+        programa_versao: devVersao?.programa_versao ?? null,
+        desired_channels: (desejados ?? []).map((c: any) => ({
+          canal: c.canal_numero,
+          estado: c.estado_atual ?? "off",
+          intensidade_pct: c.intensidade_atual ?? (c.estado_atual === "on" ? 100 : 0),
+        })),
+      });
     }
+
+
 
     // ──────────────────────────────────────────────
     // POST /command  → backend envia comando para canal
