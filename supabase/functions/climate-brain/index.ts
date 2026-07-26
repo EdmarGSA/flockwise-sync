@@ -488,12 +488,23 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Apenas dispatcher e nebulização sob demanda — ventilação/cortina já têm cron próprio
-  // (evita double-fire e logs duplicados, ref. auditoria M3).
-  await Promise.all([
+  // Orquestração. Com `crons_consolidados` ligado, o Brain chama as rotinas
+  // climáticas (que tiveram suas crons próprias desativadas) — ref. Etapa 4.
+  const consolidado = flags["crons_consolidados"] === true;
+  const chamadas: Promise<any>[] = [
     decisoesNeb.length > 0 ? callFn("auto-nebulizacao", { decisoes: decisoesNeb }) : Promise.resolve(),
-    callFn("brain-dispatcher", {}),
-  ]);
+  ];
+  if (consolidado) {
+    chamadas.push(
+      callFn("auto-ventilacao", {}).catch((e) => console.error("[climate-brain] auto-ventilacao", e?.message)),
+      callFn("auto-cortina", { time: new Date().toISOString() }).catch((e) => console.error("[climate-brain] auto-cortina", e?.message)),
+      callFn("auto-temperatura", { time: new Date().toISOString() }).catch((e) => console.error("[climate-brain] auto-temperatura", e?.message)),
+      callFn("auto-qualidade-ar", { time: new Date().toISOString() }).catch((e) => console.error("[climate-brain] auto-qualidade-ar", e?.message)),
+    );
+  }
+  chamadas.push(callFn("brain-dispatcher", {}));
+  await Promise.all(chamadas);
+
 
   // Métricas do ciclo (retidas por 7 dias)
   try {
