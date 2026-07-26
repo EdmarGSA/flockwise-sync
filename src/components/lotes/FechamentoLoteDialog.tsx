@@ -104,6 +104,8 @@ export function FechamentoLoteDialog({
   const [convAjustadaPrev, setConvAjustadaPrev] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [ripiPath, setRipiPath] = useState<string | null>(null);
+  const [ripiBrutos, setRipiBrutos] = useState<RipiExtracao | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +120,83 @@ export function FechamentoLoteDialog({
     setPatasCondenadas('0');
     setPcCondenacaoPrevisto('');
     setPcCaloPataPrevisto('');
+    setRipiPath(null);
+    setRipiBrutos(null);
   }, [open, loteId]);
+
+  const aplicarRipi = (dados: RipiExtracao, blocos: BlocoRipi[], arquivoPath: string | null) => {
+    setRipiBrutos(dados);
+    if (arquivoPath) setRipiPath(arquivoPath);
+
+    if (blocos.includes('abate')) {
+      setAbate((p) => ({
+        dataAbate: dados.data_abate || p.dataAbate,
+        horaMediaAbate: dados.hora_media_abate || p.horaMediaAbate,
+        avesAbatidas: str(dados.aves_abatidas) || p.avesAbatidas,
+        pesoTotalAbatido: str(dados.peso_total_kg) || p.pesoTotalAbatido,
+        consumoTotalRacao: str(dados.consumo_total_racao_kg) || p.consumoTotalRacao,
+        tipoProduto: dados.tipo_produto || p.tipoProduto,
+        abatedouro: dados.abatedouro || p.abatedouro,
+        loteIntegradora: dados.lote_integradora || p.loteIntegradora,
+        tecnicoResponsavel: dados.tecnico_responsavel || p.tecnicoResponsavel,
+        conversaoPrevista: str(dados.conversao_prevista) || p.conversaoPrevista,
+        mortalidadePrevista: str(dados.mortalidade_prevista) || p.mortalidadePrevista,
+      }));
+    }
+
+    if (blocos.includes('cargas') && dados.cargas?.length) {
+      setCargas(
+        dados.cargas.map((c) => ({
+          abatedouro: c.abatedouro || dados.abatedouro || '',
+          data_abate: c.data_abate || dados.data_abate || '',
+          quantidade: c.quantidade ?? 0,
+          peso_total_kg: c.peso_total_kg ?? 0,
+          nota_produtor: c.nota_produtor || '',
+        })),
+      );
+    }
+
+    if (blocos.includes('condenacoes')) {
+      if (dados.condenacoes?.length) {
+        setCondenacoes(
+          dados.condenacoes.map((c) => ({
+            tipo: c.tipo === 'FP' ? 'FP' : 'FT',
+            codigo: c.codigo || '',
+            descricao: c.descricao || '',
+            quantidade: c.quantidade ?? 0,
+          })),
+        );
+      }
+      if (dados.aves_condenadas_total != null) setCondTotal(str(dados.aves_condenadas_total));
+      if (dados.aves_condenadas_parcial != null) setCondParcial(str(dados.aves_condenadas_parcial));
+      if (dados.calo_pata_quantidade != null) setCaloPataQtd(str(dados.calo_pata_quantidade));
+      if (dados.pc_condenacao_previsto != null) setPcCondenacaoPrevisto(str(dados.pc_condenacao_previsto));
+      if (dados.pc_calo_pata_previsto != null) setPcCaloPataPrevisto(str(dados.pc_calo_pata_previsto));
+    }
+
+    if (blocos.includes('partilha')) {
+      setPartilha((p) => ({
+        precoKgFrango: str(dados.preco_kg_frango) || p.precoKgFrango,
+        valorRacao: str(dados.valor_racao) || p.valorRacao,
+        percentualBasico: str(dados.percentual_basico) || p.percentualBasico,
+        avalConversao: str(dados.aval_conversao) || p.avalConversao,
+        avalCondenacao: str(dados.aval_condenacao) || p.avalCondenacao,
+        avalCaloPata: str(dados.aval_calo_pata) || p.avalCaloPata,
+        avalChecklist: str(dados.aval_checklist) || p.avalChecklist,
+      }));
+    }
+
+    if (blocos.includes('descontos') && dados.descontos?.length) {
+      setDescontos(
+        dados.descontos.map((d) => ({
+          descricao: d.descricao || '',
+          debito: d.debito ?? 0,
+          credito: d.credito ?? 0,
+        })),
+      );
+    }
+  };
+
 
   useEffect(() => {
     const fetchData = async () => {
