@@ -155,14 +155,28 @@ Deno.serve(async (req) => {
       const deviceId = url.searchParams.get("deviceId");
       if (!deviceId) return json({ error: "deviceId obrigatório" }, 400);
 
-      const { data: device } = await supabase
+      const { data: device, error: devErr } = await supabase
         .from("dispositivos_iot")
         .select("id, nome, num_canais, auth_token, galpao_id, integrado_id, online")
         .eq("device_id_ewelink", deviceId)
         .eq("ativo", true)
         .maybeSingle();
 
+      // Erro de consulta não pode ser confundido com "não registrado" — devolve 500 explícito.
+      if (devErr) {
+        console.error("config: erro ao buscar dispositivo", devErr);
+        return json({ error: `Falha ao consultar dispositivo: ${devErr.message}` }, 500);
+      }
       if (!device) return json({ error: "Dispositivo não registrado" }, 404);
+
+      // Autenticação: se o dispositivo tem token, o ESP32 precisa enviá-lo também no /config
+      if (device.auth_token) {
+        const provided = req.headers.get("x-device-token");
+        if (provided !== device.auth_token) {
+          return json({ error: "Token inválido" }, 401);
+        }
+      }
+
 
       // Marca online + atualiza ultimo_sync
       const wasOffline = device.online === false;
