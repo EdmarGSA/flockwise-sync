@@ -392,7 +392,12 @@ export function FechamentoLoteDialog({
           iep: metrics.iep,
           iee: metrics.iee,
           conv_ajustada_prev: convAjustadaPrev,
+          ripi_arquivo_path: ripiPath,
+          ripi_importado_em: ripiBrutos ? new Date().toISOString() : null,
+          ripi_importado_por: ripiBrutos ? user.id : null,
+          ripi_dados_brutos: ripiBrutos ? (ripiBrutos as any) : null,
           fechado_por: user.id,
+
         })
         .select('id')
         .single();
