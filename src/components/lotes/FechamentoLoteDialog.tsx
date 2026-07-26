@@ -17,6 +17,8 @@ import { AbaCargas } from './fechamento/AbaCargas';
 import { AbaCondenacoes } from './fechamento/AbaCondenacoes';
 import { AbaPartilha, PartilhaCampos } from './fechamento/AbaPartilha';
 import { PainelDivergencias } from './fechamento/PainelDivergencias';
+import { ImportarRipiPdf, BlocoRipi } from './fechamento/ImportarRipiPdf';
+import { RipiExtracao, str } from '@/lib/utils/ripiImport';
 import {
   CargaAbate,
   CondenacaoItem,
@@ -27,6 +29,7 @@ import {
   percentualCondenacao,
   totalizarCargas,
 } from '@/lib/utils/fechamentoRipi';
+
 
 interface FechamentoLoteDialogProps {
   open: boolean;
