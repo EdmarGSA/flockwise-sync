@@ -2660,6 +2660,7 @@ export type Database = {
           modelo: string | null
           nome: string
           num_canais: number
+          online: boolean
           peso_amostragem: number
           programa_versao: string | null
           regra_grupo: string | null
@@ -2700,6 +2701,7 @@ export type Database = {
           modelo?: string | null
           nome: string
           num_canais?: number
+          online?: boolean
           peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
@@ -2740,6 +2742,7 @@ export type Database = {
           modelo?: string | null
           nome?: string
           num_canais?: number
+          online?: boolean
           peso_amostragem?: number
           programa_versao?: string | null
           regra_grupo?: string | null
