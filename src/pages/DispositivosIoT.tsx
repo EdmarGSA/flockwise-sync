@@ -116,7 +116,9 @@ export default function DispositivosIoT() {
     modbus_baud: number;
     sensor_wifi_token: string;
   }>({ driver: 'ewelink', device_id_ewelink: '', nome: '', galpao_id: '', auth_token: '', num_canais: 6, zona: 'geral', peso_amostragem: 1.0, sm_wt_enabled: false, sensor_serial: '', modbus_slave_id: 1, modbus_baud: 9600, sensor_wifi_token: '' });
+  const bridgeUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/esp32-bridge`;
   const [ewelinkConnected, setEwelinkConnected] = useState(false);
+
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [ewelinkDevices, setEwelinkDevices] = useState<EwelinkApiDevice[]>([]);
