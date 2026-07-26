@@ -131,6 +131,17 @@ Deno.serve(async (req) => {
       if (l.galpoes?.nucleo_id) nucleoByGalpao.set(l.galpao_id, l.galpoes.nucleo_id);
     }
 
+    // Saída antecipada: sem lote alojado nenhum canal é acionado (ver `if (!lote) continue` abaixo).
+    // Evita ~5 consultas por ciclo quando não há produção ativa.
+    if (loteByGalpao.size === 0) {
+      return new Response(
+        JSON.stringify({ message: "Nenhum lote alojado nos galpões com iluminação", acoes: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+
+
     // Solar de hoje por núcleo
     const hoje = new Date().toISOString().slice(0, 10);
     const nucleoIds = [...new Set([...nucleoByGalpao.values()])];
