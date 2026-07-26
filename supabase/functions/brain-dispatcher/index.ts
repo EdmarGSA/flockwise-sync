@@ -68,6 +68,17 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Feature flag: smart_commands (não reenvia comando cujo estado já é o vigente)
+  let smartCommands = false;
+  try {
+    const { data: flag } = await supabase
+      .from("feature_flags_sistema")
+      .select("ativo")
+      .eq("chave", "smart_commands")
+      .maybeSingle();
+    smartCommands = flag?.ativo === true;
+  } catch (_e) { /* off por padrão */ }
+
   // 1) Comandos elegíveis:
   //    - status=aprovado (sempre executa)
   //    - status=sugerido AND galpao.automacao_brain='auto'
@@ -88,6 +99,7 @@ Deno.serve(async (req) => {
 
   const pendentes = [...(aprovados ?? []), ...(sugeridos ?? [])];
   const resultados: any[] = [];
+  let ignorados = 0;
 
   for (const cmd of pendentes) {
     try {
@@ -95,10 +107,13 @@ Deno.serve(async (req) => {
       let canalId = cmd.canal_id;
       let canal: any = null;
 
+      const CANAL_COLS = "id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, ultimo_estado_persistido, ultimo_estado_persistido_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)";
+
       if (canalId) {
         const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
+          .select(CANAL_COLS)
+
           .eq("id", canalId)
           .maybeSingle();
         if (error) console.error("[brain-dispatcher] erro select canal por id", canalId, error);
