@@ -10582,7 +10582,7 @@ export type Database = {
         Args: { _codigo_addon: string; _integrado_id: string }
         Returns: boolean
       }
-      purge_ambiencia_historico: { Args: never; Returns: Json }
+      purge_ambiencia_historico: { Args: never; Returns: undefined }
       purge_pg_net_responses: { Args: never; Returns: undefined }
       redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
       registrar_leitura_sensor_unificada: {
