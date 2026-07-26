@@ -446,28 +446,39 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Anti-duplicidade: só insere se não houver uma sugestão
-        // ativa para o mesmo galpão+função há menos de 2 min
+        // Anti-duplicidade: não repete comando idêntico.
+        // smart_commands: compara com o último comando do galpão+função
+        // (sem janela de tempo) e ignora quando o estado desejado já é o vigente.
         for (const s of sugestoes) {
-          const { data: recente } = await supabase
+          let query = supabase
             .from("comando_brain")
-            .select("id, estado_desejado")
+            .select("id, estado_desejado, status")
             .eq("galpao_id", s.galpao_id)
             .eq("funcao", s.funcao)
-            .in("status", ["sugerido", "aprovado", "enviado"])
-            .gte("created_at", new Date(Date.now() - 120_000).toISOString())
-            .limit(1)
-            .maybeSingle();
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (!smartCommands) {
+            query = query
+              .in("status", ["sugerido", "aprovado", "enviado"])
+              .gte("created_at", new Date(Date.now() - 120_000).toISOString());
+          } else {
+            query = query.neq("status", "falhou");
+          }
+          const { data: recente } = await query.maybeSingle();
           if (recente && JSON.stringify(recente.estado_desejado) === JSON.stringify(s.estado_desejado)) {
+            metrics.comandos_ignorados++;
             continue;
           }
           await supabase.from("comando_brain").insert(s);
+          metrics.comandos_enviados++;
         }
       }
     } catch (e: any) {
       console.error("[climate-brain] erro shadow:", e?.message);
     }
 
+    metrics.galpoes++;
+    metrics.sensores += ctxReal.sensoresUsados;
     resultados.push({ galpao: lote.galpao_id, modo: dReal.modo, tempC: ctxReal.tempC,
                       tempAlvo, ventPct, acaoNeb: dReal.acaoNeb, trocaArDuty,
                       sombra: dSombra?.modo, divergente });
@@ -484,7 +495,25 @@ Deno.serve(async (req) => {
     callFn("brain-dispatcher", {}),
   ]);
 
-  return new Response(JSON.stringify({ ok: true, processados: resultados.length, resultados }), {
+  // Métricas do ciclo (retidas por 7 dias)
+  try {
+    await supabase.from("brain_metrics").insert({
+      origem: "climate-brain",
+      duracao_ms: Date.now() - t0,
+      galpoes_processados: metrics.galpoes,
+      sensores_lidos: metrics.sensores,
+      decisoes_alteradas: metrics.decisoes_alteradas,
+      decisoes_ignoradas: metrics.decisoes_ignoradas,
+      comandos_enviados: metrics.comandos_enviados,
+      comandos_ignorados: metrics.comandos_ignorados,
+      detalhes: { smart_logging: smartLogging, smart_commands: smartCommands },
+    });
+  } catch (e: any) {
+    console.error("[climate-brain] erro métricas:", e?.message);
+  }
+
+  return new Response(JSON.stringify({ ok: true, processados: resultados.length, metrics, resultados }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
