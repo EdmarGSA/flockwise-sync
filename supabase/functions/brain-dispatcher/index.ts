@@ -68,6 +68,17 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Feature flag: smart_commands (não reenvia comando cujo estado já é o vigente)
+  let smartCommands = false;
+  try {
+    const { data: flag } = await supabase
+      .from("feature_flags_sistema")
+      .select("ativo")
+      .eq("chave", "smart_commands")
+      .maybeSingle();
+    smartCommands = flag?.ativo === true;
+  } catch (_e) { /* off por padrão */ }
+
   // 1) Comandos elegíveis:
   //    - status=aprovado (sempre executa)
   //    - status=sugerido AND galpao.automacao_brain='auto'
@@ -88,6 +99,7 @@ Deno.serve(async (req) => {
 
   const pendentes = [...(aprovados ?? []), ...(sugeridos ?? [])];
   const resultados: any[] = [];
+  let ignorados = 0;
 
   for (const cmd of pendentes) {
     try {
@@ -95,10 +107,13 @@ Deno.serve(async (req) => {
       let canalId = cmd.canal_id;
       let canal: any = null;
 
+      const CANAL_COLS = "id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, ultimo_estado_persistido, ultimo_estado_persistido_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)";
+
       if (canalId) {
         const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
+          .select(CANAL_COLS)
+
           .eq("id", canalId)
           .maybeSingle();
         if (error) console.error("[brain-dispatcher] erro select canal por id", canalId, error);
@@ -106,7 +121,7 @@ Deno.serve(async (req) => {
       } else {
         const { data, error } = await supabase
           .from("canais_dispositivo")
-          .select("id, dispositivo_id, canal_numero, cooldown_seg, ultimo_comando_em, canal_redundante_id, dispositivos_iot!inner(driver, ultimo_sync, ativo, galpao_id, device_id_ewelink, num_canais)")
+          .select(CANAL_COLS)
           .eq("integrado_id", cmd.integrado_id)
           .eq("funcao_automacao", cmd.funcao)
           .eq("automacao_ativa", true)
@@ -128,6 +143,27 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // smart_commands: se o estado desejado já é o estado confirmado (ACK ≤ 10 min),
+      // encerra o comando sem tocar no dispositivo nem gravar novo estado.
+      if (smartCommands) {
+        const acaoDesejada = (cmd.estado_desejado?.acao ?? cmd.estado_desejado?.estado ?? null) as
+          | "ligar" | "desligar" | null;
+        const estadoDesejado = acaoDesejada === "ligar" ? "on" : acaoDesejada === "desligar" ? "off" : null;
+        const ackMs = canal.ultimo_estado_persistido_em
+          ? new Date(canal.ultimo_estado_persistido_em).getTime() : 0;
+        const ackFresco = ackMs > 0 && (Date.now() - ackMs) < 10 * 60_000;
+        if (estadoDesejado && ackFresco && canal.ultimo_estado_persistido === estadoDesejado) {
+          await supabase.from("comando_brain").update({
+            status: "ignorado",
+            confirmado_em: new Date().toISOString(),
+            erro: null,
+          }).eq("id", cmd.id);
+          ignorados++;
+          resultados.push({ id: cmd.id, skip: "estado_ja_vigente" });
+          continue;
+        }
+      }
+
       // Trava: cooldown
       if (canal.ultimo_comando_em) {
         const ageSec = (Date.now() - new Date(canal.ultimo_comando_em).getTime()) / 1000;
@@ -136,6 +172,7 @@ Deno.serve(async (req) => {
           continue;
         }
       }
+
 
       const dev = canal.dispositivos_iot;
       // Online derivado de ultimo_sync (heartbeat ≤ 10 min). Sem coluna `online` na tabela.
@@ -230,5 +267,5 @@ Deno.serve(async (req) => {
     });
   }
 
-  return json({ ok: true, processados: resultados.length, resultados, timeouts: travados?.length ?? 0 });
+  return json({ ok: true, processados: resultados.length, ignorados, resultados, timeouts: travados?.length ?? 0 });
 });

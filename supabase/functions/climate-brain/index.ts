@@ -108,10 +108,24 @@ function decidir(ctx: AgregadoCtx, tempAlvo: number, urMax: number,
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const t0 = Date.now();
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // Feature flags (redução de custo do banco)
+  const flags: Record<string, boolean> = {};
+  try {
+    const { data: flagRows } = await supabase
+      .from("feature_flags_sistema")
+      .select("chave, ativo");
+    for (const f of flagRows ?? []) flags[f.chave] = !!f.ativo;
+  } catch (_e) { /* flags off por padrão */ }
+  const smartLogging = flags["smart_logging"] === true;
+  const smartCommands = flags["smart_commands"] === true;
+  const HEARTBEAT_MS = 15 * 60_000;
 
   const { data: lotes, error } = await supabase
     .from("lotes")
@@ -126,6 +140,12 @@ Deno.serve(async (req) => {
 
   const decisoesNeb: any[] = [];
   const resultados: any[] = [];
+  const metrics = {
+    galpoes: 0, sensores: 0,
+    decisoes_alteradas: 0, decisoes_ignoradas: 0,
+    comandos_enviados: 0, comandos_ignorados: 0,
+  };
+
 
   for (const lote of lotes ?? []) {
     if (!lote.galpao_id || !lote.data_alojamento) continue;
@@ -317,7 +337,7 @@ Deno.serve(async (req) => {
     const divergente = !!dSombra && dSombra.modo !== dReal.modo;
     const deltaT = ctxSombra ? Math.abs(ctxSombra.tempC - ctxReal.tempC) : 0;
 
-    await supabase.from("log_decisao_clima").insert({
+    const logPayload = {
       integrado_id: lote.integrado_id,
       galpao_id: lote.galpao_id,
       lote_id: lote.id,
@@ -342,7 +362,32 @@ Deno.serve(async (req) => {
         delta_temp_c: Number(deltaT.toFixed(2)),
         motivo: dSombra.motivo,
       } : null,
-    });
+    };
+
+    // smart_logging: grava só quando a decisão muda ou a cada 15 min (heartbeat)
+    let deveLogar = true;
+    if (smartLogging) {
+      const { data: ultimoLog } = await supabase
+        .from("log_decisao_clima")
+        .select("estado_decidido, created_at")
+        .eq("galpao_id", lote.galpao_id)
+        .eq("funcao_automacao", "climate_brain")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ultimoLog) {
+        const mudou = ultimoLog.estado_decidido !== dReal.modo;
+        const velho = Date.now() - new Date(ultimoLog.created_at as string).getTime() >= HEARTBEAT_MS;
+        deveLogar = mudou || velho;
+      }
+    }
+    if (deveLogar) {
+      metrics.decisoes_alteradas++;
+      await supabase.from("log_decisao_clima").insert(logPayload);
+    } else {
+      metrics.decisoes_ignoradas++;
+    }
+
 
     // ────────────────────────────────────────────────
     // Sugestões SHADOW: registra intenção em comando_brain
@@ -401,28 +446,39 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Anti-duplicidade: só insere se não houver uma sugestão
-        // ativa para o mesmo galpão+função há menos de 2 min
+        // Anti-duplicidade: não repete comando idêntico.
+        // smart_commands: compara com o último comando do galpão+função
+        // (sem janela de tempo) e ignora quando o estado desejado já é o vigente.
         for (const s of sugestoes) {
-          const { data: recente } = await supabase
+          let query = supabase
             .from("comando_brain")
-            .select("id, estado_desejado")
+            .select("id, estado_desejado, status")
             .eq("galpao_id", s.galpao_id)
             .eq("funcao", s.funcao)
-            .in("status", ["sugerido", "aprovado", "enviado"])
-            .gte("created_at", new Date(Date.now() - 120_000).toISOString())
-            .limit(1)
-            .maybeSingle();
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (!smartCommands) {
+            query = query
+              .in("status", ["sugerido", "aprovado", "enviado"])
+              .gte("created_at", new Date(Date.now() - 120_000).toISOString());
+          } else {
+            query = query.neq("status", "falhou");
+          }
+          const { data: recente } = await query.maybeSingle();
           if (recente && JSON.stringify(recente.estado_desejado) === JSON.stringify(s.estado_desejado)) {
+            metrics.comandos_ignorados++;
             continue;
           }
           await supabase.from("comando_brain").insert(s);
+          metrics.comandos_enviados++;
         }
       }
     } catch (e: any) {
       console.error("[climate-brain] erro shadow:", e?.message);
     }
 
+    metrics.galpoes++;
+    metrics.sensores += ctxReal.sensoresUsados;
     resultados.push({ galpao: lote.galpao_id, modo: dReal.modo, tempC: ctxReal.tempC,
                       tempAlvo, ventPct, acaoNeb: dReal.acaoNeb, trocaArDuty,
                       sombra: dSombra?.modo, divergente });
@@ -439,7 +495,25 @@ Deno.serve(async (req) => {
     callFn("brain-dispatcher", {}),
   ]);
 
-  return new Response(JSON.stringify({ ok: true, processados: resultados.length, resultados }), {
+  // Métricas do ciclo (retidas por 7 dias)
+  try {
+    await supabase.from("brain_metrics").insert({
+      origem: "climate-brain",
+      duracao_ms: Date.now() - t0,
+      galpoes_processados: metrics.galpoes,
+      sensores_lidos: metrics.sensores,
+      decisoes_alteradas: metrics.decisoes_alteradas,
+      decisoes_ignoradas: metrics.decisoes_ignoradas,
+      comandos_enviados: metrics.comandos_enviados,
+      comandos_ignorados: metrics.comandos_ignorados,
+      detalhes: { smart_logging: smartLogging, smart_commands: smartCommands },
+    });
+  } catch (e: any) {
+    console.error("[climate-brain] erro métricas:", e?.message);
+  }
+
+  return new Response(JSON.stringify({ ok: true, processados: resultados.length, metrics, resultados }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+

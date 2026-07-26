@@ -817,6 +817,54 @@ export type Database = {
           },
         ]
       }
+      brain_metrics: {
+        Row: {
+          comandos_enviados: number
+          comandos_ignorados: number
+          created_at: string
+          decisoes_alteradas: number
+          decisoes_ignoradas: number
+          detalhes: Json | null
+          duracao_ms: number | null
+          erro: string | null
+          galpoes_processados: number
+          id: string
+          integrado_id: string | null
+          origem: string
+          sensores_lidos: number
+        }
+        Insert: {
+          comandos_enviados?: number
+          comandos_ignorados?: number
+          created_at?: string
+          decisoes_alteradas?: number
+          decisoes_ignoradas?: number
+          detalhes?: Json | null
+          duracao_ms?: number | null
+          erro?: string | null
+          galpoes_processados?: number
+          id?: string
+          integrado_id?: string | null
+          origem?: string
+          sensores_lidos?: number
+        }
+        Update: {
+          comandos_enviados?: number
+          comandos_ignorados?: number
+          created_at?: string
+          decisoes_alteradas?: number
+          decisoes_ignoradas?: number
+          detalhes?: Json | null
+          duracao_ms?: number | null
+          erro?: string | null
+          galpoes_processados?: number
+          id?: string
+          integrado_id?: string | null
+          origem?: string
+          sensores_lidos?: number
+        }
+        Relationships: []
+      }
       cameras_canais: {
         Row: {
           ativo: boolean
@@ -3084,6 +3132,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      feature_flags_sistema: {
+        Row: {
+          ativo: boolean
+          chave: string
+          created_at: string
+          descricao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          created_at?: string
+          descricao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          created_at?: string
+          descricao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       fechamento_cargas: {
         Row: {
@@ -10511,6 +10583,7 @@ export type Database = {
         Returns: boolean
       }
       purge_ambiencia_historico: { Args: never; Returns: Json }
+      purge_pg_net_responses: { Args: never; Returns: undefined }
       redact_sensitive_jsonb: { Args: { p: Json }; Returns: Json }
       registrar_leitura_sensor_unificada: {
         Args: {
