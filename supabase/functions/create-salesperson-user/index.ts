@@ -14,6 +14,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth obrigatória: só admin/integrado/fornecedor podem criar vendedores
+  const auth = await authenticate(req);
+  if (!auth) return unauthorized(corsHeaders);
+  if (!hasAnyRole(auth, ['admin', 'superadmin', 'integrado', 'fornecedor'])) {
+    return forbidden(corsHeaders);
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
