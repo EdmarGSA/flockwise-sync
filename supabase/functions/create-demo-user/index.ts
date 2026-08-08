@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { authenticate, hasAnyRole, unauthorized, forbidden } from '../_shared/authGuard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+
+  // Somente superadmin pode provisionar/reconfigurar o usuário demo
+  const auth = await authenticate(req)
+  if (!auth) return unauthorized(corsHeaders)
+  if (!hasAnyRole(auth, ['superadmin'])) return forbidden(corsHeaders)
 
   try {
     const supabaseAdmin = createClient(

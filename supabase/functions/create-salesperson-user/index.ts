@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticate, hasAnyRole, unauthorized, forbidden } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,13 @@ Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth obrigatória: só admin/integrado/fornecedor podem criar vendedores
+  const auth = await authenticate(req);
+  if (!auth) return unauthorized(corsHeaders);
+  if (!hasAnyRole(auth, ['admin', 'superadmin', 'integrado', 'fornecedor'])) {
+    return forbidden(corsHeaders);
   }
 
   try {
