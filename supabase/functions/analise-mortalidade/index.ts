@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.2";
+import { authenticate, unauthorized } from "../_shared/authGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +39,12 @@ function calcTendencia(registros: { data_registro: string; total: number }[]): "
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Exige usuário autenticado (a função roda com verify_jwt = false)
+  const auth = await authenticate(req);
+  if (!auth) return unauthorized(corsHeaders);
+
   try {
+
     const { mortalidade_id, lote_id } = await req.json();
     if (!mortalidade_id || !lote_id) {
       return new Response(JSON.stringify({ error: "mortalidade_id e lote_id obrigatórios" }), {
