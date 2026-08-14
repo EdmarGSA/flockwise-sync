@@ -60,8 +60,9 @@ Deno.serve(async (req) => {
 
 
     // eWeLink webhook payload structure
-    const deviceId = body.deviceid || body.device_id;
-    const params = body.params || {};
+    const deviceId = (body.deviceid || body.device_id) as string | undefined;
+    const params = (body.params || {}) as Record<string, unknown>;
+
 
     if (!deviceId) {
       return new Response(
