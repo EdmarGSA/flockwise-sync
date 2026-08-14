@@ -2,8 +2,33 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-signature",
 };
+
+// Assinatura HMAC-SHA256 do corpo bruto, enviada em `x-signature` (hex, com ou sem prefixo sha256=)
+async function assinaturaValida(rawBody: string, header: string | null): Promise<boolean> {
+  const secret = Deno.env.get("SENSOR_WEBHOOK_SECRET");
+  if (!secret) return false;
+  if (!header) return false;
+  const recebida = header.replace(/^sha256=/i, "").trim().toLowerCase();
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+  const esperada = Array.from(new Uint8Array(sigBuf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  if (esperada.length !== recebida.length) return false;
+  let diff = 0;
+  for (let i = 0; i < esperada.length; i++) diff |= esperada.charCodeAt(i) ^ recebida.charCodeAt(i);
+  return diff === 0;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,7 +40,24 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const body = await req.json();
+    const rawBody = await req.text();
+    if (!(await assinaturaValida(rawBody, req.headers.get("x-signature")))) {
+      return new Response(
+        JSON.stringify({ error: "Assinatura inválida" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "JSON inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
 
     // eWeLink webhook payload structure
     const deviceId = body.deviceid || body.device_id;
