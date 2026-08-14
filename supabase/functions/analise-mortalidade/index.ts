@@ -38,7 +38,12 @@ function calcTendencia(registros: { data_registro: string; total: number }[]): "
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Exige usuário autenticado (a função roda com verify_jwt = false)
+  const auth = await authenticate(req);
+  if (!auth) return unauthorized(corsHeaders);
+
   try {
+
     const { mortalidade_id, lote_id } = await req.json();
     if (!mortalidade_id || !lote_id) {
       return new Response(JSON.stringify({ error: "mortalidade_id e lote_id obrigatórios" }), {
